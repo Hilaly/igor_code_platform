@@ -17,7 +17,7 @@
 | Раздел | Документ | Статус |
 | --- | --- | --- |
 | Вижн продукта | [vision.md](vision.md) | Утверждено (со слов владельца), не полон |
-| Структура репозитория | [repository-structure.md](repository-structure.md) | Частично утверждено, есть открытые вопросы |
+| Структура репозитория | [repository-structure.md](repository-structure.md), [adr/0005](adr/0005-apps-and-packages-layout.md) | Раскладка утверждена, остальное — открытые вопросы |
 | Рантайм | [adr/0002](adr/0002-nodejs-lts-as-runtime.md), [runtime-checks.md](runtime-checks.md) | Утверждено: Node.js 24 LTS, возможности проверены на 24.18.0 |
 | Менеджер пакетов | [adr/0003](adr/0003-pnpm-workspaces.md) | Утверждено: pnpm workspaces |
 | Формат поставки продакшн-сборки | — | Обсуждается: связано с тем, кто ставит зависимости плагинов |
