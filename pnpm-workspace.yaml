@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# esbuild распаковывает свой бинарь в postinstall — без этого Vite не запустится.
+# Список ведётся явно: любой новый пакет со скриптами установки требует решения.
+allowBuilds:
+  esbuild: true

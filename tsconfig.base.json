@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+
+    // Платформа исполняется без --experimental-transform-types (ADR-0004),
+    // поэтому нестираемый синтаксис здесь запрещён компилятором, а не договорённостью.
+    "erasableSyntaxOnly": true,
+
+    // Пакеты потребляются исходниками (ADR-0006): компилятор ничего не выпускает,
+    // импорты указывают на .ts напрямую.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    "isolatedModules": true,
+    "skipLibCheck": true
+  }
+}
