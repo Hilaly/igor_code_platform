@@ -71,6 +71,21 @@ node -e 'const {DatabaseSync}=require("node:sqlite"); new DatabaseSync(":memory:
 
 Результат: работает без флагов и без нативных зависимостей.
 
+## 7. Пакет воркспейса резолвится в исходниках через симлинк pnpm
+
+Node не стирает типы в файлах внутри `node_modules`, а pnpm кладёт туда симлинк на пакет
+воркспейса. Вопрос — какой путь увидит Node.
+
+```bash
+cd apps/daemon && node -e 'import("@sovereign/protocol").then((m) => console.log(m.healthPath))'
+```
+
+Результат: `/api/health`. Node разворачивает симлинк в реальный путь (`packages/protocol/src`),
+то есть файл оказывается вне `node_modules` и стирание типов применяется.
+
+Это опорный факт для [ADR-0006](adr/0006-internal-packages-consumed-as-sources.md): без него
+потребление пакетов исходниками не работало бы и потребовалась бы сборка в `dist`.
+
 ## Чего эти проверки не покрывают
 
 - Поведение при тысячах циклов `terminate`/`spawn` — утечки на длинной дистанции не измерялись.
