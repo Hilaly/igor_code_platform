@@ -51,11 +51,23 @@ const packagesMustNotImportApps = {
   },
 };
 
+/**
+ * ADR-0021 объявил `console.log` ошибкой, а не стилем: у записи без источника нет получателей —
+ * ни базы, ни шины, ни интерфейса. Веб пока не входит: своего логгера у него нет.
+ */
+const daemonAndPackagesLogThroughTheLogger = {
+  files: ["apps/daemon/**/*.ts", "packages/**/*.{ts,tsx}"],
+  rules: {
+    "no-console": "error",
+  },
+};
+
 export default tseslint.config(
   { ignores: ["**/dist/**", "**/node_modules/**"] },
   js.configs.recommended,
   tseslint.configs.recommended,
   appsMustNotImportApps,
   packagesMustNotImportApps,
+  daemonAndPackagesLogThroughTheLogger,
   prettier,
 );

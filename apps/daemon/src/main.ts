@@ -1,6 +1,7 @@
 import { parseArguments } from "./arguments.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
+import { createLogger } from "./logger.ts";
 import { createDaemonServer } from "./server.ts";
 
 const parsed = parseArguments(process.argv.slice(2));
@@ -31,16 +32,21 @@ const lock = (() => {
   }
 })();
 
+// Уровень пока постоянный: настроек ещё нет, а функция здесь потому, что уровень придёт из
+// снимка config.json и обязан меняться без перезапуска.
+const logger = createLogger({ source: "core", level: () => "info" });
+
 const server = createDaemonServer(new Date());
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`daemon listening on http://127.0.0.1:${port}, data directory ${directory}`);
+  logger.info("daemon started", { url: `http://127.0.0.1:${port}`, dataDirectory: directory });
 });
 
 // Лок держится ровно столько, сколько живёт процесс: после kill -9 файл остаётся, и его
 // подхватит проверка на протухание при следующем старте (ADR-0008).
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
+    logger.info("daemon stopping", { signal });
     server.close();
     server.closeAllConnections();
     lock.release();
