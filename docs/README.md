@@ -11,6 +11,8 @@
   Точка входа: отсюда видно, что решено, что обсуждается, чего ещё нет.
 - [vision.md](vision.md) — вижн продукта.
 - [repository-structure.md](repository-structure.md) — структура репозитория.
+- [sessions-and-projects.md](sessions-and-projects.md) — проекты, сессии и что можно делать с
+  запущенной сессией.
 - [agent-runtime-contract.md](agent-runtime-contract.md) — контракт Pi: сессии, хуки,
   авторизация в LLM-провайдерах, и где он расходится с нашими требованиями.
 - [ui-extension-model.md](ui-extension-model.md) — как плагин добавляет и переопределяет
