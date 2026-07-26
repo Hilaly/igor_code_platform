@@ -10,6 +10,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Data directory of the dev daemon
+.sovereign-dev/
+
 # Local environment
 .env
 .env.*

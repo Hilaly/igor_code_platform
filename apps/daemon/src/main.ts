@@ -1,11 +1,24 @@
+import { parseArguments } from "./arguments.ts";
+import { ensureDataDirectory } from "./data-directory.ts";
 import { createDaemonServer } from "./server.ts";
 
-// Порт и директория данных пока не имеют своего разбора аргументов: способ конфигурации
-// демона ещё не выбран. Переменная окружения — временная заглушка для dev-режима.
-const port = Number(process.env["SOVEREIGN_PORT"] ?? 8787);
+const parsed = parseArguments(process.argv.slice(2));
+
+if (parsed.kind === "help") {
+  process.stdout.write(`${parsed.text}\n`);
+  process.exit(0);
+}
+
+if (parsed.kind === "error") {
+  process.stderr.write(`${parsed.message}\nRun with --help to see the usage.\n`);
+  process.exit(1);
+}
+
+const { dataDirectory, port } = parsed.options;
+const directory = ensureDataDirectory(dataDirectory);
 
 const server = createDaemonServer(new Date());
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`daemon listening on http://127.0.0.1:${port}`);
+  console.log(`daemon listening on http://127.0.0.1:${port}, data directory ${directory}`);
 });
