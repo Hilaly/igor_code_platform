@@ -11,6 +11,8 @@
   Точка входа: отсюда видно, что решено, что обсуждается, чего ещё нет.
 - [vision.md](vision.md) — вижн продукта.
 - [repository-structure.md](repository-structure.md) — структура репозитория.
+- [agent-runtime-contract.md](agent-runtime-contract.md) — контракт Pi: сессии, хуки,
+  авторизация в LLM-провайдерах, и где он расходится с нашими требованиями.
 - [runtime-checks.md](runtime-checks.md) — что проверено запуском про возможности Node.
 - [runbook.md](runbook.md) — как запустить, проверить и что где слушает.
 - [adr/](adr/) — принятые архитектурные решения, по файлу на решение.
