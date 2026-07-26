@@ -13,6 +13,8 @@
 - [repository-structure.md](repository-structure.md) — структура репозитория.
 - [agent-runtime-contract.md](agent-runtime-contract.md) — контракт Pi: сессии, хуки,
   авторизация в LLM-провайдерах, и где он расходится с нашими требованиями.
+- [ui-extension-model.md](ui-extension-model.md) — как плагин добавляет и переопределяет
+  элементы интерфейса: места, вклады, экземпляры, сборка браузерного кода.
 - [runtime-checks.md](runtime-checks.md) — что проверено запуском про возможности Node.
 - [runbook.md](runbook.md) — как запустить, проверить и что где слушает.
 - [adr/](adr/) — принятые архитектурные решения, по файлу на решение.
