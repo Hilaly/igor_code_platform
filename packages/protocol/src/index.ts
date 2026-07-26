@@ -5,3 +5,4 @@
 
 export * from "./health.ts";
 export * from "./log.ts";
+export * from "./settings.ts";

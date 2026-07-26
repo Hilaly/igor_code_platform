@@ -3,6 +3,7 @@ import { ensureDataDirectory } from "./data-directory.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger } from "./logger.ts";
 import { createDaemonServer } from "./server.ts";
+import { createSettingsStore } from "./settings.ts";
 
 const parsed = parseArguments(process.argv.slice(2));
 
@@ -32,14 +33,29 @@ const lock = (() => {
   }
 })();
 
-// Уровень пока постоянный: настроек ещё нет, а функция здесь потому, что уровень придёт из
-// снимка config.json и обязан меняться без перезапуска.
-const logger = createLogger({ source: "core", level: () => "info" });
+const settings = createSettingsStore({ directory });
+
+// Уровень читается в момент записи, поэтому правка config.json меняет его без перезапуска.
+const logger = createLogger({
+  source: "core",
+  level: () => settings.current().config.logLevel,
+});
+
+// Файлы читаются после создания логгера: диагностика первого чтения обязана в него попасть.
+settings.start(logger);
+
+settings.subscribe((snapshot) => {
+  logger.info("settings reloaded", { logLevel: snapshot.config.logLevel });
+});
 
 const server = createDaemonServer(new Date());
 
 server.listen(port, "127.0.0.1", () => {
-  logger.info("daemon started", { url: `http://127.0.0.1:${port}`, dataDirectory: directory });
+  logger.info("daemon started", {
+    url: `http://127.0.0.1:${port}`,
+    dataDirectory: directory,
+    logLevel: settings.current().config.logLevel,
+  });
 });
 
 // Лок держится ровно столько, сколько живёт процесс: после kill -9 файл остаётся, и его
@@ -49,6 +65,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     logger.info("daemon stopping", { signal });
     server.close();
     server.closeAllConnections();
+    settings.close();
     lock.release();
   });
 }
