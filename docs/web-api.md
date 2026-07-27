@@ -52,13 +52,23 @@
 {
   "revision": 2,
   "plugins": [{ "key": "data:hello", "id": "hello", "source": "data", "state": "running" }],
-  "contributions": [{ "id": "hello.board", "pluginKey": "data:hello", "kind": "custom" }]
+  "contributions": [
+    { "id": "hello.board", "pluginKey": "data:hello", "kind": "custom" },
+    {
+      "id": "tracker.task.created",
+      "pluginKey": "data:tracker",
+      "kind": "event",
+      "payloadSchema": { "type": "object", "properties": { "id": { "type": "string" } } }
+    }
+  ]
 }
 ```
 
 Статусы здесь те же самые, что уходят событием `core.plugin.lifecycle`: снимок и поток собираются из
 одного источника, иначе догон по индексу не имел бы смысла. `revision` — версия набора вкладов, по
-ней клиент понимает, не устарел ли снимок относительно уже полученного события.
+ней клиент понимает, не устарел ли снимок относительно уже полученного события. У вклада вида
+`event` рядом лежит описание схемы нагрузки: это и есть ответ на вопрос «какие события существуют и
+кто их публикует».
 
 Порядок для клиента: сначала открыть поток, потом запросить снимок. Наоборот — потеряешь события,
 случившиеся между ответом и подпиской.
@@ -86,10 +96,22 @@ data: {"index":18,"time":"2026-07-27T07:06:07.923Z","type":"core.plugin.lifecycl
 | `core.stream.gap`           | Пропущенного уже нет, состояние надо перезапросить |
 
 Неймспейс `core.*` принадлежит ядру, занять его плагин не может
-([ADR-0060](adr/0060-bus-events-are-declared-with-a-schema-in-the-publishers-namespace.md)).
+([ADR-0072](adr/0072-plugin-events-are-validated-in-the-publishers-worker.md)).
 
 Набор вкладов приходит целиком, а не приращением: подписчик, пропустивший одно приращение, остался
 бы с испорченной картиной навсегда.
+
+**События плагинов идут тем же потоком и нумеруются наравне с событиями ядра.** Отличает их поле
+`plugin` — кто опубликовал; тип несёт полное имя с неймспейсом публикатора:
+
+```
+id: 73
+data: {"index":73,"time":"2026-07-27T08:12:08.713Z","type":"tracker.task.created","payload":{"id":"15"},"plugin":{"key":"data:tracker","id":"tracker","source":"data"}}
+```
+
+Перечня таких типов нет и быть не может: плагин в поставку не входит. Что существует сейчас,
+отвечает снимок `/api/plugins` — вклады вида `event` со схемой нагрузки. Нагрузку проверил воркер
+публикатора (ADR-0072), ядро её не разбирает.
 
 ### Переподключение
 
@@ -142,6 +164,8 @@ curl -X PUT http://localhost:5273/api/plugins/data%3Ahello/preferences \
   [ADR-0053](adr/0053-plugin-backend-access-routes-core-api-and-the-bus.md)) и вида вклада
   «маршрут без входа» ([ADR-0065](adr/0065-a-login-free-route-is-a-separate-public-route-contribution.md)):
   регистрировать в них пока нечего.
-- **Публикации и подписки на шину из плагинов** — сейчас в потоке только события ядра.
+- **Публикации в шину из браузера** — она тоже идёт запросом через ядро
+  ([ADR-0053](adr/0053-plugin-backend-access-routes-core-api-and-the-bus.md)), но маршрута для неё
+  ещё нет: потребителя нет.
 - **Отдачи браузерных ассетов**: в dev-режиме это делает Vite, в продакшне будет делать демон
   ([ADR-0035](adr/0035-production-artifact-embeds-the-frontend-and-built-in-plugin-sources.md)).
