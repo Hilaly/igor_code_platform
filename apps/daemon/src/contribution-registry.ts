@@ -7,24 +7,15 @@
  * контракт без потребителя проверить нечем.
  */
 
-import { pluginSources, type PluginSource } from "@sovereign/protocol";
+import {
+  pluginSources,
+  type ContributionRegistration,
+  type PluginSource,
+} from "@sovereign/protocol";
 import type { CustomContribution } from "@sovereign/sdk";
 
 /** Точки в идентификаторе разрешены: они дают плагину свою иерархию внутри своего неймспейса. */
 const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
-
-export type ContributionRegistration = {
-  /** С неймспейсом: `<pluginId>.<объявленный>` (ADR-0024, ADR-0060). */
-  id: string;
-  declaredId: string;
-  kind: "custom";
-  pluginKey: string;
-  pluginId: string;
-  source: PluginSource;
-  title?: string;
-  description?: string;
-  payload?: unknown;
-};
 
 /** Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника (ADR-0040). */
 export type ContributionConflict = {
