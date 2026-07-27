@@ -74,14 +74,12 @@ export function applyStreamEvent(state: PluginsState, event: StreamEvent): Strea
 }
 
 /**
- * Ответы приходят не в том порядке, в котором их спросили: снимок с ревизией старше уже применённой
- * отбрасывается, иначе поздний ответ откатил бы картину назад.
+ * Ответ применяется целиком и всегда: ревизия для упорядочивания ответов не годится — она живёт в
+ * памяти демона и сбрасывается вместе с его перезапуском, а именно после перезапуска снимок и нужен
+ * больше всего. Порядок обеспечивается иначе: запрос снимка один в полёте, предыдущий отменяется
+ * (`use-plugins.ts`), поэтому двум ответам разойтись негде.
  */
-export function applySnapshot(state: PluginsState, snapshot: PluginsSnapshot): PluginsState {
-  if (state.snapshot !== undefined && snapshot.revision < state.snapshot.revision) {
-    return state;
-  }
-
+export function applySnapshot(_state: PluginsState, snapshot: PluginsSnapshot): PluginsState {
   return { snapshot, stale: false };
 }
 

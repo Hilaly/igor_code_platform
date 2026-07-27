@@ -8,6 +8,12 @@ describe("matchPage", () => {
     expect(matchPage("")).toEqual({ kind: "home" });
   });
 
+  it("keeps the plugin management on its own address", () => {
+    expect(matchPage("/plugins")).toEqual({ kind: "plugins" });
+    // Вложенного у вью плагинов нет: адрес глубже — не она.
+    expect(matchPage("/plugins/hello")).toEqual({ kind: "unknown", path: "/plugins/hello" });
+  });
+
   it("reads the plugin page namespace", () => {
     expect(matchPage("/p/tracker/board")).toEqual({
       kind: "plugin",
@@ -35,7 +41,13 @@ describe("matchPage", () => {
 
 describe("pathOf", () => {
   it("survives a round trip", () => {
-    for (const path of ["/", "/p/tracker/board", "/p/tracker/board/15/edit", "/settings"]) {
+    for (const path of [
+      "/",
+      "/plugins",
+      "/p/tracker/board",
+      "/p/tracker/board/15/edit",
+      "/settings",
+    ]) {
       expect(pathOf(matchPage(path))).toBe(path === "" ? "/" : path);
     }
   });

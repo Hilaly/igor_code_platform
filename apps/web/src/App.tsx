@@ -36,6 +36,8 @@ import {
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
+import { PluginsView } from "./plugins/plugins-view.tsx";
+import { usePlugins } from "./plugins/use-plugins.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { AppearancePanel } from "./shell/appearance-panel.tsx";
 import { DaemonStatus } from "./shell/daemon-status.tsx";
@@ -174,6 +176,8 @@ export function App() {
     return () => controller.abort();
   }, [stream]);
 
+  const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
+
   const translator = useMemo(
     () =>
       createTranslator({
@@ -214,6 +218,12 @@ export function App() {
             >
               <Text>{translator.t("nav.home")}</Text>
             </ListRow>
+            <ListRow
+              selected={page.kind === "plugins"}
+              onSelect={() => navigation.navigate({ kind: "plugins" })}
+            >
+              <Text>{translator.t("nav.plugins")}</Text>
+            </ListRow>
           </List>
         </div>
       }
@@ -242,7 +252,17 @@ export function App() {
         },
       ]}
     >
-      <PageView page={page} translator={translator} />
+      <PageView
+        page={page}
+        plugins={
+          <PluginsView
+            state={plugins.state}
+            onSwitch={plugins.switchPlugin}
+            translator={translator}
+          />
+        }
+        translator={translator}
+      />
     </Shell>
   );
 }

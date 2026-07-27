@@ -32,7 +32,7 @@ export const coreEnglish: CatalogRegistration = {
     "nav.home": "Overview",
     "nav.plugins": "Plugins",
     "page.home.title": "The shell is up",
-    "page.home.hint": "The plugin view lands here next.",
+    "page.home.hint": "Pick a view in the panel on the left.",
     "page.plugin.title": "This page belongs to a plugin",
     "page.plugin.hint": "Plugin pages arrive with the browser code the daemon builds.",
     "page.unknown.title": "No such page",

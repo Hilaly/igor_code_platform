@@ -116,6 +116,42 @@ body {
   flex-wrap: wrap;
 }
 
+/* Вью плагинов: панель на плагин, в панели — строки вкладов. Геометрия здесь, вид — в ките. */
+.plugins,
+.plugins-plugin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plugins-plugin {
+  gap: 0.5rem;
+}
+
+.plugins-plugin-head,
+.plugins-plugin-facts,
+.plugins-contribution {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.plugins-contribution {
+  padding: 0.375rem 0.5rem;
+}
+
+/* Переключатель плагина держится правого края и не переносится: он про панель, а не про её строку. */
+.plugins-plugin-head > .sv-toggle {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.plugins-reasons {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
 .shell-daemon-line {
   display: flex;
   align-items: center;

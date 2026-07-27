@@ -1,19 +1,26 @@
 /**
- * Центральная страница. В этом срезе на всех адресах стоит заглушка оболочки: вью плагинов встанет
- * сюда следующим, а страницы плагинов — вместе с браузерным кодом, который собирает демон (ADR-0025).
+ * Центральная страница: разводит адреса по вью. Своё вью есть у управления плагинами, страницы
+ * плагинов появятся вместе с браузерным кодом, который собирает демон (ADR-0025).
  */
 
 import { EmptyState, Heading, type ScopedTranslator } from "@sovereign/ui-kit";
+import type { ReactNode } from "react";
 
 import type { Page } from "../router.ts";
 
 export type PageViewProps = {
   page: Page;
+  /** Вью плагинов приходит собранным: страница не знает ни про шину, ни про запросы. */
+  plugins: ReactNode;
   translator: ScopedTranslator;
 };
 
-export function PageView({ page, translator }: PageViewProps) {
+export function PageView({ page, plugins, translator }: PageViewProps) {
   const { t } = translator;
+
+  if (page.kind === "plugins") {
+    return plugins;
+  }
 
   if (page.kind === "plugin") {
     return (

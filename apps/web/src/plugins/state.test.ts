@@ -121,10 +121,12 @@ describe("applyStreamEvent", () => {
 });
 
 describe("applySnapshot", () => {
-  it("drops an answer older than what is already shown", () => {
-    const state = shown(3);
+  it("takes an answer whose revision is lower: the daemon restarted and started counting again", () => {
+    // Ревизия живёт в памяти демона. Отбросить такой снимок значило бы показывать состояние
+    // прошлой жизни демона именно тогда, когда свежее нужнее всего.
+    const state = shown(4);
 
-    expect(applySnapshot(state, snapshot(2))).toBe(state);
+    expect(applySnapshot(state, snapshot(1)).snapshot?.revision).toBe(1);
   });
 
   it("takes an answer of the same revision: the statuses in it are newer", () => {

@@ -7,8 +7,12 @@
 
 export const pluginPagePrefix = "p";
 
+/** Управление плагинами живёт в ядре и своего адреса не теряет (ADR-0047, ADR-0066). */
+export const pluginsPagePath = "/plugins";
+
 export type Page =
   | { kind: "home" }
+  | { kind: "plugins" }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -18,6 +22,10 @@ export function matchPage(path: string): Page {
 
   if (segments.length === 0) {
     return { kind: "home" };
+  }
+
+  if (segments.length === 1 && `/${segments[0]}` === pluginsPagePath) {
+    return { kind: "plugins" };
   }
 
   if (segments[0] === pluginPagePrefix) {
@@ -38,6 +46,8 @@ export function pathOf(page: Page): string {
   switch (page.kind) {
     case "home":
       return "/";
+    case "plugins":
+      return pluginsPagePath;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":

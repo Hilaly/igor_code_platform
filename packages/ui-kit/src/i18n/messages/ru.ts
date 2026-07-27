@@ -29,7 +29,7 @@ export const coreRussian: CatalogRegistration = {
     "nav.home": "Обзор",
     "nav.plugins": "Плагины",
     "page.home.title": "Оболочка поднялась",
-    "page.home.hint": "Следующим сюда встанет вью плагинов.",
+    "page.home.hint": "Выбери вью в панели слева.",
     "page.plugin.title": "Эта страница принадлежит плагину",
     "page.plugin.hint":
       "Страницы плагинов появятся вместе с браузерным кодом, который собирает демон.",
