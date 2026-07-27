@@ -5,5 +5,6 @@
 
 export * from "./health.ts";
 export * from "./log.ts";
+export * from "./plugin-lifecycle.ts";
 export * from "./plugin.ts";
 export * from "./settings.ts";

@@ -2,15 +2,21 @@
  * Супервизор плагинов (ADR-0011): по одному воркеру на плагин, падение плагина не трогает ядро,
  * загрузочная и рабочая ошибка обрабатываются одинаково.
  *
- * Здесь же живёт жизненный цикл (ADR-0018) и его наблюдаемость. Шины пока нет, поэтому переходы
- * уходят в журнал; когда шина появится, публикация встанет рядом с этим же местом.
+ * Здесь же ведётся жизненный цикл (ADR-0018) и его наблюдаемость. Сами состояния — контракт и
+ * живут в протоколе; супервизор ими только распоряжается. Шины пока нет, поэтому переходы уходят в
+ * журнал; когда шина появится, публикация встанет рядом с этим же местом.
  */
 
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import type { CustomContribution } from "@sovereign/sdk";
-import type { LogSource, Preferences } from "@sovereign/protocol";
+import type {
+  LogSource,
+  PluginLifecycleState,
+  PluginStatus,
+  Preferences,
+} from "@sovereign/protocol";
 
 import type { ContributionRegistry } from "./contribution-registry.ts";
 import type { Logger } from "./logger.ts";
@@ -18,34 +24,6 @@ import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-depen
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
 import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
-
-/** Перечень — публичный контракт (ADR-0070): журнал, вью и будущая шина называют состояния так. */
-export const pluginLifecycleStates = [
-  "discovered",
-  "disabled",
-  "refused",
-  "installing",
-  "starting",
-  "running",
-  "stopping",
-  "stopped",
-  "failed",
-] as const;
-
-export type PluginLifecycleState = (typeof pluginLifecycleStates)[number];
-
-export type PluginStatus = {
-  key: string;
-  id?: string;
-  source: string;
-  directory: string;
-  state: PluginLifecycleState;
-  /** Почему отказано или почему упал. У штатных состояний причины нет. */
-  reason?: string;
-  /** Номер неудачной попытки и момент следующей: перезапуск наблюдаем, а не угадывается. */
-  attempt?: number;
-  nextAttemptAt?: number;
-};
 
 export type PluginSupervisor = {
   statuses: () => PluginStatus[];
