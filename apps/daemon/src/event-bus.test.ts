@@ -26,6 +26,13 @@ function bus(onListenerError: CreateEventBusOptions["onListenerError"] = () => {
   };
 }
 
+/** Тесты шины публикуют только записи журнала: нагрузка остальных событий здесь ничего не меняет. */
+const messageOf = (event: CoreEvent): string => {
+  assert.equal(event.type, "core.log");
+
+  return event.type === "core.log" ? event.payload.message : "";
+};
+
 describe("createEventBus", () => {
   it("delivers what was published to a subscriber", () => {
     const { bus: events } = bus();
@@ -46,10 +53,7 @@ describe("createEventBus", () => {
     unsubscribe();
     events.publish("core.log", record("second"));
 
-    assert.deepEqual(
-      seen.map((event) => event.payload.message),
-      ["first"],
-    );
+    assert.deepEqual(seen.map(messageOf), ["first"]);
   });
 
   it("tells a late subscriber nothing about the past: the bus has no memory", () => {
@@ -69,7 +73,7 @@ describe("createEventBus", () => {
     events.subscribe(() => {
       throw new Error("the listener is broken");
     });
-    events.subscribe((event) => seen.push(event.payload.message));
+    events.subscribe((event) => seen.push(messageOf(event)));
 
     events.publish("core.log", record("delivered anyway"));
 
@@ -84,10 +88,10 @@ describe("createEventBus", () => {
     const seen: string[] = [];
 
     const unsubscribe = events.subscribe((event) => {
-      seen.push(event.payload.message);
+      seen.push(messageOf(event));
       unsubscribe();
     });
-    events.subscribe((event) => seen.push(`second:${event.payload.message}`));
+    events.subscribe((event) => seen.push(`second:${messageOf(event)}`));
 
     events.publish("core.log", record("first"));
     events.publish("core.log", record("second"));

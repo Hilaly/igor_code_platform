@@ -82,6 +82,7 @@ const contributions = createContributionRegistry();
 const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
+  bus,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel, write }),
 });

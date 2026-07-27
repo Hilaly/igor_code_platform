@@ -71,7 +71,11 @@ test("a record reaches both stdout and the bus", () => {
     },
   });
 
-  bus.subscribe((event) => published.push(event.payload));
+  bus.subscribe((event) => {
+    if (event.type === "core.log") {
+      published.push(event.payload);
+    }
+  });
 
   const logger = createLogger({
     source: "plugin:hello",
@@ -103,7 +107,11 @@ test("a record below the current level reaches nobody, not even the bus", () => 
     },
   });
 
-  bus.subscribe((event) => published.push(event.payload));
+  bus.subscribe((event) => {
+    if (event.type === "core.log") {
+      published.push(event.payload);
+    }
+  });
 
   const logger = createLogger({
     source: "core",

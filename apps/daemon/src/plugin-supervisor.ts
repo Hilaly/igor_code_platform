@@ -2,23 +2,25 @@
  * Супервизор плагинов (ADR-0011): по одному воркеру на плагин, падение плагина не трогает ядро,
  * загрузочная и рабочая ошибка обрабатываются одинаково.
  *
- * Здесь же ведётся жизненный цикл (ADR-0018) и его наблюдаемость. Сами состояния — контракт и
- * живут в протоколе; супервизор ими только распоряжается. Шины пока нет, поэтому переходы уходят в
- * журнал; когда шина появится, публикация встанет рядом с этим же местом.
+ * Здесь же ведётся жизненный цикл (ADR-0018) и его наблюдаемость: каждый переход уходит и в
+ * журнал, и в шину. Сами состояния — контракт и живут в протоколе; супервизор ими только
+ * распоряжается.
  */
 
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import type { CustomContribution } from "@sovereign/sdk";
-import type {
-  LogSource,
-  PluginLifecycleState,
-  PluginStatus,
-  Preferences,
+import {
+  coreEventTypes,
+  type LogSource,
+  type PluginLifecycleState,
+  type PluginStatus,
+  type Preferences,
 } from "@sovereign/protocol";
 
 import type { ContributionRegistry } from "./contribution-registry.ts";
+import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
@@ -40,6 +42,8 @@ export type CancelScheduled = () => void;
 export type CreatePluginSupervisorOptions = {
   logger: Logger;
   registry: ContributionRegistry;
+  /** Куда уходят переходы жизненного цикла и смена набора вкладов (ADR-0018). */
+  bus: EventBus;
   /** Источник записи штампует ядро: плагин не может назваться чужим именем (ADR-0021). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
@@ -88,7 +92,7 @@ type Supervised = {
 };
 
 export function createPluginSupervisor(options: CreatePluginSupervisorOptions): PluginSupervisor {
-  const { logger, createPluginLogger, registry } = options;
+  const { logger, createPluginLogger, registry, bus } = options;
   const now = options.now ?? (() => Date.now());
   const schedule =
     options.schedule ??
@@ -108,16 +112,55 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
 
+  /**
+   * Единственное место, где состояние записи превращается в статус: снимок и событие обязаны
+   * говорить одно и то же, иначе догон по потоку бессмысленен (ADR-0041).
+   */
+  const statusOf = (entry: Supervised): PluginStatus => ({
+    key: entry.plugin.key,
+    id: entry.plugin.id,
+    source: entry.plugin.source,
+    directory: entry.plugin.directory,
+    state: entry.state,
+    ...(entry.reason === undefined ? {} : { reason: entry.reason }),
+    ...(entry.attempt === 0 ? {} : { attempt: entry.attempt }),
+    ...(entry.nextAttemptAt === undefined ? {} : { nextAttemptAt: entry.nextAttemptAt }),
+  });
+
   const transition = (entry: Supervised, state: PluginLifecycleState, reason?: string): void => {
     entry.state = state;
     entry.reason = reason;
 
+    const status = statusOf(entry);
+
     logger.info("plugin lifecycle", {
-      plugin: entry.plugin.key,
+      plugin: status.key,
       state,
-      ...(reason === undefined ? {} : { reason }),
-      ...(entry.attempt === 0 ? {} : { attempt: entry.attempt }),
-      ...(entry.nextAttemptAt === undefined ? {} : { nextAttemptAt: entry.nextAttemptAt }),
+      ...(status.reason === undefined ? {} : { reason: status.reason }),
+      ...(status.attempt === undefined ? {} : { attempt: status.attempt }),
+      ...(status.nextAttemptAt === undefined ? {} : { nextAttemptAt: status.nextAttemptAt }),
+    });
+
+    bus.publish(coreEventTypes.pluginLifecycle, status);
+  };
+
+  /**
+   * Ревизия реестра растёт только при настоящем изменении набора, поэтому она же и решает, есть ли
+   * о чём сообщать: переприменение того же снимка никого не будит.
+   */
+  let publishedRevision = registry.revision();
+
+  const publishContributions = (): void => {
+    const revision = registry.revision();
+
+    if (revision === publishedRevision) {
+      return;
+    }
+
+    publishedRevision = revision;
+    bus.publish(coreEventTypes.pluginContributions, {
+      revision,
+      contributions: registry.resolved(),
     });
   };
 
@@ -150,12 +193,15 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         },
       );
     }
+
+    publishContributions();
   };
 
   const dropContributions = (entry: Supervised): void => {
     entry.pending = [];
     entry.contributed = [];
     registry.remove(entry.plugin.key);
+    publishContributions();
   };
 
   const fail = (entry: Supervised, reason: string): void => {
@@ -366,14 +412,20 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         continue;
       }
 
-      refused.set(key, {
+      const status: PluginStatus = {
         key: plugin.id === undefined ? key : `${plugin.source}:${plugin.id}`,
         ...(plugin.id === undefined ? {} : { id: plugin.id }),
         source: plugin.source,
         directory: plugin.directory,
         state: "refused",
         reason: plugin.reason,
-      });
+      };
+
+      refused.set(key, status);
+
+      // Отказ — такое же состояние жизненного цикла, как остальные, и публикуется наравне с ними:
+      // иначе снимок знал бы о плагине то, чего не знает поток.
+      bus.publish(coreEventTypes.pluginLifecycle, status);
 
       logger.error("the plugin was refused", {
         plugin: plugin.id ?? plugin.directory,
@@ -459,19 +511,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   };
 
   return {
-    statuses: () => [
-      ...[...supervised.values()].map((entry) => ({
-        key: entry.plugin.key,
-        id: entry.plugin.id,
-        source: entry.plugin.source,
-        directory: entry.plugin.directory,
-        state: entry.state,
-        ...(entry.reason === undefined ? {} : { reason: entry.reason }),
-        ...(entry.attempt === 0 ? {} : { attempt: entry.attempt }),
-        ...(entry.nextAttemptAt === undefined ? {} : { nextAttemptAt: entry.nextAttemptAt }),
-      })),
-      ...refused.values(),
-    ],
+    statuses: () => [...[...supervised.values()].map(statusOf), ...refused.values()],
     apply,
     reload: async (directories) => {
       const affected = new Set(directories);

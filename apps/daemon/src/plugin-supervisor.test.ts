@@ -2,9 +2,16 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import type { LogRecord, LogSource, Preferences } from "@sovereign/protocol";
+import type {
+  CoreEvent,
+  LogRecord,
+  LogSource,
+  PluginStatus,
+  Preferences,
+} from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
+import { createEventBus, type EventBus } from "./event-bus.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import {
   createPluginSupervisor,
@@ -42,6 +49,9 @@ type Journal = {
   records: LogRecord[];
   logger: Logger;
   pluginLogger: (source: LogSource) => Logger;
+  bus: EventBus;
+  /** Всё, что супервизор опубликовал: переходы и смены набора вкладов. */
+  events: CoreEvent[];
   /** Ждёт запись, удовлетворяющую условию: состояния приходят асинхронно, из воркера. */
   waitFor: (predicate: (record: LogRecord) => boolean, hint: string) => Promise<LogRecord>;
 };
@@ -60,10 +70,22 @@ function journal(): Journal {
 
   const make = (source: LogSource): Logger => createLogger({ source, level: () => "debug", write });
 
+  const events: CoreEvent[] = [];
+  const bus = createEventBus({
+    // Тест не прощает упавшего подписчика: свой подписчик здесь один, и падать ему не с чего.
+    onListenerError: (cause) => {
+      throw cause;
+    },
+  });
+
+  bus.subscribe((event) => events.push(event));
+
   return {
     records,
     logger: make("core"),
     pluginLogger: make,
+    bus,
+    events,
     waitFor: (predicate, hint) =>
       new Promise((resolve, reject) => {
         const check = (): void => {
@@ -130,12 +152,97 @@ afterEach(async () => {
   running = undefined;
 });
 
+const lifecycleEvents = (events: CoreEvent[], key: string): PluginStatus[] =>
+  events
+    .filter((event) => event.type === "core.plugin.lifecycle")
+    .map((event) => event.payload)
+    .filter((status) => status.key === key);
+
 describe("createPluginSupervisor", () => {
+  it("publishes the same status it would answer with in a snapshot", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    const published = lifecycleEvents(recorded.events, "data:hello");
+
+    assert.deepEqual(
+      published.map((status) => status.state),
+      ["discovered", "starting", "running"],
+    );
+
+    // Последнее событие обязано совпасть со снимком до поля: расхождение между потоком и снимком
+    // делает догон бессмысленным (ADR-0041).
+    assert.deepEqual(
+      published.at(-1),
+      supervisor.statuses().find((status) => status.key === "data:hello"),
+    );
+  });
+
+  it("publishes the effective contributions with the registry revision", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    const changes = recorded.events.filter((event) => event.type === "core.plugin.contributions");
+    const last = changes.at(-1);
+
+    assert.equal(last?.payload.revision, registry.revision());
+    assert.deepEqual(last?.payload.contributions, registry.resolved());
+    assert.equal(last?.payload.contributions.length > 0, true);
+  });
+
+  it("says nothing about contributions when the effective set did not change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    const before = recorded.events.filter(
+      (event) => event.type === "core.plugin.contributions",
+    ).length;
+
+    // Тот же набор предпочтений: плагин остаётся запущенным, реестр не трогается.
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+
+    assert.equal(
+      recorded.events.filter((event) => event.type === "core.plugin.contributions").length,
+      before,
+    );
+  });
+
   it("starts an enabled plugin and stamps its log lines with its own source", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -158,6 +265,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -183,6 +291,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -200,6 +309,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -219,6 +329,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -237,6 +348,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -261,6 +373,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       ensureDependencies: async (_plugin, onInstallStart) => {
@@ -282,6 +395,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       schedule: clock.schedule,
@@ -314,6 +428,7 @@ describe("createPluginSupervisor", () => {
     let asked = false;
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       ensureDependencies: async () => {
@@ -342,6 +457,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       now: clock.now,
@@ -375,6 +491,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       now: clock.now,
@@ -405,6 +522,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -430,6 +548,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
       deactivateTimeoutMilliseconds: 50,
@@ -458,6 +577,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -476,6 +596,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -514,6 +635,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -549,6 +671,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
@@ -571,6 +694,7 @@ describe("createPluginSupervisor", () => {
     const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
+      bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
     });
