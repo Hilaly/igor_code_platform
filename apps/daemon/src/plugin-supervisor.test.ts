@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import type {
-  CoreEvent,
-  LogRecord,
-  LogSource,
-  PluginStatus,
-  Preferences,
+import {
+  isPluginBusEvent,
+  type BusEvent,
+  type LogRecord,
+  type LogSource,
+  type PluginStatus,
+  type Preferences,
 } from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
@@ -50,8 +51,10 @@ type Journal = {
   logger: Logger;
   pluginLogger: (source: LogSource) => Logger;
   bus: EventBus;
-  /** Всё, что супервизор опубликовал: переходы и смены набора вкладов. */
-  events: CoreEvent[];
+  /** Всё, что попало на шину: переходы, смены набора вкладов и события плагинов. */
+  events: BusEvent[];
+  /** Ждёт событие на шине: оно приходит асинхронно, из воркера. */
+  waitForEvent: (predicate: (event: BusEvent) => boolean, hint: string) => Promise<BusEvent>;
   /** Ждёт запись, удовлетворяющую условию: состояния приходят асинхронно, из воркера. */
   waitFor: (predicate: (record: LogRecord) => boolean, hint: string) => Promise<LogRecord>;
 };
@@ -70,7 +73,7 @@ function journal(): Journal {
 
   const make = (source: LogSource): Logger => createLogger({ source, level: () => "debug", write });
 
-  const events: CoreEvent[] = [];
+  const events: BusEvent[] = [];
   const bus = createEventBus({
     // Тест не прощает упавшего подписчика: свой подписчик здесь один, и падать ему не с чего.
     onListenerError: (cause) => {
@@ -78,7 +81,15 @@ function journal(): Journal {
     },
   });
 
-  bus.subscribe((event) => events.push(event));
+  const eventWaiters = new Set<() => void>();
+
+  bus.subscribe((event) => {
+    events.push(event);
+
+    for (const waiter of [...eventWaiters]) {
+      waiter();
+    }
+  });
 
   return {
     records,
@@ -86,6 +97,26 @@ function journal(): Journal {
     pluginLogger: make,
     bus,
     events,
+    waitForEvent: (predicate, hint) =>
+      new Promise((resolve, reject) => {
+        const check = (): void => {
+          const found = events.find(predicate);
+
+          if (found !== undefined) {
+            eventWaiters.delete(check);
+            clearTimeout(timer);
+            resolve(found);
+          }
+        };
+
+        const timer = setTimeout(() => {
+          eventWaiters.delete(check);
+          reject(new Error(`no bus event for ${hint}; seen: ${JSON.stringify(events)}`));
+        }, 5_000);
+
+        eventWaiters.add(check);
+        check();
+      }),
     waitFor: (predicate, hint) =>
       new Promise((resolve, reject) => {
         const check = (): void => {
@@ -152,10 +183,11 @@ afterEach(async () => {
   running = undefined;
 });
 
-const lifecycleEvents = (events: CoreEvent[], key: string): PluginStatus[] =>
+const lifecycleEvents = (events: BusEvent[], key: string): PluginStatus[] =>
   events
-    .filter((event) => event.type === "core.plugin.lifecycle")
-    .map((event) => event.payload)
+    .flatMap((event) =>
+      !isPluginBusEvent(event) && event.type === "core.plugin.lifecycle" ? [event.payload] : [],
+    )
     .filter((status) => status.key === key);
 
 describe("createPluginSupervisor", () => {
@@ -202,12 +234,38 @@ describe("createPluginSupervisor", () => {
     await supervisor.apply(only("hello"), enabled("data:hello"));
     await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
 
-    const changes = recorded.events.filter((event) => event.type === "core.plugin.contributions");
+    const changes = recorded.events.flatMap((event) =>
+      !isPluginBusEvent(event) && event.type === "core.plugin.contributions" ? [event.payload] : [],
+    );
     const last = changes.at(-1);
 
-    assert.equal(last?.payload.revision, registry.revision());
-    assert.deepEqual(last?.payload.contributions, registry.resolved());
-    assert.equal(last?.payload.contributions.length > 0, true);
+    assert.equal(last?.revision, registry.revision());
+    assert.deepEqual(last?.contributions, registry.resolved());
+    assert.equal((last?.contributions.length ?? 0) > 0, true);
+  });
+
+  it("puts an event published by a plugin on the bus with its namespace and origin", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("publisher"), enabled("data:publisher"));
+
+    const event = await recorded.waitForEvent(
+      (event) => isPluginBusEvent(event) && event.type === "publisher.task.created",
+      "the event published by the plugin",
+    );
+
+    assert.deepEqual(event, {
+      type: "publisher.task.created",
+      payload: { id: "42" },
+      plugin: { key: "data:publisher", id: "publisher", source: "data" },
+    });
   });
 
   it("says nothing about contributions when the effective set did not change", async () => {

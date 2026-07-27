@@ -62,13 +62,30 @@ export type EventDescriptor<Schema extends z.ZodType = z.ZodType> = {
   /** Объявленный, без неймспейса: неймспейс ставит хост по идентичности плагина. */
   id: string;
   schema: Schema;
+  publish: (payload: z.input<Schema>) => Promise<void>;
 };
 
 export function defineEvent<Schema extends z.ZodType>(
   id: string,
   schema: Schema,
 ): EventDescriptor<Schema> {
-  return { id, schema };
+  return {
+    id,
+    schema,
+    publish: async (payload) => {
+      const checked = schema.safeParse(payload);
+
+      // Отказ здесь, у того, кто ошибся, и до отправки: ядро схемы не знает и молча донесло бы
+      // несоответствие до подписчика (ADR-0072).
+      if (!checked.success) {
+        throw new Error(
+          `the payload of the event ${id} does not match its schema: ${z.prettifyError(checked.error)}`,
+        );
+      }
+
+      await currentPluginHost().publishEvent(id, checked.data);
+    },
+  };
 }
 
 export const contribute = {

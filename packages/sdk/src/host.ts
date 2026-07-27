@@ -57,6 +57,11 @@ export type PluginHost = {
   identity: PluginIdentity;
   log: (level: PluginLogLevel, message: string, fields?: Record<string, unknown>) => Promise<void>;
   contribute: (contribution: PluginContribution) => Promise<void>;
+  /**
+   * Нагрузка проверена схемой здесь же, в воркере публикатора (ADR-0072). Имя объявленное, без
+   * неймспейса: неймспейс ставит хост по идентичности, поэтому чужим именем не опубликуешь.
+   */
+  publishEvent: (declaredId: string, payload: unknown) => Promise<void>;
 };
 
 export function installPluginHost(host: PluginHost): void {

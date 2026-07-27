@@ -24,6 +24,7 @@ import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
+import { createPluginEvents } from "./plugin-events.ts";
 import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
 import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
 
@@ -111,6 +112,8 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
+
+  const events = createPluginEvents({ registry, bus, logger });
 
   /**
    * Единственное место, где состояние записи превращается в статус: снимок и событие обязаны
@@ -244,6 +247,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         return;
       case "contribute":
         entry.pending.push(message.contribution);
+
+        return;
+      case "publish":
+        events.publish(entry.plugin, message.declaredId, message.payload);
 
         return;
       case "activated":

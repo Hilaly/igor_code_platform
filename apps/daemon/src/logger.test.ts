@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { LogLevel, LogRecord } from "@sovereign/protocol";
+import { isPluginBusEvent, type LogLevel, type LogRecord } from "@sovereign/protocol";
 
 import { createEventBus } from "./event-bus.ts";
 import { createLogger, createRecordWriter } from "./logger.ts";
@@ -72,7 +72,7 @@ test("a record reaches both stdout and the bus", () => {
   });
 
   bus.subscribe((event) => {
-    if (event.type === "core.log") {
+    if (!isPluginBusEvent(event) && event.type === "core.log") {
       published.push(event.payload);
     }
   });
@@ -108,7 +108,7 @@ test("a record below the current level reaches nobody, not even the bus", () => 
   });
 
   bus.subscribe((event) => {
-    if (event.type === "core.log") {
+    if (!isPluginBusEvent(event) && event.type === "core.log") {
       published.push(event.payload);
     }
   });

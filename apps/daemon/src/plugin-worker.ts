@@ -40,6 +40,9 @@ installPluginHost({
   contribute: async (contribution) => {
     send({ kind: "contribute", contribution });
   },
+  publishEvent: async (declaredId, payload) => {
+    send({ kind: "publish", declaredId, payload });
+  },
 });
 
 let plugin: PluginModule | undefined;

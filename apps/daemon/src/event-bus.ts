@@ -7,12 +7,22 @@
  * здесь: у шины нет порядка, который можно было бы пронумеровать.
  */
 
-import type { CoreEvent, CoreEventPayloads, CoreEventType } from "@sovereign/protocol";
+import type {
+  BusEvent,
+  CoreEventPayloads,
+  CoreEventType,
+  PluginBusEvent,
+} from "@sovereign/protocol";
 
-export type EventBusListener = (event: CoreEvent) => void;
+export type EventBusListener = (event: BusEvent) => void;
 
 export type EventBus = {
   publish: <Type extends CoreEventType>(type: Type, payload: CoreEventPayloads[Type]) => void;
+  /**
+   * Событие плагина приходит собранным: имя с неймспейсом и происхождение проставляет тот, кто
+   * знает плагина, — шина в это не вмешивается (ADR-0072).
+   */
+  publishFromPlugin: (event: PluginBusEvent) => void;
   /** Возвращает функцию отписки. */
   subscribe: (listener: EventBusListener) => () => void;
 };
@@ -23,27 +33,28 @@ export type CreateEventBusOptions = {
    * Логгер сюда не передаётся напрямую — он публикует в эту же шину, и цикл логгер → шина →
    * логгер повесил бы демон; защиту от повторного входа ставит тот, кто шину создаёт.
    */
-  onListenerError: (cause: unknown, event: CoreEvent) => void;
+  onListenerError: (cause: unknown, event: BusEvent) => void;
 };
 
 export function createEventBus(options: CreateEventBusOptions): EventBus {
   const listeners = new Set<EventBusListener>();
 
-  return {
-    publish: (type, payload) => {
-      const event = { type, payload } as CoreEvent;
-
-      // Набор копируется: подписчик имеет право отписаться или подписать другого прямо в
-      // обработчике, а правка Set во время обхода меняет сам обход.
-      for (const listener of [...listeners]) {
-        try {
-          listener(event);
-        } catch (cause) {
-          // Отказ одного подписчика не отменяет доставку остальным: они друг о друге не знают.
-          options.onListenerError(cause, event);
-        }
+  const deliver = (event: BusEvent): void => {
+    // Набор копируется: подписчик имеет право отписаться или подписать другого прямо в
+    // обработчике, а правка Set во время обхода меняет сам обход.
+    for (const listener of [...listeners]) {
+      try {
+        listener(event);
+      } catch (cause) {
+        // Отказ одного подписчика не отменяет доставку остальным: они друг о друге не знают.
+        options.onListenerError(cause, event);
       }
-    },
+    }
+  };
+
+  return {
+    publish: (type, payload) => deliver({ type, payload } as BusEvent),
+    publishFromPlugin: deliver,
     subscribe: (listener) => {
       listeners.add(listener);
 

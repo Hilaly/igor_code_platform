@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { CoreEvent, LogRecord } from "@sovereign/protocol";
+import { isPluginBusEvent, type BusEvent, type LogRecord } from "@sovereign/protocol";
 
 import { createEventBus, type CreateEventBusOptions } from "./event-bus.ts";
 
@@ -13,7 +13,7 @@ const record = (message: string): LogRecord => ({
 });
 
 function bus(onListenerError: CreateEventBusOptions["onListenerError"] = () => {}) {
-  const failures: { cause: unknown; event: CoreEvent }[] = [];
+  const failures: { cause: unknown; event: BusEvent }[] = [];
 
   return {
     failures,
@@ -27,16 +27,16 @@ function bus(onListenerError: CreateEventBusOptions["onListenerError"] = () => {
 }
 
 /** Тесты шины публикуют только записи журнала: нагрузка остальных событий здесь ничего не меняет. */
-const messageOf = (event: CoreEvent): string => {
+const messageOf = (event: BusEvent): string => {
   assert.equal(event.type, "core.log");
 
-  return event.type === "core.log" ? event.payload.message : "";
+  return !isPluginBusEvent(event) && event.type === "core.log" ? event.payload.message : "";
 };
 
 describe("createEventBus", () => {
   it("delivers what was published to a subscriber", () => {
     const { bus: events } = bus();
-    const seen: CoreEvent[] = [];
+    const seen: BusEvent[] = [];
 
     events.subscribe((event) => seen.push(event));
     events.publish("core.log", record("daemon started"));
@@ -46,7 +46,7 @@ describe("createEventBus", () => {
 
   it("stops delivering to a subscriber that unsubscribed", () => {
     const { bus: events } = bus();
-    const seen: CoreEvent[] = [];
+    const seen: BusEvent[] = [];
     const unsubscribe = events.subscribe((event) => seen.push(event));
 
     events.publish("core.log", record("first"));
@@ -58,7 +58,7 @@ describe("createEventBus", () => {
 
   it("tells a late subscriber nothing about the past: the bus has no memory", () => {
     const { bus: events } = bus();
-    const seen: CoreEvent[] = [];
+    const seen: BusEvent[] = [];
 
     events.publish("core.log", record("before"));
     events.subscribe((event) => seen.push(event));

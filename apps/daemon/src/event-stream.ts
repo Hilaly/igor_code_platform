@@ -11,6 +11,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
   eventsPath,
+  isPluginBusEvent,
   lastEventIdParameter,
   streamGapType,
   type StreamEvent,
@@ -80,6 +81,9 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
       time: new Date(now()).toISOString(),
       type: event.type,
       payload: event.payload,
+      // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
+      // платформенного (ADR-0072).
+      ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
     } as StreamEvent);
 
     nextIndex += 1;

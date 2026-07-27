@@ -24,6 +24,7 @@ describe("the sdk without a host", () => {
     await assert.rejects(() => log.info("hello"), /sdk is not initialised/);
     await assert.rejects(() => contribute.custom({ id: "board" }), /sdk is not initialised/);
     await assert.rejects(() => contribute.event(taskCreated), /sdk is not initialised/);
+    await assert.rejects(() => taskCreated.publish({ id: "42" }), /sdk is not initialised/);
     assert.throws(() => identity(), /sdk is not initialised/);
   });
 });
@@ -100,5 +101,25 @@ describe("a declared event", () => {
 
     assert.equal(taskCreated.schema.safeParse({ id: "42" }).success, true);
     assert.equal(taskCreated.schema.safeParse({ id: 42 }).success, false);
+  });
+
+  it("publishes a payload that matches the schema", async () => {
+    const host = installTestHost({ id: "tracker" });
+
+    await taskCreated.publish({ id: "42" });
+
+    assert.deepEqual(host.published, [{ declaredId: "task.created", payload: { id: "42" } }]);
+  });
+
+  it("refuses a payload that does not match, and sends nothing", async () => {
+    const host = installTestHost({ id: "tracker" });
+
+    await assert.rejects(
+      // @ts-expect-error — автор ошибся в типе; проверка обязана поймать это и в рантайме.
+      () => taskCreated.publish({ id: 42 }),
+      /the payload of the event task\.created does not match its schema/,
+    );
+
+    assert.deepEqual(host.published, []);
   });
 });

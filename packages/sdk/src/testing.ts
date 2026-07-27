@@ -20,10 +20,17 @@ export type RecordedLog = {
   fields?: Record<string, unknown>;
 };
 
+/** Имя объявленное, без неймспейса: неймспейс ставит настоящий хост, и в тесте его нет. */
+export type RecordedEvent = {
+  declaredId: string;
+  payload: unknown;
+};
+
 export type PluginTestHost = {
   identity: PluginIdentity;
   logs: RecordedLog[];
   contributions: PluginContribution[];
+  published: RecordedEvent[];
   /** Снимает шов. Без этого следующий тест увидит чужой хост. */
   restore: () => void;
 };
@@ -35,6 +42,7 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   };
   const logs: RecordedLog[] = [];
   const contributions: PluginContribution[] = [];
+  const published: RecordedEvent[] = [];
 
   installPluginHost({
     identity: resolved,
@@ -44,7 +52,10 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     contribute: async (contribution) => {
       contributions.push(contribution);
     },
+    publishEvent: async (declaredId, payload) => {
+      published.push({ declaredId, payload });
+    },
   });
 
-  return { identity: resolved, logs, contributions, restore: removePluginHost };
+  return { identity: resolved, logs, contributions, published, restore: removePluginHost };
 }
