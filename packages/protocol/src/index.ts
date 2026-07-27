@@ -4,6 +4,7 @@
  */
 
 export * from "./contribution.ts";
+export * from "./event-stream.ts";
 export * from "./events.ts";
 export * from "./health.ts";
 export * from "./log.ts";

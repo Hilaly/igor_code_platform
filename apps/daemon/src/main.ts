@@ -2,6 +2,7 @@ import { parseArguments } from "./arguments.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
+import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger, createRecordWriter } from "./logger.ts";
@@ -122,9 +123,17 @@ const pluginWatcher = createPluginWatcher({
 pluginWatcher.start();
 applyPlugins();
 
+// Поток подписывается на шину последним из подписчиков ядра, но нумерует всё, что придёт после:
+// события до его создания рассказывать некому — клиентов ещё нет.
+const events = createEventStream({ bus, logger });
+
 const server = createDaemonServer({
   logger,
-  routes: [healthRoute(new Date()), pluginsRoute({ plugins, registry: contributions })],
+  routes: [
+    healthRoute(new Date()),
+    pluginsRoute({ plugins, registry: contributions }),
+    events.route(),
+  ],
 });
 
 server.listen(port, "127.0.0.1", () => {
@@ -140,6 +149,10 @@ server.listen(port, "127.0.0.1", () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     logger.info("daemon stopping", { signal });
+
+    // Потоки закрываются до сервера: открытое SSE-соединение живёт, пока его не закрыли, и
+    // `server.close()` ждал бы его вечно.
+    events.close();
     server.close();
     server.closeAllConnections();
     settings.close();
