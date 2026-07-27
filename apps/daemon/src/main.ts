@@ -2,6 +2,7 @@ import { parseArguments } from "./arguments.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
+import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger, createRecordWriter } from "./logger.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
@@ -120,7 +121,7 @@ const pluginWatcher = createPluginWatcher({
 pluginWatcher.start();
 applyPlugins();
 
-const server = createDaemonServer(new Date());
+const server = createDaemonServer({ logger, routes: [healthRoute(new Date())] });
 
 server.listen(port, "127.0.0.1", () => {
   logger.info("daemon started", {
