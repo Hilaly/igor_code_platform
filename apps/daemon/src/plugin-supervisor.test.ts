@@ -165,11 +165,13 @@ describe("createPluginSupervisor", () => {
 
     await supervisor.apply(only("hello"), { plugins: {} });
 
-    // Не «обнаружен»: решение применено, и оно — «выключен» (ADR-0018).
+    // Не «обнаружен»: решение применено, и оно — «выключен» (ADR-0018). Переход виден в журнале
+    // и без воркера: человеку нужно подтверждение, а не молчание.
     assert.equal(
       supervisor.statuses().find((status) => status.key === "data:hello")?.state,
       "disabled",
     );
+    assert.equal(recorded.records.some(reachedState("data:hello", "disabled")), true);
     assert.equal(
       recorded.records.some((record) => record.message === "hello is up"),
       false,

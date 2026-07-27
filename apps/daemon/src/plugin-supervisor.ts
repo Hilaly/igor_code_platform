@@ -155,6 +155,13 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       });
     }
 
+    // Действующий набор виден только здесь: вью плагинов ещё нет, а знать, что применилось, надо.
+    logger.debug("plugin contributions applied", {
+      plugin: entry.plugin.key,
+      contributions: outcome.registered.map((registration) => registration.id),
+      revision: registry.revision(),
+    });
+
     for (const conflict of registry.conflicts()) {
       logger.warn(
         "the contribution is claimed by several plugins of one source and applies to none",
@@ -321,9 +328,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
     const worker = entry.worker;
 
+    // Даже без воркера переход пишется в журнал: «выключен» — такое же наблюдаемое состояние, как
+    // «запущен», и человек, выключивший плагин, должен увидеть подтверждение (ADR-0018).
     if (worker === undefined) {
-      entry.state = finalState;
       dropContributions(entry);
+      transition(entry, finalState);
 
       return;
     }
@@ -509,7 +518,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     },
     stopAll: async () => {
       for (const entry of supervised.values()) {
-        await stop(entry, "stopped");
+        // Уже выключенный или отказанный не «останавливается»: останавливать нечего.
+        if (entry.state !== "disabled" && entry.state !== "stopped") {
+          await stop(entry, "stopped");
+        }
       }
     },
   };
