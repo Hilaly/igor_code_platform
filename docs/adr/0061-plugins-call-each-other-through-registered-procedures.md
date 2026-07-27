@@ -1,6 +1,6 @@
 # ADR-0061: Plugins call each other through registered procedures
 
-- **Статус:** Accepted
+- **Статус:** Superseded by [ADR-0071](0071-plugin-state-is-read-through-plugin-routes.md)
 - **Дата:** 2026-07-26
 
 ## Контекст
