@@ -56,6 +56,12 @@ export type Preferences = {
   locale: string;
 };
 
+/** Раздел файла, которым владеет оболочка: он же тело и ответ маршрута `preferences-api.ts`. */
+export type AppearancePreferences = {
+  appearance: Appearance;
+  locale: string;
+};
+
 export const defaultConfig: Config = { logLevel: "info" };
 export const defaultAppearance: Appearance = {
   colorScheme: baseColorScheme,
@@ -217,6 +223,53 @@ export function parseLocale(
   }
 
   return { kind: "parsed", value: raw, diagnostics: [] };
+}
+
+/**
+ * Тело записи внешнего вида и локали. Оба ключа обязательны: запись заменяет весь раздел, и тело без
+ * локали молча вернуло бы английский интерфейс человеку, который менял только тему.
+ */
+export function parseAppearancePreferences(
+  raw: unknown,
+  label = "preferences",
+): SettingsParseResult<AppearancePreferences> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, ["appearance", "locale"]);
+
+  for (const required of ["appearance", "locale"]) {
+    if (fields[required] === undefined) {
+      diagnostics.push(`${label}.${required} is required: the write replaces both`);
+
+      return { kind: "rejected", diagnostics };
+    }
+  }
+
+  const appearance = parseAppearance(fields["appearance"], `${label}.appearance`);
+
+  diagnostics.push(...appearance.diagnostics);
+
+  if (appearance.kind === "rejected") {
+    return { kind: "rejected", diagnostics };
+  }
+
+  const locale = parseLocale(fields["locale"], `${label}.locale`);
+
+  diagnostics.push(...locale.diagnostics);
+
+  if (locale.kind === "rejected") {
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: { appearance: appearance.value, locale: locale.value },
+    diagnostics,
+  };
 }
 
 function parsePluginsSection(raw: unknown): SettingsParseResult<Record<string, PluginPreferences>> {

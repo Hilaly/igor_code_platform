@@ -21,6 +21,7 @@ import {
   parseConfig,
   parsePreferences,
   preferencesFileName,
+  type AppearancePreferences,
   type Config,
   type PluginPreferences,
   type Preferences,
@@ -53,6 +54,8 @@ export type SettingsStore = {
    * получает управление тогда, когда снимок уже новый.
    */
   writePluginPreferences: (pluginKey: string, preferences: PluginPreferences) => WriteOutcome;
+  /** Тем же путём и с тем же отказом: внешний вид и локаль лежат в том же файле. */
+  writeAppearancePreferences: (preferences: AppearancePreferences) => WriteOutcome;
   close: () => void;
 };
 
@@ -190,9 +193,8 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
     reload();
   };
 
-  const writePluginPreferences = (
-    pluginKey: string,
-    preferences: PluginPreferences,
+  const patchPreferences = (
+    patch: (document: Record<string, unknown>) => Record<string, unknown>,
   ): WriteOutcome => {
     // Основа для записи — файл, а не снимок в памяти: между перечитываниями его мог поправить
     // человек, и переключение одного плагина не должно откатывать соседнюю строку.
@@ -202,15 +204,9 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       return stored;
     }
 
-    const plugins = asObject(stored.document["plugins"]) ?? {};
-    const next = {
-      ...stored.document,
-      plugins: { ...plugins, [pluginKey]: preferences },
-    };
-
     writeAtomically(
       join(directory, preferencesFileName),
-      `${JSON.stringify(next, undefined, 2)}\n`,
+      `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
     );
 
     // Наблюдатель принесёт своё событие следом и вызовет перечитывание второй раз. Второе ничего не
@@ -229,7 +225,13 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
     },
     start,
     reload,
-    writePluginPreferences,
+    writePluginPreferences: (pluginKey, preferences) =>
+      patchPreferences((document) => ({
+        ...document,
+        plugins: { ...(asObject(document["plugins"]) ?? {}), [pluginKey]: preferences },
+      })),
+    writeAppearancePreferences: ({ appearance, locale }) =>
+      patchPreferences((document) => ({ ...document, appearance, locale })),
     close: () => {
       if (debounceTimer !== undefined) {
         clearTimeout(debounceTimer);

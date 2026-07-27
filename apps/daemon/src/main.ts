@@ -1,3 +1,4 @@
+import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
 import { parseArguments } from "./arguments.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
@@ -98,6 +99,8 @@ settings.subscribe((snapshot) => {
   applyPlugins();
 });
 
+publishAppearanceChanges({ settings, bus });
+
 const pluginWatcher = createPluginWatcher({
   roots: pluginRoots,
   logger,
@@ -119,6 +122,7 @@ const server = createDaemonServer({
     healthRoute(new Date()),
     pluginsRoute({ plugins, registry: contributions }),
     pluginPreferencesRoute({ settings, plugins, logger }),
+    ...appearancePreferencesRoutes({ settings, logger }),
     events.route(),
   ],
 });
