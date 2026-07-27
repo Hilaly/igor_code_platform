@@ -1,3 +1,6 @@
+import "@sovereign/ui-kit/styles.css";
+import "./shell/shell.css";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 

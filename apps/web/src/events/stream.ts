@@ -1,14 +1,22 @@
 /**
  * Одно `EventSource` на приложение (ADR-0017): все события ядра и плагинов приходят одним потоком и
- * раздаются фронтовой шиной. Позицию `Last-Event-ID` браузер присылает сам, поэтому переподключение
- * ничего не теряет — кроме случая, когда пропущенного уже нет: тогда приходит `core.stream.gap`, и
- * состояние надо перезапросить целиком (ADR-0038).
+ * раздаются фронтовой шиной.
  *
- * Источник приходит параметром, а не создаётся здесь: `EventSource` в тестовой среде отсутствует, а
- * поведение при разрыве и при негодном кадре проверять надо.
+ * Переподключение своё, а не браузерное. Браузер повторяет попытку сам, но только пока сервер отвечает
+ * как положено: на HTTP-ошибку — а именно её отдаёт прокси, пока демон лежит, — `EventSource`
+ * закрывается навсегда. Поэтому позиция хранится здесь и уезжает параметром `lastEventId`, а не
+ * заголовком `Last-Event-ID`, который браузер ставит только своим попыткам (ADR-0038).
+ *
+ * Источник приходит параметром, а не создаётся внутри: `EventSource` в тестовой среде отсутствует, а
+ * поведение при разрыве, при догоне и при негодном кадре проверять надо.
  */
 
-import { eventsPath, streamGapType, type StreamEvent } from "@sovereign/protocol";
+import {
+  eventsPath,
+  lastEventIdParameter,
+  streamGapType,
+  type StreamEvent,
+} from "@sovereign/protocol";
 
 import type { FrontendBus } from "./bus.ts";
 
@@ -16,16 +24,20 @@ export type StreamStatus =
   /** Соединение открывается впервые. */
   | "connecting"
   | "open"
-  /** Разрыв. Браузер переподключается сам и присылает позицию. */
+  /** Разрыв: попытка повторится, и пропущенное придёт догоном. */
   | "reconnecting";
 
 /** Ровно то, что нужно от `EventSource`. */
 export type EventSourceLike = {
   addEventListener: (type: string, listener: (event: Event) => void) => void;
   close: () => void;
+  /** `2` — соединение закрыто и сам браузер повторять не будет. */
+  readyState: number;
 };
 
 export type OpenEventSource = (path: string) => EventSourceLike;
+
+export type CancelScheduled = () => void;
 
 export type StreamConnection = {
   status: () => StreamStatus;
@@ -35,16 +47,34 @@ export type StreamConnection = {
 export type ConnectEventStreamOptions = {
   bus: Pick<FrontendBus, "publish">;
   onStatus: (status: StreamStatus) => void;
-  /** Негодный кадр и разрыв — это диагностика, а не тишина: своего журнала у браузера нет. */
+  /** Негодный кадр, разрыв и пропуск — это диагностика, а не тишина: журнала у браузера нет. */
   onDiagnostic: (diagnostic: string) => void;
   open?: OpenEventSource;
+  /** Планировщик под контролем теста: задержки повторов проверяются числами, а не ожиданием. */
+  schedule?: (callback: () => void, delay: number) => CancelScheduled;
 };
+
+const closedReadyState = 2;
+
+/** Пауза растёт до пяти секунд: демон могли остановить надолго, и долбить его незачем. */
+const retryDelays = [500, 1_000, 2_000, 5_000];
 
 export function connectEventStream(options: ConnectEventStreamOptions): StreamConnection {
   const open = options.open ?? ((path: string) => new EventSource(path));
-  const source = open(eventsPath);
+  const schedule =
+    options.schedule ??
+    ((callback, delay) => {
+      const timer = setTimeout(callback, delay);
+
+      return () => clearTimeout(timer);
+    });
 
   let status: StreamStatus = "connecting";
+  let source: EventSourceLike | undefined;
+  let cancelRetry: CancelScheduled | undefined;
+  let attempt = 0;
+  let lastIndex: number | undefined;
+  let closedByUs = false;
 
   const moveTo = (next: StreamStatus): void => {
     if (next === status) {
@@ -55,37 +85,68 @@ export function connectEventStream(options: ConnectEventStreamOptions): StreamCo
     options.onStatus(next);
   };
 
-  source.addEventListener("open", () => moveTo("open"));
+  const connect = (): void => {
+    // Догон просится с той позиции, которую мы дочитали: без неё поток начался бы с текущего конца, и
+    // пропущенное потерялось бы молча.
+    const path =
+      lastIndex === undefined ? eventsPath : `${eventsPath}?${lastEventIdParameter}=${lastIndex}`;
+    const active = open(path);
 
-  source.addEventListener("error", () => {
-    // `EventSource` переподключается сам, поэтому это не конец потока, а его пауза.
-    moveTo("reconnecting");
-    options.onDiagnostic("the event stream broke off, the browser is reconnecting");
-  });
+    source = active;
 
-  source.addEventListener("message", (event) => {
-    const frame = parseFrame(event);
+    active.addEventListener("open", () => {
+      attempt = 0;
+      moveTo("open");
+    });
 
-    if (frame === undefined) {
-      // Кадр собирает демон из типов протокола: негодный json здесь означает, что стороны разошлись,
-      // и молчать об этом нельзя.
-      options.onDiagnostic("the event stream sent a frame that is not valid json");
+    active.addEventListener("error", () => {
+      moveTo("reconnecting");
+      options.onDiagnostic("the event stream broke off");
 
-      return;
-    }
+      // Браузер повторяет сам, пока соединение не закрыто совсем; закрытое он не воскресит.
+      if (closedByUs || active.readyState !== closedReadyState) {
+        return;
+      }
 
-    if (frame.type === streamGapType) {
-      options.onDiagnostic(
-        "the event stream no longer holds what we missed, the state has to be asked for again",
-      );
-    }
+      active.close();
 
-    options.bus.publish(frame);
-  });
+      const delay = retryDelays[Math.min(attempt, retryDelays.length - 1)] ?? 5_000;
+
+      attempt += 1;
+      cancelRetry = schedule(connect, delay);
+    });
+
+    active.addEventListener("message", (event) => {
+      const frame = parseFrame(event);
+
+      if (frame === undefined) {
+        // Кадр собирает демон из типов протокола: негодный json означает, что стороны разошлись.
+        options.onDiagnostic("the event stream sent a frame that is not valid json");
+
+        return;
+      }
+
+      lastIndex = frame.index;
+
+      if (frame.type === streamGapType) {
+        options.onDiagnostic(
+          "the event stream no longer holds what we missed, the state has to be asked for again",
+        );
+      }
+
+      options.bus.publish(frame);
+    });
+  };
+
+  connect();
 
   return {
     status: () => status,
-    close: () => source.close(),
+    close: () => {
+      closedByUs = true;
+      cancelRetry?.();
+      source?.close();
+    },
   };
 }
 

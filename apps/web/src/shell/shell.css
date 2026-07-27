@@ -1,0 +1,124 @@
+/*
+ * Раскладка оболочки. Цвета — только переменные ролей: значения задаёт цветовая схема (ADR-0031).
+ * Здесь лежит геометрия хоста, а не вид примитивов — тот живёт в ките.
+ */
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: var(--sovereign-page-surface);
+  color: var(--sovereign-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.shell {
+  display: flex;
+  align-items: stretch;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--sovereign-panel-surface);
+  overflow: hidden auto;
+  flex: 0 0 auto;
+}
+
+.shell-left-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.shell-left-bottom {
+  border-top: 1px solid var(--sovereign-border);
+  padding-top: 0.5rem;
+}
+
+.shell-page {
+  flex: 1 1 auto;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.shell-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--sovereign-panel-surface);
+  overflow: hidden auto;
+  flex: 0 0 auto;
+}
+
+.shell-tabs {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.shell-tab-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Граница панели: тянется мышью, а с клавиатуры — стрелками, поэтому у неё есть фокус. */
+.shell-resizer {
+  flex: 0 0 auto;
+  width: 5px;
+  border: none;
+  background: var(--sovereign-border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.shell-resizer:hover,
+.shell-resizer:focus-visible {
+  background: var(--sovereign-accent);
+  outline: none;
+}
+
+.shell-nav,
+.shell-home,
+.shell-appearance,
+.shell-daemon {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.shell-appearance-variants,
+.shell-appearance-buttons {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.shell-appearance-variants {
+  flex-direction: column;
+}
+
+.shell-appearance-buttons {
+  flex-wrap: wrap;
+}
+
+.shell-daemon-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}

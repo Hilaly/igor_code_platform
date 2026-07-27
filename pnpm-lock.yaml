@@ -44,6 +44,9 @@ importers:
       '@sovereign/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@sovereign/ui-kit':
+        specifier: workspace:*
+        version: link:../../packages/ui-kit
       react:
         specifier: ^19.0.0
         version: 19.2.8
