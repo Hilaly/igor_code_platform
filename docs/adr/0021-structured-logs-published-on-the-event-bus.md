@@ -1,6 +1,6 @@
 # ADR-0021: Structured logs published on the event bus
 
-- **Статус:** Accepted
+- **Статус:** Superseded by [ADR-0074](0074-the-log-goes-to-stdout-and-not-to-the-bus.md)
 - **Дата:** 2026-07-26
 
 ## Контекст
