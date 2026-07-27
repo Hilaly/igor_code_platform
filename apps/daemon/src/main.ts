@@ -2,6 +2,8 @@ import { parseArguments } from "./arguments.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger } from "./logger.ts";
+import { createPluginSupervisor } from "./plugin-supervisor.ts";
+import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
 
@@ -44,9 +46,34 @@ const logger = createLogger({
 // Файлы читаются после создания логгера: диагностика первого чтения обязана в него попасть.
 settings.start(logger);
 
+const pluginRoots = defaultPluginRoots(directory);
+
+const plugins = createPluginSupervisor({
+  logger,
+  createPluginLogger: (source) =>
+    createLogger({ source, level: () => settings.current().config.logLevel }),
+});
+
+// Приведения идут цепочкой: два одновременных перечитывания настроек не должны поднимать один
+// плагин дважды.
+let applying = Promise.resolve();
+
+const applyPlugins = (): void => {
+  applying = applying
+    .then(() => plugins.apply(discoverPlugins(pluginRoots), settings.current().preferences))
+    .catch((cause: unknown) => {
+      logger.error("applying the plugin state failed", {
+        reason: cause instanceof Error ? cause.message : String(cause),
+      });
+    });
+};
+
 settings.subscribe((snapshot) => {
   logger.info("settings reloaded", { logLevel: snapshot.config.logLevel });
+  applyPlugins();
 });
+
+applyPlugins();
 
 const server = createDaemonServer(new Date());
 
@@ -66,6 +93,9 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.close();
     server.closeAllConnections();
     settings.close();
-    lock.release();
+
+    // Лок снимается последним и в любом случае: воркер, зависший на выгрузке, не имеет права
+    // оставить директорию данных запертой.
+    void plugins.stopAll().finally(() => lock.release());
   });
 }

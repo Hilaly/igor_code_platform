@@ -35,6 +35,9 @@ importers:
       '@sovereign/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@sovereign/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
 
   apps/web:
     dependencies:

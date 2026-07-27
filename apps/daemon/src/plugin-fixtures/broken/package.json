@@ -1,0 +1,11 @@
+{
+  "name": "broken",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "broken",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

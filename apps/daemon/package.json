@@ -10,6 +10,7 @@
     "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
-    "@sovereign/protocol": "workspace:*"
+    "@sovereign/protocol": "workspace:*",
+    "@sovereign/sdk": "workspace:*"
   }
 }
