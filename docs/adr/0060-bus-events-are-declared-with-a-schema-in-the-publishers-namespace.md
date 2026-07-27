@@ -1,6 +1,6 @@
 # ADR-0060: Bus events are declared with a schema in the publisher's namespace
 
-- **Статус:** Accepted
+- **Статус:** Superseded by [ADR-0072](0072-plugin-events-are-validated-in-the-publishers-worker.md)
 - **Дата:** 2026-07-26
 
 ## Контекст
