@@ -46,7 +46,7 @@ const at =
   async (message, fields) =>
     currentPluginHost().log(level, message, fields);
 
-/** Источник записи проставляет ядро, а не плагин: подделать чужой нечем (ADR-0021). */
+/** Источник записи проставляет ядро, а не плагин: подделать чужой нечем (ADR-0074). */
 export const log: Record<PluginLogLevel, LogCall> = {
   debug: at("debug"),
   info: at("info"),

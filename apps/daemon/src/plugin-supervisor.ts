@@ -45,7 +45,7 @@ export type CreatePluginSupervisorOptions = {
   registry: ContributionRegistry;
   /** Куда уходят переходы жизненного цикла и смена набора вкладов (ADR-0018). */
   bus: EventBus;
-  /** Источник записи штампует ядро: плагин не может назваться чужим именем (ADR-0021). */
+  /** Источник записи штампует ядро: плагин не может назваться чужим именем (ADR-0074). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
   schedule?: (callback: () => void, delayMilliseconds: number) => CancelScheduled;

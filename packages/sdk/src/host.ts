@@ -17,7 +17,7 @@ const hostSymbol = Symbol.for("sovereign.plugin.host");
  */
 export type PluginLogLevel = "debug" | "info" | "warn" | "error";
 
-/** Кто мы. Приходит от хоста: сам себя плагин не называет (ADR-0021). */
+/** Кто мы. Приходит от хоста: сам себя плагин не называет (ADR-0074). */
 export type PluginIdentity = {
   id: string;
   source: string;

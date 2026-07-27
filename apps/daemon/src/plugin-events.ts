@@ -55,7 +55,7 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
 
     for (const pluginKey of listening) {
       // Плагин, подписанный на своё же событие, получит и его: кольцо разрывает автор, а не
-      // платформа. Доставка асинхронна, поэтому демон от этого не встаёт (ADR-0073).
+      // платформа. Доставка асинхронна, поэтому демон от этого не встаёт.
       send(pluginKey, message);
     }
   });

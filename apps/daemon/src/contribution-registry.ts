@@ -127,7 +127,7 @@ export function createContributionRegistry(): ContributionRegistry {
         const id = `${plugin.id}.${contribution.id}`;
 
         // Неймспейс ядра принадлежит ядру (ADR-0072): плагин с идентификатором `core` иначе объявил
-        // бы событие `core.log` и стал бы неотличим от платформы.
+        // бы событие `core.plugin.lifecycle` и стал бы неотличим от платформы.
         if (contribution.kind === "event" && id.startsWith(`${coreEventNamespace}.`)) {
           problems.push(
             `the event ${id} is in the namespace of the core, which belongs to the platform`,

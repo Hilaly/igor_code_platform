@@ -41,7 +41,7 @@ export function createLogger(options: LoggerOptions): Logger {
     };
 
     // Служебные поля идут первыми и потому читаются в терминале первыми. Дополнительное поле с
-    // таким же именем игнорируется: иначе плагин подделал бы источник записи (ADR-0021).
+    // таким же именем игнорируется: иначе плагин подделал бы источник записи (ADR-0074).
     for (const [field, value] of Object.entries(fields ?? {})) {
       if (!(field in record)) {
         record[field] = value;
