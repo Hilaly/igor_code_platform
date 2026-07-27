@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest";
+
+import { coreNamespace, type CatalogRegistration } from "./catalog.ts";
+import { coreEnglish } from "./messages/en.ts";
+import { coreRussian } from "./messages/ru.ts";
+import { createTranslator, type CreateTranslatorOptions } from "./translator.ts";
+
+const shipped = [coreEnglish, coreRussian];
+
+function translator(locale: string, extra: CatalogRegistration[] = []) {
+  const diagnostics: string[] = [];
+  const options: CreateTranslatorOptions = {
+    locale,
+    namespace: coreNamespace,
+    catalogs: [...shipped, ...extra],
+    onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+  };
+
+  return { ...createTranslator(options), diagnostics };
+}
+
+describe("createTranslator", () => {
+  it("translates a key in the chosen locale", () => {
+    expect(translator("ru").t("appearance.variant.dark")).toBe("Тёмная");
+    expect(translator("en").t("appearance.variant.dark")).toBe("Dark");
+  });
+
+  it("shows the base string and says the translation is missing", () => {
+    const russian = translator("ru", [{ namespace: coreNamespace, locale: "ru", messages: {} }]);
+    const incomplete = translator("pt-BR");
+
+    expect(incomplete.t("state.loading")).toBe("Loading…");
+    expect(incomplete.diagnostics.join("\n")).toMatch(/core:pt-BR has no translation/);
+    expect(russian.t("state.loading")).toBe("Загрузка…");
+  });
+
+  it("says nothing twice about the same hole", () => {
+    const incomplete = translator("pt-BR");
+
+    incomplete.t("state.loading");
+    incomplete.t("state.loading");
+
+    expect(incomplete.diagnostics).toHaveLength(1);
+  });
+
+  it("gives back the key when no locale has the message", () => {
+    const kit = translator("en");
+
+    expect(kit.t("shell.nothing")).toBe("shell.nothing");
+    expect(kit.diagnostics.join("\n")).toMatch(/no message shell.nothing in any locale/);
+  });
+
+  it("lets a plugin catalog replace our string without taking the rest", () => {
+    const kit = translator("ru", [
+      {
+        namespace: coreNamespace,
+        locale: "ru",
+        messages: { "appearance.variant.dark": "Ночная" },
+      },
+    ]);
+
+    expect(kit.t("appearance.variant.dark")).toBe("Ночная");
+    expect(kit.t("appearance.variant.light")).toBe("Светлая");
+  });
+
+  it("keeps the namespaces apart", () => {
+    const kit = translator("en", [
+      { namespace: "tracker", locale: "en", messages: { title: "Tasks" } },
+    ]);
+
+    expect(kit.scope("tracker").t("title")).toBe("Tasks");
+    expect(kit.t("title")).toBe("title");
+  });
+
+  it("substitutes parameters and formats numbers with Intl", () => {
+    const kit = translator("ru", [
+      {
+        namespace: coreNamespace,
+        locale: "ru",
+        messages: { "plugins.running": "Работает {count} из {total}" },
+      },
+    ]);
+
+    // Разряды по-русски разделяет неразрывный пробел: это и есть работа `Intl`, а не наша.
+    expect(kit.t("plugins.running", { count: 2, total: 1234 })).toBe("Работает 2 из 1\u00a0234");
+  });
+
+  it("reports a placeholder nobody filled instead of printing it as text", () => {
+    const kit = translator("en", [
+      { namespace: coreNamespace, locale: "en", messages: { greeting: "Hello, {name}" } },
+    ]);
+
+    expect(kit.t("greeting")).toBe("Hello, {name}");
+    expect(kit.diagnostics.join("\n")).toMatch(/needs the parameter name/);
+  });
+
+  it("picks the plural category the language actually has", () => {
+    const messages = {
+      "plugins.count.one": "{count} плагин",
+      "plugins.count.few": "{count} плагина",
+      "plugins.count.many": "{count} плагинов",
+    };
+    const kit = translator("ru", [{ namespace: coreNamespace, locale: "ru", messages }]);
+
+    expect(kit.t("plugins.count", { count: 1 })).toBe("1 плагин");
+    expect(kit.t("plugins.count", { count: 3 })).toBe("3 плагина");
+    expect(kit.t("plugins.count", { count: 11 })).toBe("11 плагинов");
+  });
+
+  it("formats numbers and dates in the chosen locale", () => {
+    const russian = translator("ru");
+    const english = translator("en");
+    const moment = new Date("2026-07-27T08:12:08.713Z");
+    const options: Intl.DateTimeFormatOptions = { timeZone: "UTC", dateStyle: "short" };
+
+    expect(russian.formatNumber(1234.5)).toBe("1\u00a0234,5");
+    expect(english.formatNumber(1234.5)).toBe("1,234.5");
+    expect(russian.formatDate(moment, options)).toBe("27.07.2026");
+    expect(english.formatDate(moment, options)).toBe("7/27/26");
+  });
+});
+
+describe("the shipped catalogs", () => {
+  it("say the same keys in both locales", () => {
+    expect(Object.keys(coreRussian.messages).sort()).toEqual(
+      Object.keys(coreEnglish.messages).sort(),
+    );
+  });
+});
