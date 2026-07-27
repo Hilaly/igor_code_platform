@@ -69,14 +69,13 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
 
   let nextIndex = 1;
 
-  // Очередь, а не прямая отправка: запись в журнал о выгнанном клиенте сама уходит в шину, и без
-  // очереди вложенная публикация ушла бы в сокеты раньше той, что её вызвала. Индексы монотонны
-  // только тогда, когда порядок отправки совпадает с порядком присвоения.
-  const pending: StreamEvent[] = [];
-  let sending = false;
-
+  // Отправка прямо в обработчике, без очереди. Это держится на инварианте: подписчик шины не
+  // публикует на шину синхронно. Вложенная публикация ушла бы в сокеты раньше той, что её вызвала,
+  // и порядок отправки разошёлся бы с порядком присвоения индексов — то есть догон по
+  // `Last-Event-ID` начал бы врать. Раньше такой подписчик был один — журнал, — но журнал с шины
+  // ушёл (ADR-0074).
   const unsubscribe = options.bus.subscribe((event) => {
-    pending.push({
+    const frame = {
       index: nextIndex,
       time: new Date(now()).toISOString(),
       type: event.type,
@@ -84,32 +83,14 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
       // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
       // платформенного (ADR-0072).
       ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
-    } as StreamEvent);
+    } as StreamEvent;
 
     nextIndex += 1;
 
-    if (sending) {
-      return;
-    }
+    remember(frame);
 
-    sending = true;
-
-    try {
-      while (pending.length > 0) {
-        const next = pending.shift();
-
-        if (next === undefined) {
-          break;
-        }
-
-        remember(next);
-
-        for (const client of [...clients]) {
-          deliver(client, next);
-        }
-      }
-    } finally {
-      sending = false;
+    for (const client of [...clients]) {
+      deliver(client, frame);
     }
   });
 
