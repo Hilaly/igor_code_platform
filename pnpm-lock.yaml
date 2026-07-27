@@ -75,6 +75,22 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/ui-kit:
+    dependencies:
+      '@sovereign/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@24.13.3)(supports-color@7.2.0)
+
 packages:
 
   '@babel/code-frame@7.29.7':

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Кит собирается бандлером вместе с приложением, а не исполняется Node: разрешение модулей
+    // здесь такое же, как у apps/web, а не как у демона.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2023", "dom"],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": ["src"]
+}

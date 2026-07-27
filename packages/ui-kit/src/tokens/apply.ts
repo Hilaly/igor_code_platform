@@ -1,0 +1,20 @@
+/**
+ * Применение схемы: роли пишутся CSS-переменными в корень документа. Это единственное место в
+ * токенах, которое знает про DOM, — и единственный способ, которым тема доезжает до чужого
+ * компонента: перекрасить его извне платформа не может (ADR-0028).
+ *
+ * Цель приходит параметром, а не берётся из `document`: так применение проверяется без DOM.
+ */
+
+import { rolePropertyName, type RoleName, type Roles } from "./roles.ts";
+
+/** Ровно то, что нужно от `HTMLElement.style`. */
+export type StyleTarget = {
+  setProperty: (property: string, value: string) => void;
+};
+
+export function applyRoles(roles: Roles, target: StyleTarget): void {
+  for (const [role, value] of Object.entries(roles)) {
+    target.setProperty(rolePropertyName(role as RoleName), value);
+  }
+}
