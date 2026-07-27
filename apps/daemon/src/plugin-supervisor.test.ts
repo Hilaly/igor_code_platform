@@ -254,6 +254,86 @@ describe("createPluginSupervisor", () => {
     );
   });
 
+  it("shows the install stage and starts the plugin after it", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      ensureDependencies: async (_plugin, onInstallStart) => {
+        onInstallStart();
+
+        return { kind: "installed" };
+      },
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "installing"), "the install stage");
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+  });
+
+  it("leaves a plugin whose dependencies could not be installed failed, without retrying", async () => {
+    const recorded = journal();
+    const clock = manualClock();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      schedule: clock.schedule,
+      now: clock.now,
+      ensureDependencies: async (_plugin, onInstallStart) => {
+        onInstallStart();
+
+        return { kind: "failed", reason: "npm error code E404" };
+      },
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    const failure = await recorded.waitFor(
+      reachedState("data:hello", "failed"),
+      "the install failure",
+    );
+
+    assert.equal(failure["reason"], "npm error code E404");
+    assert.deepEqual(clock.delays(), []);
+    assert.equal(
+      recorded.records.some((record) => record.message === "hello is up"),
+      false,
+    );
+  });
+
+  it("does not install anything for a built-in plugin", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    let asked = false;
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      ensureDependencies: async () => {
+        asked = true;
+
+        return { kind: "not-needed" };
+      },
+    });
+    running = supervisor;
+
+    const builtin = only("hello").plugins.map((plugin) => ({
+      ...plugin,
+      key: "builtin:hello",
+      source: "builtin" as const,
+    }));
+
+    await supervisor.apply({ plugins: builtin, refused: [] }, enabled("builtin:hello"));
+    await recorded.waitFor(reachedState("builtin:hello", "running"), "the built-in plugin running");
+
+    assert.equal(asked, false);
+  });
+
   it("fails a plugin that throws in activate and retries with a growing delay", async () => {
     const recorded = journal();
     const clock = manualClock();

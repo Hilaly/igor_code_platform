@@ -14,6 +14,7 @@ import type { LogSource, Preferences } from "@sovereign/protocol";
 
 import type { ContributionRegistry } from "./contribution-registry.ts";
 import type { Logger } from "./logger.ts";
+import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
 import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
@@ -68,6 +69,11 @@ export type CreatePluginSupervisorOptions = {
   deactivateTimeoutMilliseconds?: number;
   /** Сколько плагин должен продержаться, чтобы следующее падение считалось первым. */
   stabilityMilliseconds?: number;
+  /** Установка зависимостей (ADR-0042). Внедряется, чтобы тест не ходил в сеть. */
+  ensureDependencies?: (
+    plugin: DiscoveredPlugin,
+    onInstallStart: () => void,
+  ) => Promise<DependencyOutcome>;
 };
 
 const defaultRetryDelays = [1_000, 5_000, 15_000, 30_000, 60_000];
@@ -95,6 +101,8 @@ type Supervised = {
   contributed: CustomContribution[];
   disabledContributions: ReadonlySet<string>;
   cancelRetry?: CancelScheduled;
+  /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
+  startToken?: object;
 };
 
 export function createPluginSupervisor(options: CreatePluginSupervisorOptions): PluginSupervisor {
@@ -110,6 +118,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const retryDelays = options.retryDelaysMilliseconds ?? defaultRetryDelays;
   const deactivateTimeout = options.deactivateTimeoutMilliseconds ?? defaultDeactivateTimeout;
   const stability = options.stabilityMilliseconds ?? defaultStability;
+  const ensureDependencies =
+    options.ensureDependencies ??
+    ((plugin: DiscoveredPlugin, onInstallStart: () => void) =>
+      ensurePluginDependencies({ directory: plugin.directory, logger, onInstallStart }));
 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
@@ -223,7 +235,50 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     }
   };
 
+  /**
+   * Установка — этап жизненного цикла, а не скрытая подготовка (ADR-0042): плагин с зависимостями
+   * стартует долго, и это видно. Встроенные сюда не заходят — их зависимости решены сборкой.
+   */
+  const install = async (entry: Supervised): Promise<boolean> => {
+    if (entry.plugin.source === "builtin") {
+      return true;
+    }
+
+    const outcome = await ensureDependencies(entry.plugin, () => transition(entry, "installing"));
+
+    if (outcome.kind === "failed") {
+      // Провал установки не перезапускается (ADR-0070): повтор раз в минуту не починит сеть или
+      // реестр. Повтор происходит по действию человека или по правке плагина.
+      entry.attempt = 0;
+      entry.nextAttemptAt = undefined;
+      transition(entry, "failed", outcome.reason);
+
+      return false;
+    }
+
+    logger.debug("the plugin dependencies are ready", {
+      plugin: entry.plugin.key,
+      outcome: outcome.kind,
+    });
+
+    return true;
+  };
+
   const start = (entry: Supervised): void => {
+    const token = {};
+    entry.startToken = token;
+
+    void (async () => {
+      const ready = await install(entry);
+
+      // Пока ставились зависимости, плагин могли выключить или снять с диска.
+      if (ready && entry.startToken === token) {
+        launch(entry);
+      }
+    })();
+  };
+
+  const launch = (entry: Supervised): void => {
     transition(entry, "starting");
 
     const workerData: PluginWorkerData = {
@@ -258,6 +313,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.cancelRetry?.();
     entry.cancelRetry = undefined;
     entry.nextAttemptAt = undefined;
+    entry.startToken = undefined;
 
     const worker = entry.worker;
 
@@ -385,7 +441,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       entry.disabledContributions = enablement.disabledContributions;
 
       const alive =
-        entry.state === "starting" || entry.state === "running" || entry.state === "failed";
+        entry.state === "installing" ||
+        entry.state === "starting" ||
+        entry.state === "running" ||
+        entry.state === "failed";
 
       if (enablement.enabled && !alive) {
         entry.attempt = 0;
