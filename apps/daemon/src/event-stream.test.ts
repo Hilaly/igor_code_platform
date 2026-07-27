@@ -7,6 +7,7 @@ import { after, describe, it } from "node:test";
 import {
   coreEventTypes,
   eventsPath,
+  isPluginStreamEvent,
   streamGapType,
   type LogRecord,
   type StreamEvent,
@@ -134,7 +135,9 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
 }
 
 const messagesOf = (events: StreamEvent[]): string[] =>
-  events.map((event) => (event.type === "core.log" ? event.payload.message : event.type));
+  events.map((event) =>
+    !isPluginStreamEvent(event) && event.type === "core.log" ? event.payload.message : event.type,
+  );
 
 describe("createEventStream", () => {
   it("numbers events monotonically and delivers them one by one", async () => {

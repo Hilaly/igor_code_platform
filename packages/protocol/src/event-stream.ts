@@ -4,7 +4,7 @@
  * дочитал до сих пор» и получает пропущенное при переподключении.
  */
 
-import type { CoreEventPayloads } from "./events.ts";
+import type { CoreEventPayloads, PluginEventOrigin } from "./events.ts";
 
 export const eventsPath = "/api/events";
 
@@ -33,14 +33,38 @@ export type StreamEventPayloads = CoreEventPayloads & {
 
 export type StreamEventType = keyof StreamEventPayloads;
 
-/** Кадр потока целиком: он же тело `data:`, разбирать SSE-поля клиенту не нужно. */
-export type StreamEvent = {
-  [Type in StreamEventType]: {
-    /** Монотонный, начинается с единицы и сбрасывается при перезапуске демона. */
-    index: number;
-    /** Момент попадания в поток, ISO 8601. */
-    time: string;
+type StreamFrame = {
+  /** Монотонный, начинается с единицы и сбрасывается при перезапуске демона. */
+  index: number;
+  /** Момент попадания в поток, ISO 8601. */
+  time: string;
+};
+
+/** Кадр события ядра: тип определяет форму нагрузки. */
+export type CoreStreamEvent = {
+  [Type in StreamEventType]: StreamFrame & {
     type: Type;
     payload: StreamEventPayloads[Type];
   };
 }[StreamEventType];
+
+/**
+ * Кадр события плагина. В поток он идёт наравне с событиями ядра, а не завёрнутым в них
+ * (ADR-0017): для клиента это такое же событие, только имя пришло не из поставки.
+ */
+export type PluginStreamEvent = StreamFrame & {
+  type: string;
+  payload: unknown;
+  plugin: PluginEventOrigin;
+};
+
+/** Кадр потока целиком: он же тело `data:`, разбирать SSE-поля клиенту не нужно. */
+export type StreamEvent = CoreStreamEvent | PluginStreamEvent;
+
+/**
+ * Различает кадры так же, как шина различает события, — по наличию `plugin`. Без этого имя
+ * события ядра перестаёт сужать нагрузку: у события плагина имя произвольное.
+ */
+export function isPluginStreamEvent(event: StreamEvent): event is PluginStreamEvent {
+  return "plugin" in event;
+}

@@ -9,15 +9,36 @@
 
 import type { PluginSource } from "./plugin.ts";
 
-export type ContributionRegistration = {
-  /** С неймспейсом: `<pluginId>.<объявленный>` (ADR-0024, ADR-0060). */
+/**
+ * Схема нагрузки в виде данных — то, что отдаёт `z.toJSONSchema()`. Сама схема сюда попасть не
+ * может: в ней функции, а между воркером и ядром ходит структурное клонирование (ADR-0072).
+ */
+export type PayloadSchema = Record<string, unknown>;
+
+type RegistrationCommon = {
+  /** С неймспейсом: `<pluginId>.<объявленный>` (ADR-0024, ADR-0072). */
   id: string;
   declaredId: string;
-  kind: "custom";
   pluginKey: string;
   pluginId: string;
   source: PluginSource;
   title?: string;
   description?: string;
+};
+
+/** Общий вид: платформа о нагрузке ничего не знает и ничего с ней не делает. */
+export type CustomContributionRegistration = RegistrationCommon & {
+  kind: "custom";
   payload?: unknown;
 };
+
+/** Событие шины, объявленное плагином (ADR-0072). Идентификатор вклада — имя события. */
+export type EventContributionRegistration = RegistrationCommon & {
+  kind: "event";
+  payloadSchema: PayloadSchema;
+};
+
+export type ContributionRegistration =
+  CustomContributionRegistration | EventContributionRegistration;
+
+export type ContributionKind = ContributionRegistration["kind"];

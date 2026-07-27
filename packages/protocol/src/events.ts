@@ -10,6 +10,7 @@
 import type { ContributionRegistration } from "./contribution.ts";
 import type { LogRecord } from "./log.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
+import type { PluginSource } from "./plugin.ts";
 
 export const coreEventTypes = {
   /** Каждая запись журнала — событие шины (ADR-0021). */
@@ -42,3 +43,36 @@ export type CoreEventType = keyof CoreEventPayloads;
 export type CoreEvent = {
   [Type in CoreEventType]: { type: Type; payload: CoreEventPayloads[Type] };
 }[CoreEventType];
+
+/**
+ * Кто опубликовал. Подписчик обязан это знать: контракт события принадлежит автору, и без имени
+ * расхождение «форма нагрузки изменилась» не на кого повесить (ADR-0072).
+ */
+export type PluginEventOrigin = {
+  /** Ключ экземпляра: идентичность вместе с источником (ADR-0067). */
+  key: string;
+  id: string;
+  source: PluginSource;
+};
+
+/**
+ * Событие плагина. Перечислить их типы заранее нельзя — плагин не входит в поставку, — поэтому
+ * форма одна на все: имя строкой, нагрузка непрозрачная. Проверил её тот, кто опубликовал
+ * (ADR-0072).
+ */
+export type PluginBusEvent = {
+  /** Полное имя, с неймспейсом публикатора: `<pluginId>.<объявленное>`. */
+  type: string;
+  payload: unknown;
+  plugin: PluginEventOrigin;
+};
+
+/**
+ * Всё, что ходит по шине. Различаются формы наличием `plugin`, а не полем-меткой: объединение
+ * событий ядра остаётся закрытым, и нагрузка `core.log` не деградирует до `unknown`.
+ */
+export type BusEvent = CoreEvent | PluginBusEvent;
+
+export function isPluginBusEvent(event: BusEvent): event is PluginBusEvent {
+  return "plugin" in event;
+}
