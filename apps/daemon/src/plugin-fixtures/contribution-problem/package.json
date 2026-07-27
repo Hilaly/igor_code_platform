@@ -1,0 +1,11 @@
+{
+  "name": "contribution-problem",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "problem",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

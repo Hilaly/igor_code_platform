@@ -470,6 +470,56 @@ describe("createPluginSupervisor", () => {
     );
   });
 
+  it("carries the rejected contribution as a reason on the status of a running plugin", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("problem"), enabled("data:problem"));
+    await recorded.waitFor(reachedState("data:problem", "running"), "problem running");
+
+    // Кривой вклад не роняет плагин: остальные его вклады действуют.
+    assert.deepEqual(
+      registry.resolved().map((registration) => registration.id),
+      ["problem.board"],
+    );
+
+    const status = supervisor.statuses().find((entry) => entry.key === "data:problem");
+
+    assert.equal(status?.state, "running");
+    assert.match(status?.contributionProblems?.[0] ?? "", /"Board Panel" must match/);
+
+    // Причина обязана уехать тем же событием: для пользователя это единственный признак, что вклад
+    // не появился, а журнал в браузер не отдаётся (ADR-0074).
+    assert.deepEqual(lifecycleEvents(recorded.events, "data:problem").at(-1), status);
+  });
+
+  it("forgets the rejected contribution when the plugin is switched off", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("problem"), enabled("data:problem"));
+    await recorded.waitFor(reachedState("data:problem", "running"), "problem running");
+    await supervisor.apply(only("problem"), disabled("data:problem"));
+
+    const status = supervisor.statuses().find((entry) => entry.key === "data:problem");
+
+    assert.equal(status?.state, "disabled");
+    assert.equal(status?.contributionProblems, undefined);
+  });
+
   it("takes the contributions away when the plugin is switched off", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();

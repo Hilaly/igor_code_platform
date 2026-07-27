@@ -84,6 +84,8 @@ type Supervised = {
   pending: PluginContribution[];
   /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
   contributed: PluginContribution[];
+  /** Почему объявленный вклад не появился (ADR-0054): причина живёт до следующего применения. */
+  contributionProblems: string[];
   disabledContributions: ReadonlySet<string>;
   /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
   enabled: boolean;
@@ -134,6 +136,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     ...(entry.reason === undefined ? {} : { reason: entry.reason }),
     ...(entry.attempt === 0 ? {} : { attempt: entry.attempt }),
     ...(entry.nextAttemptAt === undefined ? {} : { nextAttemptAt: entry.nextAttemptAt }),
+    ...(entry.contributionProblems.length === 0
+      ? {}
+      : { contributionProblems: entry.contributionProblems }),
   });
 
   const transition = (entry: Supervised, state: PluginLifecycleState, reason?: string): void => {
@@ -177,6 +182,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const applyContributions = (entry: Supervised): void => {
     const outcome = registry.apply(entry.plugin, entry.contributed, entry.disabledContributions);
 
+    // Причина уезжает в статус, то есть и в снимок, и в событие жизненного цикла: вклады
+    // применяются перед переходом в `running`, поэтому событие уносит её с собой. Переключение
+    // вклада набор проблем не меняет — они про форму объявления, а не про решение человека.
+    entry.contributionProblems = outcome.problems;
+
     for (const problem of outcome.problems) {
       // Кривой вклад — событие жизненного цикла плагина, а не исключение (ADR-0054).
       logger.warn("the plugin contribution was not applied", {
@@ -209,6 +219,8 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const dropContributions = (entry: Supervised): void => {
     entry.pending = [];
     entry.contributed = [];
+    // Причина уходит вместе с вкладами: у выгруженного плагина объявленного нет вовсе.
+    entry.contributionProblems = [];
     registry.remove(entry.plugin.key);
 
     // Подписки снимаются здесь же, где вклады: перезагруженный плагин подпишется заново, и две
@@ -492,6 +504,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           attempt: 0,
           pending: [],
           contributed: [],
+          contributionProblems: [],
           disabledContributions: new Set(),
           enabled: false,
         };
