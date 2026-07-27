@@ -23,6 +23,12 @@ export const coreEventTypes = {
   pluginLifecycle: "core.plugin.lifecycle",
   /** Действующий набор вкладов изменился. */
   pluginContributions: "core.plugin.contributions",
+  /**
+   * Внешний вид или локаль изменились. Событие обязано быть: `preferences.json` перечитывается на
+   * живом демоне (ADR-0033), и правка файла руками должна доезжать до открытого браузера. О записях
+   * плагинов из того же файла говорят события жизненного цикла и набора вкладов.
+   */
+  preferencesChanged: "core.preferences.changed",
 } as const;
 
 /**
@@ -35,9 +41,17 @@ export type PluginContributionsChanged = {
   contributions: ContributionRegistration[];
 };
 
+/**
+ * Нагрузки нет: событие говорит «изменилось», а состояние спрашивается у владельца — `GET
+ * /api/preferences` (ADR-0041). Дублировать значения в событии значит завести второй источник правды
+ * о файле, который в этот момент могли перезаписать ещё раз.
+ */
+export type PreferencesChanged = Record<string, never>;
+
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
+  "core.preferences.changed": PreferencesChanged;
 };
 
 export type CoreEventType = keyof CoreEventPayloads;

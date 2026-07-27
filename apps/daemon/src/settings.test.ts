@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { configFileName, preferencesFileName } from "@sovereign/protocol";
+import {
+  configFileName,
+  defaultConfig,
+  defaultPreferences,
+  preferencesFileName,
+} from "@sovereign/protocol";
 
 import type { Logger } from "./logger.ts";
 import { createSettingsStore, type SettingsSnapshot, type SettingsStore } from "./settings.ts";
@@ -100,10 +105,7 @@ async function applyAtomically(
 test("missing files mean the defaults", () => {
   const { store, messages } = startedStore(freshDirectory());
 
-  assert.deepEqual(store.current(), {
-    config: { logLevel: "info" },
-    preferences: { plugins: {} },
-  });
+  assert.deepEqual(store.current(), { config: defaultConfig, preferences: defaultPreferences });
   assert.deepEqual(messages, []);
 });
 

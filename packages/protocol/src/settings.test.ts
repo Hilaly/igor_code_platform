@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parsePreferences, type Preferences } from "./settings.ts";
+import { defaultPreferences, parsePreferences, type Preferences } from "./settings.ts";
 
 const parsedPlugins = (raw: unknown): Preferences["plugins"] => {
   const result = parsePreferences(raw);
@@ -70,5 +70,75 @@ describe("parsePreferences", () => {
 
     assert.equal(result.kind, "parsed");
     assert.match(result.diagnostics.join("\n"), /pinned/);
+  });
+});
+
+describe("parsePreferences: appearance and locale", () => {
+  const parsed = (raw: unknown): Preferences => {
+    const result = parsePreferences(raw);
+
+    assert.equal(result.kind, "parsed");
+    assert.deepEqual(result.kind === "parsed" ? result.diagnostics : ["unreachable"], []);
+
+    return result.kind === "parsed" ? result.value : defaultPreferences;
+  };
+
+  it("takes a file that says nothing as the built-in scheme and the base locale", () => {
+    assert.deepEqual(parsed({}).appearance, { colorScheme: "base", variant: "system" });
+    assert.equal(parsed({}).locale, "en");
+  });
+
+  it("reads the scheme, the variant and the locale", () => {
+    const preferences = parsed({
+      appearance: { colorScheme: "midnight", variant: "dark" },
+      locale: "ru",
+    });
+
+    assert.deepEqual(preferences.appearance, { colorScheme: "midnight", variant: "dark" });
+    assert.equal(preferences.locale, "ru");
+  });
+
+  it("fills in what the appearance does not name", () => {
+    assert.deepEqual(parsed({ appearance: { variant: "light" } }), {
+      plugins: {},
+      appearance: { colorScheme: "base", variant: "light" },
+      locale: "en",
+    });
+  });
+
+  it("refuses the whole file when the appearance or the locale is wrong", () => {
+    for (const raw of [
+      { appearance: { variant: "bright" } },
+      { appearance: { colorScheme: "" } },
+      { appearance: { colorScheme: 7 } },
+      { appearance: "dark" },
+      { locale: "не тег" },
+      { locale: 7 },
+    ]) {
+      const result = parsePreferences(raw);
+
+      assert.equal(result.kind, "rejected", `${JSON.stringify(raw)} must be refused`);
+      assert.equal(result.diagnostics.length, 1, `${JSON.stringify(raw)} must say what is wrong`);
+    }
+  });
+
+  it("keeps an unknown key inside the appearance as a diagnostic", () => {
+    const result = parsePreferences({ appearance: { variant: "dark", contrast: "high" } });
+
+    assert.equal(result.kind, "parsed");
+    assert.match(result.diagnostics.join("\n"), /contrast/);
+  });
+
+  it("reports every section before refusing, so one run names all the problems", () => {
+    const result = parsePreferences({
+      pinned: true,
+      plugins: { hello: { enabled: true } },
+      locale: "не тег",
+    });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join("\n"), /pinned/);
+    assert.match(result.diagnostics.join("\n"), /hello/);
+    assert.match(result.diagnostics.join("\n"), /locale/);
   });
 });

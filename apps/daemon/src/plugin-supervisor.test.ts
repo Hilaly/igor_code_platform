@@ -4,6 +4,7 @@ import { afterEach, describe, it } from "node:test";
 import { setTimeout as wait } from "node:timers/promises";
 
 import {
+  defaultPreferences,
   isPluginBusEvent,
   type BusEvent,
   type LogRecord,
@@ -35,17 +36,20 @@ function only(...ids: string[]): PluginDiscovery {
   };
 }
 
-const enabled = (...keys: string[]): Preferences => ({
-  plugins: Object.fromEntries(
-    keys.map((key) => [key, { enabled: true, disabledContributions: [] }]),
-  ),
+const preferences = (plugins: Preferences["plugins"]): Preferences => ({
+  ...defaultPreferences,
+  plugins,
 });
 
-const disabled = (...keys: string[]): Preferences => ({
-  plugins: Object.fromEntries(
-    keys.map((key) => [key, { enabled: false, disabledContributions: [] }]),
-  ),
-});
+const enabled = (...keys: string[]): Preferences =>
+  preferences(
+    Object.fromEntries(keys.map((key) => [key, { enabled: true, disabledContributions: [] }])),
+  );
+
+const disabled = (...keys: string[]): Preferences =>
+  preferences(
+    Object.fromEntries(keys.map((key) => [key, { enabled: false, disabledContributions: [] }])),
+  );
 
 type Journal = {
   records: LogRecord[];
@@ -413,7 +417,7 @@ describe("createPluginSupervisor", () => {
     });
     running = supervisor;
 
-    await supervisor.apply(only("hello"), { plugins: {} });
+    await supervisor.apply(only("hello"), preferences({}));
 
     // Не «обнаружен»: решение применено, и оно — «выключен» (ADR-0018). Переход виден в журнале
     // и без воркера: человеку нужно подтверждение, а не молчание.
@@ -499,9 +503,10 @@ describe("createPluginSupervisor", () => {
     await supervisor.apply(only("hello"), enabled("data:hello"));
     await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
 
-    await supervisor.apply(only("hello"), {
-      plugins: { "data:hello": { enabled: true, disabledContributions: ["hello.board"] } },
-    });
+    await supervisor.apply(
+      only("hello"),
+      preferences({ "data:hello": { enabled: true, disabledContributions: ["hello.board"] } }),
+    );
 
     assert.deepEqual(registry.resolved(), []);
     assert.equal(

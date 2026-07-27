@@ -8,7 +8,10 @@ import { resolvePluginEnablement } from "./plugin-enablement.ts";
 const builtin = { key: "builtin:tasks", source: "builtin" } as const;
 const external = { key: "data:hello", source: "data" } as const;
 
-const preferences = (plugins: Preferences["plugins"]): Preferences => ({ plugins });
+const preferences = (plugins: Preferences["plugins"]): Preferences => ({
+  ...defaultPreferences,
+  plugins,
+});
 
 describe("resolvePluginEnablement", () => {
   it("runs a built-in plugin nobody has decided about", () => {

@@ -12,4 +12,5 @@ export * from "./plugin-lifecycle.ts";
 export * from "./plugin-preferences.ts";
 export * from "./plugin.ts";
 export * from "./plugins-snapshot.ts";
+export * from "./preferences-api.ts";
 export * from "./settings.ts";
