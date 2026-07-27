@@ -8,6 +8,7 @@ import { createLogger, createRecordWriter } from "./logger.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
+import { pluginsRoute } from "./plugins-snapshot.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
 
@@ -121,7 +122,10 @@ const pluginWatcher = createPluginWatcher({
 pluginWatcher.start();
 applyPlugins();
 
-const server = createDaemonServer({ logger, routes: [healthRoute(new Date())] });
+const server = createDaemonServer({
+  logger,
+  routes: [healthRoute(new Date()), pluginsRoute({ plugins, registry: contributions })],
+});
 
 server.listen(port, "127.0.0.1", () => {
   logger.info("daemon started", {
