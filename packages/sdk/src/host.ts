@@ -25,20 +25,38 @@ export type PluginIdentity = {
 
 /**
  * Общий вид вклада (ADR-0054): идентификатор, метаданные отображения, произвольная нагрузка.
- * Типизированные виды появятся вместе со своими потребителями.
+ * Типизированные виды появляются вместе со своими потребителями.
  */
 export type CustomContribution = {
-  /** Без неймспейса: его добавляет хост, объявить чужой нельзя (ADR-0024, ADR-0060). */
+  /** Без неймспейса: его добавляет хост, объявить чужой нельзя (ADR-0024, ADR-0072). */
   id: string;
   title?: string;
   description?: string;
   payload?: unknown;
 };
 
+/**
+ * Схема нагрузки, превращённая в данные. К хосту едет описание, а не схема: в схеме функции, а
+ * граница воркера — структурное клонирование (ADR-0072).
+ */
+export type PayloadSchema = Record<string, unknown>;
+
+/** Объявление события шины (ADR-0072). Идентификатор вклада — это имя события. */
+export type EventContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  payloadSchema: PayloadSchema;
+};
+
+/** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
+export type PluginContribution =
+  ({ kind: "custom" } & CustomContribution) | ({ kind: "event" } & EventContribution);
+
 export type PluginHost = {
   identity: PluginIdentity;
   log: (level: PluginLogLevel, message: string, fields?: Record<string, unknown>) => Promise<void>;
-  contribute: (contribution: CustomContribution) => Promise<void>;
+  contribute: (contribution: PluginContribution) => Promise<void>;
 };
 
 export function installPluginHost(host: PluginHost): void {

@@ -5,15 +5,25 @@
  * Всё асинхронно (ADR-0011): плагин живёт в своём воркере, и любой вызов к платформе — сообщение.
  */
 
+import { z } from "zod";
+
 import { currentPluginHost, type CustomContribution, type PluginLogLevel } from "./host.ts";
 
-export type { CustomContribution, PluginHost, PluginIdentity, PluginLogLevel } from "./host.ts";
+export type {
+  CustomContribution,
+  EventContribution,
+  PayloadSchema,
+  PluginContribution,
+  PluginHost,
+  PluginIdentity,
+  PluginLogLevel,
+} from "./host.ts";
 
 /**
  * Язык схем платформы (ADR-0072). Реэкспорт, а не «поставьте zod сами»: два экземпляра zod в одном
  * процессе дают два несовместимых типа схемы, и схема плагина перестала бы подходить платформе.
  */
-export { z } from "zod";
+export { z };
 
 /**
  * Точки входа плагина. `activate` вызывается после того, как хост готов; `deactivate` — перед
@@ -41,13 +51,44 @@ export const log: Record<PluginLogLevel, LogCall> = {
   error: at("error"),
 };
 
+/**
+ * Событие плагина: имя, схема нагрузки и способ его опубликовать (ADR-0072).
+ *
+ * Дескриптор — обычный экспорт модуля, и это главное в нём: подписчик импортирует его у
+ * публикатора и получает и типы, и возможность проверить нагрузку у себя. Схема между воркерами не
+ * ходит, а исходники — ходят.
+ */
+export type EventDescriptor<Schema extends z.ZodType = z.ZodType> = {
+  /** Объявленный, без неймспейса: неймспейс ставит хост по идентичности плагина. */
+  id: string;
+  schema: Schema;
+};
+
+export function defineEvent<Schema extends z.ZodType>(
+  id: string,
+  schema: Schema,
+): EventDescriptor<Schema> {
+  return { id, schema };
+}
+
 export const contribute = {
   /**
    * Общий вид вклада (ADR-0054). Регистрация во время `activate` применяется одним снимком:
    * наблюдатель видит либо прежний набор, либо новый целиком.
    */
   custom: async (contribution: CustomContribution): Promise<void> =>
-    currentPluginHost().contribute(contribution),
+    currentPluginHost().contribute({ kind: "custom", ...contribution }),
+
+  /**
+   * Объявить событие. Пока оно не объявлено, публикация отказывается ядром: событие — это вклад, а
+   * значит его видно в реестре и его можно выключить (ADR-0032, ADR-0072).
+   */
+  event: async <Schema extends z.ZodType>(event: EventDescriptor<Schema>): Promise<void> =>
+    currentPluginHost().contribute({
+      kind: "event",
+      id: event.id,
+      payloadSchema: { ...z.toJSONSchema(event.schema) },
+    }),
 };
 
 /** Кто мы, по версии хоста. Полезно в логах самого плагина и в его собственных путях. */

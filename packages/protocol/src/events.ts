@@ -12,6 +12,9 @@ import type { LogRecord } from "./log.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginSource } from "./plugin.ts";
 
+/** Неймспейс ядра. Плагин занять его не может: иначе его событие неотличимо от платформенного. */
+export const coreEventNamespace = "core";
+
 export const coreEventTypes = {
   /** Каждая запись журнала — событие шины (ADR-0021). */
   log: "core.log",

@@ -39,7 +39,7 @@ describe("buildPluginsSnapshot", () => {
 
     state.registry.apply(
       { key: "data:hello", id: "hello", source: "data" },
-      [{ id: "greeting" }],
+      [{ kind: "custom", id: "greeting" }],
       new Set(),
     );
 
@@ -66,7 +66,7 @@ describe("buildPluginsSnapshot", () => {
     state.registry.remove("data:hello");
     state.registry.apply(
       { key: "data:hello", id: "hello", source: "data" },
-      [{ id: "later" }],
+      [{ kind: "custom", id: "later" }],
       new Set(),
     );
 

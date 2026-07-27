@@ -3,16 +3,17 @@
  * них действуют, и держит связь «вклад — плагин»: без неё выключение плагина не может снять всё, что
  * он зарегистрировал (ADR-0016).
  *
- * Вид пока один — общий (ADR-0054). Типизированные виды появятся вместе со своими потребителями:
- * контракт без потребителя проверить нечем.
+ * Видов два: общий и событие шины (ADR-0072). Остальные типизированные виды появятся вместе со
+ * своими потребителями — контракт без потребителя проверить нечем.
  */
 
 import {
+  coreEventNamespace,
   pluginSources,
   type ContributionRegistration,
   type PluginSource,
 } from "@sovereign/protocol";
-import type { CustomContribution } from "@sovereign/sdk";
+import type { PluginContribution } from "@sovereign/sdk";
 
 /** Точки в идентификаторе разрешены: они дают плагину свою иерархию внутри своего неймспейса. */
 const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
@@ -46,7 +47,7 @@ export type ContributionRegistry = {
    */
   apply: (
     plugin: ContributingPlugin,
-    contributions: CustomContribution[],
+    contributions: PluginContribution[],
     disabledContributions: ReadonlySet<string>,
   ) => ContributionApplyOutcome;
   remove: (pluginKey: string) => void;
@@ -125,21 +126,37 @@ export function createContributionRegistry(): ContributionRegistry {
 
         const id = `${plugin.id}.${contribution.id}`;
 
+        // Неймспейс ядра принадлежит ядру (ADR-0072): плагин с идентификатором `core` иначе объявил
+        // бы событие `core.log` и стал бы неотличим от платформы.
+        if (contribution.kind === "event" && id.startsWith(`${coreEventNamespace}.`)) {
+          problems.push(
+            `the event ${id} is in the namespace of the core, which belongs to the platform`,
+          );
+
+          continue;
+        }
+
+        const common = {
+          id,
+          declaredId: contribution.id,
+          pluginKey: plugin.key,
+          pluginId: plugin.id,
+          source: plugin.source,
+          ...(contribution.title === undefined ? {} : { title: contribution.title }),
+          ...(contribution.description === undefined
+            ? {}
+            : { description: contribution.description }),
+        };
+
         claimed.set(id, [
           ...(claimed.get(id) ?? []),
-          {
-            id,
-            declaredId: contribution.id,
-            kind: "custom",
-            pluginKey: plugin.key,
-            pluginId: plugin.id,
-            source: plugin.source,
-            ...(contribution.title === undefined ? {} : { title: contribution.title }),
-            ...(contribution.description === undefined
-              ? {}
-              : { description: contribution.description }),
-            ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
-          },
+          contribution.kind === "event"
+            ? { ...common, kind: "event", payloadSchema: contribution.payloadSchema }
+            : {
+                ...common,
+                kind: "custom",
+                ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
+              },
         ]);
       }
 

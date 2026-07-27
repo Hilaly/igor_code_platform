@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
 import { removePluginHost } from "./host.ts";
-import { contribute, identity, log, z } from "./index.ts";
+import { contribute, defineEvent, identity, log, z } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
 afterEach(() => removePluginHost());
@@ -19,8 +19,11 @@ describe("the zod re-exported by the sdk", () => {
 
 describe("the sdk without a host", () => {
   it("explains itself instead of failing on undefined", async () => {
+    const taskCreated = defineEvent("task.created", z.object({ id: z.string() }));
+
     await assert.rejects(() => log.info("hello"), /sdk is not initialised/);
     await assert.rejects(() => contribute.custom({ id: "board" }), /sdk is not initialised/);
+    await assert.rejects(() => contribute.event(taskCreated), /sdk is not initialised/);
     assert.throws(() => identity(), /sdk is not initialised/);
   });
 });
@@ -44,7 +47,7 @@ describe("the testing seam", () => {
     await contribute.custom({ id: "board", title: "Board", payload: { columns: 3 } });
 
     assert.deepEqual(host.contributions, [
-      { id: "board", title: "Board", payload: { columns: 3 } },
+      { kind: "custom", id: "board", title: "Board", payload: { columns: 3 } },
     ]);
   });
 
@@ -68,6 +71,34 @@ describe("the testing seam", () => {
     await plugin.activate();
 
     assert.deepEqual(host.logs, [{ level: "info", message: "hello is up" }]);
-    assert.deepEqual(host.contributions, [{ id: "board", title: "Board" }]);
+    assert.deepEqual(host.contributions, [{ kind: "custom", id: "board", title: "Board" }]);
+  });
+});
+
+describe("a declared event", () => {
+  const taskCreated = defineEvent(
+    "task.created",
+    z.object({ id: z.string(), title: z.string().optional() }),
+  );
+
+  it("is declared as a contribution with its schema as data", async () => {
+    const host = installTestHost({ id: "tracker" });
+
+    await contribute.event(taskCreated);
+
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "event",
+        id: "task.created",
+        payloadSchema: z.toJSONSchema(taskCreated.schema),
+      },
+    ]);
+  });
+
+  it("keeps the schema at hand, so a subscriber importing the descriptor can check the payload", () => {
+    installTestHost({ id: "tracker" });
+
+    assert.equal(taskCreated.schema.safeParse({ id: "42" }).success, true);
+    assert.equal(taskCreated.schema.safeParse({ id: 42 }).success, false);
   });
 });

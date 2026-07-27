@@ -8,7 +8,7 @@
  * исключением на месте вызова (ADR-0054).
  */
 
-import type { CustomContribution, PluginLogLevel } from "@sovereign/sdk";
+import type { PluginContribution, PluginLogLevel } from "@sovereign/sdk";
 import type { PluginSource } from "@sovereign/protocol";
 
 export type PluginWorkerData = {
@@ -26,7 +26,7 @@ export type PluginOutgoing =
       message: string;
       fields?: Record<string, unknown>;
     }
-  | { kind: "contribute"; contribution: CustomContribution }
+  | { kind: "contribute"; contribution: PluginContribution }
   | { kind: "activated" }
   /** Выгрузка завершена; `problem` заполнен, если `deactivate` бросил. */
   | { kind: "deactivated"; problem?: string }

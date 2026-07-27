@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { CustomContribution } from "@sovereign/sdk";
+import type { CustomContribution, PluginContribution } from "@sovereign/sdk";
 
 import { createContributionRegistry, type ContributingPlugin } from "./contribution-registry.ts";
 
@@ -9,7 +9,13 @@ const builtinHello: ContributingPlugin = { key: "builtin:hello", id: "hello", so
 const dataHello: ContributingPlugin = { key: "data:hello", id: "hello", source: "data" };
 const dataNotes: ContributingPlugin = { key: "data:notes", id: "notes", source: "data" };
 
-const board: CustomContribution = { id: "board", title: "Board" };
+/** Вид проставляет SDK, а не автор: в реестр вклад приходит уже с ним. */
+const custom = (contribution: CustomContribution): PluginContribution => ({
+  kind: "custom",
+  ...contribution,
+});
+
+const board = custom({ id: "board", title: "Board" });
 
 const nothingDisabled = new Set<string>();
 
@@ -32,7 +38,7 @@ describe("createContributionRegistry", () => {
   it("refuses an identifier that cannot be namespaced", () => {
     const registry = createContributionRegistry();
 
-    const outcome = registry.apply(dataHello, [{ id: "Board Panel" }], nothingDisabled);
+    const outcome = registry.apply(dataHello, [custom({ id: "Board Panel" })], nothingDisabled);
 
     assert.equal(outcome.registered.length, 0);
     assert.equal(outcome.problems.length, 1);
@@ -44,7 +50,7 @@ describe("createContributionRegistry", () => {
 
     const outcome = registry.apply(
       dataHello,
-      [board, { id: "board", title: "Another board" }],
+      [board, custom({ id: "board", title: "Another board" })],
       nothingDisabled,
     );
 
@@ -67,8 +73,16 @@ describe("createContributionRegistry", () => {
   it("lets the more specific source win over the built-in one", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(builtinHello, [{ id: "board", title: "Built-in board" }], nothingDisabled);
-    registry.apply(dataHello, [{ id: "board", title: "Overriding board" }], nothingDisabled);
+    registry.apply(
+      builtinHello,
+      [custom({ id: "board", title: "Built-in board" })],
+      nothingDisabled,
+    );
+    registry.apply(
+      dataHello,
+      [custom({ id: "board", title: "Overriding board" })],
+      nothingDisabled,
+    );
 
     assert.deepEqual(
       registry.resolved().map((registration) => [registration.source, registration.title]),
@@ -80,7 +94,11 @@ describe("createContributionRegistry", () => {
   it("keeps a disabled contribution out of the resolution entirely", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(builtinHello, [{ id: "board", title: "Built-in board" }], nothingDisabled);
+    registry.apply(
+      builtinHello,
+      [custom({ id: "board", title: "Built-in board" })],
+      nothingDisabled,
+    );
     registry.apply(dataHello, [board], new Set(["hello.board"]));
 
     // Выключенный вклад не перекрывает встроенный: он не участвует ни в чём (ADR-0032).
@@ -93,8 +111,8 @@ describe("createContributionRegistry", () => {
   it("replaces the whole set of a plugin at once", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(dataHello, [board, { id: "panel" }], nothingDisabled);
-    registry.apply(dataHello, [{ id: "panel" }], nothingDisabled);
+    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
+    registry.apply(dataHello, [custom({ id: "panel" })], nothingDisabled);
 
     assert.deepEqual(
       registry.resolved().map((registration) => registration.id),
@@ -105,7 +123,7 @@ describe("createContributionRegistry", () => {
   it("removes everything a plugin registered when it goes away", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(dataHello, [board, { id: "panel" }], nothingDisabled);
+    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
     registry.remove("data:hello");
 
     assert.deepEqual(registry.resolved(), []);
@@ -121,16 +139,73 @@ describe("createContributionRegistry", () => {
 
     assert.equal(registry.revision(), afterFirst);
 
-    registry.apply(dataHello, [board, { id: "panel" }], nothingDisabled);
+    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
 
     assert.equal(registry.revision(), afterFirst + 1);
+  });
+
+  it("registers an event with its schema alongside the general kind", () => {
+    const registry = createContributionRegistry();
+    const payloadSchema = { type: "object", properties: { id: { type: "string" } } };
+
+    const outcome = registry.apply(
+      dataHello,
+      [board, { kind: "event", id: "task.created", payloadSchema }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(
+      outcome.registered.map((registration) => [registration.kind, registration.id]),
+      [
+        ["custom", "hello.board"],
+        ["event", "hello.task.created"],
+      ],
+    );
+    assert.deepEqual(
+      registry.resolved().find((registration) => registration.kind === "event")?.payloadSchema,
+      payloadSchema,
+    );
+  });
+
+  it("refuses an event in the namespace of the core", () => {
+    const registry = createContributionRegistry();
+    const asCore: ContributingPlugin = { key: "data:core", id: "core", source: "data" };
+
+    const outcome = registry.apply(
+      asCore,
+      [{ kind: "event", id: "log", payloadSchema: {} }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.registered, []);
+    assert.match(outcome.problems[0] ?? "", /namespace of the core/);
+  });
+
+  it("keeps a disabled event out, so publishing it has nothing to stand on", () => {
+    const registry = createContributionRegistry();
+
+    registry.apply(
+      dataHello,
+      [{ kind: "event", id: "task.created", payloadSchema: {} }],
+      new Set(["hello.task.created"]),
+    );
+
+    assert.deepEqual(registry.resolved(), []);
   });
 
   it("brings the overridden contribution back when the overriding plugin leaves", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(builtinHello, [{ id: "board", title: "Built-in board" }], nothingDisabled);
-    registry.apply(dataHello, [{ id: "board", title: "Overriding board" }], nothingDisabled);
+    registry.apply(
+      builtinHello,
+      [custom({ id: "board", title: "Built-in board" })],
+      nothingDisabled,
+    );
+    registry.apply(
+      dataHello,
+      [custom({ id: "board", title: "Overriding board" })],
+      nothingDisabled,
+    );
     registry.remove("data:hello");
 
     assert.deepEqual(

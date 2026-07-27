@@ -10,7 +10,7 @@
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
-import type { CustomContribution } from "@sovereign/sdk";
+import type { PluginContribution } from "@sovereign/sdk";
 import {
   coreEventTypes,
   type LogSource,
@@ -80,9 +80,9 @@ type Supervised = {
   worker?: Worker;
   runningSince?: number;
   /** Вклады копятся до `activated` и применяются одним снимком (ADR-0024). */
-  pending: CustomContribution[];
+  pending: PluginContribution[];
   /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
-  contributed: CustomContribution[];
+  contributed: PluginContribution[];
   disabledContributions: ReadonlySet<string>;
   /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
   enabled: boolean;

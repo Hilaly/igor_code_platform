@@ -9,7 +9,7 @@
 import {
   installPluginHost,
   removePluginHost,
-  type CustomContribution,
+  type PluginContribution,
   type PluginIdentity,
   type PluginLogLevel,
 } from "./host.ts";
@@ -23,7 +23,7 @@ export type RecordedLog = {
 export type PluginTestHost = {
   identity: PluginIdentity;
   logs: RecordedLog[];
-  contributions: CustomContribution[];
+  contributions: PluginContribution[];
   /** Снимает шов. Без этого следующий тест увидит чужой хост. */
   restore: () => void;
 };
@@ -34,7 +34,7 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     source: identity.source ?? "data",
   };
   const logs: RecordedLog[] = [];
-  const contributions: CustomContribution[] = [];
+  const contributions: PluginContribution[] = [];
 
   installPluginHost({
     identity: resolved,
