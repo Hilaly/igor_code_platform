@@ -6,6 +6,7 @@ import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger, createRecordWriter } from "./logger.ts";
+import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
@@ -132,6 +133,7 @@ const server = createDaemonServer({
   routes: [
     healthRoute(new Date()),
     pluginsRoute({ plugins, registry: contributions }),
+    pluginPreferencesRoute({ settings, plugins, logger }),
     events.route(),
   ],
 });

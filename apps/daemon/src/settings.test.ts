@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -207,4 +207,66 @@ test("foreign files in the data directory raise nothing", async () => {
 
   assert.equal(notifications, 0);
   assert.equal(store.current().config.logLevel, "debug");
+});
+
+test("a written preference is in the snapshot when the call returns", () => {
+  const directory = freshDirectory();
+  const { store } = startedStore(directory);
+
+  const outcome = store.writePluginPreferences("data:hello", {
+    enabled: true,
+    disabledContributions: ["hello.greeting"],
+  });
+
+  assert.deepEqual(outcome, { kind: "written" });
+  assert.deepEqual(store.current().preferences.plugins["data:hello"], {
+    enabled: true,
+    disabledContributions: ["hello.greeting"],
+  });
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, preferencesFileName), "utf8")), {
+    plugins: { "data:hello": { enabled: true, disabledContributions: ["hello.greeting"] } },
+  });
+});
+
+test("writing one plugin keeps what the file says about the others", () => {
+  const directory = freshDirectory();
+
+  write(
+    directory,
+    preferencesFileName,
+    `{ "plugins": { "builtin:demo": { "enabled": false, "disabledContributions": [] } } }`,
+  );
+
+  const { store } = startedStore(directory);
+
+  store.writePluginPreferences("data:hello", { enabled: true, disabledContributions: [] });
+
+  assert.deepEqual(store.current().preferences.plugins, {
+    "builtin:demo": { enabled: false, disabledContributions: [] },
+    "data:hello": { enabled: true, disabledContributions: [] },
+  });
+});
+
+test("an unreadable preferences file is refused instead of overwritten", () => {
+  const directory = freshDirectory();
+
+  write(directory, preferencesFileName, "{ broken");
+
+  const { store } = startedStore(directory);
+  const outcome = store.writePluginPreferences("data:hello", {
+    enabled: true,
+    disabledContributions: [],
+  });
+
+  assert.equal(outcome.kind, "refused");
+  assert.equal(readFileSync(join(directory, preferencesFileName), "utf8"), "{ broken");
+});
+
+test("the write leaves no temporary file behind", () => {
+  const directory = freshDirectory();
+  const { store } = startedStore(directory);
+
+  store.writePluginPreferences("data:hello", { enabled: true, disabledContributions: [] });
+
+  assert.deepEqual(readdirSync(directory), [preferencesFileName]);
 });

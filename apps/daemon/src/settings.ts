@@ -4,7 +4,14 @@
  * а `rename` подставляет новый ([runtime-checks.md](../../../docs/runtime-checks.md), проверка 12).
  */
 
-import { readFileSync, watch, type FSWatcher } from "node:fs";
+import {
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  watch,
+  writeFileSync,
+  type FSWatcher,
+} from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -15,6 +22,7 @@ import {
   parsePreferences,
   preferencesFileName,
   type Config,
+  type PluginPreferences,
   type Preferences,
   type SettingsParseResult,
 } from "@sovereign/protocol";
@@ -40,8 +48,18 @@ export type SettingsStore = {
   start: (logger: Logger) => void;
   /** Перечитать оба файла сейчас. Тот же путь, которым идёт наблюдатель. */
   reload: () => void;
+  /**
+   * Записать предпочтения одного плагина в `preferences.json` и сразу перечитать файл: вызывающий
+   * получает управление тогда, когда снимок уже новый.
+   */
+  writePluginPreferences: (pluginKey: string, preferences: PluginPreferences) => WriteOutcome;
   close: () => void;
 };
+
+export type WriteOutcome =
+  | { kind: "written" }
+  /** Файл на диске не читается. Записать поверх — значит стереть чужую правку (ADR-0033). */
+  | { kind: "refused"; reason: string };
 
 export type CreateSettingsStoreOptions = {
   directory: string;
@@ -172,6 +190,36 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
     reload();
   };
 
+  const writePluginPreferences = (
+    pluginKey: string,
+    preferences: PluginPreferences,
+  ): WriteOutcome => {
+    // Основа для записи — файл, а не снимок в памяти: между перечитываниями его мог поправить
+    // человек, и переключение одного плагина не должно откатывать соседнюю строку.
+    const raw = readFileIfExists(join(directory, preferencesFileName));
+    const stored = raw === undefined ? parsePreferences({}) : parseStoredPreferences(raw);
+
+    if (stored.kind === "rejected") {
+      return { kind: "refused", reason: stored.diagnostics.join("; ") };
+    }
+
+    const next: Preferences = {
+      ...stored.value,
+      plugins: { ...stored.value.plugins, [pluginKey]: preferences },
+    };
+
+    writeAtomically(
+      join(directory, preferencesFileName),
+      `${JSON.stringify(next, undefined, 2)}\n`,
+    );
+
+    // Наблюдатель принесёт своё событие следом и вызовет перечитывание второй раз. Второе ничего не
+    // сделает: совпавший снимок никого не будит.
+    reload();
+
+    return { kind: "written" };
+  };
+
   return {
     current: () => snapshot,
     subscribe: (listener) => {
@@ -181,6 +229,7 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
     },
     start,
     reload,
+    writePluginPreferences,
     close: () => {
       if (debounceTimer !== undefined) {
         clearTimeout(debounceTimer);
@@ -191,6 +240,42 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       watcher = undefined;
     },
   };
+}
+
+function parseStoredPreferences(raw: string): SettingsParseResult<Preferences> {
+  try {
+    return parsePreferences(JSON.parse(raw));
+  } catch (cause) {
+    return {
+      kind: "rejected",
+      diagnostics: [
+        `${preferencesFileName} is not valid json: ${cause instanceof Error ? cause.message : String(cause)}`,
+      ],
+    };
+  }
+}
+
+/**
+ * Замена целиком, а не дописывание: наблюдатель не должен увидеть половину файла, а оборванная на
+ * середине запись не должна оставить настройки битыми (ADR-0033).
+ */
+function writeAtomically(path: string, text: string): void {
+  const temporary = `${path}.${process.pid}.tmp`;
+
+  try {
+    writeFileSync(temporary, text, { encoding: "utf8", mode: 0o600 });
+    renameSync(temporary, path);
+  } catch (cause) {
+    // Временный файл рядом с настройками пережил бы перезапуск и остался мусором в чужой
+    // директории; удалить его не удалось только если его и не создали.
+    try {
+      unlinkSync(temporary);
+    } catch {
+      // Нечего убирать.
+    }
+
+    throw cause;
+  }
 }
 
 function readFileIfExists(path: string): string | undefined {

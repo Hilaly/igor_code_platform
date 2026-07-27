@@ -112,48 +112,59 @@ export function parsePreferences(raw: unknown): SettingsParseResult<Preferences>
       continue;
     }
 
-    const entry = asObject(raw);
+    const entry = parsePluginPreferences(raw, `${preferencesFileName}: plugins.${key}`);
 
-    if (entry === undefined) {
-      diagnostics.push(`${preferencesFileName}: plugins.${key} must be an object`);
+    diagnostics.push(...entry.diagnostics);
 
+    if (entry.kind === "rejected") {
       return { kind: "rejected", diagnostics };
     }
 
-    diagnostics.push(
-      ...diagnoseUnknownKeys(`${preferencesFileName}: plugins.${key}`, entry, [
-        "enabled",
-        "disabledContributions",
-      ]),
-    );
-
-    const enabled = entry["enabled"];
-
-    if (enabled !== undefined && typeof enabled !== "boolean") {
-      diagnostics.push(
-        `${preferencesFileName}: plugins.${key}.enabled must be a boolean, got ${JSON.stringify(enabled)}`,
-      );
-
-      return { kind: "rejected", diagnostics };
-    }
-
-    const disabled = entry["disabledContributions"];
-
-    if (disabled !== undefined && !isStringArray(disabled)) {
-      diagnostics.push(
-        `${preferencesFileName}: plugins.${key}.disabledContributions must be an array of contribution identifiers`,
-      );
-
-      return { kind: "rejected", diagnostics };
-    }
-
-    plugins[key] = {
-      enabled: enabled ?? defaultPluginPreferences.enabled,
-      disabledContributions: disabled ?? [],
-    };
+    plugins[key] = entry.value;
   }
 
   return { kind: "parsed", value: { plugins }, diagnostics };
+}
+
+/**
+ * Предпочтения одного плагина. Отдельно от файла, потому что тем же телом плагин переключается через
+ * веб-API: форма одна, файл остаётся источником истины (ADR-0033), и разойтись им не на чем.
+ */
+export function parsePluginPreferences(
+  raw: unknown,
+  label = "preferences",
+): SettingsParseResult<PluginPreferences> {
+  const entry = asObject(raw);
+
+  if (entry === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, entry, ["enabled", "disabledContributions"]);
+  const enabled = entry["enabled"];
+
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    diagnostics.push(`${label}.enabled must be a boolean, got ${JSON.stringify(enabled)}`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const disabled = entry["disabledContributions"];
+
+  if (disabled !== undefined && !isStringArray(disabled)) {
+    diagnostics.push(`${label}.disabledContributions must be an array of contribution identifiers`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: {
+      enabled: enabled ?? defaultPluginPreferences.enabled,
+      disabledContributions: disabled ?? [],
+    },
+    diagnostics,
+  };
 }
 
 function isPluginKey(key: string): boolean {
