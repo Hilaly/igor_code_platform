@@ -15,6 +15,14 @@ export const manifestField = "sovereign";
  */
 export const platformVersion = "0.1.0";
 
+/**
+ * Источники плагинов в порядке возрастания специфичности (ADR-0030, ADR-0036): более специфичный
+ * перекрывает менее специфичный при споре вкладов. Папка проекта появится здесь вместе с проектами.
+ */
+export const pluginSources = ["builtin", "data"] as const;
+
+export type PluginSource = (typeof pluginSources)[number];
+
 /** Идентификатор попадает в маршрут `/p/<pluginId>/...`, поэтому годятся не любые символы. */
 export const pluginIdPattern = /^[a-z0-9][a-z0-9-]*$/;
 
