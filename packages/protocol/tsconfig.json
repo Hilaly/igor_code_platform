@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es2023"]
+    "lib": ["es2023"],
+    // Типы Node нужны только тестам пакета: сам контракт ни на что из Node не опирается.
+    "types": ["node"]
   },
   "include": ["src"]
 }
