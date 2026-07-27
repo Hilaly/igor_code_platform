@@ -167,29 +167,6 @@ describe("createPluginEvents", () => {
     });
   });
 
-  it("refuses a subscription to the log and never delivers it", () => {
-    const { bus, events: plugins, delivered, records } = events();
-    const automation: ContributingPlugin = {
-      key: "data:automation",
-      id: "automation",
-      source: "data",
-    };
-
-    plugins.subscribe(automation, coreEventTypes.log);
-    bus.publish(coreEventTypes.log, {
-      time: "2026-07-27T10:00:00.000Z",
-      level: "info",
-      source: "core",
-      message: "daemon started",
-    });
-
-    assert.deepEqual(delivered, []);
-    assert.equal(
-      records.some((record) => record.message.includes("subscribed to the log")),
-      true,
-    );
-  });
-
   it("drops the subscriptions of a plugin that went away", () => {
     const { registry, events: plugins, delivered } = events();
     const automation: ContributingPlugin = {

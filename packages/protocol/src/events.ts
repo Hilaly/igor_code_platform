@@ -8,16 +8,17 @@
  */
 
 import type { ContributionRegistration } from "./contribution.ts";
-import type { LogRecord } from "./log.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginSource } from "./plugin.ts";
 
 /** Неймспейс ядра. Плагин занять его не может: иначе его событие неотличимо от платформенного. */
 export const coreEventNamespace = "core";
 
+/**
+ * Записи журнала здесь нет намеренно: журнал не событие предметной области и на шину не публикуется
+ * (ADR-0074). Его единственный получатель — `stdout`.
+ */
 export const coreEventTypes = {
-  /** Каждая запись журнала — событие шины (ADR-0021). */
-  log: "core.log",
   /** Переход жизненного цикла плагина (ADR-0018). */
   pluginLifecycle: "core.plugin.lifecycle",
   /** Действующий набор вкладов изменился. */
@@ -35,7 +36,6 @@ export type PluginContributionsChanged = {
 };
 
 export type CoreEventPayloads = {
-  "core.log": LogRecord;
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
 };
@@ -72,7 +72,7 @@ export type PluginBusEvent = {
 
 /**
  * Всё, что ходит по шине. Различаются формы наличием `plugin`, а не полем-меткой: объединение
- * событий ядра остаётся закрытым, и нагрузка `core.log` не деградирует до `unknown`.
+ * событий ядра остаётся закрытым, и нагрузка события ядра не деградирует до `unknown`.
  */
 export type BusEvent = CoreEvent | PluginBusEvent;
 

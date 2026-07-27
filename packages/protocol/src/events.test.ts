@@ -7,12 +7,13 @@ describe("isPluginBusEvent", () => {
   it("separates a plugin event from a core one and keeps the core payload typed", () => {
     const events: BusEvent[] = [
       {
-        type: coreEventTypes.log,
+        type: coreEventTypes.pluginLifecycle,
         payload: {
-          time: "2026-07-27T10:00:00.000Z",
-          level: "info",
-          source: "core",
-          message: "daemon started",
+          key: "data:tracker",
+          id: "tracker",
+          source: "data",
+          directory: "/plugins/tracker",
+          state: "running",
         },
       },
       {
@@ -29,9 +30,9 @@ describe("isPluginBusEvent", () => {
 
       // Сужение здесь и есть предмет проверки: отсеяв событие плагина, компилятор всё ещё
       // разбирает события ядра по типу, а не выдаёт `unknown` из-за соседа по объединению.
-      return event.type === coreEventTypes.log ? event.payload.message : event.type;
+      return event.type === coreEventTypes.pluginLifecycle ? event.payload.state : event.type;
     });
 
-    assert.deepEqual(messages, ["daemon started", "tracker said tracker.task.created"]);
+    assert.deepEqual(messages, ["running", "tracker said tracker.task.created"]);
   });
 });

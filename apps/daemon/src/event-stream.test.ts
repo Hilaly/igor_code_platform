@@ -10,6 +10,7 @@ import {
   isPluginStreamEvent,
   streamGapType,
   type LogRecord,
+  type PluginStatus,
   type StreamEvent,
 } from "@sovereign/protocol";
 
@@ -27,11 +28,12 @@ after(async () => {
   }
 });
 
-const record = (message: string): LogRecord => ({
-  time: "2026-07-27T10:00:00.000Z",
-  level: "info",
-  source: "core",
-  message,
+/** Образец события ядра: в потоке важен кадр вокруг нагрузки, а не сама нагрузка. */
+const status = (key: string): PluginStatus => ({
+  key,
+  source: "data",
+  directory: `/plugins/${key}`,
+  state: "running",
 });
 
 /** Читает кадры потока и даёт дождаться нужного их количества: события приходят по сети. */
@@ -129,14 +131,16 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
     return reader;
   };
 
-  const publish = (message: string): void => bus.publish(coreEventTypes.log, record(message));
+  const publish = (key: string): void => bus.publish(coreEventTypes.pluginLifecycle, status(key));
 
   return { read, publish, records, close: () => events.close() };
 }
 
-const messagesOf = (events: StreamEvent[]): string[] =>
+const keysOf = (events: StreamEvent[]): string[] =>
   events.map((event) =>
-    !isPluginStreamEvent(event) && event.type === "core.log" ? event.payload.message : event.type,
+    !isPluginStreamEvent(event) && event.type === coreEventTypes.pluginLifecycle
+      ? event.payload.key
+      : event.type,
   );
 
 describe("createEventStream", () => {
@@ -153,7 +157,7 @@ describe("createEventStream", () => {
       events.map((event) => event.index),
       [1, 2],
     );
-    assert.deepEqual(messagesOf(events), ["first", "second"]);
+    assert.deepEqual(keysOf(events), ["first", "second"]);
     assert.equal(events[0]?.time, new Date(events[0]?.time ?? "").toISOString());
   });
 
@@ -166,7 +170,7 @@ describe("createEventStream", () => {
 
     publish("after");
 
-    assert.deepEqual(messagesOf(await reader.waitFor(1)), ["after"]);
+    assert.deepEqual(keysOf(await reader.waitFor(1)), ["after"]);
   });
 
   it("catches a reconnected client up with exactly what it missed", async () => {
@@ -179,7 +183,7 @@ describe("createEventStream", () => {
     const reader = await read(1);
     const events = await reader.waitFor(2);
 
-    assert.deepEqual(messagesOf(events), ["two", "three"]);
+    assert.deepEqual(keysOf(events), ["two", "three"]);
     assert.deepEqual(
       events.map((event) => event.index),
       [2, 3],
@@ -225,7 +229,7 @@ describe("createEventStream", () => {
 
     const reader = await read(2);
 
-    assert.deepEqual(messagesOf(await reader.waitFor(1)), ["three"]);
+    assert.deepEqual(keysOf(await reader.waitFor(1)), ["three"]);
   });
 
   it("disconnects a client that stopped reading and writes down why", async () => {

@@ -1,13 +1,15 @@
 /**
  * Единственное место, где событие плагина попадает на шину и где событие с шины уходит в воркеры
- * (ADR-0072, ADR-0073). Отдельно от супервизора, потому что решает оно не про жизнь плагина, а про
- * право публиковать и про то, кому событие интересно.
+ * (ADR-0072). Отдельно от супервизора, потому что решает оно не про жизнь плагина, а про право
+ * публиковать и про то, кому событие интересно.
+ *
+ * Исключений среди событий ядра нет: доставляется всё, на что подписались (ADR-0074).
  *
  * Нагрузку здесь никто не проверяет: её проверил воркер публикатора своей схемой. Ядру проверять
  * нечем — схема между воркером и ядром не ходит, ездит только её описание.
  */
 
-import { coreEventTypes, isPluginBusEvent } from "@sovereign/protocol";
+import { isPluginBusEvent } from "@sovereign/protocol";
 
 import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
 import type { EventBus } from "./event-bus.ts";
@@ -38,12 +40,6 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
   const subscribers = new Map<string, Set<string>>();
 
   bus.subscribe((event) => {
-    // Журнал в воркеры не доставляется никогда (ADR-0073): это самый частый источник событий, а
-    // плагин, пишущий в журнал внутри обработчика журнала, замыкает петлю.
-    if (event.type === coreEventTypes.log) {
-      return;
-    }
-
     const listening = subscribers.get(event.type);
 
     if (listening === undefined) {
@@ -96,17 +92,6 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
       });
     },
     subscribe: (plugin, type) => {
-      if (type === coreEventTypes.log) {
-        // Отказ, а не молчаливая недоставка: подписчик, которому ничего не приходит, отлаживает
-        // не то (ADR-0073).
-        logger.warn("the plugin subscribed to the log, which is not delivered to workers", {
-          plugin: plugin.key,
-          event: type,
-        });
-
-        return;
-      }
-
       const listening = subscribers.get(type);
 
       if (listening === undefined) {

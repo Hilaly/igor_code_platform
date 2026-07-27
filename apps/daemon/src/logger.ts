@@ -1,18 +1,11 @@
 /**
- * Логгер ядра (ADR-0021). Получателей записи трое, в этом срезе есть двое: `stdout` и шина.
- * Логгер о них не знает — он отдаёт запись в единственную точку расширения `write`, а собирает
- * получателей `createRecordWriter`. База добавится туда же, когда появится `state.db`.
+ * Логгер ядра (ADR-0074). Получатель у записи один — `stdout`. Ни на шину, ни наружу журнал не
+ * идёт: событие шины — это событие предметной области, а запись журнала им не является.
+ *
+ * Получатель всё равно вынесен в `write`: тест обязан читать записи, не разбирая вывод процесса.
  */
 
-import {
-  coreEventTypes,
-  logLevels,
-  type LogLevel,
-  type LogRecord,
-  type LogSource,
-} from "@sovereign/protocol";
-
-import type { EventBus } from "./event-bus.ts";
+import { logLevels, type LogLevel, type LogRecord, type LogSource } from "@sovereign/protocol";
 
 export type LogFields = Record<string, unknown>;
 
@@ -63,25 +56,6 @@ export function createLogger(options: LoggerOptions): Logger {
     info: (message, fields) => log("info", message, fields),
     warn: (message, fields) => log("warn", message, fields),
     error: (message, fields) => log("error", message, fields),
-  };
-}
-
-export type RecordWriterOptions = {
-  bus: EventBus;
-  /** Внедряется тестом; в демоне это `stdout`. */
-  toStdout?: (record: LogRecord) => void;
-};
-
-/**
- * Собирает получателей записи в одну функцию для `LoggerOptions.write`. Порядок значим: `stdout`
- * пишется первым, потому что он единственный переживает падение подписчика шины.
- */
-export function createRecordWriter(options: RecordWriterOptions): (record: LogRecord) => void {
-  const toStdout = options.toStdout ?? writeLineToStdout;
-
-  return (record) => {
-    toStdout(record);
-    options.bus.publish(coreEventTypes.log, record);
   };
 }
 

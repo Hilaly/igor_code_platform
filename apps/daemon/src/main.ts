@@ -5,7 +5,7 @@ import { createEventBus } from "./event-bus.ts";
 import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
-import { createLogger, createRecordWriter } from "./logger.ts";
+import { createLogger } from "./logger.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
@@ -44,36 +44,21 @@ const lock = (() => {
 
 const settings = createSettingsStore({ directory });
 
-// Упавший подписчик — повод для записи в журнал, а запись идёт в эту же шину и снова к нему.
-// Защита от повторного входа обрывает цикл на первом витке: второй отказ подряд молчит.
-let reportingListenerError = false;
-
+// Логгер зовётся здесь напрямую: запись уходит в `stdout` и на шину не возвращается (ADR-0074),
+// поэтому цикла «упавший подписчик → журнал → тот же подписчик» больше нет.
 const bus = createEventBus({
   onListenerError: (cause, event) => {
-    if (reportingListenerError) {
-      return;
-    }
-
-    reportingListenerError = true;
-
-    try {
-      logger.error("the event bus listener failed", {
-        event: event.type,
-        reason: cause instanceof Error ? cause.message : String(cause),
-      });
-    } finally {
-      reportingListenerError = false;
-    }
+    logger.error("the event bus listener failed", {
+      event: event.type,
+      reason: cause instanceof Error ? cause.message : String(cause),
+    });
   },
 });
-
-const write = createRecordWriter({ bus });
 
 // Уровень читается в момент записи, поэтому правка config.json меняет его без перезапуска.
 const logger = createLogger({
   source: "core",
   level: () => settings.current().config.logLevel,
-  write,
 });
 
 // Файлы читаются после создания логгера: диагностика первого чтения обязана в него попасть.
@@ -88,7 +73,7 @@ const plugins = createPluginSupervisor({
   registry: contributions,
   bus,
   createPluginLogger: (source) =>
-    createLogger({ source, level: () => settings.current().config.logLevel, write }),
+    createLogger({ source, level: () => settings.current().config.logLevel }),
 });
 
 // Приведения идут цепочкой: два одновременных перечитывания настроек не должны поднимать один

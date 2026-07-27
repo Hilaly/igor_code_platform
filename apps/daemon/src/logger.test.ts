@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { isPluginBusEvent, type LogLevel, type LogRecord } from "@sovereign/protocol";
+import type { LogLevel, LogRecord, LogSource } from "@sovereign/protocol";
 
-import { createEventBus } from "./event-bus.ts";
-import { createLogger, createRecordWriter } from "./logger.ts";
+import { createLogger } from "./logger.ts";
 
-function collect(level: () => LogLevel = () => "debug") {
+function collect(level: () => LogLevel = () => "debug", source: LogSource = "core") {
   const records: LogRecord[] = [];
   const logger = createLogger({
-    source: "core",
+    source,
     level,
     write: (record) => records.push(record),
     now: () => new Date("2026-07-26T10:00:00.000Z"),
@@ -62,67 +61,19 @@ test("the level is read at the moment of the call, so a hot reload takes effect"
   );
 });
 
-test("a record reaches both stdout and the bus", () => {
-  const stdout: LogRecord[] = [];
-  const published: LogRecord[] = [];
-  const bus = createEventBus({
-    onListenerError: (cause) => {
-      throw cause;
-    },
-  });
-
-  bus.subscribe((event) => {
-    if (!isPluginBusEvent(event) && event.type === "core.log") {
-      published.push(event.payload);
-    }
-  });
-
-  const logger = createLogger({
-    source: "plugin:hello",
-    level: () => "info",
-    write: createRecordWriter({ bus, toStdout: (record) => stdout.push(record) }),
-    now: () => new Date("2026-07-26T10:00:00.000Z"),
-  });
+test("the source of a plugin record travels as it is", () => {
+  const { logger, records } = collect(() => "debug", "plugin:hello");
 
   logger.info("the plugin said something");
 
-  const expected: LogRecord = {
-    time: "2026-07-26T10:00:00.000Z",
-    level: "info",
-    // Источник плагина доезжает до шины как есть: подписчик обязан отличить плагин от ядра.
-    source: "plugin:hello",
-    message: "the plugin said something",
-  };
-
-  assert.deepEqual(stdout, [expected]);
-  assert.deepEqual(published, [expected]);
-});
-
-test("a record below the current level reaches nobody, not even the bus", () => {
-  const stdout: LogRecord[] = [];
-  const published: LogRecord[] = [];
-  const bus = createEventBus({
-    onListenerError: (cause) => {
-      throw cause;
+  assert.deepEqual(records, [
+    {
+      time: "2026-07-26T10:00:00.000Z",
+      level: "info",
+      source: "plugin:hello",
+      message: "the plugin said something",
     },
-  });
-
-  bus.subscribe((event) => {
-    if (!isPluginBusEvent(event) && event.type === "core.log") {
-      published.push(event.payload);
-    }
-  });
-
-  const logger = createLogger({
-    source: "core",
-    level: () => "warn",
-    write: createRecordWriter({ bus, toStdout: (record) => stdout.push(record) }),
-  });
-
-  logger.debug("noise");
-
-  assert.deepEqual(stdout, []);
-  assert.deepEqual(published, []);
+  ]);
 });
 
 test("extra fields cannot overwrite the service ones", () => {
