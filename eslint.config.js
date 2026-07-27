@@ -62,6 +62,37 @@ const daemonAndPackagesLogThroughTheLogger = {
   },
 };
 
+/**
+ * ADR-0031: любой цвет, оставленный мимо токена, не переключается ни при смене варианта, ни при
+ * смене схемы, и находится он на чужой схеме, а не у нас. Значения живут только в файлах токенов
+ * кита; остальной код читает роли.
+ *
+ * Правило смотрит на строковые литералы в коде. За CSS-файлами оно не следит — там дисциплину
+ * проверяет схема с дикими цветами (docs/ui-kit.md).
+ */
+const colorsComeFromTokensOnly = {
+  files: ["packages/ui-kit/**/*.{ts,tsx}", "apps/web/**/*.{ts,tsx}"],
+  ignores: ["packages/ui-kit/src/tokens/**"],
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
+        message: "Цвет задаётся токеном кита, а не литералом (ADR-0031).",
+      },
+      {
+        selector: "Literal[value=/(?:rgb|hsl|lab|lch|oklab|oklch|color-mix)a?\\(/]",
+        message: "Цвет задаётся токеном кита, а не литералом (ADR-0031).",
+      },
+      {
+        selector:
+          "Literal[value=/^(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|pink|brown|cyan|magenta|teal|navy|olive|maroon|lime|aqua|fuchsia)$/i]",
+        message: "Цвет задаётся токеном кита, а не именем цвета (ADR-0031).",
+      },
+    ],
+  },
+};
+
 export default tseslint.config(
   { ignores: ["**/dist/**", "**/node_modules/**"] },
   js.configs.recommended,
@@ -69,5 +100,6 @@ export default tseslint.config(
   appsMustNotImportApps,
   packagesMustNotImportApps,
   daemonAndPackagesLogThroughTheLogger,
+  colorsComeFromTokensOnly,
   prettier,
 );
