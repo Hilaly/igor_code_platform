@@ -2,10 +2,20 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
 import { removePluginHost } from "./host.ts";
-import { contribute, identity, log } from "./index.ts";
+import { contribute, identity, log, z } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
 afterEach(() => removePluginHost());
+
+describe("the zod re-exported by the sdk", () => {
+  it("describes a schema as data, which is the only form that reaches the core", () => {
+    const description = z.toJSONSchema(z.object({ id: z.string() }));
+
+    // Схема сама по себе не клонируется — в ней функции. Уезжает описание, и оно обязано пережить
+    // структурное клонирование, иначе объявление вклада не дойдёт до демона (ADR-0072).
+    assert.deepEqual(structuredClone(description), description);
+  });
+});
 
 describe("the sdk without a host", () => {
   it("explains itself instead of failing on undefined", async () => {

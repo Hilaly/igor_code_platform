@@ -10,6 +10,12 @@ import { currentPluginHost, type CustomContribution, type PluginLogLevel } from 
 export type { CustomContribution, PluginHost, PluginIdentity, PluginLogLevel } from "./host.ts";
 
 /**
+ * Язык схем платформы (ADR-0072). Реэкспорт, а не «поставьте zod сами»: два экземпляра zod в одном
+ * процессе дают два несовместимых типа схемы, и схема плагина перестала бы подходить платформе.
+ */
+export { z } from "zod";
+
+/**
  * Точки входа плагина. `activate` вызывается после того, как хост готов; `deactivate` — перед
  * выгрузкой, и у него есть только ограниченное время (супервизор не ждёт вечно).
  */
