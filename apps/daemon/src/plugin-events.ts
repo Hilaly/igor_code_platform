@@ -1,29 +1,68 @@
 /**
- * Единственное место, где событие плагина попадает на шину (ADR-0072). Отдельно от супервизора,
- * потому что решает оно не про жизнь плагина, а про право публиковать: событие — это вклад, и
- * действует оно ровно тогда, когда действует вклад.
+ * Единственное место, где событие плагина попадает на шину и где событие с шины уходит в воркеры
+ * (ADR-0072, ADR-0073). Отдельно от супервизора, потому что решает оно не про жизнь плагина, а про
+ * право публиковать и про то, кому событие интересно.
  *
  * Нагрузку здесь никто не проверяет: её проверил воркер публикатора своей схемой. Ядру проверять
  * нечем — схема между воркером и ядром не ходит, ездит только её описание.
  */
 
-import type { EventBus } from "./event-bus.ts";
+import { coreEventTypes, isPluginBusEvent } from "@sovereign/protocol";
+
 import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
+import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
+import type { PluginIncoming } from "./plugin-wire.ts";
 
 export type PluginEvents = {
   /** Имя приходит объявленным: неймспейс ставится здесь, по идентичности воркера. */
   publish: (plugin: ContributingPlugin, declaredId: string, payload: unknown) => void;
+  /** Имя, наоборот, полное: подписываются на чужое событие. */
+  subscribe: (plugin: ContributingPlugin, type: string) => void;
+  unsubscribe: (pluginKey: string, type: string) => void;
+  /** Снять все подписки плагина. Зовётся там же, где снимаются его вклады. */
+  remove: (pluginKey: string) => void;
 };
 
 export type CreatePluginEventsOptions = {
   registry: ContributionRegistry;
   bus: EventBus;
   logger: Logger;
+  /** Отправка в живой воркер. Плагина без воркера здесь может не быть — это не ошибка. */
+  send: (pluginKey: string, message: PluginIncoming) => void;
 };
 
 export function createPluginEvents(options: CreatePluginEventsOptions): PluginEvents {
-  const { registry, bus, logger } = options;
+  const { registry, bus, logger, send } = options;
+
+  const subscribers = new Map<string, Set<string>>();
+
+  bus.subscribe((event) => {
+    // Журнал в воркеры не доставляется никогда (ADR-0073): это самый частый источник событий, а
+    // плагин, пишущий в журнал внутри обработчика журнала, замыкает петлю.
+    if (event.type === coreEventTypes.log) {
+      return;
+    }
+
+    const listening = subscribers.get(event.type);
+
+    if (listening === undefined) {
+      return;
+    }
+
+    const message: PluginIncoming = {
+      kind: "event",
+      type: event.type,
+      payload: event.payload,
+      ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
+    };
+
+    for (const pluginKey of listening) {
+      // Плагин, подписанный на своё же событие, получит и его: кольцо разрывает автор, а не
+      // платформа. Доставка асинхронна, поэтому демон от этого не встаёт (ADR-0073).
+      send(pluginKey, message);
+    }
+  });
 
   return {
     publish: (plugin, declaredId, payload) => {
@@ -55,6 +94,43 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
         payload,
         plugin: { key: plugin.key, id: plugin.id, source: plugin.source },
       });
+    },
+    subscribe: (plugin, type) => {
+      if (type === coreEventTypes.log) {
+        // Отказ, а не молчаливая недоставка: подписчик, которому ничего не приходит, отлаживает
+        // не то (ADR-0073).
+        logger.warn("the plugin subscribed to the log, which is not delivered to workers", {
+          plugin: plugin.key,
+          event: type,
+        });
+
+        return;
+      }
+
+      const listening = subscribers.get(type);
+
+      if (listening === undefined) {
+        subscribers.set(type, new Set([plugin.key]));
+      } else {
+        listening.add(plugin.key);
+      }
+    },
+    unsubscribe: (pluginKey, type) => {
+      const listening = subscribers.get(type);
+      listening?.delete(pluginKey);
+
+      if (listening?.size === 0) {
+        subscribers.delete(type);
+      }
+    },
+    remove: (pluginKey) => {
+      for (const [type, listening] of [...subscribers]) {
+        listening.delete(pluginKey);
+
+        if (listening.size === 0) {
+          subscribers.delete(type);
+        }
+      }
     },
   };
 }

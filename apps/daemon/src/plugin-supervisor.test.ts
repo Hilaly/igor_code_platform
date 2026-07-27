@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { setTimeout as wait } from "node:timers/promises";
 
 import {
   isPluginBusEvent,
@@ -266,6 +267,89 @@ describe("createPluginSupervisor", () => {
       payload: { id: "42" },
       plugin: { key: "data:publisher", id: "publisher", source: "data" },
     });
+  });
+
+  it("carries an event from the worker of one plugin to the worker of another", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+    });
+    running = supervisor;
+
+    await supervisor.apply(
+      only("publisher", "subscriber"),
+      enabled("data:publisher", "data:subscriber"),
+    );
+
+    const record = await recorded.waitFor(
+      (record) => record.message === "subscriber got the event",
+      "the subscriber reacting to the event",
+    );
+
+    assert.equal(record.source, "plugin:subscriber");
+    assert.deepEqual(record["payload"], { id: "42" });
+    assert.equal(record["from"], "publisher");
+  });
+
+  it("leaves no second subscription behind when the plugin is reloaded", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+    });
+    running = supervisor;
+
+    const deliverOnce = async (hint: string): Promise<number> => {
+      const before = recorded.records.filter(
+        (record) => record.message === "subscriber got the event",
+      ).length;
+
+      recorded.bus.publishFromPlugin({
+        type: "publisher.task.created",
+        payload: { id: "42" },
+        plugin: { key: "data:publisher", id: "publisher", source: "data" },
+      });
+
+      await recorded.waitFor(
+        (record) =>
+          record.message === "subscriber got the event" &&
+          recorded.records.filter((seen) => seen.message === "subscriber got the event").length >
+            before,
+        hint,
+      );
+
+      // Дубликат пришёл бы следующим сообщением, а не через секунду: доставка синхронная, задержка
+      // здесь только на путь через воркер.
+      await wait(100);
+
+      return (
+        recorded.records.filter((record) => record.message === "subscriber got the event").length -
+        before
+      );
+    };
+
+    await supervisor.apply(only("subscriber"), enabled("data:subscriber"));
+    await recorded.waitFor(reachedState("data:subscriber", "running"), "subscriber running");
+    assert.equal(await deliverOnce("the first delivery"), 1);
+
+    await supervisor.reload([join(fixtures, "subscriber")]);
+    await recorded.waitFor(
+      (record) =>
+        record.message === "plugin lifecycle" &&
+        record["plugin"] === "data:subscriber" &&
+        record["state"] === "running" &&
+        recorded.records.filter(
+          (seen) => seen.message === "plugin lifecycle" && seen["state"] === "running",
+        ).length > 1,
+      "subscriber running again",
+    );
+
+    assert.equal(await deliverOnce("the delivery after the reload"), 1);
   });
 
   it("says nothing about contributions when the effective set did not change", async () => {

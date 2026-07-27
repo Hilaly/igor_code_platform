@@ -7,7 +7,10 @@
 
 import { z } from "zod";
 
+import { subscribeToEvent } from "./events.ts";
 import { currentPluginHost, type CustomContribution, type PluginLogLevel } from "./host.ts";
+
+export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
 export type {
   CustomContribution,
@@ -106,6 +109,16 @@ export const contribute = {
       id: event.id,
       payloadSchema: { ...z.toJSONSchema(event.schema) },
     }),
+};
+
+export const events = {
+  /**
+   * Слушать чужое событие по полному имени, вместе с неймспейсом публикатора. События ядра
+   * слушаются так же, кроме журнала: подписка на `core.log` отказывается (ADR-0073).
+   *
+   * Возвращает отписку. Пока плагин жив, подписка живёт: снимает её ядро вместе с плагином.
+   */
+  subscribe: subscribeToEvent,
 };
 
 /** Кто мы, по версии хоста. Полезно в логах самого плагина и в его собственных путях. */

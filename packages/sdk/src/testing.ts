@@ -6,6 +6,7 @@
  * плагин, у которого при первом же вызове нет хоста.
  */
 
+import { clearEventHandlers, deliverEvent, type EventOrigin } from "./events.ts";
 import {
   installPluginHost,
   removePluginHost,
@@ -31,7 +32,11 @@ export type PluginTestHost = {
   logs: RecordedLog[];
   contributions: PluginContribution[];
   published: RecordedEvent[];
-  /** Снимает шов. Без этого следующий тест увидит чужой хост. */
+  /** Имена, на которые плагин подписался: их и знает настоящее ядро. */
+  subscriptions: string[];
+  /** Доставить событие подписчику — то, что в живой платформе делает ядро. */
+  deliver: (type: string, payload: unknown, origin?: EventOrigin) => Promise<void>;
+  /** Снимает шов и подписки. Без этого следующий тест увидит чужой хост. */
   restore: () => void;
 };
 
@@ -43,6 +48,7 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const logs: RecordedLog[] = [];
   const contributions: PluginContribution[] = [];
   const published: RecordedEvent[] = [];
+  const subscriptions: string[] = [];
 
   installPluginHost({
     identity: resolved,
@@ -55,7 +61,28 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     publishEvent: async (declaredId, payload) => {
       published.push({ declaredId, payload });
     },
+    subscribeEvent: async (type) => {
+      subscriptions.push(type);
+    },
+    unsubscribeEvent: async (type) => {
+      const index = subscriptions.indexOf(type);
+
+      if (index >= 0) {
+        subscriptions.splice(index, 1);
+      }
+    },
   });
 
-  return { identity: resolved, logs, contributions, published, restore: removePluginHost };
+  return {
+    identity: resolved,
+    logs,
+    contributions,
+    published,
+    subscriptions,
+    deliver: deliverEvent,
+    restore: () => {
+      clearEventHandlers();
+      removePluginHost();
+    },
+  };
 }

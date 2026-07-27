@@ -62,6 +62,12 @@ export type PluginHost = {
    * неймспейса: неймспейс ставит хост по идентичности, поэтому чужим именем не опубликуешь.
    */
   publishEvent: (declaredId: string, payload: unknown) => Promise<void>;
+  /**
+   * Имя полное: подписываются на чужое событие, и неймспейс в нём чужой. Ядру сообщается имя, а не
+   * обработчик, — обработчики остаются в воркере (ADR-0072).
+   */
+  subscribeEvent: (type: string) => Promise<void>;
+  unsubscribeEvent: (type: string) => Promise<void>;
 };
 
 export function installPluginHost(host: PluginHost): void {

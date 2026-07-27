@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
+import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
-import { contribute, defineEvent, identity, log, z } from "./index.ts";
+import { contribute, defineEvent, events, identity, log, z } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
-afterEach(() => removePluginHost());
+afterEach(() => {
+  clearEventHandlers();
+  removePluginHost();
+});
 
 describe("the zod re-exported by the sdk", () => {
   it("describes a schema as data, which is the only form that reaches the core", () => {
@@ -25,6 +29,10 @@ describe("the sdk without a host", () => {
     await assert.rejects(() => contribute.custom({ id: "board" }), /sdk is not initialised/);
     await assert.rejects(() => contribute.event(taskCreated), /sdk is not initialised/);
     await assert.rejects(() => taskCreated.publish({ id: "42" }), /sdk is not initialised/);
+    await assert.rejects(
+      () => events.subscribe("tracker.task.created", () => {}),
+      /sdk is not initialised/,
+    );
     assert.throws(() => identity(), /sdk is not initialised/);
   });
 });
@@ -121,5 +129,79 @@ describe("a declared event", () => {
     );
 
     assert.deepEqual(host.published, []);
+  });
+});
+
+describe("a subscription", () => {
+  it("tells the core the full name once and delivers to every handler", async () => {
+    const host = installTestHost({ id: "automation" });
+    const seen: unknown[] = [];
+
+    await events.subscribe("tracker.task.created", (payload) => {
+      seen.push(payload);
+    });
+    await events.subscribe("tracker.task.created", (payload, origin) => {
+      seen.push(origin?.id ?? payload);
+    });
+
+    await host.deliver(
+      "tracker.task.created",
+      { id: "42" },
+      { key: "data:tracker", id: "tracker", source: "data" },
+    );
+
+    assert.deepEqual(host.subscriptions, ["tracker.task.created"]);
+    assert.deepEqual(seen, [{ id: "42" }, "tracker"]);
+  });
+
+  it("stops delivering after the unsubscribe it returned", async () => {
+    const host = installTestHost({ id: "automation" });
+    const seen: unknown[] = [];
+
+    const unsubscribe = await events.subscribe("tracker.task.created", (payload) => {
+      seen.push(payload);
+    });
+
+    await unsubscribe();
+    await host.deliver("tracker.task.created", { id: "42" });
+
+    assert.deepEqual(seen, []);
+    assert.deepEqual(host.subscriptions, []);
+  });
+
+  it("keeps the name subscribed while another handler still wants it", async () => {
+    const host = installTestHost({ id: "automation" });
+    const seen: unknown[] = [];
+
+    const unsubscribe = await events.subscribe("tracker.task.created", () => {
+      seen.push("first");
+    });
+    await events.subscribe("tracker.task.created", () => {
+      seen.push("second");
+    });
+
+    await unsubscribe();
+    await host.deliver("tracker.task.created", { id: "42" });
+
+    assert.deepEqual(host.subscriptions, ["tracker.task.created"]);
+    assert.deepEqual(seen, ["second"]);
+  });
+
+  it("reports a handler that threw instead of losing it, and delivers to the rest", async () => {
+    const host = installTestHost({ id: "automation" });
+    const seen: unknown[] = [];
+
+    await events.subscribe("tracker.task.created", () => {
+      throw new Error("the handler is broken");
+    });
+    await events.subscribe("tracker.task.created", () => {
+      seen.push("second");
+    });
+
+    await host.deliver("tracker.task.created", { id: "42" });
+
+    assert.deepEqual(seen, ["second"]);
+    assert.equal(host.logs.at(-1)?.level, "error");
+    assert.match(String(host.logs.at(-1)?.fields?.["reason"]), /the handler is broken/);
   });
 });

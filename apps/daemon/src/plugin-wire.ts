@@ -9,7 +9,7 @@
  */
 
 import type { PluginContribution, PluginLogLevel } from "@sovereign/sdk";
-import type { PluginSource } from "@sovereign/protocol";
+import type { PluginEventOrigin, PluginSource } from "@sovereign/protocol";
 
 export type PluginWorkerData = {
   id: string;
@@ -29,10 +29,16 @@ export type PluginOutgoing =
   | { kind: "contribute"; contribution: PluginContribution }
   /** Имя объявленное: неймспейс ставит ядро по идентичности воркера (ADR-0072). */
   | { kind: "publish"; declaredId: string; payload: unknown }
+  /** Здесь имя, наоборот, полное: подписываются на чужое событие. */
+  | { kind: "subscribe"; type: string }
+  | { kind: "unsubscribe"; type: string }
   | { kind: "activated" }
   /** Выгрузка завершена; `problem` заполнен, если `deactivate` бросил. */
   | { kind: "deactivated"; problem?: string }
   /** Импорт или `activate` не удались. Воркер после этого бесполезен и снимается ядром. */
   | { kind: "failed"; reason: string };
 
-export type PluginIncoming = { kind: "deactivate" };
+export type PluginIncoming =
+  | { kind: "deactivate" }
+  /** Событие с шины. `plugin` есть только у события плагина: у события ядра автора нет. */
+  | { kind: "event"; type: string; payload: unknown; plugin?: PluginEventOrigin };

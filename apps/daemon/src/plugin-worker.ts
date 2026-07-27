@@ -10,6 +10,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 
+import { deliverEvent } from "@sovereign/sdk/events";
 import { installPluginHost } from "@sovereign/sdk/host";
 import type { PluginModule } from "@sovereign/sdk";
 
@@ -43,6 +44,12 @@ installPluginHost({
   publishEvent: async (declaredId, payload) => {
     send({ kind: "publish", declaredId, payload });
   },
+  subscribeEvent: async (type) => {
+    send({ kind: "subscribe", type });
+  },
+  unsubscribeEvent: async (type) => {
+    send({ kind: "unsubscribe", type });
+  },
 });
 
 let plugin: PluginModule | undefined;
@@ -64,7 +71,10 @@ try {
 }
 
 port.on("message", (message: PluginIncoming) => {
-  if (message.kind !== "deactivate") {
+  if (message.kind === "event") {
+    // Доставка асинхронна и ответа не имеет: ядро не ждёт обработчик плагина (ADR-0041).
+    void deliverEvent(message.type, message.payload, message.plugin);
+
     return;
   }
 

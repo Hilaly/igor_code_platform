@@ -113,7 +113,13 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
 
-  const events = createPluginEvents({ registry, bus, logger });
+  const events = createPluginEvents({
+    registry,
+    bus,
+    logger,
+    // Воркера может уже не быть: плагин выгружается между публикацией и доставкой, и это штатно.
+    send: (pluginKey, message) => supervised.get(pluginKey)?.worker?.postMessage(message),
+  });
 
   /**
    * Единственное место, где состояние записи превращается в статус: снимок и событие обязаны
@@ -204,6 +210,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.pending = [];
     entry.contributed = [];
     registry.remove(entry.plugin.key);
+
+    // Подписки снимаются здесь же, где вклады: перезагруженный плагин подпишется заново, и две
+    // подписки на одно имя означали бы двойную доставку.
+    events.remove(entry.plugin.key);
     publishContributions();
   };
 
@@ -251,6 +261,14 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         return;
       case "publish":
         events.publish(entry.plugin, message.declaredId, message.payload);
+
+        return;
+      case "subscribe":
+        events.subscribe(entry.plugin, message.type);
+
+        return;
+      case "unsubscribe":
+        events.unsubscribe(entry.plugin.key, message.type);
 
         return;
       case "activated":
