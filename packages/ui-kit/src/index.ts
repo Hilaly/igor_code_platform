@@ -2,11 +2,22 @@
  * Публичная поверхность кита (ADR-0027). Наш интерфейс строится только из него: компонент, сделанный
  * «на месте» в `apps/web`, немедленно становится тем, что плагин воспроизвести не может.
  *
- * Стабильная часть контракта — токены: палитра, роли, объявление схемы и её применение. Всё
- * остальное пока нестабильно и ломается свободно, пока прикладной код не показал, какие примитивы
- * нужны на самом деле (ADR-0031).
+ * Стабильная часть контракта — токены: палитра, роли, объявление схемы и её применение. Набор
+ * примитивов пока нестабилен и ломается свободно, пока прикладной код не показал, какие из них нужны
+ * на самом деле (ADR-0031).
+ *
+ * Стили подключаются отдельно: `import "@sovereign/ui-kit/styles.css"` один раз в приложении.
  */
 
+export * from "./components/badge.tsx";
+export * from "./components/button.tsx";
+export * from "./components/list.tsx";
+export * from "./components/notice.tsx";
+export * from "./components/panel.tsx";
+export * from "./components/select.tsx";
+export * from "./components/state.tsx";
+export * from "./components/text.tsx";
+export * from "./components/toggle.tsx";
 export * from "./i18n/catalog.ts";
 export * from "./i18n/messages/en.ts";
 export * from "./i18n/messages/ru.ts";

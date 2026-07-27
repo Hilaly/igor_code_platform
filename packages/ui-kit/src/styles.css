@@ -1,0 +1,310 @@
+/*
+ * Классы примитивов. Единственный источник цвета здесь — переменные ролей: значения приходят из
+ * цветовой схемы, а не отсюда (ADR-0031). Файл импортируется приложением один раз — так у кита нет ни
+ * CSS-in-JS, ни объявления типов на каждый импорт стиля.
+ */
+
+.sv-text {
+  color: var(--sovereign-text);
+}
+
+.sv-text-muted {
+  color: var(--sovereign-text-muted);
+}
+
+.sv-text-accent {
+  color: var(--sovereign-accent);
+}
+
+.sv-text-danger {
+  color: var(--sovereign-danger);
+}
+
+.sv-text-warning {
+  color: var(--sovereign-warning);
+}
+
+.sv-text-success {
+  color: var(--sovereign-success);
+}
+
+.sv-heading {
+  margin: 0;
+  color: var(--sovereign-text);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.sv-heading-1 {
+  font-size: 1.5rem;
+}
+
+.sv-heading-2 {
+  font-size: 1.125rem;
+}
+
+.sv-heading-3 {
+  font-size: 0.9375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sovereign-text-muted);
+}
+
+.sv-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--sovereign-border);
+  border-radius: 0.375rem;
+  background: var(--sovereign-control-surface);
+  color: var(--sovereign-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sv-button:hover:not(:disabled) {
+  background: var(--sovereign-control-surface-hover);
+}
+
+.sv-button:focus-visible,
+.sv-toggle-input:focus-visible,
+.sv-select-input:focus-visible,
+.sv-list-row-select:focus-visible {
+  outline: 2px solid var(--sovereign-focus-ring);
+  outline-offset: 1px;
+}
+
+.sv-button:disabled {
+  color: var(--sovereign-text-muted);
+  cursor: not-allowed;
+}
+
+.sv-button[aria-pressed="true"] {
+  background: var(--sovereign-accent-surface);
+  border-color: var(--sovereign-accent);
+}
+
+.sv-button-accent {
+  background: var(--sovereign-accent);
+  border-color: var(--sovereign-accent);
+  color: var(--sovereign-text-on-accent);
+}
+
+.sv-button-accent:hover:not(:disabled) {
+  background: var(--sovereign-accent-hover);
+}
+
+.sv-button-danger {
+  background: var(--sovereign-danger);
+  border-color: var(--sovereign-danger);
+  color: var(--sovereign-text-on-danger);
+}
+
+.sv-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.sv-toggle-input {
+  accent-color: var(--sovereign-accent);
+}
+
+.sv-toggle-input:disabled {
+  cursor: not-allowed;
+}
+
+.sv-toggle-label {
+  color: var(--sovereign-text);
+}
+
+.sv-select {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sv-select-label {
+  color: var(--sovereign-text-muted);
+  font-size: 0.8125rem;
+}
+
+.sv-select-input {
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--sovereign-border);
+  border-radius: 0.375rem;
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+  font: inherit;
+}
+
+.sv-badge {
+  display: inline-block;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--sovereign-border);
+  border-radius: 999px;
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text-muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.sv-badge-accent {
+  border-color: var(--sovereign-accent);
+  color: var(--sovereign-accent);
+}
+
+.sv-badge-success {
+  border-color: var(--sovereign-success);
+  color: var(--sovereign-success);
+}
+
+.sv-badge-warning {
+  border-color: var(--sovereign-warning);
+  color: var(--sovereign-warning);
+}
+
+.sv-badge-danger {
+  border-color: var(--sovereign-danger);
+  color: var(--sovereign-danger);
+}
+
+.sv-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sovereign-border);
+  border-radius: 0.5rem;
+  background: var(--sovereign-panel-surface);
+  overflow: hidden;
+}
+
+.sv-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--sovereign-border);
+}
+
+.sv-panel-actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.sv-panel-body {
+  padding: 0.75rem;
+}
+
+.sv-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sv-list-row {
+  border-bottom: 1px solid var(--sovereign-border);
+  color: var(--sovereign-text);
+}
+
+.sv-list-row:last-child {
+  border-bottom: none;
+}
+
+.sv-list-row-selected {
+  background: var(--sovereign-accent-surface);
+}
+
+.sv-list-row-select {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sv-list-row-select:hover {
+  background: var(--sovereign-control-surface-hover);
+}
+
+.sv-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--sovereign-border);
+  border-left-width: 3px;
+  border-radius: 0.375rem;
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+}
+
+.sv-notice-info {
+  border-left-color: var(--sovereign-accent);
+}
+
+.sv-notice-warning {
+  border-left-color: var(--sovereign-warning);
+}
+
+.sv-notice-danger {
+  border-left-color: var(--sovereign-danger);
+}
+
+.sv-notice-body {
+  color: var(--sovereign-text-muted);
+  font-size: 0.875rem;
+}
+
+.sv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+}
+
+.sv-empty-title {
+  color: var(--sovereign-text);
+}
+
+.sv-empty-hint {
+  color: var(--sovereign-text-muted);
+  font-size: 0.875rem;
+}
+
+.sv-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sovereign-text-muted);
+}
+
+.sv-spinner-mark {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--sovereign-border);
+  border-top-color: var(--sovereign-accent);
+  border-radius: 50%;
+  animation: sv-spin 0.8s linear infinite;
+}
+
+@keyframes sv-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Движение убирается, если система просит покоя: крутилка не стоит приступа укачивания. */
+@media (prefers-reduced-motion: reduce) {
+  .sv-spinner-mark {
+    animation: none;
+  }
+}
