@@ -3,7 +3,8 @@ import { test } from "node:test";
 
 import type { LogLevel, LogRecord } from "@sovereign/protocol";
 
-import { createLogger } from "./logger.ts";
+import { createEventBus } from "./event-bus.ts";
+import { createLogger, createRecordWriter } from "./logger.ts";
 
 function collect(level: () => LogLevel = () => "debug") {
   const records: LogRecord[] = [];
@@ -59,6 +60,61 @@ test("the level is read at the moment of the call, so a hot reload takes effect"
     records.map((record) => record.message),
     ["kept"],
   );
+});
+
+test("a record reaches both stdout and the bus", () => {
+  const stdout: LogRecord[] = [];
+  const published: LogRecord[] = [];
+  const bus = createEventBus({
+    onListenerError: (cause) => {
+      throw cause;
+    },
+  });
+
+  bus.subscribe((event) => published.push(event.payload));
+
+  const logger = createLogger({
+    source: "plugin:hello",
+    level: () => "info",
+    write: createRecordWriter({ bus, toStdout: (record) => stdout.push(record) }),
+    now: () => new Date("2026-07-26T10:00:00.000Z"),
+  });
+
+  logger.info("the plugin said something");
+
+  const expected: LogRecord = {
+    time: "2026-07-26T10:00:00.000Z",
+    level: "info",
+    // Источник плагина доезжает до шины как есть: подписчик обязан отличить плагин от ядра.
+    source: "plugin:hello",
+    message: "the plugin said something",
+  };
+
+  assert.deepEqual(stdout, [expected]);
+  assert.deepEqual(published, [expected]);
+});
+
+test("a record below the current level reaches nobody, not even the bus", () => {
+  const stdout: LogRecord[] = [];
+  const published: LogRecord[] = [];
+  const bus = createEventBus({
+    onListenerError: (cause) => {
+      throw cause;
+    },
+  });
+
+  bus.subscribe((event) => published.push(event.payload));
+
+  const logger = createLogger({
+    source: "core",
+    level: () => "warn",
+    write: createRecordWriter({ bus, toStdout: (record) => stdout.push(record) }),
+  });
+
+  logger.debug("noise");
+
+  assert.deepEqual(stdout, []);
+  assert.deepEqual(published, []);
 });
 
 test("extra fields cannot overwrite the service ones", () => {

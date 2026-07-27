@@ -3,6 +3,7 @@
  * импортируют их отсюда, поэтому расхождение между сервером и клиентом ловится компилятором.
  */
 
+export * from "./events.ts";
 export * from "./health.ts";
 export * from "./log.ts";
 export * from "./plugin-lifecycle.ts";

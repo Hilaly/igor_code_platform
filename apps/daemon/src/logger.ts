@@ -1,10 +1,18 @@
 /**
- * Логгер ядра (ADR-0021). Из трёх получателей записи в этом срезе есть один — `stdout`: базы и
- * шины ещё нет. Точка расширения одна (`write`), поэтому подключение остальных не потребует правки
- * вызовов.
+ * Логгер ядра (ADR-0021). Получателей записи трое, в этом срезе есть двое: `stdout` и шина.
+ * Логгер о них не знает — он отдаёт запись в единственную точку расширения `write`, а собирает
+ * получателей `createRecordWriter`. База добавится туда же, когда появится `state.db`.
  */
 
-import { logLevels, type LogLevel, type LogRecord, type LogSource } from "@sovereign/protocol";
+import {
+  coreEventTypes,
+  logLevels,
+  type LogLevel,
+  type LogRecord,
+  type LogSource,
+} from "@sovereign/protocol";
+
+import type { EventBus } from "./event-bus.ts";
 
 export type LogFields = Record<string, unknown>;
 
@@ -55,6 +63,25 @@ export function createLogger(options: LoggerOptions): Logger {
     info: (message, fields) => log("info", message, fields),
     warn: (message, fields) => log("warn", message, fields),
     error: (message, fields) => log("error", message, fields),
+  };
+}
+
+export type RecordWriterOptions = {
+  bus: EventBus;
+  /** Внедряется тестом; в демоне это `stdout`. */
+  toStdout?: (record: LogRecord) => void;
+};
+
+/**
+ * Собирает получателей записи в одну функцию для `LoggerOptions.write`. Порядок значим: `stdout`
+ * пишется первым, потому что он единственный переживает падение подписчика шины.
+ */
+export function createRecordWriter(options: RecordWriterOptions): (record: LogRecord) => void {
+  const toStdout = options.toStdout ?? writeLineToStdout;
+
+  return (record) => {
+    toStdout(record);
+    options.bus.publish(coreEventTypes.log, record);
   };
 }
 
