@@ -196,16 +196,16 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
   ): WriteOutcome => {
     // Основа для записи — файл, а не снимок в памяти: между перечитываниями его мог поправить
     // человек, и переключение одного плагина не должно откатывать соседнюю строку.
-    const raw = readFileIfExists(join(directory, preferencesFileName));
-    const stored = raw === undefined ? parsePreferences({}) : parseStoredPreferences(raw);
+    const stored = readStoredPreferences(join(directory, preferencesFileName));
 
-    if (stored.kind === "rejected") {
-      return { kind: "refused", reason: stored.diagnostics.join("; ") };
+    if (stored.kind === "refused") {
+      return stored;
     }
 
-    const next: Preferences = {
-      ...stored.value,
-      plugins: { ...stored.value.plugins, [pluginKey]: preferences },
+    const plugins = asObject(stored.document["plugins"]) ?? {};
+    const next = {
+      ...stored.document,
+      plugins: { ...plugins, [pluginKey]: preferences },
     };
 
     writeAtomically(
@@ -242,17 +242,49 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
   };
 }
 
-function parseStoredPreferences(raw: string): SettingsParseResult<Preferences> {
+type StoredPreferences =
+  /** Документ как он лежит на диске, а не разобранный снимок: см. `readStoredPreferences`. */
+  { kind: "read"; document: Record<string, unknown> } | { kind: "refused"; reason: string };
+
+/**
+ * Читает файл для правки. Пишется потом **этот документ** с заменённым полем, а не сериализованный
+ * снимок: снимок не знает о ключах, которых нет в схеме, и запись из интерфейса молча уносила бы
+ * настройку, написанную более новой версией платформы или руками (ADR-0049).
+ *
+ * Разбор при этом всё равно нужен: чинить негодный файл записью поверх нельзя (ADR-0033).
+ */
+function readStoredPreferences(path: string): StoredPreferences {
+  const raw = readFileIfExists(path);
+
+  if (raw === undefined) {
+    return { kind: "read", document: {} };
+  }
+
+  let document: unknown;
+
   try {
-    return parsePreferences(JSON.parse(raw));
+    document = JSON.parse(raw);
   } catch (cause) {
     return {
-      kind: "rejected",
-      diagnostics: [
-        `${preferencesFileName} is not valid json: ${cause instanceof Error ? cause.message : String(cause)}`,
-      ],
+      kind: "refused",
+      reason: `${preferencesFileName} is not valid json: ${cause instanceof Error ? cause.message : String(cause)}`,
     };
   }
+
+  const parsed = parsePreferences(document);
+
+  if (parsed.kind === "rejected") {
+    return { kind: "refused", reason: parsed.diagnostics.join("; ") };
+  }
+
+  // Верхний уровень не объект — это уже отказ выше, так что здесь остаётся только объект.
+  return { kind: "read", document: asObject(document) ?? {} };
+}
+
+function asObject(raw: unknown): Record<string, unknown> | undefined {
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : undefined;
 }
 
 /**

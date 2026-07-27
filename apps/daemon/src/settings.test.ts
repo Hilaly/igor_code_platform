@@ -247,6 +247,29 @@ test("writing one plugin keeps what the file says about the others", () => {
   });
 });
 
+test("writing one plugin keeps a key the schema does not know", () => {
+  const directory = freshDirectory();
+
+  write(directory, preferencesFileName, `{ "pinnedViews": ["plugins"], "plugins": {} }`);
+
+  const { store } = startedStore(directory);
+
+  assert.deepEqual(
+    store.writePluginPreferences("data:hello", {
+      enabled: true,
+      disabledContributions: [],
+    }),
+    { kind: "written" },
+  );
+
+  // Ключ из более новой версии платформы или из чужой правки переживает запись (ADR-0049): иначе
+  // нажатие переключателя молча уносит настройку.
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, preferencesFileName), "utf8")), {
+    pinnedViews: ["plugins"],
+    plugins: { "data:hello": { enabled: true, disabledContributions: [] } },
+  });
+});
+
 test("an unreadable preferences file is refused instead of overwritten", () => {
   const directory = freshDirectory();
 
