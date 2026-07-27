@@ -17,6 +17,9 @@ export function resolveDataDirectory(path: string, home: string = homedir()): st
   return resolve(expanded);
 }
 
+/** Папка плагинов создаётся вместе с директорией данных: класть плагин человеку некуда иначе. */
+export const pluginsDirectoryName = "plugins";
+
 export function ensureDataDirectory(path: string): string {
   const directory = resolveDataDirectory(path);
   const existing = statSync(directory, { throwIfNoEntry: false });
@@ -25,7 +28,7 @@ export function ensureDataDirectory(path: string): string {
     throw new Error(`The data directory path is taken by a file: ${directory}`);
   }
 
-  mkdirSync(directory, { recursive: true });
+  mkdirSync(join(directory, pluginsDirectoryName), { recursive: true });
 
   return directory;
 }

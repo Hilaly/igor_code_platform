@@ -51,6 +51,8 @@ export type PluginSupervisor = {
   statuses: () => PluginStatus[];
   /** Привести живое к желаемому: поднять включённые, погасить выключенные, забыть исчезнувшие. */
   apply: (discovery: PluginDiscovery, preferences: Preferences) => Promise<void>;
+  /** Поднять заново включённые плагины из перечисленных папок: их исходники изменились. */
+  reload: (directories: Iterable<string>) => Promise<void>;
   stopAll: () => Promise<void>;
 };
 
@@ -100,6 +102,8 @@ type Supervised = {
   /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
   contributed: CustomContribution[];
   disabledContributions: ReadonlySet<string>;
+  /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
+  enabled: boolean;
   cancelRetry?: CancelScheduled;
   /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
   startToken?: object;
@@ -425,6 +429,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           pending: [],
           contributed: [],
           disabledContributions: new Set(),
+          enabled: false,
         };
 
         supervised.set(plugin.key, entry);
@@ -439,6 +444,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       const switched = !sameSet(entry.disabledContributions, enablement.disabledContributions);
       entry.disabledContributions = enablement.disabledContributions;
+      entry.enabled = enablement.enabled;
 
       const alive =
         entry.state === "installing" ||
@@ -480,6 +486,27 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       ...refused.values(),
     ],
     apply,
+    reload: async (directories) => {
+      const affected = new Set(directories);
+
+      for (const entry of supervised.values()) {
+        // Плагин, которому сейчас ставят зависимости, перезагружать нечего: он и так поднимется с
+        // новыми исходниками, а перезапуск начал бы установку заново (ADR-0042).
+        if (
+          !affected.has(entry.plugin.directory) ||
+          !entry.enabled ||
+          entry.state === "installing"
+        ) {
+          continue;
+        }
+
+        logger.info("the plugin sources changed, reloading", { plugin: entry.plugin.key });
+
+        await stop(entry, "stopped");
+        entry.attempt = 0;
+        start(entry);
+      }
+    },
     stopAll: async () => {
       for (const entry of supervised.values()) {
         await stop(entry, "stopped");

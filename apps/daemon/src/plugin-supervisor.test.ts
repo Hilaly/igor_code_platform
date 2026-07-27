@@ -507,6 +507,63 @@ describe("createPluginSupervisor", () => {
     ]);
   });
 
+  it("reloads a plugin whose sources changed", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    const hello = only("hello").plugins[0];
+    assert.ok(hello !== undefined);
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    await supervisor.reload([hello.directory]);
+    await recorded.waitFor(reachedState("data:hello", "stopped"), "hello stopped for the reload");
+    await recorded.waitFor(
+      (record) =>
+        recorded.records.filter(reachedState("data:hello", "running")).length === 2 &&
+        record.message === "plugin lifecycle",
+      "hello running again",
+    );
+
+    assert.equal(
+      recorded.records.filter((record) => record.message === "hello is going down").length,
+      1,
+    );
+    assert.deepEqual(
+      registry.resolved().map((registration) => registration.id),
+      ["hello.board"],
+    );
+  });
+
+  it("leaves a plugin nobody enabled alone when its sources change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    const hello = only("hello").plugins[0];
+    assert.ok(hello !== undefined);
+
+    await supervisor.apply(only("hello"), disabled("data:hello"));
+    await supervisor.reload([hello.directory]);
+
+    assert.equal(
+      recorded.records.some((record) => record.message === "hello is up"),
+      false,
+    );
+  });
+
   it("stops every worker on shutdown", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();

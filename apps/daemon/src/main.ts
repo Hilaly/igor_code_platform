@@ -5,6 +5,7 @@ import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger } from "./logger.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
+import { createPluginWatcher } from "./plugin-watcher.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
 
@@ -62,9 +63,12 @@ const plugins = createPluginSupervisor({
 // плагин дважды.
 let applying = Promise.resolve();
 
-const applyPlugins = (): void => {
+const applyPlugins = (changedDirectories: string[] = []): void => {
   applying = applying
-    .then(() => plugins.apply(discoverPlugins(pluginRoots), settings.current().preferences))
+    .then(async () => {
+      await plugins.apply(discoverPlugins(pluginRoots), settings.current().preferences);
+      await plugins.reload(changedDirectories);
+    })
     .catch((cause: unknown) => {
       logger.error("applying the plugin state failed", {
         reason: cause instanceof Error ? cause.message : String(cause),
@@ -77,6 +81,15 @@ settings.subscribe((snapshot) => {
   applyPlugins();
 });
 
+const pluginWatcher = createPluginWatcher({
+  roots: pluginRoots,
+  logger,
+  onChange: applyPlugins,
+});
+
+// Наблюдатель ставится до первого обхода: правка, потерянная не успевшим встать наблюдателем, при
+// таком порядке всё равно попадает в первый снимок (runtime-checks.md, проверка 14).
+pluginWatcher.start();
 applyPlugins();
 
 const server = createDaemonServer(new Date());
@@ -97,6 +110,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.close();
     server.closeAllConnections();
     settings.close();
+    pluginWatcher.close();
 
     // Лок снимается последним и в любом случае: воркер, зависший на выгрузке, не имеет права
     // оставить директорию данных запертой.
