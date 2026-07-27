@@ -10,6 +10,7 @@
 import {
   coreEventNamespace,
   pluginSources,
+  type ContributionConflict,
   type ContributionRegistration,
   type PluginSource,
 } from "@sovereign/protocol";
@@ -17,13 +18,6 @@ import type { PluginContribution } from "@sovereign/sdk";
 
 /** Точки в идентификаторе разрешены: они дают плагину свою иерархию внутри своего неймспейса. */
 const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
-
-/** Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника (ADR-0040). */
-export type ContributionConflict = {
-  id: string;
-  source: PluginSource;
-  plugins: string[];
-};
 
 export type ContributionApplyOutcome = {
   registered: ContributionRegistration[];
@@ -52,11 +46,27 @@ export type ContributionRegistry = {
   ) => ContributionApplyOutcome;
   remove: (pluginKey: string) => void;
   resolved: () => ContributionRegistration[];
+  /**
+   * Объявленное, но выключенное человеком. Реестр помнит его целиком, а не только применённое:
+   * иначе выключенный вклад исчезал бы из интерфейса вместе с возможностью включить его обратно
+   * (ADR-0032).
+   */
+  switchedOff: () => ContributionRegistration[];
   conflicts: () => ContributionConflict[];
 };
 
+/** Что плагин объявил и что из этого действует. Разница между ними — решение человека. */
+type PluginContributions = {
+  declared: ContributionRegistration[];
+  registered: ContributionRegistration[];
+  disabled: ReadonlySet<string>;
+};
+
+const byIdentifier = (left: ContributionRegistration, right: ContributionRegistration): number =>
+  left.id < right.id ? -1 : 1;
+
 export function createContributionRegistry(): ContributionRegistry {
-  const byPlugin = new Map<string, ContributionRegistration[]>();
+  const byPlugin = new Map<string, PluginContributions>();
 
   let revision = 0;
   let resolved: ContributionRegistration[] = [];
@@ -65,8 +75,8 @@ export function createContributionRegistry(): ContributionRegistry {
   const resolve = (): void => {
     const claims = new Map<string, ContributionRegistration[]>();
 
-    for (const registrations of byPlugin.values()) {
-      for (const registration of registrations) {
+    for (const contributions of byPlugin.values()) {
+      for (const registration of contributions.registered) {
         claims.set(registration.id, [...(claims.get(registration.id) ?? []), registration]);
       }
     }
@@ -111,6 +121,7 @@ export function createContributionRegistry(): ContributionRegistry {
   return {
     revision: () => revision,
     apply: (plugin, contributions, disabledContributions) => {
+      const declared: ContributionRegistration[] = [];
       const registered: ContributionRegistration[] = [];
       const problems: string[] = [];
       const claimed = new Map<string, ContributionRegistration[]>();
@@ -171,6 +182,8 @@ export function createContributionRegistry(): ContributionRegistry {
           continue;
         }
 
+        declared.push(single);
+
         if (disabledContributions.has(id)) {
           continue;
         }
@@ -178,7 +191,7 @@ export function createContributionRegistry(): ContributionRegistry {
         registered.push(single);
       }
 
-      byPlugin.set(plugin.key, registered);
+      byPlugin.set(plugin.key, { declared, registered, disabled: disabledContributions });
       resolve();
 
       return { registered, problems };
@@ -189,6 +202,14 @@ export function createContributionRegistry(): ContributionRegistry {
       }
     },
     resolved: () => resolved,
+    switchedOff: () =>
+      [...byPlugin.values()]
+        .flatMap((contributions) =>
+          contributions.declared.filter((registration) =>
+            contributions.disabled.has(registration.id),
+          ),
+        )
+        .sort(byIdentifier),
     conflicts: () => conflicts,
   };
 }

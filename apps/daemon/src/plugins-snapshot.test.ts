@@ -4,7 +4,13 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, it } from "node:test";
 
-import { pluginsPath, type PluginStatus } from "@sovereign/protocol";
+import {
+  defaultConfig,
+  defaultPreferences,
+  pluginsPath,
+  type PluginPreferences,
+  type PluginStatus,
+} from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createDispatcher } from "./dispatcher.ts";
@@ -27,10 +33,19 @@ const refused: PluginStatus = {
   reason: "sovereign.id must match ^[a-z0-9][a-z0-9-]*$",
 };
 
-function sources(statuses: PluginStatus[]) {
+function sources(statuses: PluginStatus[], plugins: Record<string, PluginPreferences> = {}) {
   const registry = createContributionRegistry();
 
-  return { plugins: { statuses: () => statuses }, registry };
+  return {
+    plugins: { statuses: () => statuses },
+    registry,
+    settings: {
+      current: () => ({
+        config: defaultConfig,
+        preferences: { ...defaultPreferences, plugins },
+      }),
+    },
+  };
 }
 
 describe("buildPluginsSnapshot", () => {
@@ -56,7 +71,64 @@ describe("buildPluginsSnapshot", () => {
           source: "data",
         },
       ],
+      switchedOffContributions: [],
+      conflicts: [],
+      // У плагина из данных нет записи, значит решение выведено по источнику: включает человек.
+      enablement: { "data:hello": { enabled: false, disabledContributions: [] } },
     });
+  });
+
+  it("tells the recorded enablement apart from the one derived from the source", () => {
+    const state = sources([running], {
+      "data:hello": { enabled: true, disabledContributions: ["hello.panel"] },
+    });
+
+    assert.deepEqual(buildPluginsSnapshot(state).enablement, {
+      "data:hello": { enabled: true, disabledContributions: ["hello.panel"] },
+    });
+  });
+
+  it("gives no enablement record to a plugin refused before its manifest was read", () => {
+    // Ключ такого плагина — путь к папке, и записывать предпочтения по нему некуда.
+    const withoutIdentifier: PluginStatus = { ...refused, key: "/plugins/broken" };
+
+    assert.deepEqual(buildPluginsSnapshot(sources([withoutIdentifier])).enablement, {});
+  });
+
+  it("reports the switched off contributions and the conflicts of the registry", () => {
+    const state = sources([running], {
+      "data:hello": { enabled: true, disabledContributions: ["hello.panel"] },
+    });
+
+    state.registry.apply(
+      { key: "data:hello", id: "hello", source: "data" },
+      [
+        { kind: "custom", id: "greeting" },
+        { kind: "custom", id: "panel", title: "Panel" },
+      ],
+      new Set(["hello.panel"]),
+    );
+    state.registry.apply(
+      { key: "data:notes", id: "hello", source: "data" },
+      [{ kind: "custom", id: "greeting" }],
+      new Set(),
+    );
+
+    const snapshot = buildPluginsSnapshot(state);
+
+    // Выключенный вклад приходит целиком: интерфейсу нужен и вид, и название, а не идентификатор.
+    assert.deepEqual(
+      snapshot.switchedOffContributions.map((registration) => [
+        registration.id,
+        registration.title,
+      ]),
+      [["hello.panel", "Panel"]],
+    );
+    assert.deepEqual(snapshot.conflicts, [
+      { id: "hello.greeting", source: "data", plugins: ["data:hello", "data:notes"] },
+    ]);
+    assert.deepEqual(snapshot.contributions, []);
+    assert.equal(snapshot.revision, state.registry.revision());
   });
 
   it("reads the state at the moment of the request, not at the moment of wiring", () => {

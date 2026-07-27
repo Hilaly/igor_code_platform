@@ -42,3 +42,15 @@ export type ContributionRegistration =
   CustomContributionRegistration | EventContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
+
+/**
+ * Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника: не применяется ни
+ * один (ADR-0040). Форма — контракт, потому что спор уходит в снимок: диагностика обязана быть
+ * заметной в интерфейсе, а не строкой в журнале.
+ */
+export type ContributionConflict = {
+  id: string;
+  source: PluginSource;
+  /** Ключи плагинов, претендующих на идентификатор. */
+  plugins: string[];
+};

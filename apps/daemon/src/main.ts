@@ -120,7 +120,7 @@ const server = createDaemonServer({
   logger,
   routes: [
     healthRoute(new Date()),
-    pluginsRoute({ plugins, registry: contributions }),
+    pluginsRoute({ plugins, registry: contributions, settings }),
     pluginPreferencesRoute({ settings, plugins, logger }),
     ...appearancePreferencesRoutes({ settings, logger }),
     events.route(),

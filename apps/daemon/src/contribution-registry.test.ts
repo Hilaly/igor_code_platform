@@ -108,6 +108,58 @@ describe("createContributionRegistry", () => {
     );
   });
 
+  it("remembers a switched off contribution with its title and kind", () => {
+    const registry = createContributionRegistry();
+
+    registry.apply(
+      dataHello,
+      [board, { kind: "event", id: "task.created", payloadSchema: {} }],
+      new Set(["hello.board"]),
+    );
+
+    // Интерфейсу нужен не идентификатор, а сам вклад: иначе переключатель нечем подписать.
+    assert.deepEqual(
+      registry.switchedOff().map((registration) => [registration.id, registration.title]),
+      [["hello.board", "Board"]],
+    );
+    assert.deepEqual(
+      registry.resolved().map((registration) => registration.id),
+      ["hello.task.created"],
+    );
+  });
+
+  it("returns a switched on contribution to the resolved set", () => {
+    const registry = createContributionRegistry();
+
+    registry.apply(dataHello, [board], new Set(["hello.board"]));
+    registry.apply(dataHello, [board], nothingDisabled);
+
+    assert.deepEqual(registry.switchedOff(), []);
+    assert.deepEqual(
+      registry.resolved().map((registration) => registration.id),
+      ["hello.board"],
+    );
+  });
+
+  it("forgets both the resolved and the switched off contributions of a plugin that went away", () => {
+    const registry = createContributionRegistry();
+
+    registry.apply(dataHello, [board, custom({ id: "panel" })], new Set(["hello.panel"]));
+    registry.remove("data:hello");
+
+    assert.deepEqual(registry.resolved(), []);
+    assert.deepEqual(registry.switchedOff(), []);
+  });
+
+  it("does not remember a contribution the registry refused as switched off", () => {
+    const registry = createContributionRegistry();
+
+    // Кривой вклад не «выключен», а не принят: включать его обратно нечем, пока плагин не исправлен.
+    registry.apply(dataHello, [custom({ id: "Board Panel" })], new Set(["hello.Board Panel"]));
+
+    assert.deepEqual(registry.switchedOff(), []);
+  });
+
   it("replaces the whole set of a plugin at once", () => {
     const registry = createContributionRegistry();
 
