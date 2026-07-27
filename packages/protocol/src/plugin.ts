@@ -23,6 +23,14 @@ export const pluginSources = ["builtin", "data"] as const;
 
 export type PluginSource = (typeof pluginSources)[number];
 
+/**
+ * Плагин, о котором в предпочтениях ещё ничего не сказано: встроенный работает сразу (ADR-0019),
+ * любой другой ждёт явного включения — включение это граница доверия (ADR-0016, ADR-0018).
+ */
+export function pluginEnabledByDefault(source: PluginSource): boolean {
+  return source === "builtin";
+}
+
 /** Идентификатор попадает в маршрут `/p/<pluginId>/...`, поэтому годятся не любые символы. */
 export const pluginIdPattern = /^[a-z0-9][a-z0-9-]*$/;
 

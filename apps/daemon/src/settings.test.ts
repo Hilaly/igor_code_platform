@@ -100,7 +100,10 @@ async function applyAtomically(
 test("missing files mean the defaults", () => {
   const { store, messages } = startedStore(freshDirectory());
 
-  assert.deepEqual(store.current(), { config: { logLevel: "info" }, preferences: {} });
+  assert.deepEqual(store.current(), {
+    config: { logLevel: "info" },
+    preferences: { plugins: {} },
+  });
   assert.deepEqual(messages, []);
 });
 
