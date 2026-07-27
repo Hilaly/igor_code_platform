@@ -37,6 +37,8 @@ describe("styles.css", () => {
       "sv-panel",
       "sv-list",
       "sv-notice",
+      "sv-disclosure",
+      "sv-code",
       "sv-empty",
       "sv-spinner",
     ]) {

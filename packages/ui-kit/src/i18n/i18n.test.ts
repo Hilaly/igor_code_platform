@@ -120,10 +120,41 @@ describe("createTranslator", () => {
   });
 });
 
+/**
+ * Множественное число ломает сравнение ключей один в один: в английском категорий две, в русском
+ * три, и это не дырка в переводе, а свойство языка. Поэтому сравниваются семьи сообщений — ключ без
+ * категории, — а сами категории проверяются по `Intl`.
+ */
+const pluralCategories = new Set(["zero", "one", "two", "few", "many", "other"]);
+
+const family = (key: string): string => {
+  const lastDot = key.lastIndexOf(".");
+  const suffix = key.slice(lastDot + 1);
+
+  return lastDot > 0 && pluralCategories.has(suffix) ? key.slice(0, lastDot) : key;
+};
+
+const families = (catalog: CatalogRegistration): string[] =>
+  [...new Set(Object.keys(catalog.messages).map(family))].sort();
+
 describe("the shipped catalogs", () => {
-  it("say the same keys in both locales", () => {
-    expect(Object.keys(coreRussian.messages).sort()).toEqual(
-      Object.keys(coreEnglish.messages).sort(),
-    );
+  it("say the same messages in both locales", () => {
+    expect(families(coreRussian)).toEqual(families(coreEnglish));
+  });
+
+  it("name only the plural categories the language has", () => {
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const known: string[] = new Intl.PluralRules(catalog.locale).resolvedOptions()
+        .pluralCategories;
+      const used = Object.keys(catalog.messages)
+        .filter((key) => family(key) !== key)
+        .map((key) => key.slice(key.lastIndexOf(".") + 1));
+
+      expect(used.length, catalog.locale).toBeGreaterThan(0);
+      expect(
+        used.filter((category) => !known.includes(category)),
+        catalog.locale,
+      ).toEqual([]);
+    }
   });
 });

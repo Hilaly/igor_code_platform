@@ -11,6 +11,8 @@
 
 export * from "./components/badge.tsx";
 export * from "./components/button.tsx";
+export * from "./components/code.tsx";
+export * from "./components/disclosure.tsx";
 export * from "./components/list.tsx";
 export * from "./components/notice.tsx";
 export * from "./components/panel.tsx";

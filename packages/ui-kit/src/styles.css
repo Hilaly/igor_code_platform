@@ -262,6 +262,52 @@
   font-size: 0.875rem;
 }
 
+.sv-disclosure {
+  border: 1px solid var(--sovereign-border);
+  border-radius: 0.375rem;
+  background: var(--sovereign-sunken-surface);
+}
+
+.sv-disclosure-summary {
+  padding: 0.25rem 0.5rem;
+  color: var(--sovereign-text-muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.sv-disclosure-summary:focus-visible {
+  outline: 2px solid var(--sovereign-focus-ring);
+  outline-offset: 1px;
+}
+
+.sv-disclosure-body {
+  padding: 0 0.5rem 0.5rem;
+}
+
+.sv-code {
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  /* Длинная строка ломается и прокручивается внутри блока, а не растягивает страницу. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+}
+
+.sv-code-inline {
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+  font-family: ui-monospace, monospace;
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
 .sv-empty {
   display: flex;
   flex-direction: column;
