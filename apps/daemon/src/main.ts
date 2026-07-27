@@ -1,4 +1,5 @@
 import { parseArguments } from "./arguments.ts";
+import { createContributionRegistry } from "./contribution-registry.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLogger } from "./logger.ts";
@@ -48,8 +49,11 @@ settings.start(logger);
 
 const pluginRoots = defaultPluginRoots(directory);
 
+const contributions = createContributionRegistry();
+
 const plugins = createPluginSupervisor({
   logger,
+  registry: contributions,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
 });

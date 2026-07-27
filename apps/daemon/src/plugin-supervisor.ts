@@ -12,6 +12,7 @@ import { Worker } from "node:worker_threads";
 import type { CustomContribution } from "@sovereign/sdk";
 import type { LogSource, Preferences } from "@sovereign/protocol";
 
+import type { ContributionRegistry } from "./contribution-registry.ts";
 import type { Logger } from "./logger.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
@@ -57,6 +58,7 @@ export type CancelScheduled = () => void;
 
 export type CreatePluginSupervisorOptions = {
   logger: Logger;
+  registry: ContributionRegistry;
   /** Источник записи штампует ядро: плагин не может назваться чужим именем (ADR-0021). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
@@ -74,6 +76,10 @@ const defaultStability = 60_000;
 
 const bootstrapPath = join(import.meta.dirname, "plugin-worker.ts");
 
+function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
 type Supervised = {
   plugin: DiscoveredPlugin;
   logger: Logger;
@@ -85,11 +91,14 @@ type Supervised = {
   runningSince?: number;
   /** Вклады копятся до `activated` и применяются одним снимком (ADR-0024). */
   pending: CustomContribution[];
+  /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
+  contributed: CustomContribution[];
+  disabledContributions: ReadonlySet<string>;
   cancelRetry?: CancelScheduled;
 };
 
 export function createPluginSupervisor(options: CreatePluginSupervisorOptions): PluginSupervisor {
-  const { logger, createPluginLogger } = options;
+  const { logger, createPluginLogger, registry } = options;
   const now = options.now ?? (() => Date.now());
   const schedule =
     options.schedule ??
@@ -118,19 +127,34 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     });
   };
 
+  /** Единственное место, где вклады плагина попадают в реестр: снимком, между activate и running. */
   const applyContributions = (entry: Supervised): void => {
-    // Реестра вкладов ещё нет: снимок пока только виден в журнале. Место его применения одно,
-    // и оно здесь — между `activated` и переходом в `running`.
-    if (entry.pending.length > 0) {
-      logger.debug("plugin contributions received", {
+    const outcome = registry.apply(entry.plugin, entry.contributed, entry.disabledContributions);
+
+    for (const problem of outcome.problems) {
+      // Кривой вклад — событие жизненного цикла плагина, а не исключение (ADR-0054).
+      logger.warn("the plugin contribution was not applied", {
         plugin: entry.plugin.key,
-        contributions: entry.pending.map((contribution) => contribution.id),
+        reason: problem,
       });
+    }
+
+    for (const conflict of registry.conflicts()) {
+      logger.warn(
+        "the contribution is claimed by several plugins of one source and applies to none",
+        {
+          contribution: conflict.id,
+          source: conflict.source,
+          plugins: conflict.plugins,
+        },
+      );
     }
   };
 
   const dropContributions = (entry: Supervised): void => {
     entry.pending = [];
+    entry.contributed = [];
+    registry.remove(entry.plugin.key);
   };
 
   const fail = (entry: Supervised, reason: string): void => {
@@ -176,6 +200,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
         return;
       case "activated":
+        entry.contributed = entry.pending;
         applyContributions(entry);
         entry.runningSince = now();
         entry.nextAttemptAt = undefined;
@@ -342,6 +367,8 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           state: "discovered",
           attempt: 0,
           pending: [],
+          contributed: [],
+          disabledContributions: new Set(),
         };
 
         supervised.set(plugin.key, entry);
@@ -354,6 +381,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       entry.plugin = plugin;
 
+      const switched = !sameSet(entry.disabledContributions, enablement.disabledContributions);
+      entry.disabledContributions = enablement.disabledContributions;
+
       const alive =
         entry.state === "starting" || entry.state === "running" || entry.state === "failed";
 
@@ -365,6 +395,13 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       if (!enablement.enabled && entry.state !== "disabled") {
         await stop(entry, "disabled");
+        continue;
+      }
+
+      // Переключение вклада не трогает плагин: он остаётся запущенным, меняется только набор
+      // действующих вкладов (ADR-0032, ADR-0063).
+      if (switched && entry.state === "running") {
+        applyContributions(entry);
       }
     }
   };

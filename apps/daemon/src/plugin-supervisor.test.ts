@@ -4,6 +4,7 @@ import { afterEach, describe, it } from "node:test";
 
 import type { LogRecord, LogSource, Preferences } from "@sovereign/protocol";
 
+import { createContributionRegistry } from "./contribution-registry.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import {
   createPluginSupervisor,
@@ -132,9 +133,11 @@ afterEach(async () => {
 describe("createPluginSupervisor", () => {
   it("starts an enabled plugin and stamps its log lines with its own source", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -152,9 +155,11 @@ describe("createPluginSupervisor", () => {
 
   it("keeps a plugin nobody enabled out of the worker pool", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -173,9 +178,11 @@ describe("createPluginSupervisor", () => {
 
   it("runs plugin code written with non-erasable typescript", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -186,29 +193,75 @@ describe("createPluginSupervisor", () => {
     );
   });
 
-  it("collects the contributions declared during activate", async () => {
+  it("puts the contributions declared during activate into the registry", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
     await supervisor.apply(only("hello"), enabled("data:hello"));
-    const snapshot = await recorded.waitFor(
-      (record) => record.message === "plugin contributions received",
-      "the contribution snapshot",
-    );
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
 
-    assert.deepEqual(snapshot["contributions"], ["board"]);
+    assert.deepEqual(
+      registry.resolved().map((registration) => [registration.id, registration.pluginKey]),
+      [["hello.board", "data:hello"]],
+    );
+  });
+
+  it("takes the contributions away when the plugin is switched off", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    await supervisor.apply(only("hello"), disabled("data:hello"));
+
+    assert.deepEqual(registry.resolved(), []);
+  });
+
+  it("switches a single contribution off without touching the plugin", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    await supervisor.apply(only("hello"), {
+      plugins: { "data:hello": { enabled: true, disabledContributions: ["hello.board"] } },
+    });
+
+    assert.deepEqual(registry.resolved(), []);
+    assert.equal(
+      supervisor.statuses().find((status) => status.key === "data:hello")?.state,
+      "running",
+    );
   });
 
   it("fails a plugin that throws in activate and retries with a growing delay", async () => {
     const recorded = journal();
     const clock = manualClock();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
       now: clock.now,
       schedule: clock.schedule,
       retryDelaysMilliseconds: [10, 20, 40],
@@ -237,9 +290,11 @@ describe("createPluginSupervisor", () => {
   it("counts a long-lived plugin's crash as the first one", async () => {
     const recorded = journal();
     const clock = manualClock();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
       now: clock.now,
       schedule: clock.schedule,
       retryDelaysMilliseconds: [10, 20, 40],
@@ -265,9 +320,11 @@ describe("createPluginSupervisor", () => {
 
   it("deactivates a plugin the human switched off and forgets its contributions", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -288,9 +345,11 @@ describe("createPluginSupervisor", () => {
 
   it("does not let a hanging deactivate hold the unload", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
       deactivateTimeoutMilliseconds: 50,
     });
     running = supervisor;
@@ -314,9 +373,11 @@ describe("createPluginSupervisor", () => {
 
   it("stops a plugin that disappeared from the disk", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -330,9 +391,11 @@ describe("createPluginSupervisor", () => {
 
   it("reports a refused plugin without trying to run it", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
     running = supervisor;
 
@@ -366,9 +429,11 @@ describe("createPluginSupervisor", () => {
 
   it("stops every worker on shutdown", async () => {
     const recorded = journal();
+    const registry = createContributionRegistry();
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
       createPluginLogger: recorded.pluginLogger,
+      registry,
     });
 
     await supervisor.apply(only("hello", "typescripty"), enabled("data:hello", "data:typescripty"));
