@@ -189,15 +189,34 @@ export function App() {
     [preferences.locale, diagnostics],
   );
 
+  // Номер последней отправленной записи внешнего вида. Два быстрых переключения рвут договор:
+  // второе wins локально, но первый ответ резолвится первым и затирает второе решение ответом на
+  // первое. Ответ применяется, только если он последний отправленный; протухший молча отбрасывается
+  // — снимок вернётся следующим событием или перезапросом.
+  const appearanceSeq = useRef(0);
+
   const change = (next: AppearancePreferences): void => {
     // Выбранное показывается сразу, не дожидаясь ответа: запись может отказать, и тогда придёт
     // причина, а состояние вернётся перезапросом.
     setPreferences(next);
     setRefusal(undefined);
 
+    const seq = appearanceSeq.current + 1;
+    appearanceSeq.current = seq;
+
     void writeAppearance(next)
-      .then(setPreferences)
+      .then((confirmed) => {
+        if (appearanceSeq.current !== seq) {
+          return;
+        }
+
+        setPreferences(confirmed);
+      })
       .catch((cause: unknown) => {
+        if (appearanceSeq.current !== seq) {
+          return;
+        }
+
         setRefusal(cause instanceof Error ? cause.message : String(cause));
         reload.current();
       });

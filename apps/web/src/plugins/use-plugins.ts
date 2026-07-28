@@ -54,6 +54,13 @@ export function usePlugins(options: UsePluginsOptions): PluginsController {
 
   const pending = useRef<AbortController | undefined>(undefined);
 
+  // Записи идут оптимистично: локальное решение применяется сразу, а ответ сервера переприменяет
+  // его же. Без упорядочивания два быстрых переключения одного плагина рвут договор: второй wins
+  // локально, но первый резолвится первым и затирает второе решение ответом на первое. Поэтому
+  // ответ применяется, только если он — последний отправленный для этого плагина: номер записи
+  // растёт на каждом вызове, и протухший ответ (старший номер пришёл позже) молча отбрасывается.
+  const writeSeq = useRef<Map<string, number>>(new Map());
+
   const reload = useCallback(() => {
     // Предыдущий запрос отменяется: его ответ уже не нужен, а прийти он может позже нового.
     pending.current?.abort();
@@ -106,11 +113,24 @@ export function usePlugins(options: UsePluginsOptions): PluginsController {
       // вернётся перезапросом.
       apply((current) => applyWrittenPreferences(current, pluginKey, preferences));
 
+      const seq = (writeSeq.current.get(pluginKey) ?? 0) + 1;
+      writeSeq.current.set(pluginKey, seq);
+
       void writePluginPreferences(pluginKey, preferences)
-        .then((updated) =>
-          apply((current) => applyWrittenPreferences(current, updated.key, updated.preferences)),
-        )
+        .then((updated) => {
+          // Протухший ответ: после этой записи человек переключил ещё раз, и его новое решение
+          // не должно затираться ответом на старое. Снимок вернётся и так — следующим событием.
+          if ((writeSeq.current.get(pluginKey) ?? 0) !== seq) {
+            return;
+          }
+
+          apply((current) => applyWrittenPreferences(current, updated.key, updated.preferences));
+        })
         .catch((cause: unknown) => {
+          if ((writeSeq.current.get(pluginKey) ?? 0) !== seq) {
+            return;
+          }
+
           const reason = reasonOf(cause);
 
           onDiagnostic(`the plugin preferences were not written: ${reason}`);
