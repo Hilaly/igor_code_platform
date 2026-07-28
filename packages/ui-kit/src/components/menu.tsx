@@ -137,6 +137,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
               onClick={() => {
                 item.onSelect();
                 setOpen(false);
+                triggerRef.current?.focus();
               }}
             >
               {item.label}

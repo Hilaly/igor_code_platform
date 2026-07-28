@@ -1,0 +1,31 @@
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  fill: currentColor;
+}
+
+.xs {
+  width: var(--sovereign-icon-xs);
+  height: var(--sovereign-icon-xs);
+}
+
+.sm {
+  width: var(--sovereign-icon-sm);
+  height: var(--sovereign-icon-sm);
+}
+
+.md {
+  width: var(--sovereign-icon-md);
+  height: var(--sovereign-icon-md);
+}
+
+.lg {
+  width: var(--sovereign-icon-lg);
+  height: var(--sovereign-icon-lg);
+}
+
+.xl {
+  width: var(--sovereign-icon-xl);
+  height: var(--sovereign-icon-xl);
+}

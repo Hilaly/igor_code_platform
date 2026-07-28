@@ -140,16 +140,14 @@ export function ConfirmDialog({
           <Button onClick={onClose} disabled={pending}>
             {cancelLabel}
           </Button>
-          {/*
-           * `aria-busy` стоит на обёртке, а не на самой кнопке: поверхность `Button` узкая и этого
-           * пропса не знает, а расширять её — отдельное изменение. Атрибут глобальный, участок вокруг
-           * кнопки он помечает занятым не хуже.
-           */}
-          <span className={styles.confirm} aria-busy={pending}>
-            <Button tone={destructive ? "danger" : "accent"} onClick={onConfirm} disabled={pending}>
-              {confirmLabel}
-            </Button>
-          </span>
+          <Button
+            tone={destructive ? "danger" : "accent"}
+            onClick={onConfirm}
+            disabled={pending}
+            busy={pending}
+          >
+            {confirmLabel}
+          </Button>
         </>
       }
     >

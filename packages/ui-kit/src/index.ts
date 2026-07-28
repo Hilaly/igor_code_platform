@@ -20,6 +20,7 @@ export * from "./components/code.tsx";
 export * from "./components/dialog.tsx";
 export * from "./components/disclosure.tsx";
 export * from "./components/field.tsx";
+export * from "./components/icon.tsx";
 export * from "./components/input.tsx";
 export * from "./components/list.tsx";
 export * from "./components/menu.tsx";

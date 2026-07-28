@@ -8,7 +8,7 @@
  * работает только если триггер сам умеет принимать фокус: у нарисованной картинки подсказки не будет.
  */
 
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, useId, type ReactNode } from "react";
 
 import styles from "./tooltip.module.css";
 
@@ -24,10 +24,19 @@ export type TooltipProps = {
 };
 
 export function Tooltip({ content, side = "top", children }: TooltipProps) {
+  const tooltipId = useId();
+  const trigger = isValidElement(children)
+    ? cloneElement(children, {
+        "aria-describedby": (children.props as { "aria-describedby"?: string })["aria-describedby"]
+          ? `${(children.props as { "aria-describedby"?: string })["aria-describedby"]} ${tooltipId}`
+          : tooltipId,
+      } as Record<string, unknown>)
+    : children;
+
   return (
     <span className={styles.wrap}>
-      {children}
-      <span className={`${styles.tip} ${styles[side]}`} role="tooltip">
+      {trigger}
+      <span className={`${styles.tip} ${styles[side]}`} id={tooltipId} role="tooltip">
         {content}
       </span>
     </span>

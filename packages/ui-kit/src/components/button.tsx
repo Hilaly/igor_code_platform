@@ -11,6 +11,8 @@ export type ButtonProps = {
   onClick: () => void;
   disabled?: boolean;
   pressed?: boolean;
+  /** Занятость операции: помечает кнопку aria-busy для скринридера. */
+  busy?: boolean;
   /** Подсказка при наведении: для кнопки без подписи она единственное объяснение. */
   title?: string;
   children: ReactNode;
@@ -21,6 +23,7 @@ export function Button({
   onClick,
   disabled = false,
   pressed,
+  busy,
   title,
   children,
 }: ButtonProps) {
@@ -29,8 +32,9 @@ export function Button({
       type="button"
       className={`${styles.button} ${styles[tone]}`}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || busy}
       aria-pressed={pressed}
+      aria-busy={busy || undefined}
       title={title}
     >
       {children}
