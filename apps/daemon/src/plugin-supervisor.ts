@@ -591,6 +591,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           await stop(entry, "stopped");
         }
       }
+
+      // Снимает подписку на шину, чтобы пересоздание супервизора (тест, будущий рантайм) не
+      // оставляло старую доставлять события в дохлые хэндлы воркеров.
+      events.close();
     },
   };
 }

@@ -24,6 +24,12 @@ export type PluginEvents = {
   unsubscribe: (pluginKey: string, type: string) => void;
   /** Снять все подписки плагина. Зовётся там же, где снимаются его вклады. */
   remove: (pluginKey: string) => void;
+  /**
+   * Снять подписку на шину, которую заводит этот объект. Сегодня один `PluginEvents` на жизнь
+   * демона, но если он будет пересоздан в рантайме или в тесте, старая подписка без этого —
+   * живая и доставляет события в дохлые хэндлы воркеров. Симметрично `event-stream.ts`.
+   */
+  close: () => void;
 };
 
 export type CreatePluginEventsOptions = {
@@ -39,7 +45,9 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
 
   const subscribers = new Map<string, Set<string>>();
 
-  bus.subscribe((event) => {
+  // Функция отписки хранится и зовётся в close(): иначе пересоздание PluginEvents в рантайме или
+  // в тесте оставляет старую подписку живой — она доставляет события в дохлые хэндлы воркеров.
+  const unsubscribeBus = bus.subscribe((event) => {
     const listening = subscribers.get(event.type);
 
     if (listening === undefined) {
@@ -116,6 +124,10 @@ export function createPluginEvents(options: CreatePluginEventsOptions): PluginEv
           subscribers.delete(type);
         }
       }
+    },
+    close: () => {
+      subscribers.clear();
+      unsubscribeBus();
     },
   };
 }

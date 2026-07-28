@@ -199,6 +199,26 @@ describe("createPluginEvents", () => {
     assert.deepEqual(delivered, []);
   });
 
+  it("drops the bus subscription on close, so no event reaches a dead worker", () => {
+    const { registry, events: plugins, delivered, published } = events();
+    const automation: ContributingPlugin = {
+      key: "data:automation",
+      id: "automation",
+      source: "data",
+    };
+
+    registry.apply(tracker, [taskCreated], new Set());
+    plugins.subscribe(automation, "tracker.task.created");
+    plugins.close();
+
+    // Событие публикуется обычным путём и проходит по шине, но после close подписка PluginEvents
+    // снята — до воркера оно не доходит.
+    plugins.publish(tracker, "task.created", { id: "42" });
+
+    assert.equal(published.length, 1);
+    assert.deepEqual(delivered, []);
+  });
+
   it("does not let one plugin publish under the name of another", () => {
     const { registry, events: plugins, published } = events();
     const automation: ContributingPlugin = {
