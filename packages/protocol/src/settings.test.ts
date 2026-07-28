@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { defaultPreferences, parsePreferences, type Preferences } from "./settings.ts";
+import {
+  defaultPreferences,
+  interfaceScales,
+  parsePreferences,
+  type Preferences,
+} from "./settings.ts";
 
 const parsedPlugins = (raw: unknown): Preferences["plugins"] => {
   const result = parsePreferences(raw);
@@ -84,24 +89,38 @@ describe("parsePreferences: appearance and locale", () => {
   };
 
   it("takes a file that says nothing as the built-in scheme and the base locale", () => {
-    assert.deepEqual(parsed({}).appearance, { colorScheme: "base", variant: "system" });
+    assert.deepEqual(parsed({}).appearance, {
+      colorScheme: "base",
+      variant: "system",
+      scale: "default",
+    });
     assert.equal(parsed({}).locale, "en");
   });
 
-  it("reads the scheme, the variant and the locale", () => {
+  it("reads the scheme, the variant, the scale and the locale", () => {
     const preferences = parsed({
-      appearance: { colorScheme: "midnight", variant: "dark" },
+      appearance: { colorScheme: "midnight", variant: "dark", scale: "larger" },
       locale: "ru",
     });
 
-    assert.deepEqual(preferences.appearance, { colorScheme: "midnight", variant: "dark" });
+    assert.deepEqual(preferences.appearance, {
+      colorScheme: "midnight",
+      variant: "dark",
+      scale: "larger",
+    });
     assert.equal(preferences.locale, "ru");
+  });
+
+  it("reads every step of the scale", () => {
+    for (const scale of interfaceScales) {
+      assert.equal(parsed({ appearance: { scale } }).appearance.scale, scale);
+    }
   });
 
   it("fills in what the appearance does not name", () => {
     assert.deepEqual(parsed({ appearance: { variant: "light" } }), {
       plugins: {},
-      appearance: { colorScheme: "base", variant: "light" },
+      appearance: { colorScheme: "base", variant: "light", scale: "default" },
       locale: "en",
     });
   });
@@ -111,6 +130,8 @@ describe("parsePreferences: appearance and locale", () => {
       { appearance: { variant: "bright" } },
       { appearance: { colorScheme: "" } },
       { appearance: { colorScheme: 7 } },
+      { appearance: { scale: "huge" } },
+      { appearance: { scale: 2 } },
       { appearance: "dark" },
       { locale: "не тег" },
       { locale: 7 },

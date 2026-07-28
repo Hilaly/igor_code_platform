@@ -1,24 +1,15 @@
 /*
- * Раскладка оболочки. Цвета — только переменные ролей: значения задаёт цветовая схема
- * (дисциплина цвета — в docs/ui-kit.md, раздел «Чем держится дисциплина цвета»).
+ * Раскладка оболочки. Цвета — только переменные ролей, размеры — только шкалы кита: значения задают
+ * цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
  * Здесь лежит геометрия хоста, а не вид примитивов — тот живёт в ките.
+ *
+ * Базовой типографики здесь больше нет: кегль, семейство и цвет текста переехали в сброс кита
+ * (packages/ui-kit/src/styles/reset.css), потому что их обязан получить и браузерный код плагина,
+ * который рисует свой DOM (docs/ui-extension-model.md).
  */
 
 :root {
   color-scheme: light dark;
-}
-
-body {
-  margin: 0;
-  background: var(--sovereign-page-surface);
-  color: var(--sovereign-text);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
 }
 
 .shell {
@@ -32,9 +23,10 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--sovereign-space-3);
+  padding: var(--sovereign-space-3);
   background: var(--sovereign-panel-surface);
+  border-right: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   overflow: hidden auto;
   flex: 0 0 auto;
 }
@@ -42,34 +34,37 @@ body {
 .shell-left-main {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--sovereign-space-3);
   min-height: 0;
 }
 
 .shell-left-bottom {
-  border-top: 1px solid var(--sovereign-border);
-  padding-top: 0.5rem;
+  border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  padding-top: var(--sovereign-space-2);
 }
 
+/* Фоновая заливка страницы — единственное место, где второй акцент работает на всю площадь. */
 .shell-page {
   flex: 1 1 auto;
-  padding: 1.25rem;
+  padding: var(--sovereign-space-5);
+  background: var(--sovereign-gradient-backdrop);
   overflow: auto;
 }
 
 .shell-right {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: var(--sovereign-space-2);
+  padding: var(--sovereign-space-3);
   background: var(--sovereign-panel-surface);
+  border-left: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   overflow: hidden auto;
   flex: 0 0 auto;
 }
 
 .shell-tabs {
   display: flex;
-  gap: 0.375rem;
+  gap: var(--sovereign-space-2);
   flex-wrap: wrap;
 }
 
@@ -81,6 +76,7 @@ body {
 /* Граница панели: тянется мышью, а с клавиатуры — стрелками, поэтому у неё есть фокус. */
 .shell-resizer {
   flex: 0 0 auto;
+  /* Полоса захвата: шкала отступов начинается с более крупного шага, а тут нужен именно тонкий край. */
   width: 5px;
   border: none;
   background: var(--sovereign-border);
@@ -100,16 +96,16 @@ body {
 .shell-daemon {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--sovereign-space-2);
 }
 
-.shell-appearance-variants,
+.shell-appearance-choice,
 .shell-appearance-buttons {
   display: flex;
-  gap: 0.375rem;
+  gap: var(--sovereign-space-2);
 }
 
-.shell-appearance-variants {
+.shell-appearance-choice {
   flex-direction: column;
 }
 
@@ -122,11 +118,11 @@ body {
 .plugins-plugin {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--sovereign-space-3);
 }
 
 .plugins-plugin {
-  gap: 0.5rem;
+  gap: var(--sovereign-space-2);
 }
 
 .plugins-plugin-head,
@@ -134,28 +130,31 @@ body {
 .plugins-contribution {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sovereign-space-2);
   flex-wrap: wrap;
 }
 
-.plugins-contribution {
-  padding: 0.375rem 0.5rem;
+/*
+ * В шапке ровно двое: сведения о плагине и его переключатель. Переключатель держится правого края
+ * распором между ними, а не селектором по классу примитива: имена классов кита хешируются модулями,
+ * и цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
+ */
+.plugins-plugin-head {
+  justify-content: space-between;
 }
 
-/* Переключатель плагина держится правого края и не переносится: он про панель, а не про её строку. */
-.plugins-plugin-head > .sv-toggle {
-  margin-left: auto;
-  flex: 0 0 auto;
+.plugins-contribution {
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
 }
 
 .plugins-reasons {
   margin: 0;
-  padding-left: 1.25rem;
+  padding-left: var(--sovereign-space-5);
 }
 
 .shell-daemon-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--sovereign-space-2);
 }

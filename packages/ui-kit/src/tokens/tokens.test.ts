@@ -1,6 +1,7 @@
+import { interfaceScales } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
-import { applyRoles } from "./apply.ts";
+import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
 import { paletteKeys, paletteVariants, type Palette } from "./palette.ts";
 import { deriveRoles, roleNames, rolePropertyName } from "./roles.ts";
 import { resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
@@ -90,6 +91,26 @@ describe("applyRoles", () => {
 
     expect(written.size).toBe(roleNames.length);
     expect(written.get("--sovereign-page-surface")).toBe(baseScheme.variants.dark.surface);
+  });
+});
+
+describe("applyScale", () => {
+  it("writes every step as the attribute the kit's css reacts to", () => {
+    for (const scale of interfaceScales) {
+      const written = new Map<string, string>();
+
+      applyScale(scale, { setAttribute: (name, value) => void written.set(name, value) });
+
+      expect(written.get(scaleAttributeName)).toBe(scale);
+    }
+  });
+
+  it("names the ordinary scale instead of dropping the attribute", () => {
+    const written = new Map<string, string>();
+
+    applyScale("default", { setAttribute: (name, value) => void written.set(name, value) });
+
+    expect(written.get(scaleAttributeName)).toBe("default");
   });
 });
 

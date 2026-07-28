@@ -36,10 +36,24 @@ export const appearanceVariants = ["light", "dark", "system"] as const;
 
 export type AppearanceVariant = (typeof appearanceVariants)[number];
 
+/**
+ * Ось масштаба интерфейса: кегль, шаг отступов и высота контролов (docs/ui-kit.md). Значений три, и
+ * список закрыт — это выбор из трёх ступеней, а не произвольный множитель.
+ */
+export const interfaceScales = ["smaller", "default", "larger"] as const;
+
+export type InterfaceScale = (typeof interfaceScales)[number];
+
+/** Нужен и снаружи: браузер проверяет им кеш выбора, переживший обновление платформы. */
+export function isInterfaceScale(value: unknown): value is InterfaceScale {
+  return interfaceScales.includes(value as InterfaceScale);
+}
+
 export type Appearance = {
   /** Идентификатор цветовой схемы; схему может добавить плагин (docs/ui-kit.md). */
   colorScheme: string;
   variant: AppearanceVariant;
+  scale: InterfaceScale;
 };
 
 /** Идентификатор встроенной схемы. Она есть всегда: заменить её нечем, пока плагинов нет. */
@@ -66,6 +80,7 @@ export const defaultConfig: Config = { logLevel: "info" };
 export const defaultAppearance: Appearance = {
   colorScheme: baseColorScheme,
   variant: "system",
+  scale: "default",
 };
 export const defaultPreferences: Preferences = {
   plugins: {},
@@ -171,7 +186,7 @@ export function parseAppearance(
     return { kind: "rejected", diagnostics: [`${label} must be an object`] };
   }
 
-  const diagnostics = diagnoseUnknownKeys(label, fields, ["colorScheme", "variant"]);
+  const diagnostics = diagnoseUnknownKeys(label, fields, ["colorScheme", "variant", "scale"]);
   const colorScheme = fields["colorScheme"];
 
   if (colorScheme !== undefined && (typeof colorScheme !== "string" || colorScheme === "")) {
@@ -190,11 +205,22 @@ export function parseAppearance(
     return { kind: "rejected", diagnostics };
   }
 
+  const scale = fields["scale"];
+
+  if (scale !== undefined && !isInterfaceScale(scale)) {
+    diagnostics.push(
+      `${label}.scale must be one of ${interfaceScales.join(", ")}, got ${JSON.stringify(scale)}`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
   return {
     kind: "parsed",
     value: {
       colorScheme: colorScheme ?? defaultAppearance.colorScheme,
       variant: variant ?? defaultAppearance.variant,
+      scale: scale ?? defaultAppearance.scale,
     },
     diagnostics,
   };

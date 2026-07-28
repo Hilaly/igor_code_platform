@@ -98,7 +98,10 @@ async function serve() {
   };
 }
 
-const midnight = { appearance: { colorScheme: "midnight", variant: "dark" }, locale: "ru" };
+const midnight = {
+  appearance: { colorScheme: "midnight", variant: "dark", scale: "larger" },
+  locale: "ru",
+};
 
 describe("appearancePreferencesRoutes", () => {
   it("answers with the defaults when the file says nothing", async () => {
@@ -107,7 +110,7 @@ describe("appearancePreferencesRoutes", () => {
 
     assert.equal(answer.status, 200);
     assert.deepEqual(JSON.parse(answer.body), {
-      appearance: { colorScheme: "base", variant: "system" },
+      appearance: { colorScheme: "base", variant: "system", scale: "default" },
       locale: "en",
     });
   });
@@ -120,6 +123,19 @@ describe("appearancePreferencesRoutes", () => {
     assert.deepEqual(JSON.parse(answer.body), midnight);
     assert.deepEqual(stored(), midnight);
     assert.deepEqual(JSON.parse((await get()).body), midnight);
+  });
+
+  it("writes the scale to the file and gives it back", async () => {
+    const { get, put, stored } = await serve();
+    const smaller = {
+      appearance: { colorScheme: "base", variant: "system", scale: "smaller" },
+      locale: "en",
+    };
+    const answer = await put(JSON.stringify(smaller));
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(stored(), smaller);
+    assert.deepEqual(JSON.parse((await get()).body), smaller);
   });
 
   it("keeps the plugin records the same file holds", async () => {
@@ -150,6 +166,20 @@ describe("appearancePreferencesRoutes", () => {
 
     assert.equal(answer.status, 400);
     assert.match(answer.body, /light, dark, system/);
+    assert.equal(existsSync(join(directory, preferencesFileName)), false);
+  });
+
+  it("refuses a body with an unknown scale and writes nothing", async () => {
+    const { directory, put } = await serve();
+    const answer = await put(
+      JSON.stringify({
+        appearance: { colorScheme: "base", variant: "dark", scale: "huge" },
+        locale: "en",
+      }),
+    );
+
+    assert.equal(answer.status, 400);
+    assert.match(answer.body, /smaller, default, larger/);
     assert.equal(existsSync(join(directory, preferencesFileName)), false);
   });
 

@@ -91,6 +91,7 @@ export function App() {
       preferences,
       prefersDark,
       target: document.documentElement.style,
+      root: document.documentElement,
       onDiagnostic: diagnostics.record,
     });
     cacheAppearance(localStorage, preferences);

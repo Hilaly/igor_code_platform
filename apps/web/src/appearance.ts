@@ -1,5 +1,5 @@
 /**
- * Выбор цветовой схемы, варианта и локали. Источник истины — `preferences.json` в директории данных
+ * Выбор цветовой схемы, варианта, масштаба и локали. Источник истины — `preferences.json` в директории данных
  * (docs/data-directory.md): интерфейс читает и пишет его через `/api/preferences`.
  *
  * Выбранное дополнительно кешируется в браузере, чтобы при загрузке не мигать чужой темой
@@ -8,16 +8,19 @@
 
 import {
   applyRoles,
+  applyScale,
   baseScheme,
   resolveScheme,
   shippedSchemes,
   type ColorScheme,
   type PaletteVariant,
+  type ScaleTarget,
   type StyleTarget,
 } from "@sovereign/ui-kit";
 import {
   defaultAppearance,
   baseLocale,
+  isInterfaceScale,
   preferencesPath,
   type AppearancePreferences,
   type AppearanceVariant,
@@ -55,7 +58,11 @@ export function readCachedAppearance(cache: PreferencesCache): AppearancePrefere
       return undefined;
     }
 
-    return { appearance, locale: parsed.locale };
+    // Масштаба могло не быть в кеше, записанном платформой, которая про него не знала. Это не повод
+    // выбросить кеш целиком: тогда страница мигнёт чужой темой ради поля со значением по умолчанию.
+    const scale = isInterfaceScale(appearance.scale) ? appearance.scale : defaultAppearance.scale;
+
+    return { appearance: { ...appearance, scale }, locale: parsed.locale };
   } catch {
     return undefined;
   }
@@ -77,16 +84,23 @@ export function resolveVariant(variant: AppearanceVariant, prefersDark: boolean)
 export type ApplyAppearanceOptions = {
   preferences: AppearancePreferences;
   prefersDark: boolean;
+  /** Куда пишутся CSS-переменные ролей: стиль корня документа. */
   target: StyleTarget;
+  /** Куда ставится атрибут масштаба: сам корень документа, а не его стиль. */
+  root: ScaleTarget;
   schemes?: readonly ColorScheme[];
   onDiagnostic: (diagnostic: string) => void;
 };
 
 /**
- * Применяет схему записью CSS-переменных. Названная схема может отсутствовать — её приносил плагин,
- * которого выключили (docs/plugins.md), — и тогда работает встроенная: интерфейс без цветов не остаётся.
+ * Применяет схему записью CSS-переменных и масштаб — атрибутом. Названная схема может отсутствовать —
+ * её приносил плагин, которого выключили (docs/plugins.md), — и тогда работает встроенная: интерфейс
+ * без цветов не остаётся.
  */
 export function applyAppearance(options: ApplyAppearanceOptions): void {
+  // Масштаб применяется первым и независимо от схемы: отказ схемы не повод оставить кегль чужим.
+  applyScale(options.preferences.appearance.scale, options.root);
+
   const schemes = options.schemes ?? shippedSchemes;
   const wanted = options.preferences.appearance.colorScheme;
   const found = schemes.find((scheme) => scheme.id === wanted);

@@ -3,7 +3,11 @@
  * (docs/data-directory.md), а не копией того, что помнит вкладка.
  */
 
-import { appearanceVariants, type AppearancePreferences } from "@sovereign/protocol";
+import {
+  appearanceVariants,
+  interfaceScales,
+  type AppearancePreferences,
+} from "@sovereign/protocol";
 import {
   Button,
   Notice,
@@ -47,7 +51,7 @@ export function AppearancePanel({
           onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
         }
       />
-      <div className="shell-appearance-variants">
+      <div className="shell-appearance-choice">
         <Text tone="muted">{t("appearance.variant")}</Text>
         <div className="shell-appearance-buttons">
           {appearanceVariants.map((variant) => (
@@ -59,6 +63,24 @@ export function AppearancePanel({
               }
             >
               {t(`appearance.variant.${variant}`)}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {/* Тот же вид выбора из трёх, что и вариант темы, поэтому и контрол тот же: два разных вида
+          управления в одной панели выглядели бы случайностью. Классы раскладки те же по той же причине. */}
+      <div className="shell-appearance-choice">
+        <Text tone="muted">{t("appearance.scale")}</Text>
+        <div className="shell-appearance-buttons">
+          {interfaceScales.map((scale) => (
+            <Button
+              key={scale}
+              pressed={preferences.appearance.scale === scale}
+              onClick={() =>
+                onChange({ ...preferences, appearance: { ...preferences.appearance, scale } })
+              }
+            >
+              {t(`appearance.scale.${scale}`)}
             </Button>
           ))}
         </div>
