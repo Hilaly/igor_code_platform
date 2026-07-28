@@ -1,8 +1,17 @@
 /**
- * Компонент системных всплывающих уведомлений ToastContainer.
+ * Системные всплывающие уведомления: ToastContainer, ToastProvider и хук useToast.
  */
 
-import { useEffect } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import styles from "./toast.module.css";
 
@@ -14,6 +23,53 @@ export type ToastMessage = {
   tone?: ToastTone;
   durationMs?: number;
 };
+
+export type ToastInput = Omit<ToastMessage, "id">;
+
+export type ToastApi = {
+  toast: (input: ToastInput) => string;
+  dismiss: (id: string) => void;
+};
+
+const ToastContext = createContext<ToastApi | null>(null);
+
+export type ToastProviderProps = {
+  children: ReactNode;
+};
+
+export function ToastProvider({ children }: ToastProviderProps) {
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const nextToastId = useRef(0);
+
+  const toast = useCallback((input: ToastInput) => {
+    const id = `toast-${nextToastId.current}`;
+    nextToastId.current += 1;
+    const newToast: ToastMessage = { ...input, id };
+    setToasts((prev) => [...prev, newToast]);
+    return id;
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const api = useMemo(() => ({ toast, dismiss }), [dismiss, toast]);
+
+  return (
+    <ToastContext.Provider value={api}>
+      {children}
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast(): ToastApi {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast должен использоваться внутри <ToastProvider>");
+  }
+  return context;
+}
 
 export type ToastContainerProps = {
   toasts: ToastMessage[];
@@ -30,13 +86,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   );
 }
 
-function ToastItem({
-  toast,
-  onDismiss,
-}: {
-  toast: ToastMessage;
-  onDismiss: (id: string) => void;
-}) {
+function ToastItem({ toast, onDismiss }: { toast: ToastMessage; onDismiss: (id: string) => void }) {
   const tone = toast.tone || "normal";
   const duration = toast.durationMs ?? 4000;
 
