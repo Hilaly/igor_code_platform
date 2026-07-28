@@ -57,6 +57,30 @@ describe("markup of the ported primitives", () => {
     expect(markup).toMatch(/for="([^"]+)"[\s\S]*id="\1"/);
   });
 
+  /**
+   * Вызывающий пишет `error={broken ? "текст" : ""}` — так написана и история каталога. Пустая строка
+   * обязана значить «ошибки нет»: иначе пустая форма открывается уже красной, а `aria-describedby`
+   * ведёт на пустой элемент.
+   */
+  it("field treats an empty error as no error at all", () => {
+    const markup = renderToStaticMarkup(
+      <Field label="Имя" error="">
+        {(control) => (
+          <Input
+            value=""
+            onChange={() => {}}
+            id={control.id}
+            describedBy={control.describedBy}
+            invalid={control.invalid}
+          />
+        )}
+      </Field>,
+    );
+    expect(markup).not.toContain("undefined");
+    expect(markup).not.toContain('aria-invalid="true"');
+    expect(markup).not.toContain("aria-describedby");
+  });
+
   it("dialog stays out of the markup without a document", () => {
     expect(renderToStaticMarkup(<Dialog open onClose={() => {}} title="Т" />)).toBe("");
     expect(

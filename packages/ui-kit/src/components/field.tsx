@@ -27,7 +27,11 @@ export type FieldProps = {
   label: string;
   /** Что ввести. Показывается всегда, а не только после ошибки. */
   hint?: string;
-  /** Причина отказа. Её наличие само помечает контрол невалидным: расходиться им нельзя. */
+  /**
+   * Причина отказа. Её наличие само помечает контрол невалидным: расходиться им нельзя. Пустая строка
+   * — это отсутствие причины, а не безымянная ошибка: вызывающий почти всегда считает её выражением
+   * вида `condition ? "текст" : ""`, и понимать её как отказ значит красить пустую форму в красное.
+   */
   error?: string;
   layout?: FieldLayout;
   /** Идентификаторы описаний, которые вызывающий держит сам; обвязка добавит к ним свои. */
@@ -49,8 +53,10 @@ export function mergeDescribedBy(...lists: (string | undefined)[]): string | und
 export function Field({ label, hint, error, layout = "stack", describedBy, children }: FieldProps) {
   const baseId = useId();
   const controlId = `${baseId}-control`;
-  const hintId = hint === undefined ? undefined : `${baseId}-hint`;
-  const errorId = error === undefined ? undefined : `${baseId}-error`;
+  const shownHint = hint === undefined || hint.trim() === "" ? undefined : hint;
+  const shownError = error === undefined || error.trim() === "" ? undefined : error;
+  const hintId = shownHint === undefined ? undefined : `${baseId}-hint`;
+  const errorId = shownError === undefined ? undefined : `${baseId}-error`;
 
   return (
     <div className={`${styles.field} ${styles[layout]}`}>
@@ -61,16 +67,16 @@ export function Field({ label, hint, error, layout = "stack", describedBy, child
         {children({
           id: controlId,
           describedBy: mergeDescribedBy(describedBy, hintId, errorId),
-          invalid: error !== undefined,
+          invalid: shownError !== undefined,
         })}
-        {hint === undefined ? undefined : (
+        {shownHint === undefined ? undefined : (
           <div className={styles.hint} id={hintId}>
-            {hint}
+            {shownHint}
           </div>
         )}
-        {error === undefined ? undefined : (
+        {shownError === undefined ? undefined : (
           <div className={styles.error} id={errorId}>
-            {error}
+            {shownError}
           </div>
         )}
       </div>
