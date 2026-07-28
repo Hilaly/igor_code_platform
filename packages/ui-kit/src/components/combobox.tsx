@@ -38,11 +38,15 @@ export function Combobox<T extends string>({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
-  const selectedOption = options.find((opt) => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value && !opt.disabled);
 
   const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(query.toLowerCase()),
   );
+
+  function filterOptions(nextQuery: string) {
+    return options.filter((option) => option.label.toLowerCase().includes(nextQuery.toLowerCase()));
+  }
 
   function firstEnabledIndex(items: readonly ComboboxOption<T>[]) {
     return items.findIndex((option) => !option.disabled);
@@ -60,7 +64,7 @@ export function Combobox<T extends string>({
     } else {
       setActiveIndex(selectedOrFirstEnabledIndex(filteredOptions));
     }
-  }, [open]);
+  }, [open, query, value, options]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -137,6 +141,7 @@ export function Combobox<T extends string>({
           value={open ? query : selectedOption?.label || ""}
           onChange={(text) => {
             setQuery(text);
+            setActiveIndex(selectedOrFirstEnabledIndex(filterOptions(text)));
             if (!open) setOpen(true);
           }}
           onClick={() => {
@@ -165,7 +170,7 @@ export function Combobox<T extends string>({
         >
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option, index) => {
-              const isSelected = option.value === value;
+              const isSelected = option.value === value && !option.disabled;
               const isActive = index === activeIndex;
               const optionId = `${listId}-opt-${option.value}`;
 

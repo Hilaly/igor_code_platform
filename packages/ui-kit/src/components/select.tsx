@@ -27,7 +27,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
-  const selectedOption = options.find((opt) => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value && !opt.disabled);
 
   function firstEnabledIndex() {
     return options.findIndex((option) => !option.disabled);
@@ -121,6 +121,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
         tabIndex={disabled ? -1 : 0}
         role="combobox"
         aria-expanded={open}
+        aria-disabled={disabled}
         aria-controls={listId}
         aria-haspopup="listbox"
         aria-activedescendant={open ? activeOptionId : undefined}
@@ -143,7 +144,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
           tabIndex={-1}
         >
           {options.map((option, index) => {
-            const isSelected = option.value === value;
+            const isSelected = option.value === value && !option.disabled;
             const isActive = index === activeIndex;
             const optionId = `${listId}-opt-${option.value}`;
 

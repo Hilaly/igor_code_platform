@@ -45,6 +45,32 @@ describe("interactive components", () => {
     expect(onChange).toHaveBeenCalledWith("third");
   });
 
+  it("resets Combobox active descendant to the enabled filtered option", () => {
+    const onChange = vi.fn();
+    render(<Combobox options={options} value="third" onChange={onChange} label="Выбор" />);
+
+    const input = screen.getByRole("combobox", { name: "Выбор" });
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { value: "Второй" } });
+
+    const enabledOption = screen.getByRole("option", { name: "Второй" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(enabledOption.id);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("second");
+  });
+
+  it("does not expose a disabled Combobox value as selected", () => {
+    render(<Combobox options={options} value="disabled" onChange={() => {}} label="Выбор" />);
+
+    const input = screen.getByRole("combobox", { name: "Выбор" }) as HTMLInputElement;
+    expect(input.value).toBe("");
+    fireEvent.click(input);
+    expect(screen.getByRole("option", { name: "Недоступно" }).getAttribute("aria-selected")).toBe(
+      "false",
+    );
+  });
+
   it("opens MultiSelect from its combobox trigger and toggles the enabled active option", () => {
     const onChange = vi.fn();
     render(<MultiSelect options={options} value={[]} onChange={onChange} label="Метки" />);
@@ -66,6 +92,38 @@ describe("interactive components", () => {
     render(<MultiSelect options={options} value={["second"]} onChange={() => {}} label="Метки" />);
 
     expect(screen.getByRole("button", { name: "Удалить Второй" })).not.toBeNull();
+  });
+
+  it("does not expose disabled MultiSelect values as selected and marks a disabled trigger", () => {
+    const { rerender } = render(
+      <MultiSelect
+        options={options}
+        value={["disabled", "second"]}
+        onChange={() => {}}
+        label="Метки"
+      />,
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "Метки" });
+    expect(screen.queryByRole("button", { name: "Удалить Недоступно" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Удалить Второй" })).not.toBeNull();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("option", { name: "Недоступно" }).getAttribute("aria-selected")).toBe(
+      "false",
+    );
+
+    rerender(
+      <MultiSelect
+        options={options}
+        value={["disabled", "second"]}
+        onChange={() => {}}
+        label="Метки"
+        disabled
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "Метки" }).getAttribute("aria-disabled")).toBe(
+      "true",
+    );
   });
 
   it("moves actual Tree focus between visible treeitems and selects with Space", () => {
@@ -123,6 +181,24 @@ describe("interactive components", () => {
     fireEvent.keyDown(trigger, { key: "Enter" });
 
     expect(onChange).toHaveBeenCalledWith("third");
+  });
+
+  it("does not expose a disabled Select value as selected and marks a disabled trigger", () => {
+    const { rerender } = render(
+      <Select options={options} value="disabled" onChange={() => {}} label="Схема" />,
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "Схема" });
+    expect(trigger.textContent).toContain("Выберите...");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("option", { name: "Недоступно" }).getAttribute("aria-selected")).toBe(
+      "false",
+    );
+
+    rerender(
+      <Select options={options} value="disabled" onChange={() => {}} label="Схема" disabled />,
+    );
+    expect(trigger.getAttribute("aria-disabled")).toBe("true");
   });
 
   it("exposes SegmentedControl as a radio group with a selected radio", () => {

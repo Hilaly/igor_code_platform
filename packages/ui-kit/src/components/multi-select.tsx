@@ -118,7 +118,7 @@ export function MultiSelect<T extends string>({
     }
   }
 
-  const selectedOptions = options.filter((opt) => value.includes(opt.value));
+  const selectedOptions = options.filter((opt) => value.includes(opt.value) && !opt.disabled);
   const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
   const activeOptionId = activeOption ? `${listId}-opt-${activeOption.value}` : undefined;
 
@@ -128,6 +128,7 @@ export function MultiSelect<T extends string>({
         tabIndex={disabled ? -1 : 0}
         role="combobox"
         aria-expanded={open}
+        aria-disabled={disabled}
         aria-controls={listId}
         aria-haspopup="listbox"
         aria-activedescendant={open ? activeOptionId : undefined}
@@ -172,7 +173,7 @@ export function MultiSelect<T extends string>({
           tabIndex={-1}
         >
           {options.map((option, index) => {
-            const isSelected = value.includes(option.value);
+            const isSelected = value.includes(option.value) && !option.disabled;
             const isActive = index === activeIndex;
             const optionId = `${listId}-opt-${option.value}`;
 
