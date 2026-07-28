@@ -15,6 +15,7 @@ import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
 import { pluginsRoute } from "./plugins-snapshot.ts";
+import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
@@ -129,6 +130,10 @@ const projects = createProjectStore({ directory, logger, normalizePath: normaliz
 
 publishProjectChanges({ projects, bus });
 
+// Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
+// отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
+const projectAvailability = createProjectAvailabilityWatcher({ projects, bus });
+
 const account = createAccountStore({ directory, logger });
 const loginSessions = createLoginSessionStore({
   directory,
@@ -151,7 +156,12 @@ const server = createDaemonServer({
     pluginsRoute({ plugins, registry: contributions, settings }),
     pluginPreferencesRoute({ settings, plugins, logger }),
     ...appearancePreferencesRoutes({ settings, logger }),
-    ...projectsRoutes({ projects, logger, normalizePath: normalizeProjectFolder }),
+    ...projectsRoutes({
+      projects,
+      logger,
+      normalizePath: normalizeProjectFolder,
+      availability: (project) => projectAvailability.of(project.id),
+    }),
     events.route(),
   ],
 });
@@ -178,6 +188,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     settings.close();
     pluginWatcher.close();
     loginSessions.stop();
+    projectAvailability.stop();
 
     // Лок снимается последним и в любом случае: воркер, зависший на выгрузке, не имеет права
     // оставить директорию данных запертой.
