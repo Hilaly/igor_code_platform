@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
+import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Menu } from "./menu.tsx";
@@ -29,6 +30,30 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('aria-invalid="true"');
     expect(markup).toContain('aria-describedby="y"');
     expect(markup).toContain('type="search"');
+  });
+
+  it("forwards composite accessibility props from input", () => {
+    const markup = renderToStaticMarkup(
+      <Input
+        value="a"
+        onChange={() => {}}
+        role="combobox"
+        aria-label="Поиск"
+        aria-autocomplete="list"
+        aria-activedescendant="option-1"
+        aria-controls="results"
+        aria-expanded
+        aria-haspopup="listbox"
+      />,
+    );
+
+    expect(markup).toContain('role="combobox"');
+    expect(markup).toContain('aria-label="Поиск"');
+    expect(markup).toContain('aria-autocomplete="list"');
+    expect(markup).toContain('aria-activedescendant="option-1"');
+    expect(markup).toContain('aria-controls="results"');
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('aria-haspopup="listbox"');
   });
 
   it("textarea", () => {
@@ -128,6 +153,18 @@ describe("markup of the ported primitives", () => {
     );
     expect(markup).not.toContain("undefined");
     expect(markup).toContain('role="tooltip"');
+  });
+
+  it("connects a tooltip to a UI-kit Button and preserves its description", () => {
+    const markup = renderToStaticMarkup(
+      <Tooltip content="почему">
+        <Button aria-describedby="field-hint">кнопка</Button>
+      </Tooltip>,
+    );
+
+    const tooltipId = markup.match(/id="([^"]+)" role="tooltip"/)?.[1];
+    expect(tooltipId).toBeDefined();
+    expect(markup).toContain(`aria-describedby="field-hint ${tooltipId}"`);
   });
 
   it("menu", () => {

@@ -4,6 +4,8 @@
  * поля и у обвязки одновременно, и связь с ошибкой зависела бы от того, кто из них её объявил.
  */
 
+import { forwardRef } from "react";
+
 import styles from "./input.module.css";
 
 /** Тип поля меняет поведение браузера: скрытие символов, кнопку очистки в поиске. */
@@ -21,18 +23,47 @@ export type InputProps = {
   /** Идентификаторы подсказки и ошибки для `aria-describedby`; их собирает `Field`. */
   describedBy?: string;
   type?: InputType;
+  role?: string;
+  readOnly?: boolean;
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  "aria-label"?: string;
+  "aria-autocomplete"?: "none" | "inline" | "list" | "both";
+  "aria-activedescendant"?: string;
+  "aria-haspopup"?: boolean | "menu" | "listbox" | "tree" | "grid" | "dialog";
+  "aria-describedby"?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onClick?: (e: React.MouseEvent<HTMLInputElement>) => void;
 };
 
-export function Input({
-  value,
-  onChange,
-  placeholder,
-  invalid = false,
-  disabled = false,
-  id,
-  describedBy,
-  type = "text",
-}: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  {
+    value,
+    onChange,
+    placeholder,
+    invalid = false,
+    disabled = false,
+    id,
+    describedBy,
+    type = "text",
+    role,
+    readOnly,
+    "aria-expanded": ariaExpanded,
+    "aria-controls": ariaControls,
+    "aria-label": ariaLabel,
+    "aria-autocomplete": ariaAutocomplete,
+    "aria-activedescendant": ariaActiveDescendant,
+    "aria-haspopup": ariaHasPopup,
+    "aria-describedby": ariaDescribedBy,
+    onKeyDown,
+    onFocus,
+    onBlur,
+    onClick,
+  },
+  ref,
+) {
   return (
     <input
       className={`${styles.control} ${styles.input}`}
@@ -41,12 +72,25 @@ export function Input({
       placeholder={placeholder}
       disabled={disabled}
       id={id}
+      role={role}
+      readOnly={readOnly}
       aria-invalid={invalid}
-      aria-describedby={describedBy}
+      aria-describedby={ariaDescribedBy || describedBy}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      aria-label={ariaLabel}
+      aria-autocomplete={ariaAutocomplete}
+      aria-activedescendant={ariaActiveDescendant}
+      aria-haspopup={ariaHasPopup}
       onChange={(event) => onChange(event.target.value)}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onClick={onClick}
+      ref={ref}
     />
   );
-}
+});
 
 export type TextareaProps = {
   value: string;

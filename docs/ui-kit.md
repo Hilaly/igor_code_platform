@@ -217,9 +217,15 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
 поверхность переписана под наши соглашения: явные пропсы, `onChange` со значением вместо события,
 строки только пропсами и уже переведёнными.
 
+- **`Button`** — `tone`, `onClick`, `disabled`, `pressed`, `busy`, `title` и стандартные для
+  интерактивного элемента `id`, `aria-label`, `aria-describedby`, `aria-expanded`,
+  `aria-controls`, `aria-haspopup`, `onFocus`, `onBlur`, `onKeyDown`; `describedBy` сохранён как
+  совместимое имя связи с описанием.
 - **`Input` и `Textarea`** — `value`, `onChange(value)`, `placeholder`, `invalid`, `disabled`, `id`,
-  `describedBy`; у поля ещё `type` (`text` | `password` | `search`), у области — `rows`. Метки,
-  подсказки и текста ошибки здесь нет: их даёт `Field`.
+  `describedBy`; у поля ещё `type` (`text` | `password` | `search`), `role`, `ref`, обработчики
+  клавиатуры и фокуса и атрибуты ARIA для составного контрола (`aria-expanded`, `aria-controls`,
+  `aria-label`, `aria-autocomplete`, `aria-activedescendant`, `aria-haspopup`), у области — `rows`.
+  Метки, подсказки и текста ошибки здесь нет: их даёт `Field`.
 - **`Field`** — обвязка контрола: `label`, `hint`, `error`, `layout` (`stack` | `row`),
   `describedBy`. Контрол приходит рендер-пропом `children(control)` и получает готовые `id`,
   `describedBy`, `invalid`.
