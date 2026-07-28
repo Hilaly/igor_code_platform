@@ -82,7 +82,7 @@ export function defineEvent<Schema extends z.ZodType>(
       // несоответствие до подписчика (docs/event-bus.md).
       if (!checked.success) {
         throw new Error(
-          `the payload of the event ${id} does not match its schema: ${z.prettifyError(checked.error)}`,
+          `the payload of the event ${id} does not match its schema: ${describeSchemaError(checked.error)}`,
         );
       }
 
@@ -123,3 +123,25 @@ export const events = {
 
 /** Кто мы, по версии хоста. Полезно в логах самого плагина и в его собственных путях. */
 export const identity = (): { id: string; source: string } => currentPluginHost().identity;
+
+/**
+ * Читаемое сообщение об ошибке схемы. z.prettifyError — недокументированный API zod 4
+ * (зафиксирован минор в зависимостях), и на error-пути его пропадание глушит исходную ошибку
+ * TypeError-ом поверх. flattenError — стабильный: возвращает {formErrors, fieldErrors}.
+ */
+function describeSchemaError(error: z.ZodError): string {
+  const flat = z.flattenError(error);
+  const lines: string[] = [...flat.formErrors];
+
+  // fieldErrors типизирован как рекорд по ключам схемы, но здесь конкретная схема неизвестна —
+  // поэтому индексируем как рекорд строк. Структуру flattenError гарантирует zod.
+  const fieldErrors = flat.fieldErrors as Record<string, string[] | undefined>;
+
+  for (const [field, messages] of Object.entries(fieldErrors)) {
+    for (const message of messages ?? []) {
+      lines.push(`${field}: ${message}`);
+    }
+  }
+
+  return lines.length > 0 ? lines.join("; ") : "validation failed";
+}

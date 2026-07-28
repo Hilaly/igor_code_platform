@@ -130,6 +130,21 @@ describe("a declared event", () => {
 
     assert.deepEqual(host.published, []);
   });
+
+  it("names the offending field in the schema error message", async () => {
+    installTestHost({ id: "tracker" });
+
+    // Сообщение собирается через стабильный z.flattenError, а не недокументированный
+    // z.prettifyError: поле и причина обязаны быть видны автору плагина.
+    await assert.rejects(
+      // @ts-expect-error — намеренно неверный тип поля.
+      () => taskCreated.publish({ id: 42 }),
+      (error: Error) =>
+        error.message.includes("task.created") &&
+        error.message.includes("id:") &&
+        /expected string/.test(error.message),
+    );
+  });
 });
 
 describe("a subscription", () => {
