@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -182,5 +183,44 @@ describe("ensurePluginDependencies", () => {
     const outcome = await ensurePluginDependencies({ directory, logger: silent });
 
     assert.equal(outcome.kind, "failed");
+  });
+
+  it("kills an npm install that hangs past its deadline", async () => {
+    // Реальный spawn-путь (а не внедрённый runInstall): фальшивый `npm` в PATH висит и не выходит.
+    const bin = mkdtempSync(join(tmpdir(), "sovereign-fake-npm-"));
+    const fakeNpm = join(bin, process.platform === "win32" ? "npm.cmd" : "npm");
+    writeFileSync(
+      fakeNpm,
+      [
+        "#!/usr/bin/env node",
+        "// Имитирует зависший npm: сетевой запрос к реестру не возвращается.",
+        "process.stdout.write('hanging npm started\\n');",
+        "setInterval(() => {}, 60_000);",
+      ].join("\n"),
+    );
+    chmodSync(fakeNpm, 0o755);
+
+    const directory = pluginFolder({ dependencies: { left: "^1.0.0" } });
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${bin}:${previousPath ?? ""}`;
+
+    try {
+      const outcome = await ensurePluginDependencies({
+        directory,
+        logger: silent,
+        installTimeoutMilliseconds: 300,
+      });
+
+      assert.equal(outcome.kind, "failed");
+      if (outcome.kind === "failed") {
+        assert.match(outcome.reason, /timed out after 300ms and was killed/);
+      }
+      // Не должно остаться зомби-процессов: spawnSync ниже отчитывает только живых наследников.
+      const stillAlive = spawnSync(process.execPath, ["-e", "process.exit(0)"]);
+      assert.equal(stillAlive.status, 0);
+    } finally {
+      process.env.PATH = previousPath;
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 });

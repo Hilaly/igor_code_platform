@@ -17,6 +17,14 @@ import type { Logger } from "./logger.ts";
 
 export const installStampFileName = ".sovereign-install.json";
 
+/**
+ * Таймаут на один `npm install`. Без него зависший на сетевом запросе к реестру или на сломанном
+ * postinstall процесс держит плагин в `installing` бесконечно: супервизор считает состояние живым,
+ * повторов нет, и единственное восстановление — перезапуск демона. 120 с хватает на холодный
+ * fetch типичного набора зависимостей и режет именно зависание.
+ */
+export const defaultInstallTimeoutMilliseconds = 120_000;
+
 export type DependencyOutcome =
   | { kind: "not-needed" }
   /** `node_modules` привезли вместе с плагином: содержимое не сверяется с манифестом. */
@@ -38,13 +46,21 @@ export type EnsurePluginDependenciesOptions = {
   runInstall?: (directory: string) => Promise<InstallRun>;
   /** Зовётся, только если установка действительно начинается: этап видим ровно тогда, когда он есть. */
   onInstallStart?: () => void;
+  /**
+   * Дедлайн на `npm install` по умолчанию. Внедряется, чтобы тест на зависание не ждал две минуты.
+   * Применяется только к стандартному `runNpmInstall`: чужой `runInstall` отвечает за свой таймаут сам.
+   */
+  installTimeoutMilliseconds?: number;
 };
 
 export async function ensurePluginDependencies(
   options: EnsurePluginDependenciesOptions,
 ): Promise<DependencyOutcome> {
   const { directory, logger } = options;
-  const runInstall = options.runInstall ?? runNpmInstall;
+  const runInstall =
+    options.runInstall ??
+    ((target: string) =>
+      runNpmInstall(target, options.installTimeoutMilliseconds ?? defaultInstallTimeoutMilliseconds));
 
   let declared: Record<string, string>;
 
@@ -131,7 +147,7 @@ function readStamp(path: string): string | undefined {
   }
 }
 
-function runNpmInstall(directory: string): Promise<InstallRun> {
+function runNpmInstall(directory: string, timeoutMilliseconds: number): Promise<InstallRun> {
   return new Promise((resolve) => {
     // Только заявленные зависимости: инструменты разработки автора плагину в работе не нужны.
     const npm = spawn("npm", ["install", "--omit=dev", "--no-audit", "--no-fund"], {
@@ -149,7 +165,20 @@ function runNpmInstall(directory: string): Promise<InstallRun> {
       output += chunk.toString();
     });
 
+    // SIGKILL, а не SIGTERM: зависший npm часто игнорирует мягкую просьбу, а плагин не должен
+    // держать выгрузку до мягкого завершения чужого процесса. Потоки дочитываются, но не вечно:
+    // после kill `close` приходит почти сразу.
+    const timer = setTimeout(() => {
+      npm.kill("SIGKILL");
+      resolve({
+        ok: false,
+        output: `${output.trim()}\nnpm install timed out after ${timeoutMilliseconds}ms and was killed`,
+      });
+    }, timeoutMilliseconds);
+    timer.unref?.();
+
     npm.on("error", (cause: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
       resolve({
         ok: false,
         output:
@@ -160,6 +189,7 @@ function runNpmInstall(directory: string): Promise<InstallRun> {
     });
 
     npm.on("close", (code) => {
+      clearTimeout(timer);
       resolve({ ok: code === 0, output: output.trim() });
     });
   });
