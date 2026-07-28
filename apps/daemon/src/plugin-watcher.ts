@@ -77,6 +77,9 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
 
       onChange(directories);
     }, debounceMilliseconds);
+    // unref: таймер перезагрузки не должен держать выход демона, если обработчик сигнала не успел
+    // дойти до close(). Симметрично с event-stream.ts.
+    debounceTimer.unref();
   };
 
   return {

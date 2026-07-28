@@ -177,7 +177,9 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
         clearTimeout(debounceTimer);
       }
 
-      debounceTimer = setTimeout(reload, debounceMilliseconds);
+      // unref: таймер перечитывания не должен держать выход демона, если обработчик сигнала не
+      // дошёл до close(). Симметрично с event-stream.ts.
+      debounceTimer = setTimeout(reload, debounceMilliseconds).unref();
     });
 
     // Ошибка наблюдателя не глушится: без него настройки молча перестанут перечитываться.
