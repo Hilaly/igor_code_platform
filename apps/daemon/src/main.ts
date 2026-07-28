@@ -15,6 +15,9 @@ import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
 import { pluginsRoute } from "./plugins-snapshot.ts";
+import { createProjectPathNormalizer } from "./project-path.ts";
+import { createProjectStore } from "./project-store.ts";
+import { projectsRoutes, publishProjectChanges } from "./projects.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
 
@@ -119,6 +122,13 @@ applyPlugins();
 // события до его создания рассказывать некому — клиентов ещё нет.
 const events = createEventStream({ bus, logger });
 
+// Один нормализатор на демон: складка пути обязана быть общей у стора и у маршрутов, иначе второй
+// проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
+const normalizeProjectFolder = createProjectPathNormalizer();
+const projects = createProjectStore({ directory, logger, normalizePath: normalizeProjectFolder });
+
+publishProjectChanges({ projects, bus });
+
 const account = createAccountStore({ directory, logger });
 const loginSessions = createLoginSessionStore({
   directory,
@@ -141,6 +151,7 @@ const server = createDaemonServer({
     pluginsRoute({ plugins, registry: contributions, settings }),
     pluginPreferencesRoute({ settings, plugins, logger }),
     ...appearancePreferencesRoutes({ settings, logger }),
+    ...projectsRoutes({ projects, logger, normalizePath: normalizeProjectFolder }),
     events.route(),
   ],
 });

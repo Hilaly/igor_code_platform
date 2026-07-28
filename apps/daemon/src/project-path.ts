@@ -32,6 +32,19 @@ export type NormalizeProjectPathOptions = {
   realpath?: (path: string) => string;
 };
 
+export type ProjectPathNormalizer = (raw: string) => NormalizeProjectPathResult;
+
+/**
+ * Один нормализатор на демон. Складка обязана быть общей: стор считает ключ папки эфемерного
+ * проекта, маршрут — ключ создаваемого, и разойдись они хоть в регистре, второй проект встал бы на
+ * ту же папку, что первый.
+ */
+export function createProjectPathNormalizer(
+  options: NormalizeProjectPathOptions = {},
+): ProjectPathNormalizer {
+  return (raw) => normalizeProjectPath(raw, options);
+}
+
 export function normalizeProjectPath(
   raw: string,
   options: NormalizeProjectPathOptions = {},

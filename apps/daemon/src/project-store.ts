@@ -16,7 +16,7 @@ import type { ProjectUpdate } from "@sovereign/protocol";
 import { writeFileAtomically } from "./atomic-file.ts";
 import { workDirectoryName } from "./data-directory.ts";
 import type { Logger } from "./logger.ts";
-import { normalizeProjectPath } from "./project-path.ts";
+import { normalizeProjectPath, type ProjectPathNormalizer } from "./project-path.ts";
 
 export const projectsFileName = "projects.json";
 
@@ -83,6 +83,11 @@ export type ProjectStore = {
 export type CreateProjectStoreOptions = {
   directory: string;
   logger: Logger;
+  /**
+   * Тот же нормализатор, что у маршрутов: ключ папки эфемерного проекта обязан складываться так же,
+   * как ключ создаваемого, иначе проект встанет на папку `work` вторым.
+   */
+  normalizePath?: ProjectPathNormalizer;
   now?: () => number;
 };
 
@@ -90,7 +95,10 @@ export function createProjectStore(options: CreateProjectStoreOptions): ProjectS
   const path = join(options.directory, projectsFileName);
   const now = options.now ?? Date.now;
   const listeners = new Set<() => void>();
-  const ephemeral = describeEphemeralProject(options.directory);
+  const ephemeral = describeEphemeralProject(
+    options.directory,
+    options.normalizePath ?? ((raw) => normalizeProjectPath(raw)),
+  );
   const file = readProjects(path, options.logger);
 
   let projects = file.kind === "read" ? file.projects : [];
@@ -194,9 +202,12 @@ export function createProjectStore(options: CreateProjectStoreOptions): ProjectS
  * «эфемерный» и значит. Имя даётся папкой, а показывает человеку локализованное вью: `name` здесь
  * нужен тем, кто смотрит ответ маршрута в терминале.
  */
-function describeEphemeralProject(directory: string): StoredProject {
+function describeEphemeralProject(
+  directory: string,
+  normalizePath: ProjectPathNormalizer,
+): StoredProject {
   const folder = join(directory, workDirectoryName);
-  const normalized = normalizeProjectPath(folder);
+  const normalized = normalizePath(folder);
 
   return {
     id: ephemeralProjectId,
