@@ -1,0 +1,107 @@
+/*
+ * Затемнение занимает окно целиком и само расставляет слой: центр для диалога, край для выдвижной
+ * панели. Прокрутка на затемнении, а не на слое, — высокий диалог на низком окне иначе обрезается.
+ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sovereign-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--sovereign-space-6);
+  overflow: auto;
+  background: var(--sovereign-overlay);
+}
+
+.backdropDrawer {
+  justify-items: end;
+  padding: 0;
+}
+
+.surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-5);
+  width: 100%;
+  max-height: calc(100% - var(--sovereign-space-12));
+  padding: var(--sovereign-space-6);
+  overflow: hidden;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  background: var(--sovereign-gradient-surface);
+  color: var(--sovereign-text);
+  box-shadow: var(--sovereign-elevation-3), var(--sovereign-hairline-secondary);
+}
+
+/*
+ * Слой принимает фокус сам, когда внутри нет ни одного контрола, и тогда обводка обязана быть видна.
+ * Внутрь, а не наружу: снаружи она попадает на затемнение, где её не видно.
+ */
+.surface:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: calc(var(--sovereign-space-1) * -1);
+}
+
+.modal {
+  /* Предел ширины: дальше строка перестаёт читаться. Это мера текста, а не шаг отступа. */
+  max-width: 36rem;
+  border-radius: var(--sovereign-radius-xl);
+}
+
+.drawer {
+  align-self: stretch;
+  max-width: 30rem;
+  max-height: 100%;
+  border-block: 0;
+  border-inline-end: 0;
+  border-radius: var(--sovereign-radius-xl) 0 0 var(--sovereign-radius-xl);
+}
+
+.header {
+  display: grid;
+  gap: var(--sovereign-space-2);
+}
+
+.title {
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-display);
+  font-size: var(--sovereign-font-size-xl);
+  font-weight: var(--sovereign-font-weight-bold);
+  line-height: var(--sovereign-line-height-tight);
+  letter-spacing: var(--sovereign-letter-spacing-tight);
+}
+
+.description {
+  color: var(--sovereign-text-muted);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  line-height: var(--sovereign-line-height-normal);
+}
+
+/*
+ * Прокручивается только середина: шапка с заголовком и кнопки внизу остаются на месте. `min-height: 0`
+ * обязателен — без него элемент flex не сжимается ниже своего содержимого и прокрутка не включается.
+ */
+.content {
+  min-height: 0;
+  overflow: auto;
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-md);
+  line-height: var(--sovereign-line-height-normal);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+  padding-top: var(--sovereign-space-4);
+  border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+/* Обёртка подтверждающей кнопки: носит `aria-busy` и не должна менять её раскладку. */
+.confirm {
+  display: inline-flex;
+}

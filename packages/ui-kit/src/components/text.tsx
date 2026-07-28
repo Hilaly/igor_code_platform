@@ -5,6 +5,8 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./text.module.css";
+
 export type TextTone = "normal" | "muted" | "accent" | "danger" | "warning" | "success";
 
 export type TextProps = {
@@ -13,7 +15,7 @@ export type TextProps = {
 };
 
 export function Text({ tone = "normal", children }: TextProps) {
-  return <span className={`sv-text sv-text-${tone}`}>{children}</span>;
+  return <span className={styles[tone]}>{children}</span>;
 }
 
 export type HeadingProps = {
@@ -23,7 +25,7 @@ export type HeadingProps = {
 };
 
 export function Heading({ level, children }: HeadingProps) {
-  const className = `sv-heading sv-heading-${level}`;
+  const className = `${styles.heading} ${styles[`h${level}`]}`;
 
   if (level === 1) {
     return <h1 className={className}>{children}</h1>;

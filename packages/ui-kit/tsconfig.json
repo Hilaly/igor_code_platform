@@ -5,9 +5,11 @@
     // здесь такое же, как у apps/web, а не как у демона.
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["es2023", "dom"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
-    "types": []
+    // `vite/client` объявляет тип импорта `*.module.css`: файла `.d.ts` на пакет для этого не нужно,
+    // и на импорт стиля — тем более (docs/roadmap.md, срез 5).
+    "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": ["src", ".ladle"]
 }

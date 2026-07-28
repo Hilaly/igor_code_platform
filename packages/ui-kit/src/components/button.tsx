@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./button.module.css";
+
 export type ButtonTone = "normal" | "accent" | "danger";
 
 export type ButtonProps = {
@@ -25,7 +27,7 @@ export function Button({
   return (
     <button
       type="button"
-      className={`sv-button sv-button-${tone}`}
+      className={`${styles.button} ${styles[tone]}`}
       onClick={onClick}
       disabled={disabled}
       aria-pressed={pressed}

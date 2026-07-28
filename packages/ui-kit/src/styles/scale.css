@@ -1,0 +1,29 @@
+/**
+ * Ось масштаба интерфейса (docs/ui-kit.md). Три значения на три токена — больше здесь ничего нет, и
+ * это главное свойство оси: всё остальное считается от них.
+ *
+ * Атрибут ставит приложение на корень документа по записи в `preferences.json`
+ * (docs/data-directory.md). Отсутствие атрибута — обычный масштаб, поэтому интерфейс не зависит от
+ * того, успело ли приложение прочитать предпочтения.
+ */
+
+:root {
+  /* Базовый кегль документа: от него считается каждое значение в `rem`. */
+  --sovereign-font-size-base: 16px;
+  /* Шаг шкалы отступов: двигает плотность интерфейса сверх кегля. */
+  --sovereign-space-unit: 0.25rem;
+  /* Высота контрола средней ступени; мелкая и крупная считаются от неё. */
+  --sovereign-control-height-md: 2.4rem;
+}
+
+[data-scale="smaller"] {
+  --sovereign-font-size-base: 14px;
+  --sovereign-space-unit: 0.225rem;
+  --sovereign-control-height-md: 2.15rem;
+}
+
+[data-scale="larger"] {
+  --sovereign-font-size-base: 18px;
+  --sovereign-space-unit: 0.275rem;
+  --sovereign-control-height-md: 2.65rem;
+}

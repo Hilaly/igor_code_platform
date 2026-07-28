@@ -1,0 +1,67 @@
+/*
+ * Стиль пустого состояния и индикатора загрузки. Единственный источник цвета — переменные ролей
+ * (docs/ui-kit.md, «Чем держится дисциплина цвета»).
+ */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sovereign-space-2);
+  padding: var(--sovereign-space-10) var(--sovereign-space-4);
+  text-align: center;
+}
+
+/* Заголовок пустого состояния — заголовок: экран, на котором ничего нет, держится только им. */
+.title {
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-display);
+  font-size: var(--sovereign-font-size-lg);
+  font-weight: var(--sovereign-font-weight-bold);
+  line-height: var(--sovereign-line-height-tight);
+  letter-spacing: var(--sovereign-letter-spacing-tight);
+}
+
+.hint {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-sm);
+}
+
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-sm);
+}
+
+.mark {
+  flex: none;
+  width: var(--sovereign-space-4);
+  height: var(--sovereign-space-4);
+  border: var(--sovereign-stroke-emphasis) solid var(--sovereign-accent-border);
+  border-top-color: var(--sovereign-accent);
+  border-radius: var(--sovereign-radius-full);
+  /*
+   * Оборот за 800 мс. Шкала длительностей кончается на 320 мс, потому что она про переходы, а не
+   * про вращение: множитель оставляет время производным от токена, а не подобранным на глаз.
+   */
+  animation: spin calc(var(--sovereign-duration-slow) * 2.5) linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/*
+ * Бесконечная анимация обнулением длительности не останавливается — 0 мс крутит кадры бесконечно
+ * быстро, — поэтому просьба обойтись без движения выключает её здесь явно (styles/tokens.css).
+ */
+@media (prefers-reduced-motion: reduce) {
+  .mark {
+    animation: none;
+  }
+}

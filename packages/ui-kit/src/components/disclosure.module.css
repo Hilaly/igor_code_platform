@@ -1,0 +1,62 @@
+/*
+ * Стиль раскрывающихся подробностей. Единственный источник цвета — переменные ролей (docs/ui-kit.md,
+ * «Чем держится дисциплина цвета»).
+ *
+ * Подпись оформлена как контрол: по ней и щёлкают. Маркер свой, а не браузерный, — нативный
+ * треугольник выглядит по-своему в каждом браузере, а поворачивать его при `[open]` нечем.
+ */
+
+.disclosure {
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-sunken-surface);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-height: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-3);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-sm);
+  font-weight: var(--sovereign-font-weight-medium);
+  cursor: pointer;
+  /* Браузерный маркер убирается двумя способами: список — для всех, псевдоэлемент — для WebKit. */
+  list-style: none;
+  transition: color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:hover {
+  color: var(--sovereign-text);
+}
+
+.summary::before {
+  content: "";
+  /*
+   * Маркер — две стороны квадрата, повёрнутые на 45°. Размер в `em` от кегля подписи: он обязан
+   * следовать за текстом, а не за шкалой отступов.
+   */
+  width: 0.36em;
+  height: 0.36em;
+  border-right: var(--sovereign-stroke-emphasis) solid currentColor;
+  border-bottom: var(--sovereign-stroke-emphasis) solid currentColor;
+  transform: rotate(-45deg);
+  /*
+   * Поворот идёт в обе стороны одинаково, поэтому кривая симметричная, а не выходная: маркер
+   * закрывается тем же движением, каким открылся.
+   */
+  transition: transform var(--sovereign-duration-normal) var(--sovereign-ease-in-out);
+}
+
+.disclosure[open] .summary::before {
+  transform: rotate(45deg);
+}
+
+.body {
+  padding: var(--sovereign-space-0) var(--sovereign-space-3) var(--sovereign-space-3);
+}

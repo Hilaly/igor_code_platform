@@ -1,0 +1,46 @@
+/*
+ * Мерцание — переход между двумя нейтральными заливками туда и обратно. Обе роли уже есть: заглушка не
+ * вводит ни одного своего цвета и потому переключается вместе со схемой.
+ */
+
+.skeleton {
+  display: block;
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-fill-surface);
+  animation: shimmer var(--sovereign-duration-slow) var(--sovereign-ease-in-out) infinite alternate;
+}
+
+.text {
+  width: 100%;
+  /* Высота строки, а не шаг отступа: заглушка встаёт на место текста основного кегля. */
+  height: var(--sovereign-font-size-md);
+}
+
+.rect {
+  width: 100%;
+  height: var(--sovereign-space-8);
+}
+
+.circle {
+  width: var(--sovereign-space-8);
+  height: var(--sovereign-space-8);
+  border-radius: var(--sovereign-radius-full);
+}
+
+@keyframes shimmer {
+  to {
+    background: var(--sovereign-fill-surface-strong);
+  }
+}
+
+/*
+ * Просьба обойтись без движения обнуляет длительность (styles/tokens.css), и цикл встал бы на первом
+ * кадре сам. Заявлено всё равно явно: заглушка обязана остаться видимой, а не превратиться в пустое
+ * место на дальнем кадре мерцания.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    background: var(--sovereign-fill-surface-strong);
+    animation: none;
+  }
+}

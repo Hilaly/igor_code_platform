@@ -1,0 +1,94 @@
+/* Обёртка задаёт систему координат всплывающему списку: тот позиционируется от неё, а не от окна. */
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  height: var(--sovereign-control-height-md);
+  padding-inline: var(--sovereign-space-4);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-control-surface);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  font-weight: var(--sovereign-font-weight-medium);
+  /* `text-wrap`, а не `white-space`: запрещён перенос, а схлопывание пробелов здесь не при чём. */
+  text-wrap: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.trigger:hover {
+  border-color: var(--sovereign-border-strong);
+  background: var(--sovereign-control-surface-hover);
+}
+
+.trigger[aria-expanded="true"] {
+  border-color: var(--sovereign-accent-border);
+  background: var(--sovereign-accent-surface);
+}
+
+.menu {
+  position: absolute;
+  /* Под шапкой триггера и над панелью, но ниже модального слоя: меню не забирает страницу целиком. */
+  z-index: var(--sovereign-z-overlay);
+  top: calc(100% + var(--sovereign-space-1));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 100%;
+  padding: var(--sovereign-space-1);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-panel-surface);
+  box-shadow: var(--sovereign-elevation-2);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-3);
+  border: var(--sovereign-stroke-thin) solid transparent;
+  border-radius: var(--sovereign-radius-2xs);
+  background: transparent;
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  /* Подпись пункта читается слева вниз по столбцу, а не по центру каждой строки. */
+  text-align: start;
+  /* `text-wrap`, а не `white-space`: запрещён перенос, а схлопывание пробелов здесь не при чём. */
+  text-wrap: nowrap;
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled) {
+  background: var(--sovereign-fill-surface);
+}
+
+.item:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: calc(var(--sovereign-space-1) * -1);
+}
+
+.item:disabled {
+  color: var(--sovereign-text-subtle);
+  cursor: not-allowed;
+}
+
+.danger {
+  color: var(--sovereign-danger-text);
+}
+
+.danger:hover:not(:disabled) {
+  border-color: var(--sovereign-danger-border);
+  background: var(--sovereign-danger-surface);
+}

@@ -1,0 +1,74 @@
+/*
+ * Стиль выбора. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
+ * дисциплина цвета»).
+ *
+ * Список раскрывает браузер: это нативный `select`, а не своё выпадающее меню. Собственная стрелка
+ * рисуется на обёртке, потому что нативную убирает `appearance: none`.
+ */
+
+.select {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+}
+
+/* Подпись поля набрана мелко и разрядкой: она называет поле, а не соперничает с его значением. */
+.label {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+  letter-spacing: var(--sovereign-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.control {
+  position: relative;
+  display: inline-flex;
+}
+
+.control::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: var(--sovereign-space-3);
+  /*
+   * Стрелка — две стороны квадрата, повёрнутые на 45°. Размеры и подъём в `em` от кегля контрола:
+   * стрелка обязана следовать за текстом поля, а не за шкалой отступов.
+   */
+  width: 0.4em;
+  height: 0.4em;
+  margin-top: -0.3em;
+  border-right: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-muted);
+  border-bottom: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.input {
+  appearance: none;
+  width: 100%;
+  height: var(--sovereign-control-height-md);
+  /* Справа втрое шире: там стоит стрелка, и значение не должно заезжать под неё. */
+  padding-inline: var(--sovereign-space-3) var(--sovereign-space-8);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--sovereign-border-strong);
+}
+
+/* Кольцо фокуса приходит из сброса; здесь граница подхватывает акцент, чтобы поле не выглядело двояко. */
+.input:focus-visible {
+  border-color: var(--sovereign-accent);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -1,0 +1,62 @@
+/*
+ * Общая часть однострочного и многострочного поля лежит в `.control`: различаются они только высотой
+ * и переносом строк, и держать два набора состояний фокуса значило бы разойтись на первой правке.
+ */
+
+.control {
+  width: 100%;
+  padding-inline: var(--sovereign-space-3);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-sunken-surface);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  transition:
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    box-shadow var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.control::placeholder {
+  color: var(--sovereign-text-subtle);
+}
+
+.control:hover:not(:disabled):not(:focus) {
+  border-color: var(--sovereign-border-strong);
+}
+
+/*
+ * Ореол рисуется тенью, а не `outline`: он повторяет скругление поля и виден при любом способе входа в
+ * поле, включая щелчок мышью. Кольцо фокуса из сброса при этом не снимается — оно обещано всей
+ * платформой, и поле не имеет права его отменять; на клавиатуре видны оба, и это один и тот же цвет.
+ */
+.control:focus {
+  border-color: var(--sovereign-accent);
+  box-shadow: 0 0 0 var(--sovereign-space-1) var(--sovereign-accent-border);
+}
+
+.control[aria-invalid="true"] {
+  border-color: var(--sovereign-danger);
+}
+
+.control[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 var(--sovereign-space-1) var(--sovereign-danger-border);
+}
+
+.control:disabled {
+  /* Приглушение прозрачностью, а не отдельной ролью: иначе роль нужна каждой поверхности под полем. */
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.input {
+  height: var(--sovereign-control-height-md);
+}
+
+.textarea {
+  min-height: var(--sovereign-control-height-lg);
+  padding-block: var(--sovereign-space-2);
+  line-height: var(--sovereign-line-height-normal);
+  /* Только по вертикали: горизонтальное растягивание ломает раскладку соседей. */
+  resize: vertical;
+}

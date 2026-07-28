@@ -6,6 +6,8 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./notice.module.css";
+
 export type NoticeTone = "info" | "warning" | "danger";
 
 export type NoticeProps = {
@@ -16,9 +18,9 @@ export type NoticeProps = {
 
 export function Notice({ tone, title, children }: NoticeProps) {
   return (
-    <div className={`sv-notice sv-notice-${tone}`} role={tone === "info" ? "status" : "alert"}>
-      <strong className="sv-notice-title">{title}</strong>
-      {children === undefined ? undefined : <div className="sv-notice-body">{children}</div>}
+    <div className={`${styles.notice} ${styles[tone]}`} role={tone === "info" ? "status" : "alert"}>
+      <strong className={styles.title}>{title}</strong>
+      {children === undefined ? undefined : <div className={styles.body}>{children}</div>}
     </div>
   );
 }

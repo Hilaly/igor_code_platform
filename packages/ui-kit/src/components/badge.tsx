@@ -3,6 +3,8 @@
  * приходит переведённым, потому что кит не знает, в каком неймспейсе лежит эта строка.
  */
 
+import styles from "./badge.module.css";
+
 export type BadgeTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 export type BadgeProps = {
@@ -11,5 +13,5 @@ export type BadgeProps = {
 };
 
 export function Badge({ tone, children }: BadgeProps) {
-  return <span className={`sv-badge sv-badge-${tone}`}>{children}</span>;
+  return <span className={`${styles.badge} ${styles[tone]}`}>{children}</span>;
 }

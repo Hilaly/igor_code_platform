@@ -3,6 +3,8 @@
  * неймспейсе они лежат.
  */
 
+import styles from "./state.module.css";
+
 export type EmptyStateProps = {
   title: string;
   hint?: string;
@@ -10,9 +12,9 @@ export type EmptyStateProps = {
 
 export function EmptyState({ title, hint }: EmptyStateProps) {
   return (
-    <div className="sv-empty">
-      <span className="sv-empty-title">{title}</span>
-      {hint === undefined ? undefined : <span className="sv-empty-hint">{hint}</span>}
+    <div className={styles.empty}>
+      <span className={styles.title}>{title}</span>
+      {hint === undefined ? undefined : <span className={styles.hint}>{hint}</span>}
     </div>
   );
 }
@@ -24,9 +26,9 @@ export type SpinnerProps = {
 
 export function Spinner({ label }: SpinnerProps) {
   return (
-    <span className="sv-spinner" role="status">
-      <span className="sv-spinner-mark" aria-hidden="true" />
-      <span className="sv-spinner-label">{label}</span>
+    <span className={styles.spinner} role="status">
+      <span className={styles.mark} aria-hidden="true" />
+      <span>{label}</span>
     </span>
   );
 }

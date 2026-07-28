@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./panel.module.css";
 import { Heading } from "./text.tsx";
 
 export type PanelProps = {
@@ -13,14 +14,14 @@ export type PanelProps = {
 
 export function Panel({ title, actions, children }: PanelProps) {
   return (
-    <section className="sv-panel">
+    <section className={styles.panel}>
       {title === undefined ? undefined : (
-        <header className="sv-panel-header">
+        <header className={styles.header}>
           <Heading level={3}>{title}</Heading>
-          {actions === undefined ? undefined : <div className="sv-panel-actions">{actions}</div>}
+          {actions === undefined ? undefined : <div className={styles.actions}>{actions}</div>}
         </header>
       )}
-      <div className="sv-panel-body">{children}</div>
+      <div className={styles.body}>{children}</div>
     </section>
   );
 }

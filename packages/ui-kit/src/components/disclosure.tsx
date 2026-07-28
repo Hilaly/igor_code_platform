@@ -6,6 +6,8 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./disclosure.module.css";
+
 export type DisclosureProps = {
   /** Подпись закрытого состояния: она объясняет, что развернётся. */
   summary: string;
@@ -14,9 +16,9 @@ export type DisclosureProps = {
 
 export function Disclosure({ summary, children }: DisclosureProps) {
   return (
-    <details className="sv-disclosure">
-      <summary className="sv-disclosure-summary">{summary}</summary>
-      <div className="sv-disclosure-body">{children}</div>
+    <details className={styles.disclosure}>
+      <summary className={styles.summary}>{summary}</summary>
+      <div className={styles.body}>{children}</div>
     </details>
   );
 }

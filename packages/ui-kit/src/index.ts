@@ -6,20 +6,33 @@
  * примитивов пока нестабилен и ломается свободно, пока прикладной код не показал, какие из них нужны
  * на самом деле (docs/ui-kit.md).
  *
- * Стили подключаются отдельно: `import "@sovereign/ui-kit/styles.css"` один раз в приложении.
+ * Стили подключаются отдельно: `import "@sovereign/ui-kit/styles.css"` один раз в приложении;
+ * оформление самих примитивов приезжает вместе с их импортом файлами `*.module.css`.
+ *
+ * Наружу выходят только примитивы и токены. Фокус-трап диалога (`hooks/use-focus-trap.ts`) и счёт
+ * перемещения фокуса по кругу (`components/roving-focus.ts`) остаются внутренними: это внутренности
+ * двух конкретных примитивов, а не то, из чего строят интерфейс.
  */
 
 export * from "./components/badge.tsx";
 export * from "./components/button.tsx";
 export * from "./components/code.tsx";
+export * from "./components/dialog.tsx";
 export * from "./components/disclosure.tsx";
+export * from "./components/field.tsx";
+export * from "./components/input.tsx";
 export * from "./components/list.tsx";
+export * from "./components/menu.tsx";
 export * from "./components/notice.tsx";
 export * from "./components/panel.tsx";
+export * from "./components/progress.tsx";
 export * from "./components/select.tsx";
+export * from "./components/skeleton.tsx";
 export * from "./components/state.tsx";
+export * from "./components/tabs.tsx";
 export * from "./components/text.tsx";
 export * from "./components/toggle.tsx";
+export * from "./components/tooltip.tsx";
 export * from "./i18n/catalog.ts";
 export * from "./i18n/messages/en.ts";
 export * from "./i18n/messages/ru.ts";

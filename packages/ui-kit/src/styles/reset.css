@@ -1,0 +1,70 @@
+/**
+ * Глобальный сброс и базовая типографика. Живёт в ките, а не в приложении: кегль, семейство и цвет
+ * текста — часть визуального слоя, и плагин, рисующий свой DOM, обязан получить их же
+ * (docs/ui-extension-model.md). Пока это лежало в оболочке, у плагина такой возможности не было.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  font-size: var(--sovereign-font-size-base);
+}
+
+body {
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-md);
+  /* Обычное начертание переменного шрифта — 450, а не 400: ось это позволяет, и текст плотнее. */
+  font-weight: var(--sovereign-font-weight-regular);
+  line-height: var(--sovereign-line-height-normal);
+  letter-spacing: var(--sovereign-letter-spacing-normal);
+  color: var(--sovereign-text);
+  background: var(--sovereign-page-surface);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--sovereign-accent-text);
+}
+
+/**
+ * Кольцо фокуса объявлено один раз на всё: компонент, забывший про клавиатуру, получает его по
+ * умолчанию, а не остаётся без него.
+ */
+:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--sovereign-text);
+  background: var(--sovereign-accent-surface);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sovereign-border-strong) transparent;
+}

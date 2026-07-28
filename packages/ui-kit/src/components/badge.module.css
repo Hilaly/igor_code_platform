@@ -1,0 +1,52 @@
+/*
+ * Стиль значка состояния. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем
+ * держится дисциплина цвета»).
+ *
+ * Заливка мягкая, а не полный цвет: значков в списке бывает много, и полный цвет на каждом
+ * перекрикивает текст, ради которого список читают. Каждый тон — тройка «заливка, граница, текст»
+ * своего семейства, поэтому базовый класс держит только геометрию.
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--sovereign-space-5);
+  padding-inline: var(--sovereign-space-2);
+  border: var(--sovereign-stroke-thin) solid transparent;
+  border-radius: var(--sovereign-radius-full);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+  line-height: var(--sovereign-line-height-none);
+  /* Состояние из двух слов не переносится: значок ростом в строку от переноса ломает раскладку. */
+  text-wrap: nowrap;
+}
+
+.neutral {
+  border-color: var(--sovereign-border);
+  background: var(--sovereign-fill-surface);
+  color: var(--sovereign-text-muted);
+}
+
+.accent {
+  border-color: var(--sovereign-accent-border);
+  background: var(--sovereign-accent-surface);
+  color: var(--sovereign-accent-text);
+}
+
+.success {
+  border-color: var(--sovereign-success-border);
+  background: var(--sovereign-success-surface);
+  color: var(--sovereign-success-text);
+}
+
+.warning {
+  border-color: var(--sovereign-warning-border);
+  background: var(--sovereign-warning-surface);
+  color: var(--sovereign-warning-text);
+}
+
+.danger {
+  border-color: var(--sovereign-danger-border);
+  background: var(--sovereign-danger-surface);
+  color: var(--sovereign-danger-text);
+}

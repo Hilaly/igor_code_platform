@@ -5,12 +5,14 @@
 
 import type { ReactNode } from "react";
 
+import styles from "./list.module.css";
+
 export type ListProps = {
   children: ReactNode;
 };
 
 export function List({ children }: ListProps) {
-  return <ul className="sv-list">{children}</ul>;
+  return <ul className={styles.list}>{children}</ul>;
 }
 
 export type ListRowProps = {
@@ -20,7 +22,7 @@ export type ListRowProps = {
 };
 
 export function ListRow({ selected = false, onSelect, children }: ListRowProps) {
-  const className = `sv-list-row${selected ? " sv-list-row-selected" : ""}`;
+  const className = `${styles.row}${selected ? ` ${styles.selected}` : ""}`;
 
   if (onSelect === undefined) {
     return <li className={className}>{children}</li>;
@@ -28,12 +30,7 @@ export function ListRow({ selected = false, onSelect, children }: ListRowProps) 
 
   return (
     <li className={className}>
-      <button
-        type="button"
-        className="sv-list-row-select"
-        onClick={onSelect}
-        aria-current={selected}
-      >
+      <button type="button" className={styles.select} onClick={onSelect} aria-current={selected}>
         {children}
       </button>
     </li>

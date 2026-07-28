@@ -1,0 +1,17 @@
+/**
+ * Единственная точка подключения стилей кита: `import "@sovereign/ui-kit/styles.css"` один раз в
+ * приложении. Стили компонентов сюда не входят — они лежат рядом с компонентами файлами
+ * `*.module.css` и приезжают вместе с импортом самого компонента (docs/ui-kit.md).
+ *
+ * Порядок важен: масштаб объявляет базовые величины, шкалы считаются от них, эффекты собираются из
+ * ролей, сброс всё это применяет.
+ */
+
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
+@import "@fontsource-variable/space-grotesk/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+@import "./scale.css";
+@import "./tokens.css";
+@import "./effects.css";
+@import "./reset.css";

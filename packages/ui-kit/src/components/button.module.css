@@ -1,0 +1,87 @@
+/*
+ * Стиль кнопки. Единственный источник цвета — переменные ролей: значения приходят из цветовой
+ * схемы, а не отсюда (docs/ui-kit.md, «Чем держится дисциплина цвета»).
+ *
+ * Геометрия одна на все тоны, различаются только заливка и возвышение: кнопки одного размера в
+ * ряду обязаны стоять по одной линии, чем бы они ни отличались по смыслу.
+ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sovereign-space-2);
+  height: var(--sovereign-control-height-md);
+  padding-inline: var(--sovereign-space-4);
+  border: var(--sovereign-stroke-thin) solid transparent;
+  border-radius: var(--sovereign-radius-md);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  font-weight: var(--sovereign-font-weight-medium);
+  letter-spacing: var(--sovereign-letter-spacing-normal);
+  /* Подпись не переносится: кнопка фиксированной высоты от переноса теряет вторую строку. */
+  text-wrap: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    box-shadow var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.normal {
+  border-color: var(--sovereign-border);
+  background: var(--sovereign-control-surface);
+}
+
+.normal:hover:not(:disabled, [aria-pressed="true"]) {
+  border-color: var(--sovereign-border-strong);
+  background: var(--sovereign-control-surface-hover);
+}
+
+.accent {
+  background: var(--sovereign-gradient-accent);
+  color: var(--sovereign-text-on-accent);
+  box-shadow: var(--sovereign-elevation-1);
+}
+
+/* Наведение на главное действие добавляет свечение, а не меняет заливку: градиент один. */
+.accent:hover:not(:disabled, [aria-pressed="true"]) {
+  box-shadow: var(--sovereign-elevation-1), var(--sovereign-glow-accent);
+}
+
+.danger {
+  background: var(--sovereign-danger);
+  color: var(--sovereign-text-on-danger);
+  box-shadow: var(--sovereign-elevation-1);
+}
+
+.danger:hover:not(:disabled, [aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--sovereign-danger) 88%, var(--sovereign-text));
+}
+
+/*
+ * Нажатие: сдвиг на пиксель вниз. Шкалой отступов он не выражается — это оптическая поправка
+ * размером в толщину линии, а не отступ.
+ */
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/*
+ * Выбранная кнопка (`aria-pressed`) — утопленная: акцентная заливка вполсилы и тень внутрь вместо
+ * возвышения. Правило идёт после тонов, потому что гасит их возвышение, а не дополняет его.
+ */
+.button[aria-pressed="true"] {
+  border-color: var(--sovereign-accent-border);
+  background: var(--sovereign-accent-surface);
+  color: var(--sovereign-accent-text);
+  box-shadow: inset 0 var(--sovereign-stroke-thin) var(--sovereign-space-1)
+    color-mix(in srgb, var(--sovereign-shadow) 40%, transparent);
+}

@@ -1,0 +1,91 @@
+/**
+ * Нецветовые токены: типографика, шкала отступов, скругления, толщины, время и порядок слоёв.
+ *
+ * От цветовых они отличаются тем, что не зависят от схемы: цветовая схема — данные и приезжает
+ * переменными на корень документа (docs/ui-kit.md), а шкалы одни на всю платформу. Поэтому они
+ * объявлены здесь CSS-файлом, а не выводятся из палитры.
+ *
+ * Шкала отступов считается от `--sovereign-space-unit`, кегли — от базового кегля документа: оба
+ * задаёт ось масштаба интерфейса (scale.css), и потому масштаб двигает интерфейс целиком.
+ */
+
+:root {
+  --sovereign-font-family-display:
+    "Space Grotesk Variable", "IBM Plex Sans Variable", "Segoe UI", sans-serif;
+  --sovereign-font-family-body:
+    "IBM Plex Sans Variable", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --sovereign-font-family-mono:
+    "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --sovereign-font-size-xs: 0.75rem;
+  --sovereign-font-size-sm: 0.875rem;
+  --sovereign-font-size-md: 1rem;
+  --sovereign-font-size-lg: 1.1rem;
+  --sovereign-font-size-xl: 1.5rem;
+  --sovereign-font-size-2xl: 2.05rem;
+
+  /* Начертания переменного шрифта: между стандартными ступенями, потому что ось это позволяет. */
+  --sovereign-font-weight-regular: 450;
+  --sovereign-font-weight-medium: 550;
+  --sovereign-font-weight-semibold: 650;
+  --sovereign-font-weight-bold: 750;
+
+  --sovereign-line-height-none: 1;
+  --sovereign-line-height-tight: 1.2;
+  --sovereign-line-height-snug: 1.35;
+  --sovereign-line-height-normal: 1.6;
+
+  --sovereign-letter-spacing-display: -0.025em;
+  --sovereign-letter-spacing-tight: -0.02em;
+  --sovereign-letter-spacing-normal: -0.005em;
+  --sovereign-letter-spacing-wide: 0.06em;
+
+  --sovereign-radius-2xs: 0.3rem;
+  --sovereign-radius-xs: 0.4rem;
+  --sovereign-radius-sm: 0.65rem;
+  --sovereign-radius-md: 0.9rem;
+  --sovereign-radius-lg: 1.2rem;
+  --sovereign-radius-xl: 1.6rem;
+  --sovereign-radius-full: 999px;
+
+  /* Ступеней 7, 9 и 11 нет намеренно: шкала должна кончаться раньше, чем начнётся подбор пикселей. */
+  --sovereign-space-0: 0;
+  --sovereign-space-1: calc(var(--sovereign-space-unit) * 1);
+  --sovereign-space-2: calc(var(--sovereign-space-unit) * 2);
+  --sovereign-space-3: calc(var(--sovereign-space-unit) * 3);
+  --sovereign-space-4: calc(var(--sovereign-space-unit) * 4);
+  --sovereign-space-5: calc(var(--sovereign-space-unit) * 5);
+  --sovereign-space-6: calc(var(--sovereign-space-unit) * 6);
+  --sovereign-space-8: calc(var(--sovereign-space-unit) * 8);
+  --sovereign-space-10: calc(var(--sovereign-space-unit) * 10);
+  --sovereign-space-12: calc(var(--sovereign-space-unit) * 12);
+
+  --sovereign-control-height-sm: calc(var(--sovereign-control-height-md) - 0.5rem);
+  --sovereign-control-height-lg: calc(var(--sovereign-control-height-md) + 0.5rem);
+
+  --sovereign-stroke-thin: 1px;
+  --sovereign-stroke-emphasis: 2px;
+
+  --sovereign-duration-fast: 120ms;
+  --sovereign-duration-normal: 200ms;
+  --sovereign-duration-slow: 320ms;
+
+  --sovereign-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sovereign-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Порядок слоёв: всплывающее над панелью, модальное над всем. */
+  --sovereign-z-overlay: 40;
+  --sovereign-z-modal: 60;
+}
+
+/**
+ * Просьба обойтись без движения выполняется один раз здесь, обнулением длительностей: иначе каждый
+ * компонент обязан помнить про неё сам, и первый забывший ломает обещание.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sovereign-duration-fast: 0ms;
+    --sovereign-duration-normal: 0ms;
+    --sovereign-duration-slow: 0ms;
+  }
+}

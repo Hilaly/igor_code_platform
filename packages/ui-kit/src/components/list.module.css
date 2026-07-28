@@ -1,0 +1,48 @@
+/*
+ * Стиль списка. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
+ * дисциплина цвета»).
+ *
+ * Строка скруглена и подсвечивается целиком: выбор и наведение — это состояния строки, а не рамки
+ * вокруг текста внутри неё. Разделитель взят самой слабой линией, потому что в плотном списке
+ * обычная граница превращает его в таблицу.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sovereign-space-0);
+  list-style: none;
+}
+
+.row {
+  border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-sm);
+  color: var(--sovereign-text);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.selected {
+  background: var(--sovereign-accent-surface);
+}
+
+.select {
+  display: block;
+  width: 100%;
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  border: none;
+  /* Скругление наследуется от строки: иначе подсветка при наведении вылезает за её углы. */
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.select:hover {
+  background: var(--sovereign-control-surface-hover);
+}

@@ -1,0 +1,40 @@
+/*
+ * Стиль панели. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
+ * дисциплина цвета»).
+ *
+ * Поверхность задана градиентом, а не плоской заливкой: наклон к цвету страницы даёт объём, не
+ * вводя ни одного нового цвета. Возвышение — второй уровень: панель это всплывающий над страницей
+ * слой, а не приподнятый контрол (styles/effects.css).
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-lg);
+  background: var(--sovereign-gradient-surface);
+  box-shadow: var(--sovereign-elevation-2);
+  color: var(--sovereign-text);
+  /* Скругление обрезает содержимое: иначе шапка вылезает углами за край панели. */
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  padding: var(--sovereign-space-3) var(--sovereign-space-4);
+  border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+}
+
+.body {
+  padding: var(--sovereign-space-4);
+}

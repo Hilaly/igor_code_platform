@@ -1,0 +1,57 @@
+/*
+ * Стиль текста и заголовка. Единственный источник цвета — переменные ролей: значения приходят из
+ * цветовой схемы, а не отсюда (дисциплина цвета — docs/ui-kit.md, «Чем держится дисциплина цвета»).
+ *
+ * Базового класса у текста нет намеренно: тон задаёт ровно одно свойство — цвет, и обычный тон
+ * такой же полноправный, как остальные.
+ */
+
+.normal {
+  color: var(--sovereign-text);
+}
+
+.muted {
+  color: var(--sovereign-text-muted);
+}
+
+/*
+ * Цветной текст берёт роль `*-text`, а не сам акцент: она уведена к основному тексту и потому
+ * читается на поверхности, тогда как чистый акцент на светлой схеме теряется.
+ */
+.accent {
+  color: var(--sovereign-accent-text);
+}
+
+.danger {
+  color: var(--sovereign-danger-text);
+}
+
+.warning {
+  color: var(--sovereign-warning-text);
+}
+
+.success {
+  color: var(--sovereign-success-text);
+}
+
+.heading {
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-display);
+  font-weight: var(--sovereign-font-weight-bold);
+  line-height: var(--sovereign-line-height-tight);
+  letter-spacing: var(--sovereign-letter-spacing-tight);
+}
+
+.h1 {
+  font-size: var(--sovereign-font-size-2xl);
+  /* Чем крупнее кегль, тем теснее набор: на заголовке страницы обычный трекинг выглядит рыхлым. */
+  letter-spacing: var(--sovereign-letter-spacing-display);
+}
+
+.h2 {
+  font-size: var(--sovereign-font-size-xl);
+}
+
+.h3 {
+  font-size: var(--sovereign-font-size-lg);
+}

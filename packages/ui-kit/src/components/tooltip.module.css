@@ -1,0 +1,61 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/*
+ * Пузырь вывернут: заливка цветом текста, надпись цветом страницы. Своей роли у выворотки нет, а эта
+ * пара уже проверена тестом контраста — в обратную сторону контраст тот же.
+ */
+.tip {
+  position: absolute;
+  z-index: var(--sovereign-z-overlay);
+  width: max-content;
+  /* Предел строки подсказки, а не шаг отступа: дальше текст перестаёт читаться одним взглядом. */
+  max-width: 16rem;
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-text);
+  color: var(--sovereign-page-surface);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-xs);
+  line-height: var(--sovereign-line-height-normal);
+  /* Пузырь не перехватывает мышь: иначе он загораживает то, к чему относится. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+/* Наведение на любой участок обёртки и фокус на любом её потомке — то же самое событие. */
+.wrap:hover > .tip,
+.wrap:focus-within > .tip {
+  opacity: 1;
+}
+
+.top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--sovereign-space-2);
+}
+
+.bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--sovereign-space-2);
+}
+
+.left {
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  margin-right: var(--sovereign-space-2);
+}
+
+.right {
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: var(--sovereign-space-2);
+}

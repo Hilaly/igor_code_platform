@@ -1,0 +1,84 @@
+/*
+ * Стиль переключателя. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем
+ * держится дисциплина цвета»).
+ *
+ * Настоящий `input` остаётся в дереве и только уводится с глаз: он даёт фокус, клавиатуру и роль
+ * для скринридера. Видимый бокс рисует соседний элемент, а галочку — его `::after` по состоянию
+ * `:checked`, поэтому второго источника истины о том, включено ли, не появляется.
+ */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-sm);
+  cursor: pointer;
+}
+
+.input {
+  position: absolute;
+  /*
+   * Не ноль: элемент нулевого размера часть браузеров исключает из порядка обхода с клавиатуры.
+   * Величина не из шкалы, потому что это не размер в раскладке, а минимум, оставляющий контрол живым.
+   */
+  width: 1px;
+  height: 1px;
+  padding: var(--sovereign-space-0);
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.box {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sovereign-space-4);
+  height: var(--sovereign-space-4);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  border-radius: var(--sovereign-radius-2xs);
+  background: var(--sovereign-sunken-surface);
+  transition:
+    background var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.toggle:hover .box {
+  border-color: var(--sovereign-accent-border);
+}
+
+.input:checked + .box {
+  border-color: transparent;
+  background: var(--sovereign-gradient-accent);
+}
+
+.input:checked + .box::after {
+  content: "";
+  /*
+   * Галочка — две стороны квадрата, повёрнутые на 45°. Размеры в `em` от кегля подписи: шкала
+   * отступов дала бы галочку, не связанную с текстом, и при смене масштаба они разъехались бы.
+   */
+  width: 0.3em;
+  height: 0.55em;
+  border-right: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-on-accent);
+  border-bottom: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-on-accent);
+  transform: rotate(45deg) translate(-0.05em, -0.05em);
+}
+
+/* Кольцо фокуса переносится на видимый бокс: у самого контрола показывать его негде. */
+.input:focus-visible + .box {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-space-1);
+}
+
+.toggle:has(.input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.label {
+  line-height: var(--sovereign-line-height-snug);
+}

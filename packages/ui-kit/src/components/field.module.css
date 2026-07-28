@@ -1,0 +1,46 @@
+.field {
+  display: flex;
+  gap: var(--sovereign-space-2);
+  width: 100%;
+}
+
+.stack {
+  flex-direction: column;
+}
+
+.row {
+  flex-direction: row;
+  /* По верху, а не по центру: под контролом бывает подсказка, и метка не должна от неё съезжать. */
+  align-items: flex-start;
+  gap: var(--sovereign-space-4);
+}
+
+.content {
+  display: grid;
+  gap: var(--sovereign-space-1);
+  width: 100%;
+}
+
+.label {
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  font-weight: var(--sovereign-font-weight-medium);
+  line-height: var(--sovereign-line-height-snug);
+}
+
+.hint,
+.error {
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-xs);
+  line-height: var(--sovereign-line-height-snug);
+}
+
+.hint {
+  color: var(--sovereign-text-muted);
+}
+
+/* Текстовая роль опасности, а не сама опасность: надпись обязана читаться на поверхности панели. */
+.error {
+  color: var(--sovereign-danger-text);
+}

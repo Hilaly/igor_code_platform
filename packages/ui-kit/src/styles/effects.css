@@ -1,0 +1,54 @@
+/**
+ * Возвышение, градиенты и свечение. Эти токены нецветовые по форме, но цветные по содержанию: они
+ * собраны из ролей, поэтому переключаются вместе со схемой, не зная о ней ничего.
+ *
+ * Уровней три, а не пять: каждый обязан иметь потребителя, иначе он врёт про то, что визуальная
+ * система его различает. Первый — приподнятый контрол, второй — всплывающий слой, третий —
+ * модальный.
+ */
+
+:root {
+  --sovereign-elevation-1:
+    0 1px 2px color-mix(in srgb, var(--sovereign-shadow) 32%, transparent),
+    0 3px 8px color-mix(in srgb, var(--sovereign-shadow) 22%, transparent);
+  --sovereign-elevation-2:
+    0 2px 4px color-mix(in srgb, var(--sovereign-shadow) 26%, transparent),
+    0 8px 20px color-mix(in srgb, var(--sovereign-shadow) 30%, transparent),
+    0 20px 44px color-mix(in srgb, var(--sovereign-shadow) 20%, transparent);
+  --sovereign-elevation-3:
+    0 12px 24px color-mix(in srgb, var(--sovereign-shadow) 34%, transparent),
+    0 30px 60px color-mix(in srgb, var(--sovereign-shadow) 44%, transparent),
+    0 60px 120px color-mix(in srgb, var(--sovereign-shadow) 32%, transparent);
+
+  --sovereign-gradient-accent: linear-gradient(
+    140deg,
+    var(--sovereign-accent),
+    var(--sovereign-accent-strong)
+  );
+  /* Поднятая поверхность с наклоном к странице: даёт объём, не вводя ни одного нового цвета. */
+  --sovereign-gradient-surface: linear-gradient(
+    180deg,
+    var(--sovereign-panel-surface),
+    color-mix(in srgb, var(--sovereign-panel-surface) 94%, var(--sovereign-page-surface))
+  );
+  /*
+   * Фон страницы: два радиальных пятна, акцентное сверху и второй акцент из дальнего угла. Это
+   * единственное место, где второй акцент работает на всю страницу, а не на деталь.
+   */
+  --sovereign-gradient-backdrop:
+    radial-gradient(
+      120% 80% at 50% 0%,
+      color-mix(in srgb, var(--sovereign-accent) 8%, var(--sovereign-page-surface)),
+      var(--sovereign-page-surface) 58%
+    ),
+    radial-gradient(
+      90% 60% at 100% 100%,
+      color-mix(in srgb, var(--sovereign-secondary) 5%, transparent),
+      transparent 60%
+    );
+
+  --sovereign-glow-accent: 0 2px 14px color-mix(in srgb, var(--sovereign-accent) 38%, transparent);
+  /* Волосяная линия вторым акцентом: край, который видно, не рисуя границы. */
+  --sovereign-hairline-secondary: inset 0 0 0 1px
+    color-mix(in srgb, var(--sovereign-secondary) 55%, transparent);
+}
