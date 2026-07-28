@@ -23,6 +23,12 @@ import type { Logger } from "./logger.ts";
 
 export type EventStream = {
   route: () => Route;
+  /**
+   * Отцепить соединения названной сессии входа. Проверка сессии стоит на входе в соединение, а
+   * соединение живёт часами: без этого выход не обрывал бы живой поток, а оставлял бы его дожить до
+   * конца процесса (docs/authentication.md).
+   */
+  disconnect: (sessionId: string) => void;
   /** Закрыть все соединения. Вызывается при остановке демона до снятия лока. */
   close: () => void;
 };
@@ -56,6 +62,8 @@ const defaultSlowClientLimitBytes = 1024 * 1024;
 type Client = {
   response: ServerResponse;
   address: string;
+  /** Чья сессия открыла соединение. Идентификатор записи, а не токен: секрет потоку не нужен. */
+  sessionId: string | undefined;
 };
 
 export function createEventStream(options: CreateEventStreamOptions): EventStream {
@@ -107,10 +115,20 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     route: () => ({
       method: "GET",
       path: eventsPath,
-      handle: ({ request, response, url }) => {
-        connect(request, response, readLastEventId(request, url));
+      handle: ({ request, response, url, session }) => {
+        connect(request, response, readLastEventId(request, url), session?.id);
       },
     }),
+    disconnect: (sessionId) => {
+      for (const client of [...clients]) {
+        if (client.sessionId !== sessionId) {
+          continue;
+        }
+
+        clients.delete(client);
+        client.response.end();
+      }
+    },
     close: () => {
       clearInterval(ping);
       unsubscribe();
@@ -134,6 +152,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     request: IncomingMessage,
     response: ServerResponse,
     lastEventId: number | undefined,
+    sessionId: string | undefined,
   ): void {
     response.writeHead(200, {
       "content-type": "text/event-stream",
@@ -149,6 +168,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     const client: Client = {
       response,
       address: request.socket.remoteAddress ?? "unknown",
+      sessionId,
     };
 
     clients.add(client);

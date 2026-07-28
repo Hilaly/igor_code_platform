@@ -1,11 +1,14 @@
+import { createAccountStore } from "./account.ts";
 import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
 import { parseArguments } from "./arguments.ts";
+import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
 import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
+import { createLoginSessionStore } from "./login-sessions.ts";
 import { createLogger } from "./logger.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
@@ -116,10 +119,21 @@ applyPlugins();
 // события до его создания рассказывать некому — клиентов ещё нет.
 const events = createEventStream({ bus, logger });
 
+const account = createAccountStore({ directory, logger });
+const loginSessions = createLoginSessionStore({ directory, logger });
+
+// Выход обрывает живой поток, а не оставляет его дожить до конца процесса (docs/authentication.md):
+// проверка сессии стоит на входе в соединение, а соединение живёт часами.
+loginSessions.subscribe((sessionId) => events.disconnect(sessionId));
+
 const server = createDaemonServer({
   logger,
+  // Проверка одна на все маршруты и живёт в диспетчере, а не в обработчиках: новый маршрут не может
+  // случайно оказаться незащищённым, потому что защита не в нём (docs/web-api.md).
+  authenticate: createSessionCheck(loginSessions),
   routes: [
     healthRoute(new Date()),
+    ...authenticationRoutes({ account, sessions: loginSessions, logger }),
     pluginsRoute({ plugins, registry: contributions, settings }),
     pluginPreferencesRoute({ settings, plugins, logger }),
     ...appearancePreferencesRoutes({ settings, logger }),

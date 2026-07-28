@@ -154,6 +154,7 @@ describe("pluginsRoute", () => {
       createDispatcher({
         routes: [pluginsRoute(state)],
         logger: createLogger({ source: "core", level: () => "debug", write: () => {} }),
+        authenticate: () => ({ kind: "session" as const, id: "the-session" }),
       }),
     );
 

@@ -59,6 +59,7 @@ async function serve() {
     createDispatcher({
       routes: appearancePreferencesRoutes({ settings: store, logger }),
       logger,
+      authenticate: () => ({ kind: "session" as const, id: "the-session" }),
     }),
   );
 

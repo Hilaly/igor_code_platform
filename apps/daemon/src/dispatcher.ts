@@ -3,8 +3,9 @@
  * пути, чтение и лимит тела, коды и единая форма отказа живут здесь; обработчик занимается только
  * своим делом.
  *
- * Проверки сессии здесь пока нет: проверять нечего до среза авторизации. Когда она появится, место
- * для неё одно — этот файл, а не два десятка обработчиков.
+ * Здесь же проверка сессии — одним местом на все маршруты, включая SSE-поток и будущие маршруты
+ * плагинов (docs/authentication.md): маршрут чужого кода не может случайно оказаться незащищённым,
+ * потому что защита не в обработчике.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -13,6 +14,13 @@ import type { Logger } from "./logger.ts";
 
 export type RouteParameters = Record<string, string>;
 
+/** Кто спрашивает. Идентификатор записи сессии, а не токен: обработчику незачем видеть секрет. */
+export type AuthenticatedSession = {
+  id: string;
+};
+
+export type Authentication = ({ kind: "session" } & AuthenticatedSession) | { kind: "none" };
+
 export type RequestContext = {
   request: IncomingMessage;
   response: ServerResponse;
@@ -20,6 +28,11 @@ export type RequestContext = {
   parameters: RouteParameters;
   /** Разобранное тело запроса. У запроса без тела — `undefined`. */
   body: unknown;
+  /**
+   * Сессия запроса. У защищённого маршрута она есть всегда — иначе обработчик не позвали бы; у
+   * открытого её может не быть, и `GET /api/session` только этим и занимается.
+   */
+  session: AuthenticatedSession | undefined;
 };
 
 export type RouteHandler = (context: RequestContext) => void | Promise<void>;
@@ -28,12 +41,22 @@ export type Route = {
   method: "GET" | "POST" | "PUT" | "DELETE";
   /** Сегмент вида `:имя` попадает в `parameters`; остальные сравниваются буквально. */
   path: string;
+  /**
+   * `open` — маршрут отвечает и без сессии. Поле необязательное, и его отсутствие значит «нужна
+   * сессия»: забытое поле делает новый маршрут защищённым, а не открытым.
+   */
+  access?: "open";
   handle: RouteHandler;
 };
 
 export type CreateDispatcherOptions = {
   routes: Route[];
   logger: Logger;
+  /**
+   * Проверка сессии. Поле обязательное, хотя открытых маршрутов хватило бы и без него: значение по
+   * умолчанию здесь означало бы, что забытая проводка открывает API целиком и молча.
+   */
+  authenticate: (request: IncomingMessage) => Authentication;
   bodyLimitBytes?: number;
 };
 
@@ -104,6 +127,18 @@ export function createDispatcher(
       return;
     }
 
+    // Проверка сессии — после разбора пути и до чтения тела. После разбора, потому что открытость
+    // это свойство маршрута; до тела, потому что буферизовать килобайты для того, кто получит
+    // отказ, незачем.
+    const authentication = options.authenticate(request);
+    const session = authentication.kind === "session" ? { id: authentication.id } : undefined;
+
+    if (session === undefined && matched.route.access !== "open") {
+      respondWithError(response, 401, "the request needs a session");
+
+      return;
+    }
+
     // У GET и DELETE тела нет по определению: читать его — значит ждать конца потока там, где
     // ждать нечего, а SSE-поток обязан начаться сразу.
     const body =
@@ -130,6 +165,7 @@ export function createDispatcher(
         url,
         parameters: matched.parameters,
         body: body.kind === "parsed" ? body.value : undefined,
+        session,
       });
     } catch (cause) {
       options.logger.error("the request handler failed", {

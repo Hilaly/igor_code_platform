@@ -206,9 +206,12 @@ function readSessions(path: string, logger: Logger): StoredLoginSession[] {
       : undefined;
 
   if (!Array.isArray(stored)) {
-    logger.warn("the login sessions file does not hold a list of sessions, every session was dropped", {
-      file: loginSessionsFileName,
-    });
+    logger.warn(
+      "the login sessions file does not hold a list of sessions, every session was dropped",
+      {
+        file: loginSessionsFileName,
+      },
+    );
 
     return [];
   }

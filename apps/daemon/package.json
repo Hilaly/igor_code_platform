@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@sovereign/protocol": "workspace:*",
-    "@sovereign/sdk": "workspace:*"
+    "@sovereign/sdk": "workspace:*",
+    "cookie": "^2.0.1"
   }
 }

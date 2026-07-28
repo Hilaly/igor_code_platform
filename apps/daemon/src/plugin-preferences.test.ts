@@ -60,7 +60,14 @@ async function serve(settings: Pick<SettingsStore, "writePluginPreferences">) {
     logger,
   });
 
-  const server = createServer(createDispatcher({ routes: [route], logger }));
+  const server = createServer(
+    // Вход этих тестов не касается: сессия есть всегда.
+    createDispatcher({
+      routes: [route],
+      logger,
+      authenticate: () => ({ kind: "session" as const, id: "the-session" }),
+    }),
+  );
 
   servers.push(server);
   server.listen(0, "127.0.0.1");

@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { createServer, request as sendRequest, type Server } from "node:http";
+import { createServer, request as sendRequest, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, describe, it } from "node:test";
 
 import type { LogRecord } from "@sovereign/protocol";
 
-import { createDispatcher, respondWithJson, type Route } from "./dispatcher.ts";
+import {
+  createDispatcher,
+  respondWithJson,
+  type Authentication,
+  type Route,
+} from "./dispatcher.ts";
 import { createLogger } from "./logger.ts";
 
 type Answer = {
@@ -24,7 +29,13 @@ after(async () => {
   }
 });
 
-async function serve(routes: Route[], bodyLimitBytes?: number) {
+type ServeOptions = {
+  bodyLimitBytes?: number;
+  /** По умолчанию сессия есть: тесты маршрутизации не про вход. */
+  authenticate?: (request: IncomingMessage) => Authentication;
+};
+
+async function serve(routes: Route[], options: ServeOptions = {}) {
   const records: LogRecord[] = [];
   const logger = createLogger({
     source: "core",
@@ -36,7 +47,8 @@ async function serve(routes: Route[], bodyLimitBytes?: number) {
     createDispatcher({
       routes,
       logger,
-      ...(bodyLimitBytes === undefined ? {} : { bodyLimitBytes }),
+      authenticate: options.authenticate ?? (() => ({ kind: "session", id: "the-session" })),
+      ...(options.bodyLimitBytes === undefined ? {} : { bodyLimitBytes: options.bodyLimitBytes }),
     }),
   );
 
@@ -69,8 +81,11 @@ async function serve(routes: Route[], bodyLimitBytes?: number) {
 const echo = (path: string, method: Route["method"] = "GET"): Route => ({
   method,
   path,
-  handle: ({ response, parameters, body }) => respondWithJson(response, 200, { parameters, body }),
+  handle: ({ response, parameters, body, session }) =>
+    respondWithJson(response, 200, { parameters, body, session }),
 });
+
+const withoutSession = { authenticate: (): Authentication => ({ kind: "none" }) };
 
 describe("createDispatcher", () => {
   it("picks the route by method and path", async () => {
@@ -79,7 +94,7 @@ describe("createDispatcher", () => {
     const answer = await call("GET", "/api/health");
 
     assert.equal(answer.status, 200);
-    assert.deepEqual(JSON.parse(answer.body), { parameters: {} });
+    assert.deepEqual(JSON.parse(answer.body).parameters, {});
   });
 
   it("reads a parameter out of the path", async () => {
@@ -116,7 +131,7 @@ describe("createDispatcher", () => {
   });
 
   it("refuses a body larger than the limit before reading it whole", async () => {
-    const { call } = await serve([echo("/api/plugins", "PUT")], 64);
+    const { call } = await serve([echo("/api/plugins", "PUT")], { bodyLimitBytes: 64 });
 
     const answer = await call("PUT", "/api/plugins", JSON.stringify({ pad: "x".repeat(1_000) }));
 
@@ -165,6 +180,69 @@ describe("createDispatcher", () => {
     assert.equal(failure?.level, "error");
     assert.equal(failure?.["path"], "/api/boom");
     assert.match(String(failure?.["reason"]), /the handler is broken/);
+  });
+
+  it("refuses a route without a session", async () => {
+    const { call } = await serve([echo("/api/plugins")], withoutSession);
+
+    const answer = await call("GET", "/api/plugins");
+
+    assert.equal(answer.status, 401);
+    assert.deepEqual(JSON.parse(answer.body), { error: "the request needs a session" });
+  });
+
+  it("answers an open route without a session", async () => {
+    // Открытость называется полем, а его отсутствие значит «нужна сессия»: забытое поле делает
+    // маршрут защищённым, а не открытым (docs/web-api.md).
+    const { call } = await serve([{ ...echo("/api/session"), access: "open" }], withoutSession);
+
+    assert.equal((await call("GET", "/api/session")).status, 200);
+  });
+
+  it("tells the handler which session asked", async () => {
+    const { call } = await serve([echo("/api/plugins")]);
+
+    assert.deepEqual(JSON.parse((await call("GET", "/api/plugins")).body).session, {
+      id: "the-session",
+    });
+  });
+
+  it("gives an open route no session when there is none", async () => {
+    const { call } = await serve([{ ...echo("/api/session"), access: "open" }], withoutSession);
+
+    assert.equal(JSON.parse((await call("GET", "/api/session")).body).session, undefined);
+  });
+
+  it("gives an open route the session when there is one", async () => {
+    // Открытый маршрут обязан различать вошедшего и невошедшего: `GET /api/session` только этим и
+    // занимается.
+    const { call } = await serve([{ ...echo("/api/session"), access: "open" }]);
+
+    assert.deepEqual(JSON.parse((await call("GET", "/api/session")).body).session, {
+      id: "the-session",
+    });
+  });
+
+  it("checks the session before it reads the body", async () => {
+    const { call } = await serve([echo("/api/plugins", "PUT")], {
+      ...withoutSession,
+      bodyLimitBytes: 64,
+    });
+
+    // Тело без сессии не читается вовсе: буферизовать килобайты для того, кто получит отказ, — это
+    // ровно та трата памяти, от которой защищает лимит.
+    const answer = await call("PUT", "/api/plugins", JSON.stringify({ pad: "x".repeat(1_000) }));
+
+    assert.equal(answer.status, 401);
+  });
+
+  it("answers an unknown path with 404 even without a session", async () => {
+    // Таблица маршрутов ядра — публичный контракт (docs/public-contract.md), скрывать её от
+    // невошедшего незачем, а разница между «нет адреса» и «не тот метод» полезна и до входа.
+    const { call } = await serve([echo("/api/plugins")], withoutSession);
+
+    assert.equal((await call("GET", "/api/nothing")).status, 404);
+    assert.equal((await call("DELETE", "/api/plugins")).status, 405);
   });
 
   it("waits for an asynchronous handler", async () => {

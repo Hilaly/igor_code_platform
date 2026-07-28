@@ -49,8 +49,7 @@ export type PasswordSubmission = {
 export const minimumPasswordLength = 8;
 
 export type PasswordSubmissionParseResult =
-  | { kind: "parsed"; value: PasswordSubmission }
-  | { kind: "rejected"; reason: string };
+  { kind: "parsed"; value: PasswordSubmission } | { kind: "rejected"; reason: string };
 
 export function parsePasswordSubmission(raw: unknown): PasswordSubmissionParseResult {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {

@@ -59,7 +59,18 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
   });
 
   const events = createEventStream({ bus, logger, ...options });
-  const server = createServer(createDispatcher({ routes: [events.route()], logger }));
+
+  // Сессия запроса приезжает из диспетчера: поток обязан помнить, какого клиента отцепить при
+  // выходе, и берёт эту связь оттуда же, откуда её берут остальные маршруты.
+  let sessionId = "the-session";
+
+  const server = createServer(
+    createDispatcher({
+      routes: [events.route()],
+      logger,
+      authenticate: () => ({ kind: "session", id: sessionId }),
+    }),
+  );
 
   servers.push(server);
   server.listen(0, "127.0.0.1");
@@ -133,7 +144,16 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
 
   const publish = (key: string): void => bus.publish(coreEventTypes.pluginLifecycle, status(key));
 
-  return { read, publish, records, close: () => events.close() };
+  return {
+    read,
+    publish,
+    records,
+    asSession: (id: string) => {
+      sessionId = id;
+    },
+    disconnect: (id: string) => events.disconnect(id),
+    close: () => events.close(),
+  };
 }
 
 const keysOf = (events: StreamEvent[]): string[] =>
@@ -271,5 +291,37 @@ describe("createEventStream", () => {
     close();
 
     await once(reader.response, "end");
+  });
+
+  it("breaks off the connection of a session that logged out", async () => {
+    const { read, disconnect } = await stream();
+    const reader = await read();
+
+    // Выход обязан обрывать живой поток, а не оставлять его дожить до конца процесса
+    // (docs/authentication.md): проверка сессии стоит на входе в соединение, а соединение живёт
+    // часами, поэтому одной проверки при подключении не хватает.
+    disconnect("the-session");
+
+    await once(reader.response, "end");
+  });
+
+  it("leaves the connections of the other sessions alone", async () => {
+    const { read, publish, disconnect, asSession } = await stream();
+
+    asSession("the-other-tab");
+
+    const kept = await read();
+
+    asSession("the-session");
+
+    const dropped = await read();
+
+    disconnect("the-session");
+
+    await once(dropped.response, "end");
+
+    publish("after the logout");
+
+    assert.deepEqual(keysOf(await kept.waitFor(1)), ["after the logout"]);
   });
 });
