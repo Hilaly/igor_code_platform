@@ -5,13 +5,11 @@ import { paletteKeys, paletteVariants, type Palette } from "./palette.ts";
 import { deriveRoles, roleNames, rolePropertyName } from "./roles.ts";
 import { resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
 import { baseScheme } from "./schemes/base.ts";
-import { checkScheme } from "./schemes/check.ts";
-
-const schemes = { base: baseScheme, check: checkScheme };
+import { shippedSchemes } from "./schemes/shipped.ts";
 
 describe("deriveRoles", () => {
   it("gives every role a value for both variants", () => {
-    for (const scheme of Object.values(schemes)) {
+    for (const scheme of shippedSchemes) {
       for (const variant of paletteVariants) {
         const roles = deriveRoles(scheme.variants[variant]);
 
@@ -115,7 +113,7 @@ describe("contrast", () => {
   ] as const satisfies readonly (readonly [keyof Palette, keyof Palette])[];
 
   it("keeps text legible in every shipped scheme", () => {
-    for (const scheme of Object.values(schemes)) {
+    for (const scheme of shippedSchemes) {
       for (const variant of paletteVariants) {
         const palette = scheme.variants[variant];
 
@@ -131,10 +129,24 @@ describe("contrast", () => {
     }
   });
 
-  it("covers the whole palette between the pairs and the overlay", () => {
-    const checked = new Set([...textPairs.flat(), "border", "overlay"]);
+  it("covers the whole palette between the pairs and what is not text", () => {
+    // Второй акцент здесь не проверяется намеренно: текстом он не бывает — на нём держатся градиенты
+    // и волосяные линии, а их читаемость судится глазом, как границы и затемнение.
+    const checked = new Set<string>([
+      ...textPairs.flat(),
+      "border",
+      "overlay",
+      "shadow",
+      "secondary",
+    ]);
 
     expect([...paletteKeys].filter((key) => !checked.has(key))).toEqual([]);
+  });
+
+  it("ships every scheme on the current token contract", () => {
+    for (const scheme of shippedSchemes) {
+      expect(scheme.tokenContract, scheme.id).toBe(tokenContractMajor);
+    }
   });
 });
 

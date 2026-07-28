@@ -9,8 +9,8 @@
 import {
   applyRoles,
   baseScheme,
-  checkScheme,
   resolveScheme,
+  shippedSchemes,
   type ColorScheme,
   type PaletteVariant,
   type StyleTarget,
@@ -23,8 +23,8 @@ import {
   type AppearanceVariant,
 } from "@sovereign/protocol";
 
-/** Схемы поставки. Плагин добавит свои, когда демон начнёт собирать его браузерный код (docs/ui-extension-model.md). */
-export const shippedSchemes: ColorScheme[] = [baseScheme, checkScheme];
+/** Схемы поставки перечисляет кит: он же их и объявляет (docs/ui-kit.md). */
+export { shippedSchemes };
 
 export const defaultAppearancePreferences: AppearancePreferences = {
   appearance: defaultAppearance,
@@ -78,7 +78,7 @@ export type ApplyAppearanceOptions = {
   preferences: AppearancePreferences;
   prefersDark: boolean;
   target: StyleTarget;
-  schemes?: ColorScheme[];
+  schemes?: readonly ColorScheme[];
   onDiagnostic: (diagnostic: string) => void;
 };
 

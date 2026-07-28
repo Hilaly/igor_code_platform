@@ -15,7 +15,7 @@ import {
 
 export type AppearancePanelProps = {
   preferences: AppearancePreferences;
-  schemes: ColorScheme[];
+  schemes: readonly ColorScheme[];
   locales: string[];
   onChange: (preferences: AppearancePreferences) => void;
   /** Отказ записи: файл на диске правил кто-то ещё, и это дело человека, а не повтора запроса. */

@@ -10,8 +10,12 @@ import { deriveRoles, roleNames, type RoleName, type Roles } from "./roles.ts";
 /**
  * Мажор контракта токенов. Растёт, когда меняется палитра: роли добавляются и переименовываются без
  * этого (docs/ui-kit.md).
+ *
+ * Второй мажор — перенос визуала (docs/roadmap.md, срез 5): палитра выросла на второй акцент и цвет
+ * тени. Сделано одной правкой намеренно: пока все схемы наши, это стоит ноль, а после среза 12 схему
+ * приносит плагин, и такая же добавка станет ломающим изменением публичного контракта.
  */
-export const tokenContractMajor = 1;
+export const tokenContractMajor = 2;
 
 export type ColorScheme = {
   id: string;
