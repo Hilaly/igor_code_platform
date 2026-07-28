@@ -9,10 +9,12 @@ export const pluginPagePrefix = "p";
 
 /** Вью базовой поставки живут в ядре и своего адреса не теряют (docs/architecture.md). */
 export const pluginsPagePath = "/plugins";
+export const projectsPagePath = "/projects";
 
 export type Page =
   | { kind: "home" }
   | { kind: "plugins" }
+  | { kind: "projects" }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -26,6 +28,10 @@ export function matchPage(path: string): Page {
 
   if (segments.length === 1 && `/${segments[0]}` === pluginsPagePath) {
     return { kind: "plugins" };
+  }
+
+  if (segments.length === 1 && `/${segments[0]}` === projectsPagePath) {
+    return { kind: "projects" };
   }
 
   if (segments[0] === pluginPagePrefix) {
@@ -48,6 +54,8 @@ export function pathOf(page: Page): string {
       return "/";
     case "plugins":
       return pluginsPagePath;
+    case "projects":
+      return projectsPagePath;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":

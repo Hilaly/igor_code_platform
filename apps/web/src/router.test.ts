@@ -14,6 +14,14 @@ describe("matchPage", () => {
     expect(matchPage("/plugins/hello")).toEqual({ kind: "unknown", path: "/plugins/hello" });
   });
 
+  it("keeps the projects on their own address", () => {
+    expect(matchPage("/projects")).toEqual({ kind: "projects" });
+    expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
+      kind: "unknown",
+      path: "/projects/b7Kq3xv9pQdT",
+    });
+  });
+
   it("reads the plugin page namespace", () => {
     expect(matchPage("/p/tracker/board")).toEqual({
       kind: "plugin",
@@ -44,6 +52,7 @@ describe("pathOf", () => {
     for (const path of [
       "/",
       "/plugins",
+      "/projects",
       "/p/tracker/board",
       "/p/tracker/board/15/edit",
       "/settings",
