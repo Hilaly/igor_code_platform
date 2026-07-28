@@ -3,6 +3,7 @@
  * импортируют их отсюда, поэтому расхождение между сервером и клиентом ловится компилятором.
  */
 
+export * from "./authentication.ts";
 export * from "./contribution.ts";
 export * from "./event-stream.ts";
 export * from "./events.ts";
