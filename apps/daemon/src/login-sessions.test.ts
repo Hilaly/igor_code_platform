@@ -64,7 +64,9 @@ function harness(
     ...(options.sweepIntervalMilliseconds === undefined
       ? {}
       : { sweepIntervalMilliseconds: options.sweepIntervalMilliseconds }),
-    ...(options.isAccountPresent === undefined ? {} : { isAccountPresent: options.isAccountPresent }),
+    ...(options.isAccountPresent === undefined
+      ? {}
+      : { isAccountPresent: options.isAccountPresent }),
   });
 
   stores.push(store);
@@ -344,10 +346,16 @@ describe("createLoginSessionStore", () => {
       chmodSync(directory, 0o700);
     }
 
-    assert.equal(records.some((record) => record.level === "error"), true);
     assert.equal(
-      (JSON.parse(readFileSync(join(directory, loginSessionsFileName), "utf8")) as { sessions: unknown[] })
-        .sessions.length,
+      records.some((record) => record.level === "error"),
+      true,
+    );
+    assert.equal(
+      (
+        JSON.parse(readFileSync(join(directory, loginSessionsFileName), "utf8")) as {
+          sessions: unknown[];
+        }
+      ).sessions.length,
       1,
     );
   });

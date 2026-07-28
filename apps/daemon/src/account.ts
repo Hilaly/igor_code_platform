@@ -170,7 +170,10 @@ export function createAccountStore(options: CreateAccountStoreOptions): AccountS
             reason: cause instanceof Error ? cause.message : String(cause),
           });
 
-          return { kind: "unreadable", reason: `${accountFileName} has unusable scrypt parameters` };
+          return {
+            kind: "unreadable",
+            reason: `${accountFileName} has unusable scrypt parameters`,
+          };
         }
 
         // Длины сравниваются до `timingSafeEqual`: он бросает на разной длине. Сойтись они обязаны —
