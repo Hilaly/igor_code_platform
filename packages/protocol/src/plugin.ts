@@ -16,12 +16,64 @@ export const manifestField = "sovereign";
 export const platformVersion = "0.1.0";
 
 /**
- * Источники плагинов в порядке возрастания специфичности (docs/plugins.md, docs/repository-structure.md): более специфичный
- * перекрывает менее специфичный при споре вкладов. Папка проекта появится здесь вместе с проектами.
+ * Источники с одним корнем на всю платформу (docs/plugins.md, docs/repository-structure.md).
+ * Третий источник — папка проекта — корня на всех не имеет: их столько, сколько проектов, поэтому
+ * он параметризован и в этот список не входит.
  */
-export const pluginSources = ["builtin", "data"] as const;
+export const staticPluginSources = ["builtin", "data"] as const;
 
-export type PluginSource = (typeof pluginSources)[number];
+/**
+ * Источник папки проекта: `project:<id записи проекта>` (docs/plugins.md,
+ * docs/sessions-and-projects.md). В ключ едет идентификатор записи, а не путь папки: путь длинный,
+ * содержит пробелы и юникод, требует кодирования в URL и меняет написание от регистра.
+ */
+export type ProjectPluginSource = `project:${string}`;
+
+/**
+ * Источники плагинов в порядке возрастания специфичности: более специфичный перекрывает менее
+ * специфичный при споре вкладов (docs/plugins.md).
+ */
+export type PluginSource = (typeof staticPluginSources)[number] | ProjectPluginSource;
+
+const projectSourcePrefix = "project:";
+
+export function projectPluginSource(projectId: string): ProjectPluginSource {
+  return `${projectSourcePrefix}${projectId}`;
+}
+
+/** Какому проекту принадлежит источник. У непроектного — никакому. */
+export function projectOfPluginSource(source: PluginSource): string | undefined {
+  return source.startsWith(projectSourcePrefix)
+    ? source.slice(projectSourcePrefix.length)
+    : undefined;
+}
+
+/**
+ * Ранг специфичности. Считается функцией, а не позицией в массиве: у источника проекта позиции нет
+ * вовсе, и `indexOf` дал бы ему −1, то есть папка проекта проигрывала бы встроенному — молча и в
+ * обратную сторону от задуманного.
+ */
+export function pluginSourceRank(source: PluginSource): number {
+  const known = staticPluginSources.indexOf(source as (typeof staticPluginSources)[number]);
+
+  return known === -1 ? staticPluginSources.length : known;
+}
+
+export function isPluginSource(value: unknown): value is PluginSource {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  if (staticPluginSources.includes(value as (typeof staticPluginSources)[number])) {
+    return true;
+  }
+
+  const projectId = projectOfPluginSource(value as PluginSource);
+
+  // Двоеточие внутри идентификатора проекта сделало бы разбор ключа неоднозначным: `project:a:b`
+  // читалось бы и как плагин `b` проекта `a`, и как плагин без имени проекта `a:b`.
+  return projectId !== undefined && projectId !== "" && !projectId.includes(":");
+}
 
 /**
  * Плагин, о котором в предпочтениях ещё ничего не сказано: встроенный работает сразу (docs/plugins.md),

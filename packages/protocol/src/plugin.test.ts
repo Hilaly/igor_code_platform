@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  isPluginSource,
   matchVersionRange,
   parsePluginManifest,
   platformVersion,
+  pluginEnabledByDefault,
+  pluginSourceRank,
+  projectOfPluginSource,
+  projectPluginSource,
   type PluginManifestParseResult,
 } from "./plugin.ts";
 
@@ -125,4 +130,40 @@ describe("matchVersionRange", () => {
       assert.equal(matchVersionRange(range, version).kind, expected);
     });
   }
+});
+
+describe("plugin sources", () => {
+  it("ranks the project folder above the data directory and both above builtin", () => {
+    // Ранг — это специфичность: более частный источник перекрывает менее частный
+    // (docs/plugins.md). Считать его позицией в массиве нельзя — источник проекта
+    // параметризован, и `indexOf` дал бы ему −1, то есть проигрыш встроенному.
+    assert.ok(pluginSourceRank("builtin") < pluginSourceRank("data"));
+    assert.ok(pluginSourceRank("data") < pluginSourceRank(projectPluginSource("b7Kq3xv9pQdT")));
+  });
+
+  it("builds and reads back the source of a project folder", () => {
+    const source = projectPluginSource("b7Kq3xv9pQdT");
+
+    assert.equal(source, "project:b7Kq3xv9pQdT");
+    assert.equal(projectOfPluginSource(source), "b7Kq3xv9pQdT");
+    assert.equal(projectOfPluginSource("data"), undefined);
+    assert.equal(projectOfPluginSource("builtin"), undefined);
+  });
+
+  it("recognises the sources it knows and refuses the rest", () => {
+    for (const source of ["builtin", "data", "project:work", "project:b7Kq3xv9pQdT"]) {
+      assert.ok(isPluginSource(source), `${source} must be a source`);
+    }
+
+    for (const source of ["", "project:", "project", "sneaky", "project:a:b", 1, null]) {
+      assert.ok(!isPluginSource(source), `${JSON.stringify(source)} must not be a source`);
+    }
+  });
+
+  it("enables only the builtin source without asking", () => {
+    // Включение — граница доверия (docs/plugins.md): код из папки проекта ждёт явного «да».
+    assert.equal(pluginEnabledByDefault("builtin"), true);
+    assert.equal(pluginEnabledByDefault("data"), false);
+    assert.equal(pluginEnabledByDefault(projectPluginSource("work")), false);
+  });
 });

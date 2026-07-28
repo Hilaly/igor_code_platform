@@ -18,6 +18,12 @@ import type { PluginRoot } from "./plugin-sources.ts";
 export type PluginWatcher = {
   /** Возвращает управление, когда наблюдатели поставлены; читать надо после этого (проверка 14). */
   start: () => void;
+  /**
+   * Переставить наблюдателей на другой набор корней. Набор не постоянен: корни папок проектов
+   * появляются и исчезают на живом демоне (docs/plugins.md). Обходить корни надо после этого — по
+   * той же причине, по которой `start()` идёт перед первым обходом (проверка 14).
+   */
+  rearm: (roots: PluginRoot[]) => void;
   close: () => void;
 };
 
@@ -82,40 +88,54 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
     debounceTimer.unref();
   };
 
-  return {
-    start: () => {
-      armedAt = Date.now();
+  const arm = (armed: PluginRoot[]): void => {
+    armedAt = Date.now();
 
-      for (const root of roots) {
-        try {
-          // Событие без имени возможно: тогда известно только, что в корне что-то было, и это
-          // повод переобнаружить источник, а не перезагружать плагины.
-          const watcher = watch(root.directory, { recursive: true }, (_event, name) => {
-            note(root, typeof name === "string" ? name : "");
+    for (const root of armed) {
+      try {
+        // Событие без имени возможно: тогда известно только, что в корне что-то было, и это
+        // повод переобнаружить источник, а не перезагружать плагины.
+        const watcher = watch(root.directory, { recursive: true }, (_event, name) => {
+          note(root, typeof name === "string" ? name : "");
+        });
+
+        // Ошибка наблюдателя не глушится: без него плагины молча перестают перезагружаться.
+        watcher.on("error", (cause: Error) => {
+          logger.error("the plugin watcher failed", {
+            directory: root.directory,
+            reason: cause.message,
+          });
+        });
+
+        watchers.push(watcher);
+      } catch (cause) {
+        if (cause instanceof Error && (cause as { code?: unknown }).code === "ENOENT") {
+          // Корня может не быть: встроенных плагинов в сборке может не оказаться вовсе.
+          logger.debug("the plugin source root is missing and is not watched", {
+            directory: root.directory,
           });
 
-          // Ошибка наблюдателя не глушится: без него плагины молча перестают перезагружаться.
-          watcher.on("error", (cause: Error) => {
-            logger.error("the plugin watcher failed", {
-              directory: root.directory,
-              reason: cause.message,
-            });
-          });
-
-          watchers.push(watcher);
-        } catch (cause) {
-          if (cause instanceof Error && (cause as { code?: unknown }).code === "ENOENT") {
-            // Корня может не быть: встроенных плагинов в сборке может не оказаться вовсе.
-            logger.debug("the plugin source root is missing and is not watched", {
-              directory: root.directory,
-            });
-
-            continue;
-          }
-
-          throw cause;
+          continue;
         }
+
+        throw cause;
       }
+    }
+  };
+
+  const disarm = (): void => {
+    for (const watcher of watchers) {
+      watcher.close();
+    }
+
+    watchers.length = 0;
+  };
+
+  return {
+    start: () => arm(roots),
+    rearm: (next) => {
+      disarm();
+      arm(next);
     },
     close: () => {
       if (debounceTimer !== undefined) {
@@ -123,11 +143,7 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
         debounceTimer = undefined;
       }
 
-      for (const watcher of watchers) {
-        watcher.close();
-      }
-
-      watchers.length = 0;
+      disarm();
     },
   };
 }

@@ -12,8 +12,9 @@ import { createLoginSessionStore } from "./login-sessions.ts";
 import { createLogger } from "./logger.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
-import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
+import { defaultPluginRoots, discoverPlugins, projectPluginRoots } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
+import type { PluginRoot } from "./plugin-sources.ts";
 import { pluginsRoute } from "./plugins-snapshot.ts";
 import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
@@ -72,7 +73,21 @@ const logger = createLogger({
 // Файлы читаются после создания логгера: диагностика первого чтения обязана в него попасть.
 settings.start(logger);
 
-const pluginRoots = defaultPluginRoots(directory);
+// Один нормализатор на демон: складка пути обязана быть общей у стора и у маршрутов, иначе второй
+// проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
+const normalizeProjectFolder = createProjectPathNormalizer();
+const projects = createProjectStore({ directory, logger, normalizePath: normalizeProjectFolder });
+
+// Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
+// отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
+const projectAvailability = createProjectAvailabilityWatcher({ projects, bus });
+
+// Корни перестали быть константой: папки проектов появляются и исчезают на живом демоне
+// (docs/plugins.md). Считаются они каждый раз заново — набор проектов между обходами меняется.
+const pluginRoots = (): PluginRoot[] => [
+  ...defaultPluginRoots(directory),
+  ...projectPluginRoots(projects.list(), (project) => projectAvailability.of(project.id)),
+];
 
 const contributions = createContributionRegistry();
 
@@ -84,14 +99,33 @@ const plugins = createPluginSupervisor({
     createLogger({ source, level: () => settings.current().config.logLevel }),
 });
 
+const pluginWatcher = createPluginWatcher({
+  roots: pluginRoots(),
+  logger,
+  onChange: (changedDirectories) => applyPlugins(changedDirectories),
+});
+
 // Приведения идут цепочкой: два одновременных перечитывания настроек не должны поднимать один
 // плагин дважды.
 let applying = Promise.resolve();
+let armedRoots = "";
 
 const applyPlugins = (changedDirectories: string[] = []): void => {
   applying = applying
     .then(async () => {
-      await plugins.apply(discoverPlugins(pluginRoots), settings.current().preferences);
+      const roots = pluginRoots();
+      const signature = roots.map((root) => root.directory).join("\n");
+
+      // Наблюдатели переставляются только когда набор корней действительно изменился: между
+      // снятием и постановкой есть окно, в котором не видно ничего (проверка 14), и открывать его
+      // на каждую правку файла плагина незачем. Переставляются до обхода, а не после: правка,
+      // потерянная не успевшим встать наблюдателем, при таком порядке попадает в этот же обход.
+      if (signature !== armedRoots) {
+        armedRoots = signature;
+        pluginWatcher.rearm(roots);
+      }
+
+      await plugins.apply(discoverPlugins(roots), settings.current().preferences);
       await plugins.reload(changedDirectories);
     })
     .catch((cause: unknown) => {
@@ -107,32 +141,22 @@ settings.subscribe((snapshot) => {
 });
 
 publishAppearanceChanges({ settings, bus });
+publishProjectChanges({ projects, bus });
 
-const pluginWatcher = createPluginWatcher({
-  roots: pluginRoots,
-  logger,
-  onChange: applyPlugins,
-});
+// Список проектов меняет набор корней: созданный проект приносит источник, архивированный уносит.
+projects.subscribe(() => applyPlugins());
 
 // Наблюдатель ставится до первого обхода: правка, потерянная не успевшим встать наблюдателем, при
 // таком порядке всё равно попадает в первый снимок (runtime-checks.md, проверка 14).
 pluginWatcher.start();
+armedRoots = pluginRoots()
+  .map((root) => root.directory)
+  .join("\n");
 applyPlugins();
 
 // Поток подписывается на шину последним из подписчиков ядра, но нумерует всё, что придёт после:
 // события до его создания рассказывать некому — клиентов ещё нет.
 const events = createEventStream({ bus, logger });
-
-// Один нормализатор на демон: складка пути обязана быть общей у стора и у маршрутов, иначе второй
-// проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
-const normalizeProjectFolder = createProjectPathNormalizer();
-const projects = createProjectStore({ directory, logger, normalizePath: normalizeProjectFolder });
-
-publishProjectChanges({ projects, bus });
-
-// Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
-// отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
-const projectAvailability = createProjectAvailabilityWatcher({ projects, bus });
 
 const account = createAccountStore({ directory, logger });
 const loginSessions = createLoginSessionStore({

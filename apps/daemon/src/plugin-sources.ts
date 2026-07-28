@@ -13,8 +13,10 @@ import { join } from "node:path";
 import {
   manifestFileName,
   parsePluginManifest,
+  projectPluginSource,
   type PluginManifest,
   type PluginSource,
+  type ProjectAvailability,
 } from "@sovereign/protocol";
 
 export type PluginRoot = {
@@ -63,6 +65,38 @@ export function defaultPluginRoots(dataDirectory: string): PluginRoot[] {
     { source: "data", directory: join(dataDirectory, "plugins") },
   ];
 }
+
+/**
+ * Третий, самый частный источник — папка `plugins/` внутри папки проекта
+ * (docs/sessions-and-projects.md, docs/plugins.md). Корней столько, сколько проектов, и набор
+ * меняется на живом демоне: проект создали, архивировали, папку отмонтировали.
+ *
+ * Источник даётся не всякому проекту:
+ *
+ * - **архивный не даёт** — «убран с глаз» обязано значить и «его код не работает», иначе
+ *   архивация выключает проект в интерфейсе, но оставляет его плагины перекрывать чужие вклады;
+ * - **проект с недоступной папкой не даёт** — читать оттуда нечего;
+ * - **эфемерный даёт** (docs/sessions-and-projects.md): плагин, положенный в `work`, перекрывает
+ *   встроенный, и это записано прямо.
+ */
+export function projectPluginRoots(
+  projects: readonly ProjectPluginFolder[],
+  availability: (project: ProjectPluginFolder) => ProjectAvailability,
+): PluginRoot[] {
+  return projects
+    .filter((project) => !project.archived && availability(project) === "available")
+    .map((project) => ({
+      source: projectPluginSource(project.id),
+      directory: join(project.folder, "plugins"),
+    }));
+}
+
+/** Ровно то, что нужно от записи проекта для обхода корней: имя модуля проектов сюда не тянется. */
+export type ProjectPluginFolder = {
+  id: string;
+  folder: string;
+  archived: boolean;
+};
 
 export function discoverPlugins(roots: PluginRoot[]): PluginDiscovery {
   const plugins: DiscoveredPlugin[] = [];

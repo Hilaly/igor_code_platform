@@ -42,6 +42,8 @@ describe("parsePreferences", () => {
   });
 
   it("ignores a key that is not <source>:<id> and says so", () => {
+    // `project:hello` — не ключ: у источника папки проекта частей три, и без идентификатора
+    // проекта непонятно, чьей папке принадлежит плагин.
     const result = parsePreferences({
       plugins: { hello: { enabled: true }, "project:hello": { enabled: true } },
     });
@@ -49,6 +51,24 @@ describe("parsePreferences", () => {
     assert.equal(result.kind, "parsed");
     assert.deepEqual(result.kind === "parsed" ? result.value.plugins : {}, {});
     assert.equal(result.diagnostics.length, 2);
+  });
+
+  it("keeps the decision about a plugin in a project folder", () => {
+    // Ключ режется по последнему двоеточию: разбор по первому дал бы три части вместо двух и молча
+    // выбросил бы решение человека о плагине проекта.
+    const result = parsePreferences({
+      plugins: {
+        "project:b7Kq3xv9pQdT:hello": { enabled: true },
+        "project:work:hello": { enabled: false },
+      },
+    });
+
+    assert.equal(result.kind, "parsed");
+    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.kind === "parsed" ? Object.keys(result.value.plugins) : [], [
+      "project:b7Kq3xv9pQdT:hello",
+      "project:work:hello",
+    ]);
   });
 
   it("refuses the whole file when a value is wrong", () => {

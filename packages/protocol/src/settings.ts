@@ -9,7 +9,7 @@
  */
 
 import { logLevels, type LogLevel } from "./log.ts";
-import { pluginIdPattern, pluginSources, type PluginSource } from "./plugin.ts";
+import { isPluginSource, pluginIdPattern } from "./plugin.ts";
 
 export const configFileName = "config.json";
 export const preferencesFileName = "preferences.json";
@@ -381,13 +381,19 @@ export function parsePluginPreferences(
   };
 }
 
+/**
+ * Ключ режется по **последнему** двоеточию, а не по первому: у источника папки проекта их два
+ * (`project:<id проекта>:<id плагина>`). Разбор однозначен — двоеточий не допускает ни
+ * `pluginIdPattern`, ни идентификатор проекта (`isPluginSource`).
+ */
 function isPluginKey(key: string): boolean {
-  const [source, ...rest] = key.split(":");
-  const id = rest.join(":");
+  const boundary = key.lastIndexOf(":");
 
-  return (
-    rest.length === 1 && pluginSources.includes(source as PluginSource) && pluginIdPattern.test(id)
-  );
+  if (boundary === -1) {
+    return false;
+  }
+
+  return isPluginSource(key.slice(0, boundary)) && pluginIdPattern.test(key.slice(boundary + 1));
 }
 
 function isStringArray(value: unknown): value is string[] {

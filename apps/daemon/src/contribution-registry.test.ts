@@ -8,6 +8,11 @@ import { createContributionRegistry, type ContributingPlugin } from "./contribut
 const builtinHello: ContributingPlugin = { key: "builtin:hello", id: "hello", source: "builtin" };
 const dataHello: ContributingPlugin = { key: "data:hello", id: "hello", source: "data" };
 const dataNotes: ContributingPlugin = { key: "data:notes", id: "notes", source: "data" };
+const projectHello: ContributingPlugin = {
+  key: "project:b7Kq3xv9pQdT:hello",
+  id: "hello",
+  source: "project:b7Kq3xv9pQdT",
+};
 
 /** Вид проставляет SDK, а не автор: в реестр вклад приходит уже с ним. */
 const custom = (contribution: CustomContribution): PluginContribution => ({
@@ -87,6 +92,22 @@ describe("createContributionRegistry", () => {
     assert.deepEqual(
       registry.resolved().map((registration) => [registration.source, registration.title]),
       [["data", "Overriding board"]],
+    );
+    assert.deepEqual(registry.conflicts(), []);
+  });
+
+  it("lets a project folder win over both", () => {
+    // Ранг источника проекта нельзя считать позицией в массиве: у параметризованного источника
+    // позиции нет, `indexOf` дал бы −1, и папка проекта проиграла бы встроенному.
+    const registry = createContributionRegistry();
+
+    registry.apply(builtinHello, [custom({ id: "board", title: "Built-in" })], nothingDisabled);
+    registry.apply(dataHello, [custom({ id: "board", title: "Data" })], nothingDisabled);
+    registry.apply(projectHello, [custom({ id: "board", title: "Project" })], nothingDisabled);
+
+    assert.deepEqual(
+      registry.resolved().map((registration) => [registration.source, registration.title]),
+      [["project:b7Kq3xv9pQdT", "Project"]],
     );
     assert.deepEqual(registry.conflicts(), []);
   });

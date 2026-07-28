@@ -9,7 +9,7 @@
 
 import {
   coreEventNamespace,
-  pluginSources,
+  pluginSourceRank,
   type ContributionConflict,
   type ContributionRegistration,
   type PluginSource,
@@ -87,7 +87,7 @@ export function createContributionRegistry(): ContributionRegistry {
     for (const [id, claimants] of [...claims].sort(([left], [right]) => (left < right ? -1 : 1))) {
       // Более специфичный источник перекрывает менее специфичный (docs/plugins.md).
       const rank = (registration: ContributionRegistration): number =>
-        pluginSources.indexOf(registration.source);
+        pluginSourceRank(registration.source);
       const best = Math.max(...claimants.map(rank));
       const winners = claimants.filter((registration) => rank(registration) === best);
       const winner = winners[0];

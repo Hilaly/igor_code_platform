@@ -6,7 +6,13 @@ import { after, describe, it } from "node:test";
 
 import { platformVersion } from "@sovereign/protocol";
 
-import { discoverPlugins, pluginKey, type PluginRoot } from "./plugin-sources.ts";
+import {
+  discoverPlugins,
+  pluginKey,
+  projectPluginRoots,
+  type PluginRoot,
+  type ProjectPluginFolder,
+} from "./plugin-sources.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-plugin-sources-"));
 let created = 0;
@@ -160,5 +166,43 @@ describe("discoverPlugins", () => {
     assert.deepEqual(discovery.plugins[0]?.diagnostics, [
       "sovereign.future is unknown and ignored",
     ]);
+  });
+});
+
+describe("projectPluginRoots", () => {
+  const folder = (
+    id: string,
+    overrides: Partial<ProjectPluginFolder> = {},
+  ): ProjectPluginFolder => ({
+    id,
+    folder: `/code/${id}`,
+    archived: false,
+    ...overrides,
+  });
+
+  it("gives every working project the plugins folder inside it", () => {
+    assert.deepEqual(
+      projectPluginRoots([folder("work"), folder("b7Kq3xv9pQdT")], () => "available"),
+      [
+        { source: "project:work", directory: join("/code/work", "plugins") },
+        { source: "project:b7Kq3xv9pQdT", directory: join("/code/b7Kq3xv9pQdT", "plugins") },
+      ],
+    );
+  });
+
+  it("takes the source away from an archived project", () => {
+    // «Убран с глаз» обязано значить и «его код не работает»: иначе архивация прячет проект в
+    // интерфейсе, но оставляет его плагины перекрывать чужие вклады.
+    assert.deepEqual(
+      projectPluginRoots([folder("a", { archived: true })], () => "available"),
+      [],
+    );
+  });
+
+  it("takes the source away from a project whose folder is not there", () => {
+    assert.deepEqual(
+      projectPluginRoots([folder("a")], () => "missing"),
+      [],
+    );
   });
 });
