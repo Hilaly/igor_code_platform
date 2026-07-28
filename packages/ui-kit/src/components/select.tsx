@@ -26,6 +26,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
+  const safeListId = `select-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
   const selectedOption = options.find((opt) => opt.value === value && !opt.disabled);
 
@@ -112,7 +113,9 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
   }
 
   const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
-  const activeOptionId = activeOption ? `${listId}-opt-${activeOption.value}` : undefined;
+  const activeOptionId = activeOption
+    ? `${safeListId}-opt-${options.indexOf(activeOption)}`
+    : undefined;
 
   return (
     <div className={styles.root} ref={rootRef}>
@@ -146,7 +149,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
           {options.map((option, index) => {
             const isSelected = option.value === value && !option.disabled;
             const isActive = index === activeIndex;
-            const optionId = `${listId}-opt-${option.value}`;
+            const optionId = `${safeListId}-opt-${index}`;
 
             return (
               <div

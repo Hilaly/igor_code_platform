@@ -37,6 +37,7 @@ export function Combobox<T extends string>({
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
+  const safeListId = `combobox-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
   const selectedOption = options.find((opt) => opt.value === value && !opt.disabled);
 
@@ -118,11 +119,13 @@ export function Combobox<T extends string>({
         setOpen(false);
       }
     } else if (event.key === "Home") {
-      event.preventDefault();
-      if (open) setActiveIndex(firstEnabledIndex(filteredOptions));
-    } else if (event.key === "End") {
-      event.preventDefault();
       if (open) {
+        event.preventDefault();
+        setActiveIndex(firstEnabledIndex(filteredOptions));
+      }
+    } else if (event.key === "End") {
+      if (open) {
+        event.preventDefault();
         const reversedIndex = [...filteredOptions]
           .reverse()
           .findIndex((option) => !option.disabled);
@@ -132,7 +135,9 @@ export function Combobox<T extends string>({
   }
 
   const activeOption = activeIndex >= 0 ? filteredOptions[activeIndex] : undefined;
-  const activeOptionId = activeOption ? `${listId}-opt-${activeOption.value}` : undefined;
+  const activeOptionId = activeOption
+    ? `${safeListId}-opt-${filteredOptions.indexOf(activeOption)}`
+    : undefined;
 
   return (
     <div className={styles.root} ref={rootRef}>
@@ -172,7 +177,7 @@ export function Combobox<T extends string>({
             filteredOptions.map((option, index) => {
               const isSelected = option.value === value && !option.disabled;
               const isActive = index === activeIndex;
-              const optionId = `${listId}-opt-${option.value}`;
+              const optionId = `${safeListId}-opt-${index}`;
 
               return (
                 <div

@@ -25,7 +25,7 @@
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);
-  backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: var(--sovereign-backdrop-blur);
   animation: slideIn var(--sovereign-duration-normal) var(--sovereign-ease-out);
 }
 

@@ -70,7 +70,7 @@
   max-height: 12rem;
   overflow-y: auto;
   padding: var(--sovereign-space-1);
-  backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 .option {

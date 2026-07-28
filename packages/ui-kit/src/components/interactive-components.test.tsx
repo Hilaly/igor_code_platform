@@ -207,4 +207,104 @@ describe("interactive components", () => {
     expect(screen.getByRole("radiogroup", { name: "Вид" })).not.toBeNull();
     expect(screen.getByRole("radio", { name: "Второй" }).getAttribute("aria-checked")).toBe("true");
   });
+
+  it("implements roving radio focus and skips disabled options", () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        options={[
+          { value: "first", label: "Первый" },
+          { value: "second", label: "Второй", disabled: true },
+          { value: "third", label: "Третий" },
+        ]}
+        value="first"
+        onChange={onChange}
+        label="Вид"
+      />,
+    );
+
+    const first = screen.getByRole("radio", { name: "Первый" });
+    const second = screen.getByRole("radio", { name: "Второй" });
+    const third = screen.getByRole("radio", { name: "Третий" });
+    expect(first.getAttribute("tabindex")).toBe("0");
+    expect(second.getAttribute("tabindex")).toBe("-1");
+    expect(third.getAttribute("tabindex")).toBe("-1");
+
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(third);
+    expect(onChange).toHaveBeenCalledWith("third");
+    fireEvent.keyDown(third, { key: "Home" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "End" });
+    expect(document.activeElement).toBe(third);
+  });
+
+  it("keeps option idrefs valid when values contain whitespace and punctuation", () => {
+    const unusual = [{ value: "a value/with:punc", label: "Необычный" }];
+    const onChange = vi.fn();
+
+    const { unmount } = render(
+      <Select options={unusual} value={unusual[0]!.value} onChange={onChange} label="Схема" />,
+    );
+    const selectTrigger = screen.getByRole("combobox", { name: "Схема" });
+    fireEvent.click(selectTrigger);
+    const selectOption = screen.getByRole("option");
+    expect(selectOption.id).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/);
+    expect(document.getElementById(selectTrigger.getAttribute("aria-activedescendant") ?? "")).toBe(
+      selectOption,
+    );
+    unmount();
+
+    render(
+      <Combobox options={unusual} value={unusual[0]!.value} onChange={onChange} label="Выбор" />,
+    );
+    const comboboxInput = screen.getByRole("combobox", { name: "Выбор" });
+    fireEvent.click(comboboxInput);
+    const comboboxOption = screen.getByRole("option");
+    expect(comboboxOption.id).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/);
+    expect(document.getElementById(comboboxInput.getAttribute("aria-activedescendant") ?? "")).toBe(
+      comboboxOption,
+    );
+    unmount();
+
+    render(<MultiSelect options={unusual} value={[]} onChange={onChange} label="Метки" />);
+    const multiTrigger = screen.getByRole("combobox", { name: "Метки" });
+    fireEvent.click(multiTrigger);
+    const multiOption = screen.getAllByRole("option").at(-1)!;
+    expect(multiOption.id).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/);
+    expect(document.getElementById(multiTrigger.getAttribute("aria-activedescendant") ?? "")).toBe(
+      multiOption,
+    );
+  });
+
+  it("does not prevent Home or End in a closed Combobox", () => {
+    render(<Combobox options={options} value="second" onChange={() => {}} label="Выбор" />);
+
+    const input = screen.getByRole("combobox", { name: "Выбор" });
+    const home = new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true });
+    const end = new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true });
+    expect(input.dispatchEvent(home)).toBe(true);
+    expect(input.dispatchEvent(end)).toBe(true);
+  });
+
+  it("normalizes Tree roving focus when the focused node is removed", () => {
+    const { rerender } = render(
+      <Tree
+        label="Файлы"
+        nodes={[
+          { id: "first", label: "Первый" },
+          { id: "second", label: "Второй" },
+        ]}
+      />,
+    );
+
+    const second = screen.getByRole("treeitem", { name: "Второй" });
+    second.focus();
+    rerender(<Tree label="Файлы" nodes={[{ id: "first", label: "Первый" }]} />);
+
+    const first = screen.getByRole("treeitem", { name: "Первый" });
+    expect(first.getAttribute("tabindex")).toBe("0");
+    expect(screen.queryByRole("treeitem", { name: "Второй" })).toBeNull();
+  });
 });

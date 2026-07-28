@@ -32,12 +32,6 @@ export function Tree({ nodes, selectedId, onSelect, label = "Иерархия о
   const treeId = useId();
   const treeItemRefs = useRef(new Map<string, HTMLDivElement>());
 
-  useEffect(() => {
-    if (selectedId && !focusedId) {
-      setFocusedId(selectedId);
-    }
-  }, [selectedId]);
-
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -65,6 +59,20 @@ export function Tree({ nodes, selectedId, onSelect, label = "Иерархия о
   }
 
   const visibleNodes = getVisibleFlatNodes(nodes);
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleNodes.map(({ node }) => node.id));
+    const fallbackId =
+      (selectedId && visibleIds.has(selectedId) ? selectedId : undefined) ??
+      visibleNodes[0]?.node.id;
+    if (focusedId && visibleIds.has(focusedId)) return;
+    if (fallbackId && fallbackId !== focusedId) {
+      setFocusedId(fallbackId);
+      treeItemRefs.current.get(fallbackId)?.focus();
+    } else if (!fallbackId && focusedId) {
+      setFocusedId(undefined);
+    }
+  }, [focusedId, selectedId, visibleNodes]);
 
   function focusItem(id: string) {
     setFocusedId(id);
