@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { shippedSchemes } from "../tokens/schemes/shipped.ts";
 import { coreNamespace, type CatalogRegistration } from "./catalog.ts";
 import { coreEnglish } from "./messages/en.ts";
 import { coreRussian } from "./messages/ru.ts";
@@ -140,6 +141,19 @@ const families = (catalog: CatalogRegistration): string[] =>
 describe("the shipped catalogs", () => {
   it("say the same messages in both locales", () => {
     expect(families(coreRussian)).toEqual(families(coreEnglish));
+  });
+
+  it("name every scheme the platform ships", () => {
+    // Схема без имени доезжает до выпадающего списка ключом вместо названия, а диагностика о ней
+    // записывается во время отрисовки. Проверять это глазами значит открыть панель внешнего вида на
+    // каждой добавленной схеме — двух схем как раз и не хватило.
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const missing = shippedSchemes
+        .map((scheme) => `appearance.scheme.${scheme.id}`)
+        .filter((key) => catalog.messages[key] === undefined);
+
+      expect(missing, catalog.locale).toEqual([]);
+    }
   });
 
   it("name only the plural categories the language has", () => {
