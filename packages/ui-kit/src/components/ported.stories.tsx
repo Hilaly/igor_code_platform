@@ -9,16 +9,26 @@
 
 import { useState } from "react";
 
+import { Accordion } from "./accordion.tsx";
+import { Breadcrumbs } from "./breadcrumbs.tsx";
 import { Button } from "./button.tsx";
+import { Combobox } from "./combobox.tsx";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Field } from "./field.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Menu } from "./menu.tsx";
+import { MultiSelect } from "./multi-select.tsx";
+import { Popover } from "./popover.tsx";
 import { Progress } from "./progress.tsx";
+import { RadioGroup } from "./radio-group.tsx";
+import { SegmentedControl } from "./segmented-control.tsx";
+import { Slider } from "./slider.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Text } from "./text.tsx";
+import { ToastProvider, useToast } from "./toast.tsx";
 import { Tooltip } from "./tooltip.tsx";
+import { Tree } from "./tree.tsx";
 
 const column = {
   display: "flex",
@@ -183,4 +193,147 @@ export const Waiting = () => (
     <Skeleton variant="rect" height="var(--sovereign-space-12)" />
     <Skeleton variant="circle" />
   </div>
+);
+
+const selectionOptions = [
+  { value: "base", label: "Базовая" },
+  { value: "imperium", label: "Империум" },
+  { value: "nord", label: "Норд" },
+  { value: "legacy", label: "Устаревшая", disabled: true },
+];
+
+export const Selectors = () => {
+  const [scheme, setScheme] = useState("imperium");
+  const [searchableScheme, setSearchableScheme] = useState("base");
+  const [visibleColumns, setVisibleColumns] = useState(["base", "nord"]);
+
+  return (
+    <div style={column}>
+      <Combobox
+        label="Схема с поиском"
+        options={selectionOptions}
+        value={searchableScheme}
+        onChange={setSearchableScheme}
+        placeholder="Найдите схему"
+      />
+      <MultiSelect
+        label="Видимые столбцы"
+        options={selectionOptions}
+        value={visibleColumns}
+        onChange={setVisibleColumns}
+        placeholder="Выберите столбцы"
+      />
+      <SegmentedControl
+        label="Плотность списка"
+        options={[
+          { value: "compact", label: "Компактно" },
+          { value: "comfortable", label: "Обычно" },
+          { value: "spacious", label: "Свободно", disabled: true },
+        ]}
+        value={scheme === "base" ? "compact" : "comfortable"}
+        onChange={(value) => setScheme(value === "compact" ? "base" : "imperium")}
+      />
+      <RadioGroup
+        label="Схема по умолчанию"
+        options={selectionOptions}
+        value={scheme}
+        onChange={setScheme}
+      />
+    </div>
+  );
+};
+
+export const NavigationAndLayers = () => {
+  const [opacity, setOpacity] = useState(72);
+
+  return (
+    <div style={column}>
+      <Breadcrumbs
+        items={[
+          { id: "projects", label: "Проекты", href: "#projects" },
+          { id: "demo", label: "Демонстрация", onClick: () => {} },
+          { id: "settings", label: "Настройки" },
+        ]}
+      />
+      <Popover trigger="Открыть сведения" ariaLabel="Сведения о настройке">
+        <Text>Escape или щелчок вне этого слоя закрывает его.</Text>
+      </Popover>
+      <Slider
+        id="panel-opacity"
+        label="Непрозрачность панели"
+        value={opacity}
+        onChange={setOpacity}
+        min={20}
+        max={100}
+        showValue
+      />
+      <Accordion
+        defaultExpandedIds={["effects"]}
+        items={[
+          {
+            id: "effects",
+            title: "Эффекты поверхности",
+            content: <Text tone="muted">Стекло, тень и градиент берутся из токенов схемы.</Text>,
+          },
+          {
+            id: "scale",
+            title: "Масштаб интерфейса",
+            content: <Text tone="muted">Шкала меняет размеры, но не цветовую схему.</Text>,
+          },
+        ]}
+      />
+      <Tree
+        label="Файлы демонстрации"
+        nodes={[
+          {
+            id: "packages",
+            label: "packages",
+            children: [
+              { id: "ui-kit", label: "ui-kit" },
+              { id: "protocol", label: "protocol" },
+            ],
+          },
+          { id: "docs", label: "docs" },
+        ]}
+      />
+    </div>
+  );
+};
+
+function ToastActions() {
+  const { dismiss, toast } = useToast();
+  const [persistentToastId, setPersistentToastId] = useState<string | undefined>();
+
+  return (
+    <div style={row}>
+      <Button
+        onClick={() => {
+          toast({ title: "Настройки сохранены", tone: "success" });
+        }}
+      >
+        Показать успех
+      </Button>
+      <Button
+        onClick={() => {
+          setPersistentToastId(
+            toast({ title: "Проверка ещё идёт", tone: "warning", durationMs: 0 }),
+          );
+        }}
+      >
+        Показать постоянное
+      </Button>
+      <Button
+        onClick={() => persistentToastId && dismiss(persistentToastId)}
+        disabled={!persistentToastId}
+      >
+        Закрыть постоянное
+      </Button>
+    </div>
+  );
+}
+
+export const Toasts = () => (
+  <ToastProvider>
+    <ToastActions />
+  </ToastProvider>
 );
