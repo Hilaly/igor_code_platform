@@ -1,4 +1,4 @@
-/** Выпадающий список Combobox с поддержкой локального поиска/фильтрации. */
+/** Выпадающий список Combobox с поддержкой локального поиска/фильтрации и клавиатурной навигации. */
 
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -34,14 +34,31 @@ export function Combobox<T extends string>({
 }: ComboboxProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
   const selectedOption = options.find((opt) => opt.value === value);
 
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  function firstEnabledIndex(items: readonly ComboboxOption<T>[]) {
+    return items.findIndex((option) => !option.disabled);
+  }
+
+  function selectedOrFirstEnabledIndex(items: readonly ComboboxOption<T>[]) {
+    const selectedIndex = items.findIndex((option) => option.value === value && !option.disabled);
+    return selectedIndex >= 0 ? selectedIndex : firstEnabledIndex(items);
+  }
+
   useEffect(() => {
     if (!open) {
       setQuery("");
+      setActiveIndex(-1);
+    } else {
+      setActiveIndex(selectedOrFirstEnabledIndex(filteredOptions));
     }
   }, [open]);
 
@@ -55,9 +72,63 @@ export function Combobox<T extends string>({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
-  const filteredOptions = options.filter((opt) =>
-    opt.label.toLowerCase().includes(query.toLowerCase()),
-  );
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!open) {
+        setOpen(true);
+      } else if (filteredOptions.length > 0) {
+        let nextIndex = activeIndex + 1;
+        while (nextIndex < filteredOptions.length && filteredOptions[nextIndex]?.disabled) {
+          nextIndex++;
+        }
+        if (nextIndex < filteredOptions.length) {
+          setActiveIndex(nextIndex);
+        }
+      }
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (open && filteredOptions.length > 0) {
+        let prevIndex = activeIndex - 1;
+        while (prevIndex >= 0 && filteredOptions[prevIndex]?.disabled) {
+          prevIndex--;
+        }
+        if (prevIndex >= 0) {
+          setActiveIndex(prevIndex);
+        }
+      }
+    } else if (event.key === "Enter") {
+      if (open && activeIndex >= 0 && activeIndex < filteredOptions.length) {
+        event.preventDefault();
+        const selected = filteredOptions[activeIndex];
+        if (selected && !selected.disabled) {
+          onChange(selected.value);
+          setOpen(false);
+        }
+      }
+    } else if (event.key === "Escape") {
+      if (open) {
+        event.preventDefault();
+        setOpen(false);
+      }
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      if (open) setActiveIndex(firstEnabledIndex(filteredOptions));
+    } else if (event.key === "End") {
+      event.preventDefault();
+      if (open) {
+        const reversedIndex = [...filteredOptions]
+          .reverse()
+          .findIndex((option) => !option.disabled);
+        setActiveIndex(reversedIndex < 0 ? -1 : filteredOptions.length - reversedIndex - 1);
+      }
+    }
+  }
+
+  const activeOption = activeIndex >= 0 ? filteredOptions[activeIndex] : undefined;
+  const activeOptionId = activeOption ? `${listId}-opt-${activeOption.value}` : undefined;
 
   return (
     <div className={styles.root} ref={rootRef}>
@@ -68,25 +139,49 @@ export function Combobox<T extends string>({
             setQuery(text);
             if (!open) setOpen(true);
           }}
+          onClick={() => {
+            if (!disabled) setOpen((prev) => !prev);
+          }}
+          onKeyDown={handleKeyDown}
           placeholder={selectedOption?.label || placeholder}
           disabled={disabled}
           invalid={invalid}
+          role="combobox"
           aria-expanded={open}
-          aria-controls={open ? listId : undefined}
+          aria-controls={listId}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-activedescendant={open ? activeOptionId : undefined}
           aria-label={label}
         />
       </div>
       {open ? (
-        <div id={listId} className={styles.dropdown} role="listbox">
+        <div
+          id={listId}
+          className={styles.dropdown}
+          role="listbox"
+          aria-label={label}
+          tabIndex={-1}
+        >
           {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => {
+            filteredOptions.map((option, index) => {
               const isSelected = option.value === value;
+              const isActive = index === activeIndex;
+              const optionId = `${listId}-opt-${option.value}`;
+
               return (
                 <div
                   key={option.value}
+                  id={optionId}
                   role="option"
                   aria-selected={isSelected}
-                  className={`${styles.option}${isSelected ? ` ${styles.selected}` : ""}`}
+                  aria-disabled={option.disabled}
+                  className={`${styles.option}${isSelected ? ` ${styles.selected}` : ""}${
+                    isActive ? ` ${styles.active}` : ""
+                  }${option.disabled ? ` ${styles.disabled}` : ""}`}
+                  onMouseEnter={() => {
+                    if (!option.disabled) setActiveIndex(index);
+                  }}
                   onClick={() => {
                     if (!option.disabled) {
                       onChange(option.value);

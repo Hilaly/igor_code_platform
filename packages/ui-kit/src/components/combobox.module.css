@@ -41,13 +41,19 @@
 }
 
 .option:hover,
-.option.focused {
+.option.focused,
+.option.active {
   background: var(--sovereign-control-surface-hover);
 }
 
 .option.selected {
   color: var(--sovereign-accent-text);
   font-weight: var(--sovereign-font-weight-semibold);
+}
+
+.option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty {

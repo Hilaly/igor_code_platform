@@ -1,5 +1,5 @@
 /**
- * Сегментированный переключатель выборов с подложкой.
+ * Сегментированный переключатель выборов с подвижной плавающей кареткой.
  * Используется для быстрой смены режима, вида или интервала из 2–5 вариантов.
  */
 
@@ -30,6 +30,11 @@ export function SegmentedControl<T extends string>({
   disabled = false,
 }: SegmentedControlProps<T>) {
   const groupId = useId();
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((opt) => opt.value === value),
+  );
+  const count = options.length;
 
   return (
     <div
@@ -37,7 +42,14 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={label}
       id={groupId}
+      style={
+        {
+          "--segmented-count": count,
+          "--segmented-index": selectedIndex,
+        } as React.CSSProperties
+      }
     >
+      <div className={styles.indicator} />
       {options.map((option) => {
         const isSelected = option.value === value;
         const isDisabled = disabled || option.disabled;

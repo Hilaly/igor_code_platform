@@ -27,6 +27,12 @@
   transition: background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
+.item:focus-visible > .row,
+.item.focused > .row {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: -1px;
+}
+
 .row:hover {
   background: var(--sovereign-control-surface-hover);
 }
