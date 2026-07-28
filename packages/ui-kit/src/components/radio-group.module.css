@@ -31,8 +31,9 @@
   display: grid;
   place-content: center;
   cursor: pointer;
-  transition: border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
-              background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+  transition:
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .radio::before {

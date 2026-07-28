@@ -29,10 +29,18 @@
   animation: slideIn var(--sovereign-duration-normal) var(--sovereign-ease-out);
 }
 
-.normal { border-left: 4px solid var(--sovereign-accent); }
-.success { border-left: 4px solid var(--sovereign-success); }
-.warning { border-left: 4px solid var(--sovereign-warning); }
-.danger { border-left: 4px solid var(--sovereign-danger); }
+.normal {
+  border-left: 4px solid var(--sovereign-accent);
+}
+.success {
+  border-left: 4px solid var(--sovereign-success);
+}
+.warning {
+  border-left: 4px solid var(--sovereign-warning);
+}
+.danger {
+  border-left: 4px solid var(--sovereign-danger);
+}
 
 .close {
   background: transparent;

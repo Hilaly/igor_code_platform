@@ -17,11 +17,7 @@ export type AccordionProps = {
   defaultExpandedIds?: string[];
 };
 
-export function Accordion({
-  items,
-  multiple = false,
-  defaultExpandedIds = [],
-}: AccordionProps) {
+export function Accordion({ items, multiple = false, defaultExpandedIds = [] }: AccordionProps) {
   const [expandedIds, setExpandedIds] = useState<string[]>(defaultExpandedIds);
 
   function toggleItem(id: string) {
@@ -38,10 +34,7 @@ export function Accordion({
         const isExpanded = expandedIds.includes(item.id);
 
         return (
-          <div
-            key={item.id}
-            className={`${styles.item}${isExpanded ? ` ${styles.expanded}` : ""}`}
-          >
+          <div key={item.id} className={`${styles.item}${isExpanded ? ` ${styles.expanded}` : ""}`}>
             <button
               type="button"
               className={styles.header}
