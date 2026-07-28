@@ -219,12 +219,16 @@ curl -X PUT http://localhost:5273/api/plugins/data%3Ahello/preferences \
 ```bash
 curl -X PUT http://localhost:5273/api/preferences \
   -H 'content-type: application/json' \
-  -d '{"appearance":{"colorScheme":"base","variant":"dark"},"locale":"ru"}'
+  -d '{"appearance":{"colorScheme":"imperium","variant":"dark","scale":"larger"},"locale":"ru"}'
 ```
 
 Тело — тот же раздел, что лежит в `preferences.json`. **Оба ключа обязательны:** запись заменяет весь
 раздел, и тело без локали молча вернуло бы английский интерфейс тому, кто менял только тему. Записи
 плагинов этот маршрут не отдаёт и не трогает — у них свой.
+
+Внутри `appearance` поля необязательны и берут значения по умолчанию, а вот значение вне перечисленных
+([data-directory.md](data-directory.md)) даёт `400` с диагностикой и не пишет файл вовсе: раздел
+применяется целиком, и половина верных полей хуже внятного отказа.
 
 Ответ — записанное. Дальше оно приезжает всем открытым вкладкам событием
 `core.preferences.changed`, включая ту, которая его записала: правку файла руками и запись через API

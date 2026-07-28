@@ -67,6 +67,10 @@ LLM-провайдеров ([models-and-providers.md](models-and-providers.md)),
 | `config.json`      | `maxConcurrentTurns`                            | целое число больше нуля                | `4`                  | живьём     |
 | `preferences.json` | `plugins.<источник>:<id>.enabled`               | `true` \| `false`                      | зависит от источника | живьём     |
 | `preferences.json` | `plugins.<источник>:<id>.disabledContributions` | список идентификаторов вкладов         | пусто                | живьём     |
+| `preferences.json` | `appearance.colorScheme`                        | идентификатор цветовой схемы           | `base`               | живьём     |
+| `preferences.json` | `appearance.variant`                            | `light` \| `dark` \| `system`          | `system`             | живьём     |
+| `preferences.json` | `appearance.scale`                              | `smaller` \| `default` \| `larger`     | `default`            | живьём     |
+| `preferences.json` | `locale`                                        | языковой тег (`en`, `ru`, …)           | `en`                 | живьём     |
 
 Примеры:
 
@@ -83,9 +87,18 @@ LLM-провайдеров ([models-and-providers.md](models-and-providers.md)),
 {
   "plugins": {
     "data:hello": { "enabled": true, "disabledContributions": ["hello.panel"] }
-  }
+  },
+  "appearance": { "colorScheme": "imperium", "variant": "system", "scale": "larger" },
+  "locale": "ru"
 }
 ```
+
+`appearance` и `locale` — раздел, которым владеет оболочка: она читает и пишет его целиком одним
+маршрутом ([web-api.md](web-api.md)), поэтому оба поля обязательны в теле записи. Значение вне
+перечисленных **отвергает разбор целиком**, а не подставляет значение по умолчанию: правка руками
+тогда не применяется вовсе, из интерфейса — получает `400`. Отсутствующее поле — не ошибка, у него
+есть значение по умолчанию. `appearance.scale` двигает базовый кегль, шаг отступов и высоту контролов
+одной осью ([ui-kit.md](ui-kit.md)).
 
 Отсутствие записи о плагине — не «выключен», а «решения не было»: встроенный работает сразу, любой
 другой ждёт включения. Подробности — в [plugins.md](plugins.md).
