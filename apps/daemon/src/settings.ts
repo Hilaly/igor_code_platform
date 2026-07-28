@@ -4,14 +4,7 @@
  * а `rename` подставляет новый ([runtime-checks.md](../../../docs/runtime-checks.md), проверка 12).
  */
 
-import {
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  watch,
-  writeFileSync,
-  type FSWatcher,
-} from "node:fs";
+import { readFileSync, watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -28,6 +21,7 @@ import {
   type SettingsParseResult,
 } from "@sovereign/protocol";
 
+import { writeFileAtomically } from "./atomic-file.ts";
 import type { Logger } from "./logger.ts";
 
 export type SettingsSnapshot = {
@@ -206,7 +200,7 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       return stored;
     }
 
-    writeAtomically(
+    writeFileAtomically(
       join(directory, preferencesFileName),
       `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
     );
@@ -289,29 +283,6 @@ function asObject(raw: unknown): Record<string, unknown> | undefined {
   return typeof raw === "object" && raw !== null && !Array.isArray(raw)
     ? (raw as Record<string, unknown>)
     : undefined;
-}
-
-/**
- * Замена целиком, а не дописывание: наблюдатель не должен увидеть половину файла, а оборванная на
- * середине запись не должна оставить настройки битыми (docs/data-directory.md).
- */
-function writeAtomically(path: string, text: string): void {
-  const temporary = `${path}.${process.pid}.tmp`;
-
-  try {
-    writeFileSync(temporary, text, { encoding: "utf8", mode: 0o600 });
-    renameSync(temporary, path);
-  } catch (cause) {
-    // Временный файл рядом с настройками пережил бы перезапуск и остался мусором в чужой
-    // директории; удалить его не удалось только если его и не создали.
-    try {
-      unlinkSync(temporary);
-    } catch {
-      // Нечего убирать.
-    }
-
-    throw cause;
-  }
 }
 
 function readFileIfExists(path: string): string | undefined {
