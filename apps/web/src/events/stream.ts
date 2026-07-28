@@ -49,6 +49,13 @@ export type ConnectEventStreamOptions = {
   onStatus: (status: StreamStatus) => void;
   /** Негодный кадр, разрыв и пропуск — это диагностика, а не тишина: журнала у браузера нет. */
   onDiagnostic: (diagnostic: string) => void;
+  /**
+   * Браузер закрыл `EventSource` навсегда, и поток переоткрывается своей попыткой. Зовётся на каждый
+   * такой разрыв, а не один раз: у `EventSource` нет кода ответа, поэтому закрытая сессия выглядит
+   * отсюда так же, как лежащий демон, — различить их может только отдельный запрос
+   * (docs/authentication.md).
+   */
+  onGaveUp?: () => void;
   open?: OpenEventSource;
   /** Планировщик под контролем теста: задержки повторов проверяются числами, а не ожиданием. */
   schedule?: (callback: () => void, delay: number) => CancelScheduled;
@@ -114,6 +121,7 @@ export function connectEventStream(options: ConnectEventStreamOptions): StreamCo
 
       attempt += 1;
       cancelRetry = schedule(connect, delay);
+      options.onGaveUp?.();
     });
 
     active.addEventListener("message", (event) => {

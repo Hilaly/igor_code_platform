@@ -1,0 +1,27 @@
+/*
+ * Раскладка вью входа. Та же дисциплина, что у оболочки: цвета — только переменные ролей, размеры —
+ * только шкалы кита (docs/ui-kit.md), проверяется тестом styles.test.ts.
+ *
+ * Вид самой карточки и полей живёт в ките — здесь только то, как эта карточка стоит на пустом экране.
+ */
+
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--sovereign-space-5);
+  background: var(--sovereign-gradient-backdrop);
+}
+
+/* Узкий экран — требование вижна, а не среза: форма входа обязана работать с телефона. */
+.login-form {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.login-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}

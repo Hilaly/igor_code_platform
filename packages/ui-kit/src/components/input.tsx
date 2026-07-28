@@ -11,6 +11,12 @@ import styles from "./input.module.css";
 /** Тип поля меняет поведение браузера: скрытие символов, кнопку очистки в поиске. */
 export type InputType = "text" | "password" | "search";
 
+/**
+ * Что подставлять менеджеру паролей. Список закрыт, а не свободная строка: значений в стандарте
+ * десятки, и открытая строка означала бы опечатку, которую видно только в чужом браузере.
+ */
+export type InputAutoComplete = "off" | "username" | "current-password" | "new-password";
+
 export type InputProps = {
   value: string;
   onChange: (value: string) => void;
@@ -23,6 +29,11 @@ export type InputProps = {
   /** Идентификаторы подсказки и ошибки для `aria-describedby`; их собирает `Field`. */
   describedBy?: string;
   type?: InputType;
+  /**
+   * Не ставится по умолчанию: браузер угадывает сам, и назвать роль поля должен тот, кто знает форму
+   * целиком, — иначе менеджер паролей предложит текущий пароль там, где просят новый.
+   */
+  autoComplete?: InputAutoComplete;
   role?: string;
   readOnly?: boolean;
   "aria-expanded"?: boolean;
@@ -48,6 +59,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     id,
     describedBy,
     type = "text",
+    autoComplete,
     role,
     readOnly,
     "aria-expanded": ariaExpanded,
@@ -68,6 +80,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <input
       className={`${styles.control} ${styles.input}`}
       type={type}
+      autoComplete={autoComplete}
       value={value}
       placeholder={placeholder}
       disabled={disabled}

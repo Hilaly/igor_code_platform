@@ -77,10 +77,13 @@ function connected() {
 
   bus.subscribe((event) => delivered.push(event));
 
+  const gaveUp: number[] = [];
+
   const connection = connectEventStream({
     bus,
     onStatus: (status) => statuses.push(status),
     onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    onGaveUp: () => gaveUp.push(scheduled.length),
     open: (path) => {
       paths.push(path);
 
@@ -107,12 +110,39 @@ function connected() {
     diagnostics,
     statuses,
     scheduled,
+    gaveUp,
     latest: () => sources[sources.length - 1] as ReturnType<typeof fakeSource>,
     sources,
   };
 }
 
 describe("connectEventStream", () => {
+  it("says nothing about giving up while the browser still retries by itself", () => {
+    const stream = connected();
+
+    stream.latest().open();
+    stream.latest().stumble();
+
+    expect(stream.gaveUp).toEqual([]);
+  });
+
+  it("tells the caller every time the browser gave up", () => {
+    const stream = connected();
+
+    stream.latest().open();
+    stream.latest().give_up();
+
+    // Повод спросить, не кончилась ли сессия: проверка стоит на входе в соединение, и закрытая
+    // сессия выглядит отсюда точно так же, как лежащий демон (docs/authentication.md).
+    expect(stream.gaveUp).toEqual([1]);
+
+    stream.scheduled[0]?.callback();
+    stream.latest().give_up();
+
+    // Каждый раз, а не один раз на разрыв: демон мог подняться уже без нашей сессии.
+    expect(stream.gaveUp).toEqual([1, 2]);
+  });
+
   it("brings a frame from the stream to a bus subscriber", () => {
     const stream = connected();
 

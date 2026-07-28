@@ -38,6 +38,14 @@
   min-height: 0;
 }
 
+/* Состояние демона и выход стоят в одной колонке: и то и другое про соединение, не про вью. */
+.shell-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  align-items: stretch;
+}
+
 .shell-left-bottom {
   border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   padding-top: var(--sovereign-space-2);

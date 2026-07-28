@@ -32,6 +32,25 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('type="search"');
   });
 
+  it("tells the password manager what the input is for", () => {
+    // Без `autocomplete` менеджер паролей не понимает, что предложить, а форма входа — это ровно то
+    // место, где он обязан работать: пароль в этой платформе один и вводится редко.
+    const markup = renderToStaticMarkup(
+      <Input value="a" onChange={() => {}} type="password" autoComplete="current-password" />,
+    );
+
+    // Регистр имени не проверяется: React 19 пишет проп как есть, а имена атрибутов в HTML
+    // регистронезависимы — браузер видит `autocomplete` в любом случае.
+    expect(markup).toMatch(/autocomplete="current-password"/i);
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("leaves the autocomplete out when it was not asked for", () => {
+    const markup = renderToStaticMarkup(<Input value="a" onChange={() => {}} />);
+
+    expect(markup).not.toMatch(/autocomplete/i);
+  });
+
   it("forwards composite accessibility props from input", () => {
     const markup = renderToStaticMarkup(
       <Input

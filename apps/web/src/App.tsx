@@ -10,9 +10,11 @@ import {
   isPluginStreamEvent,
   streamGapType,
   type AppearancePreferences,
+  type AuthenticationState,
   type Health,
 } from "@sovereign/protocol";
 import {
+  Button,
   coreEnglish,
   coreNamespace,
   coreRussian,
@@ -20,6 +22,7 @@ import {
   Heading,
   List,
   ListRow,
+  Spinner,
   Text,
 } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -36,9 +39,11 @@ import {
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
+import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { createNavigation, type Page } from "./router.ts";
+import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearancePanel } from "./shell/appearance-panel.tsx";
 import { DaemonStatus } from "./shell/daemon-status.tsx";
 import { DiagnosticsPanel } from "./shell/diagnostics-panel.tsx";
@@ -48,6 +53,9 @@ import { Shell } from "./shell/shell.tsx";
 
 const catalogs = [coreEnglish, coreRussian];
 const shippedLocales = catalogs.map((catalog) => catalog.locale);
+
+/** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
+type Access = AuthenticationState | "asking";
 
 export function App() {
   const diagnostics = useMemo(createDiagnosticsStore, []);
@@ -76,9 +84,32 @@ export function App() {
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [page, setPage] = useState<Page>(() => navigation.current());
   const [layout, setLayout] = useState<ShellLayout>(() => readLayout(localStorage));
+  const [access, setAccess] = useState<Access>("asking");
+  const [loginRefusal, setLoginRefusal] = useState<string | undefined>(undefined);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  const authenticated = access === "authenticated";
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
   useEffect(() => navigation.subscribe(setPage), [navigation]);
+
+  // Состояние входа спрашивается до всего остального: почти все маршруты защищены (docs/web-api.md),
+  // и открывать поток без сессии значит получить отказ и разбирать его вместо ответа.
+  useEffect(() => {
+    void probeSession().then((probe) => {
+      if (probe.kind === "state") {
+        setAccess(probe.state);
+
+        return;
+      }
+
+      // Спросить не удалось — демон лежит или не читает учётную запись. Форма входа при этом
+      // уместнее пустого экрана: причина показана, а первый же запрос уточнит, чего платформа хочет.
+      setAccess("unauthenticated");
+      setLoginRefusal(probe.reason);
+    });
+  }, []);
 
   useEffect(() => {
     writeLayout(localStorage, layout);
@@ -120,13 +151,33 @@ export function App() {
       );
   });
 
+  // У `EventSource` нет кода ответа, поэтому закрытая сессия выглядит из потока так же, как лежащий
+  // демон: различает их только отдельный запрос (docs/authentication.md).
+  const recheck = useRef(() => {
+    void probeSession().then((probe) => {
+      // Недоступный демон — не конец сессии: поток переоткроется сам, и выкидывать человека из
+      // интерфейса на сетевой сбой нельзя.
+      if (probe.kind !== "state" || probe.state === "authenticated") {
+        return;
+      }
+
+      setExpired(true);
+      setAccess(probe.state);
+    });
+  });
+
   useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
+
     reload.current();
 
     const connection = connectEventStream({
       bus,
       onStatus: setStream,
       onDiagnostic: diagnostics.record,
+      onGaveUp: () => recheck.current(),
     });
 
     const unsubscribe = bus.subscribe((event) => {
@@ -143,8 +194,12 @@ export function App() {
     return () => {
       unsubscribe();
       connection.close();
+
+      // Состояние соединения сбрасывается вместе с ним: иначе следующий вход начинался бы с
+      // «переподключаемся» о потоке, которого уже нет.
+      setStream("connecting");
     };
-  }, [bus, diagnostics]);
+  }, [bus, diagnostics, authenticated]);
 
   // Время работы спрашивается на подъёме соединения: пока поток жив, спрашивать незачем.
   useEffect(() => {
@@ -223,6 +278,55 @@ export function App() {
       });
   };
 
+  const submitPassword = (password: string): void => {
+    setLoginBusy(true);
+    setLoginRefusal(undefined);
+
+    const submitted = access === "registration-required" ? register(password) : logIn(password);
+
+    void submitted.then((outcome) => {
+      setLoginBusy(false);
+
+      if (outcome.kind === "authenticated") {
+        setExpired(false);
+        setAccess("authenticated");
+
+        return;
+      }
+
+      // Отдельный исход, а не текст отказа: демон говорит, что учётной записи нет, и форма меняется
+      // на регистрацию (docs/authentication.md).
+      if (outcome.kind === "registration-required") {
+        setAccess("registration-required");
+
+        return;
+      }
+
+      setLoginRefusal(outcome.reason);
+    });
+  };
+
+  if (access === "asking") {
+    return (
+      <main className="login">
+        <Spinner label={translator.t("login.asking")} />
+      </main>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <LoginView
+        registering={access === "registration-required"}
+        refusal={loginRefusal}
+        expired={expired}
+        busy={loginBusy}
+        onSubmit={submitPassword}
+        translator={translator}
+      />
+    );
+  }
+
   return (
     <Shell
       layout={layout}
@@ -248,7 +352,22 @@ export function App() {
         </div>
       }
       status={
-        <DaemonStatus stream={stream} health={health} failure={failure} translator={translator} />
+        <div className="shell-status">
+          <DaemonStatus stream={stream} health={health} failure={failure} translator={translator} />
+          <Button
+            onClick={() => {
+              // Выход закрывает серверную запись сессии, поэтому обрывает и живой поток
+              // (docs/authentication.md); вкладка возвращается к форме, не дожидаясь этого.
+              void logOut().then(() => {
+                setExpired(false);
+                setLoginRefusal(undefined);
+                setAccess("unauthenticated");
+              });
+            }}
+          >
+            {translator.t("logout")}
+          </Button>
+        </div>
       }
       tabs={[
         {
