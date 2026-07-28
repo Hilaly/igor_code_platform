@@ -130,7 +130,7 @@ const server = createDaemonServer({
   logger,
   // Проверка одна на все маршруты и живёт в диспетчере, а не в обработчиках: новый маршрут не может
   // случайно оказаться незащищённым, потому что защита не в нём (docs/web-api.md).
-  authenticate: createSessionCheck(loginSessions),
+  authenticate: createSessionCheck({ sessions: loginSessions, account }),
   routes: [
     healthRoute(new Date()),
     ...authenticationRoutes({ account, sessions: loginSessions, logger }),

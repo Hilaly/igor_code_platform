@@ -220,6 +220,35 @@ describe("createLoginSessionStore", () => {
     assert.deepEqual(closed, [opened.id]);
   });
 
+  it("closes every session at once and tells the listener about each", () => {
+    const { store, read } = harness();
+
+    const closed: string[] = [];
+
+    store.subscribe((id) => closed.push(id));
+
+    const first = store.open();
+    const second = store.open();
+
+    store.closeAll();
+
+    assert.deepEqual(store.verify(first.token), { kind: "unknown" });
+    assert.deepEqual(store.verify(second.token), { kind: "unknown" });
+    assert.deepEqual(closed.sort(), [first.id, second.id].sort());
+    assert.deepEqual(read().sessions, []);
+  });
+
+  it("says nothing to the listener when there was nothing to close", () => {
+    const { store } = harness();
+
+    const closed: string[] = [];
+
+    store.subscribe((id) => closed.push(id));
+    store.closeAll();
+
+    assert.deepEqual(closed, []);
+  });
+
   it("sweeps expired sessions out of the file", () => {
     const { store, advance, read } = harness();
 

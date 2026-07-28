@@ -53,6 +53,11 @@ export type LoginSessionStore = {
   /** Закрыть сессию по токену. Токен чужой или неизвестный — ничего не происходит. */
   close: (token: string) => void;
   /**
+   * Закрыть все сессии. Зовётся при создании учётной записи: иначе сброс пароля не сбрасывал бы
+   * доступ, а только менял бы то, чем его получают заново (docs/authentication.md).
+   */
+  closeAll: () => void;
+  /**
    * Узнать о закрытии — выходом или истечением. Нужен SSE-потоку: живой поток обязан обрываться
    * выходом, а не доживать до конца процесса (docs/authentication.md).
    *
@@ -148,6 +153,20 @@ export function createLoginSessionStore(
 
       write(path, sessions);
       announce(closed === undefined ? expired : [...expired, closed]);
+    },
+    closeAll: () => {
+      const closed = sessions;
+
+      if (closed.length === 0) {
+        return;
+      }
+
+      sessions = [];
+      write(path, sessions);
+
+      // Истёкшие среди них тоже объявляются закрытыми: получателю всё равно, чем именно кончилась
+      // сессия, а поток обязан оборваться в любом случае.
+      announce(closed);
     },
     subscribe: (listener) => {
       listeners.add(listener);

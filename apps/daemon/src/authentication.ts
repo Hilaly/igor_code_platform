@@ -33,12 +33,22 @@ export type AuthenticationRoutesOptions = {
   logger: Logger;
 };
 
+export type SessionCheckOptions = {
+  sessions: Pick<LoginSessionStore, "verify">;
+  account: Pick<AccountStore, "state">;
+};
+
 /**
  * Проверка сессии для диспетчера. Отдельно от маршрутов, потому что применяется ко всем маршрутам,
  * включая SSE-поток и будущие маршруты плагинов.
+ *
+ * Учётная запись спрашивается на каждом запросе, и это не лишний расход: `account.json` — короткий
+ * файл в кеше файловой системы, а запросов у одного пользователя единицы в секунду. Спрашивать надо
+ * именно каждый раз: сброс пароля — это удаление файла руками (docs/data-directory.md), и знать о нём
+ * иначе неоткуда.
  */
 export function createSessionCheck(
-  sessions: Pick<LoginSessionStore, "verify">,
+  options: SessionCheckOptions,
 ): (request: IncomingMessage) => Authentication {
   return (request) => {
     const token = readSessionToken(request);
@@ -47,7 +57,13 @@ export function createSessionCheck(
       return { kind: "none" };
     }
 
-    const verified = sessions.verify(token);
+    // Сессия подтверждает учётную запись: нет записи — нет и того, что подтверждать. Иначе
+    // украденная cookie переживала бы сброс пароля, ради которого файл и удаляли.
+    if (options.account.state().kind !== "present") {
+      return { kind: "none" };
+    }
+
+    const verified = options.sessions.verify(token);
 
     return verified.kind === "live" ? { kind: "session", id: verified.id } : { kind: "none" };
   };
@@ -110,6 +126,11 @@ export function authenticationRoutes(options: AuthenticationRoutesOptions): Rout
 
           return;
         }
+
+        // Новая учётная запись обнуляет старые сессии. Учётная запись создаётся заново только после
+        // сброса пароля, то есть после того, как файл удалили руками; сессии этого не видят и
+        // переживали бы сброс, ради которого его и делали (docs/authentication.md).
+        sessions.closeAll();
 
         // Сессия открывается сразу: вход отдельным запросом стоил бы ещё одного счёта хеша подряд,
         // а человек всё равно только что доказал, что знает пароль.

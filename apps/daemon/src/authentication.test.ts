@@ -79,7 +79,7 @@ async function serve(options: { directory?: string } = {}) {
     createDispatcher({
       routes: [...authenticationRoutes({ account, sessions, logger }), guarded],
       logger,
-      authenticate: createSessionCheck(sessions),
+      authenticate: createSessionCheck({ sessions, account }),
     }),
   );
 
@@ -308,6 +308,36 @@ describe("the authentication routes", () => {
     });
 
     assert.equal(answer.status, 401);
+  });
+
+  it("stops honouring the cookie when the account is gone", async () => {
+    const { call, cookieOf, directory } = await serve();
+
+    const cookie = cookieOf(await call("POST", "/api/account", { body: { password } }));
+
+    // Сброс пароля — это удаление `account.json` (docs/data-directory.md). Украденная cookie не имеет
+    // права его пережить: сессия подтверждает учётную запись, которой больше нет.
+    rmSync(join(directory, accountFileName));
+
+    assert.equal((await call("GET", "/api/plugins", { cookie })).status, 401);
+    assert.deepEqual((await call("GET", "/api/session", { cookie })).body, {
+      state: "registration-required",
+    });
+  });
+
+  it("revokes the old sessions when the account is created anew", async () => {
+    const { call, cookieOf, directory } = await serve();
+
+    const old = cookieOf(await call("POST", "/api/account", { body: { password } }));
+
+    rmSync(join(directory, accountFileName));
+
+    const fresh = cookieOf(await call("POST", "/api/account", { body: { password: "другой" } }));
+
+    // Новый пароль обязан обнулять старые сессии: иначе «сброс» не сбрасывал бы доступ, а только
+    // менял бы то, чем его получают заново.
+    assert.equal((await call("GET", "/api/plugins", { cookie: old })).status, 401);
+    assert.equal((await call("GET", "/api/plugins", { cookie: fresh })).status, 200);
   });
 
   it("refuses to guess when the account file cannot be read", async () => {
