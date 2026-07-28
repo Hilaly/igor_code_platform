@@ -45,8 +45,11 @@ export type PasswordSubmission = {
 /**
  * Нижняя граница длины пароля. Проверяется на сервере, а не только формой: маршрут открыт, и
  * единственная проверка, на которую можно опереться, — своя.
+ *
+ * Величину выбрал владелец продукта (docs/authentication.md): вход локальный и торможение подбора
+ * своё, поэтому длина здесь защищает не от перебора по сети, а от пустого пароля.
  */
-export const minimumPasswordLength = 8;
+export const minimumPasswordLength = 6;
 
 export type PasswordSubmissionParseResult =
   { kind: "parsed"; value: PasswordSubmission } | { kind: "rejected"; reason: string };

@@ -43,7 +43,9 @@ describe("checkCredentials", () => {
   it("compares the repeat before the length, not after", () => {
     // Оба поля коротки и совпадают: сказать надо про длину, потому что именно её человек не может
     // исправить повтором.
-    expect(checkCredentials("кратко", "кратко")).toEqual({
+    const short = "x".repeat(minimumPasswordLength - 1);
+
+    expect(checkCredentials(short, short)).toEqual({
       kind: "problem",
       problem: "too-short",
     });

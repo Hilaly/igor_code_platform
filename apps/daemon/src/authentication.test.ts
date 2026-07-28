@@ -263,7 +263,7 @@ describe("the authentication routes", () => {
   it("refuses to create an account on a password that is too short", async () => {
     const { call } = await serve();
 
-    const answer = await call("POST", "/api/account", { body: { password: "кратко" } });
+    const answer = await call("POST", "/api/account", { body: { password: "мало" } });
 
     assert.equal(answer.status, 400);
     assert.deepEqual((await call("GET", "/api/session")).body, { state: "registration-required" });

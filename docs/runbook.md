@@ -115,7 +115,7 @@ curl -c jar -X POST http://localhost:5273/api/account \
   -H 'content-type: application/json' -d '{"password":"correct horse"}'
 ```
 
-Дальше — обычный вход тем же телом на `POST /api/session`; пароль короче восьми символов даёт `400`,
+Дальше — обычный вход тем же телом на `POST /api/session`; пароль короче шести символов даёт `400`,
 неверный — `401`. Выход:
 
 ```bash

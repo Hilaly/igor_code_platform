@@ -123,11 +123,11 @@ describe("register", () => {
   });
 
   it("carries the reason of a refused registration", async () => {
-    daemon({ status: 400, body: { error: "the password must be at least 8 characters long" } });
+    daemon({ status: 400, body: { error: "the password must be at least 6 characters long" } });
 
     await expect(register("кратко")).resolves.toEqual({
       kind: "refused",
-      reason: "the password must be at least 8 characters long",
+      reason: "the password must be at least 6 characters long",
     });
   });
 });
