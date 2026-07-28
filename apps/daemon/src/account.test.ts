@@ -239,6 +239,46 @@ describe("createAccountStore", () => {
     assert.equal(store.state().kind, "unreadable");
   });
 
+  it("calls parameters rejected by node scrypt unreadable", async () => {
+    const { store, directory } = harness();
+
+    await store.create("правильный пароль");
+
+    const stored = JSON.parse(readFileSync(join(directory, accountFileName), "utf8")) as {
+      parameters: ScryptParameters;
+    };
+
+    writeFileSync(
+      join(directory, accountFileName),
+      JSON.stringify({ ...stored, parameters: { ...stored.parameters, cost: 2, blockSize: 1 } }),
+      "utf8",
+    );
+
+    assert.equal((await store.verify("правильный пароль")).kind, "unreadable");
+  });
+
+  it("calls an unreasonably long key unreadable", async () => {
+    const { store, directory } = harness();
+
+    await store.create("правильный пароль");
+
+    const stored = JSON.parse(readFileSync(join(directory, accountFileName), "utf8")) as {
+      parameters: ScryptParameters;
+    };
+
+    writeFileSync(
+      join(directory, accountFileName),
+      JSON.stringify({
+        ...stored,
+        passwordHash: Buffer.alloc(1_025).toString("base64"),
+        parameters: { ...stored.parameters, keyLengthBytes: 1_025 },
+      }),
+      "utf8",
+    );
+
+    assert.equal((await store.verify("правильный пароль")).kind, "unreadable");
+  });
+
   it("grows the pause after every failure and drops it after a success", async () => {
     const { store, pauses } = harness();
 

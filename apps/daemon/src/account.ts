@@ -156,11 +156,22 @@ export function createAccountStore(options: CreateAccountStoreOptions): AccountS
 
         const account = stored.account;
         const expected = Buffer.from(account.passwordHash, "base64");
-        const actual = await deriveKey(
-          password,
-          Buffer.from(account.salt, "base64"),
-          account.parameters,
-        );
+        let actual: Buffer;
+
+        try {
+          actual = await deriveKey(
+            password,
+            Buffer.from(account.salt, "base64"),
+            account.parameters,
+          );
+        } catch (cause) {
+          options.logger.error("the account parameters were rejected by scrypt", {
+            file: accountFileName,
+            reason: cause instanceof Error ? cause.message : String(cause),
+          });
+
+          return { kind: "unreadable", reason: `${accountFileName} has unusable scrypt parameters` };
+        }
 
         // Длины сравниваются до `timingSafeEqual`: он бросает на разной длине. Сойтись они обязаны —
         // чтение требует, чтобы хеш совпадал по длине с заявленной в файле, — но падать здесь из-за
@@ -311,8 +322,12 @@ function asParameters(raw: unknown): ScryptParameters | undefined {
     keyLengthBytes: fields["keyLengthBytes"] as number,
   };
 
-  // Стоимость обязана быть степенью двойки больше единицы — это требование самого алгоритма.
-  if (parameters.cost < 2 || (parameters.cost & (parameters.cost - 1)) !== 0) {
+  // Стоимость обязана быть степенью двойки не меньше четырёх — меньший набор Node отвергает.
+  if (parameters.cost < 4 || (parameters.cost & (parameters.cost - 1)) !== 0) {
+    return undefined;
+  }
+
+  if (parameters.keyLengthBytes > maximumKeyLengthBytes) {
     return undefined;
   }
 
@@ -328,6 +343,9 @@ function hashMemoryBytes(parameters: ScryptParameters): number {
 
 /** Действующему набору нужно 32 МиБ, то есть запас здесь тридцатикратный. */
 const maximumHashMemoryBytes = 1024 * 1024 * 1024;
+
+/** Хеш поставки — 64 байта; килобайт оставляет запас для смены формата без неограниченной аллокации. */
+const maximumKeyLengthBytes = 1024;
 
 async function write(
   path: string,
