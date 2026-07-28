@@ -29,6 +29,12 @@ export const coreEventTypes = {
    * плагинов из того же файла говорят события жизненного цикла и набора вкладов.
    */
   preferencesChanged: "core.preferences.changed",
+  /**
+   * Список проектов или доступность чьей-нибудь папки изменились
+   * (docs/sessions-and-projects.md). Одно событие на всё: создание, переименование, архивацию,
+   * восстановление, удаление и смену доступности — подписчик всё равно перечитывает список целиком.
+   */
+  projectsChanged: "core.projects.changed",
 } as const;
 
 /**
@@ -48,10 +54,18 @@ export type PluginContributionsChanged = {
  */
 export type PreferencesChanged = Record<string, never>;
 
+/**
+ * Нагрузки нет по той же причине, что у `PreferencesChanged`: состояние спрашивается у владельца —
+ * `GET /api/projects`. Доступность папки к тому же меняется сама по себе, и значение из события
+ * успело бы устареть к моменту доставки.
+ */
+export type ProjectsChanged = Record<string, never>;
+
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
+  "core.projects.changed": ProjectsChanged;
 };
 
 export type CoreEventType = keyof CoreEventPayloads;
