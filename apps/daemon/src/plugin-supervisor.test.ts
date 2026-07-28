@@ -769,6 +769,87 @@ describe("createPluginSupervisor", () => {
     );
   });
 
+  it("resolves stop() at once when the worker dies before it can deactivate", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    // Таймаут заведомо больше, чем занимает any реальный путь: если stop() его прождал — тест падает.
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      deactivateTimeoutMilliseconds: 2_000,
+    });
+    running = supervisor;
+
+    await supervisor.apply(
+      only("crashes-on-deactivate"),
+      enabled("data:crashes-on-deactivate"),
+    );
+    await recorded.waitFor(
+      reachedState("data:crashes-on-deactivate", "running"),
+      "crashes-on-deactivate running",
+    );
+
+    const started = Date.now();
+    await supervisor.apply(
+      only("crashes-on-deactivate"),
+      disabled("data:crashes-on-deactivate"),
+    );
+    const elapsed = Date.now() - started;
+
+    // Воркер сам сделал exit(0); stop() должен резолвнуться от `exit`, а не от таймаута.
+    assert.equal(
+      recorded.records.some(
+        (record) => record.message === "the plugin did not deactivate in time and was terminated",
+      ),
+      false,
+    );
+    assert.ok(elapsed < 2_000, `stop() took ${elapsed}ms, expected to beat the 2s timeout`);
+    assert.equal(
+      supervisor.statuses().find((status) => status.key === "data:crashes-on-deactivate")?.state,
+      "disabled",
+    );
+  });
+
+  it("does not stack message listeners on the worker across reloads", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    const warnings: string[] = [];
+    const onWarning = (warning: Error): void => {
+      warnings.push(warning.message);
+    };
+    process.on("warning", onWarning);
+
+    try {
+      // 12 циклов перебивают дефолт Node (10 listeners) — накопление даст MaxListenersExceededWarning.
+      for (let i = 0; i < 12; i += 1) {
+        await supervisor.apply(only("hello"), enabled("data:hello"));
+        await recorded.waitFor(reachedState("data:hello", "running"), `hello running #${i + 1}`);
+        await supervisor.apply(only("hello"), disabled("data:hello"));
+        await recorded.waitFor(reachedState("data:hello", "disabled"), `hello disabled #${i + 1}`);
+      }
+
+      // Сбрасываем незавершённые обработчики warning, иначе сработают в следующем тесте.
+      await wait(0);
+      assert.equal(
+        warnings.some((message) => message.includes("MaxListenersExceededWarning")),
+        false,
+        `unexpected listener warning: ${warnings.join(" | ")}`,
+      );
+    } finally {
+      process.off("warning", onWarning);
+    }
+  });
+
   it("stops a plugin that disappeared from the disk", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();

@@ -405,10 +405,25 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // остановку демона (проверка 16).
     await new Promise<void>((resolve) => {
       let settled = false;
+
+      const onDeactivated = (message: PluginOutgoing): void => {
+        if (message.kind === "deactivated") {
+          finish();
+        }
+      };
+
+      // Воркер может умереть сам, не дождавшись `deactivate` (падение, OOM, сигнал). Пока
+      // стоящий при запуске обработчик `exit` не резолвит `stop()` — он проверяет
+      // `entry.worker === worker`, а здесь уже `undefined`, — и промис честно ждёт таймаут.
+      // На stopAll, идущему последовательно, это складывается в `deactivateTimeout × N упавших`.
+      const onExit = (): void => finish();
+
       const finish = (): void => {
         if (!settled) {
           settled = true;
           cancel();
+          worker.off("message", onDeactivated);
+          worker.off("exit", onExit);
           resolve();
         }
       };
@@ -421,11 +436,8 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       }, deactivateTimeout);
 
       // Само сообщение разберёт слушатель, поставленный при запуске; здесь важен только факт.
-      worker.on("message", (message: PluginOutgoing) => {
-        if (message.kind === "deactivated") {
-          finish();
-        }
-      });
+      worker.on("message", onDeactivated);
+      worker.on("exit", onExit);
 
       const request: PluginIncoming = { kind: "deactivate" };
       worker.postMessage(request);

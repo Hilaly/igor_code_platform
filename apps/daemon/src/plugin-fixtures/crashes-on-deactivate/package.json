@@ -1,0 +1,11 @@
+{
+  "name": "crashes-on-deactivate",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "crashes-on-deactivate",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}
