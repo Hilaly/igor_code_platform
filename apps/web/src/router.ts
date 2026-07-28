@@ -7,7 +7,7 @@
 
 export const pluginPagePrefix = "p";
 
-/** Управление плагинами живёт в ядре и своего адреса не теряет (docs/architecture.md). */
+/** Вью базовой поставки живут в ядре и своего адреса не теряют (docs/architecture.md). */
 export const pluginsPagePath = "/plugins";
 
 export type Page =
