@@ -1,7 +1,7 @@
 REQUIRED_NODE_MAJOR := 24
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev build check typecheck lint lint-fix fmt fmt-check test clean node-version
+.PHONY: help install dev catalog build check typecheck lint lint-fix fmt fmt-check test clean node-version
 
 help: ## Показать список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -20,6 +20,9 @@ install: node-version ## Установить зависимости
 
 dev: node-version ## Поднять демон и веб-интерфейс с хот-релоадом
 	pnpm --recursive --parallel run dev
+
+catalog: node-version ## Поднять каталог компонентов UI-кита
+	pnpm --filter @sovereign/ui-kit run catalog
 
 build: node-version ## Собрать веб-интерфейс
 	pnpm --recursive run build
