@@ -16,8 +16,13 @@ import {
 } from "./login-sessions.ts";
 
 const directories: string[] = [];
+const stores: LoginSessionStore[] = [];
 
 after(() => {
+  for (const store of stores) {
+    store.stop();
+  }
+
   for (const directory of directories) {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -32,7 +37,9 @@ type Harness = {
   read: () => { sessions: Record<string, unknown>[] };
 };
 
-function harness(options: { directory?: string } = {}): Harness {
+function harness(
+  options: { directory?: string; sweepIntervalMilliseconds?: number } = {},
+): Harness {
   const directory = options.directory ?? mkdtempSync(join(tmpdir(), "sovereign-sessions-"));
 
   if (options.directory === undefined) {
@@ -50,7 +57,12 @@ function harness(options: { directory?: string } = {}): Harness {
       write: (record) => records.push(record),
     }),
     now: () => clock,
+    ...(options.sweepIntervalMilliseconds === undefined
+      ? {}
+      : { sweepIntervalMilliseconds: options.sweepIntervalMilliseconds }),
   });
+
+  stores.push(store);
 
   return {
     store,
@@ -262,6 +274,39 @@ describe("createLoginSessionStore", () => {
       read().sessions.map((session) => session["id"]),
       [kept.id],
     );
+  });
+
+  it("sweeps an expired session without being asked anything", async () => {
+    // Соединение живёт часами и проверяется только на входе: без уборки по времени истёкшая сессия
+    // держала бы живой SSE-поток до следующего запроса, то есть сколь угодно долго
+    // (docs/authentication.md).
+    const { store, advance, read } = harness({ sweepIntervalMilliseconds: 5 });
+
+    const closed: string[] = [];
+
+    store.subscribe((id) => closed.push(id));
+
+    const opened = store.open();
+
+    advance(sessionLifetimeMilliseconds);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.deepEqual(closed, [opened.id]);
+    assert.deepEqual(read().sessions, []);
+  });
+
+  it("stops sweeping after it is stopped", async () => {
+    const { store, advance, read } = harness({ sweepIntervalMilliseconds: 5 });
+
+    store.open();
+    store.stop();
+    advance(sessionLifetimeMilliseconds);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Демон останавливается по сигналу, а не по последнему таймеру: уборщик обязан уметь замолчать.
+    assert.equal(read().sessions.length, 1);
   });
 
   it("starts from an empty set when the file cannot be read", () => {

@@ -162,6 +162,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.closeAllConnections();
     settings.close();
     pluginWatcher.close();
+    loginSessions.stop();
 
     // Лок снимается последним и в любом случае: воркер, зависший на выгрузке, не имеет права
     // оставить директорию данных запертой.

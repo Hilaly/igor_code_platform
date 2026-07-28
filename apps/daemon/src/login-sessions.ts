@@ -64,13 +64,27 @@ export type LoginSessionStore = {
    * Возвращает функцию отписки.
    */
   subscribe: (listener: LoginSessionClosedListener) => () => void;
+  /** Остановить уборку истёкших. Зовётся при остановке демона. */
+  stop: () => void;
 };
 
 export type CreateLoginSessionStoreOptions = {
   directory: string;
   logger: Logger;
   now?: () => number;
+  sweepIntervalMilliseconds?: number;
 };
+
+/**
+ * Как часто убираются истёкшие сессии. Уборка по запросам сама по себе не годится: SSE-соединение
+ * проверяется на входе и живёт часами, поэтому истёкшая сессия без единого нового запроса держала бы
+ * живой поток сколь угодно долго (docs/authentication.md).
+ *
+ * Минута при сроке в тридцать суток — это не точность, а гарантия конечности: работа уборки —
+ * фильтр по массиву в единицы записей, и писать файл она успевает только тогда, когда что-то
+ * выкинула.
+ */
+const defaultSweepIntervalMilliseconds = 60_000;
 
 export function createLoginSessionStore(
   options: CreateLoginSessionStoreOptions,
@@ -107,6 +121,20 @@ export function createLoginSessionStore(
 
     return expired;
   };
+
+  const sweeper = setInterval(() => {
+    const expired = sweep();
+
+    if (expired.length === 0) {
+      return;
+    }
+
+    write(path, sessions);
+    announce(expired);
+  }, options.sweepIntervalMilliseconds ?? defaultSweepIntervalMilliseconds);
+
+  // Уборка не повод держать процесс живым: демон завершается по сигналу, а не по последнему таймеру.
+  sweeper.unref();
 
   return {
     open: () => {
@@ -173,6 +201,7 @@ export function createLoginSessionStore(
 
       return () => listeners.delete(listener);
     },
+    stop: () => clearInterval(sweeper),
   };
 }
 
