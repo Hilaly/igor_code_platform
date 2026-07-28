@@ -13,6 +13,8 @@ import { imperiumScheme } from "./imperium.ts";
 import { neutralScheme } from "./neutral.ts";
 import { nordScheme } from "./nord.ts";
 import { obsidianScheme } from "./obsidian.ts";
+import { oledScheme } from "./oled.ts";
+import { sageScheme } from "./sage.ts";
 import { terminalScheme } from "./terminal.ts";
 
 export const shippedSchemes: readonly ColorScheme[] = [
@@ -22,5 +24,7 @@ export const shippedSchemes: readonly ColorScheme[] = [
   nordScheme,
   obsidianScheme,
   terminalScheme,
+  oledScheme,
+  sageScheme,
   checkScheme,
 ];

@@ -1,0 +1,94 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  min-height: var(--sovereign-control-height-md);
+  background: var(--sovereign-sunken-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-md);
+  cursor: pointer;
+}
+
+.box.invalid {
+  border-color: var(--sovereign-danger);
+}
+
+.box.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  padding: 0.1rem 0.4rem;
+  background: var(--sovereign-panel-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-sm);
+  font-size: var(--sovereign-font-size-xs);
+  color: var(--sovereign-text);
+}
+
+.remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: var(--sovereign-text-muted);
+}
+
+.remove:hover {
+  color: var(--sovereign-danger);
+}
+
+.placeholder {
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-sm);
+  padding-left: var(--sovereign-space-1);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + var(--sovereign-space-1));
+  left: 0;
+  right: 0;
+  z-index: var(--sovereign-z-overlay);
+  background: var(--sovereign-panel-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-md);
+  box-shadow: var(--sovereign-elevation-2);
+  max-height: 12rem;
+  overflow-y: auto;
+  padding: var(--sovereign-space-1);
+  backdrop-filter: blur(12px) saturate(180%);
+}
+
+.option {
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  border-radius: var(--sovereign-radius-sm);
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.option:hover {
+  background: var(--sovereign-control-surface-hover);
+}
+
+.option.selected {
+  color: var(--sovereign-accent-text);
+  font-weight: var(--sovereign-font-weight-semibold);
+}

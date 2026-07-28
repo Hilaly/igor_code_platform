@@ -1,0 +1,60 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+  cursor: pointer;
+  user-select: none;
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-md);
+}
+
+.item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.radio {
+  appearance: none;
+  margin: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--sovereign-radius-full);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  background: var(--sovereign-sunken-surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
+              background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.radio::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: var(--sovereign-radius-full);
+  transform: scale(0);
+  transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
+  background: var(--sovereign-text-on-accent);
+}
+
+.radio:checked {
+  background: var(--sovereign-accent);
+  border-color: var(--sovereign-accent);
+}
+
+.radio:checked::before {
+  transform: scale(1);
+}
+
+.radio:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: 2px;
+}
