@@ -85,7 +85,8 @@ IPv4-адрес получит `ECONNREFUSED` ([runtime-checks.md](runtime-check
 работа идёт по ките. Занятый порт Ladle не считает ошибкой и молча уезжает на соседний — адрес всегда
 печатается в терминале, смотреть надо туда, а не в эту строку.
 
-Зачем он: живого DOM в тестах нет (ниже, «Тесты»), а у восьми примитивов из девятнадцати нет ни
+Зачем он: `jsdom` отвечает на «что связано с чем», а не на «как это выглядит» (ниже, «Тесты»), а у
+восьми примитивов из девятнадцати нет ни
 одного потребителя в приложении — они перенесены заранее под срезы 6–10
 ([roadmap.md](roadmap.md)). Каталог — единственное место, где такой примитив вообще видно.
 
@@ -143,6 +144,48 @@ curl -sN -b jar http://localhost:5273/api/events
 ```bash
 curl -sN -b jar -H 'Last-Event-ID: 20' http://localhost:5273/api/events
 ```
+
+## Проекты с командной строки
+
+```bash
+curl -s -b jar http://localhost:5273/api/projects
+curl -s -b jar -X POST http://localhost:5273/api/projects \
+  -H 'content-type: application/json' \
+  -d '{"folder":"~/code/platform","name":"Платформа"}'
+```
+
+Ответ создания несёт `folder` — путь после разворота `~` — и `folderKey`, по которому шло сравнение.
+Второй проект на ту же папку, как её ни напиши, отвечает `409` с полем `conflict`: целой записью
+занявшего ([web-api.md](web-api.md)).
+
+Переименование, архивация и восстановление — один `PUT` целой записью; идентификатор берётся из
+списка:
+
+```bash
+curl -s -b jar -X PUT http://localhost:5273/api/projects/b7Kq3xv9pQdT \
+  -H 'content-type: application/json' \
+  -d '{"name":"Платформа","archived":true}'
+curl -s -b jar -X DELETE http://localhost:5273/api/projects/b7Kq3xv9pQdT \
+  -H 'content-type: application/json'
+```
+
+Эфемерный проект (`id` = `work`) на оба отвечает `409`.
+
+**Смена доступности папки проверяется настоящим томом,** а не `mv` и не `chmod`: те дают `ENOENT` и
+`EACCES`, но не воспроизводят случай, ради которого наблюдатель поставлен
+([runtime-checks.md](runtime-checks.md), проверка 27).
+
+```bash
+hdiutil create -size 10m -fs APFS -volname SovereignProject /tmp/sovereign-project.dmg
+hdiutil attach /tmp/sovereign-project.dmg          # → /Volumes/SovereignProject
+# создать проект на /Volumes/SovereignProject, повесить поток событий, затем:
+hdiutil detach /Volumes/SovereignProject
+```
+
+Не трогая вкладку: в потоке появляется `core.projects.changed`, а `GET /api/projects` показывает
+`"availability":"missing"`. Задержка — от одного до двух интервалов опроса (интервал 5 с): сразу
+после `detach` точка монтирования какое-то время ещё существует папкой. `hdiutil attach` возвращает
+состояние сам.
 
 ## Плагин на живом демоне
 

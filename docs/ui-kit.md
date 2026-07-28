@@ -631,7 +631,8 @@ CSS оболочки — `shell/shell.css`, геометрия хоста. Цв�
 
 ### DOM-тесты сложных интерактивных компонентов
 
-`@testing-library/react` и `jsdom` добавлены только в devDependencies `ui-kit`. Они исполняют реальный
+`@testing-library/react` и `jsdom` лежат в devDependencies `ui-kit`, а срезом 7 — и `web`, теми же
+диапазонами: лок-файл один, и две версии jsdom в нём были бы ошибкой, а не выбором. Они исполняют реальный
 React-рендер и события клавиатуры в изолированном `// @vitest-environment jsdom` тесте: так проверяются
 `aria-activedescendant`, пропуск недоступных пунктов и фактическое перемещение DOM-фокуса в `Tree`.
 
