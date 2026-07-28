@@ -60,7 +60,10 @@ export async function ensurePluginDependencies(
   const runInstall =
     options.runInstall ??
     ((target: string) =>
-      runNpmInstall(target, options.installTimeoutMilliseconds ?? defaultInstallTimeoutMilliseconds));
+      runNpmInstall(
+        target,
+        options.installTimeoutMilliseconds ?? defaultInstallTimeoutMilliseconds,
+      ));
 
   let declared: Record<string, string>;
 

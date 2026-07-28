@@ -782,20 +782,14 @@ describe("createPluginSupervisor", () => {
     });
     running = supervisor;
 
-    await supervisor.apply(
-      only("crashes-on-deactivate"),
-      enabled("data:crashes-on-deactivate"),
-    );
+    await supervisor.apply(only("crashes-on-deactivate"), enabled("data:crashes-on-deactivate"));
     await recorded.waitFor(
       reachedState("data:crashes-on-deactivate", "running"),
       "crashes-on-deactivate running",
     );
 
     const started = Date.now();
-    await supervisor.apply(
-      only("crashes-on-deactivate"),
-      disabled("data:crashes-on-deactivate"),
-    );
+    await supervisor.apply(only("crashes-on-deactivate"), disabled("data:crashes-on-deactivate"));
     const elapsed = Date.now() - started;
 
     // Воркер сам сделал exit(0); stop() должен резолвнуться от `exit`, а не от таймаута.

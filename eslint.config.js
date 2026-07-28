@@ -80,16 +80,19 @@ const colorsComeFromTokensOnly = {
       "error",
       {
         selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
-        message: "Цвет задаётся токеном кита, а не литералом (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
+        message:
+          "Цвет задаётся токеном кита, а не литералом (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
       },
       {
         selector: "Literal[value=/(?:rgb|hsl|lab|lch|oklab|oklch|color-mix)a?\\(/]",
-        message: "Цвет задаётся токеном кита, а не литералом (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
+        message:
+          "Цвет задаётся токеном кита, а не литералом (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
       },
       {
         selector:
           "Literal[value=/^(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|pink|brown|cyan|magenta|teal|navy|olive|maroon|lime|aqua|fuchsia)$/i]",
-        message: "Цвет задаётся токеном кита, а не именем цвета (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
+        message:
+          "Цвет задаётся токеном кита, а не именем цвета (docs/ui-kit.md, «Чем держится дисциплина цвета»).",
       },
     ],
   },
