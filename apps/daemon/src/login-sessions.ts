@@ -73,6 +73,7 @@ export type CreateLoginSessionStoreOptions = {
   logger: Logger;
   now?: () => number;
   sweepIntervalMilliseconds?: number;
+  isAccountPresent?: () => boolean;
 };
 
 /**
@@ -92,6 +93,7 @@ export function createLoginSessionStore(
   const path = join(options.directory, loginSessionsFileName);
   const now = options.now ?? Date.now;
   const listeners = new Set<LoginSessionClosedListener>();
+  const isAccountPresent = options.isAccountPresent ?? (() => true);
 
   // Набор читается один раз при старте и дальше живёт в памяти: файл пишет только этот модуль, а
   // проверка сессии идёт на каждом запросе, включая SSE-поток, — читать диск на каждый запрос
@@ -123,13 +125,45 @@ export function createLoginSessionStore(
   };
 
   const sweeper = setInterval(() => {
+    if (!isAccountPresent() && sessions.length > 0) {
+      const closed = sessions;
+
+      try {
+        write(path, []);
+      } catch (cause) {
+        options.logger.error("the login sessions could not be revoked", {
+          file: loginSessionsFileName,
+          reason: cause instanceof Error ? cause.message : String(cause),
+        });
+
+        return;
+      }
+
+      sessions = [];
+      announce(closed);
+
+      return;
+    }
+
+    const previous = sessions;
     const expired = sweep();
 
     if (expired.length === 0) {
       return;
     }
 
-    write(path, sessions);
+    try {
+      write(path, sessions);
+    } catch (cause) {
+      sessions = previous;
+      options.logger.error("the expired login sessions could not be persisted", {
+        file: loginSessionsFileName,
+        reason: cause instanceof Error ? cause.message : String(cause),
+      });
+
+      return;
+    }
+
     announce(expired);
   }, options.sweepIntervalMilliseconds ?? defaultSweepIntervalMilliseconds);
 
@@ -189,8 +223,8 @@ export function createLoginSessionStore(
         return;
       }
 
+      write(path, []);
       sessions = [];
-      write(path, sessions);
 
       // Истёкшие среди них тоже объявляются закрытыми: получателю всё равно, чем именно кончилась
       // сессия, а поток обязан оборваться в любом случае.

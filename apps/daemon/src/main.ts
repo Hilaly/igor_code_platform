@@ -120,7 +120,11 @@ applyPlugins();
 const events = createEventStream({ bus, logger });
 
 const account = createAccountStore({ directory, logger });
-const loginSessions = createLoginSessionStore({ directory, logger });
+const loginSessions = createLoginSessionStore({
+  directory,
+  logger,
+  isAccountPresent: () => account.state().kind === "present",
+});
 
 // Выход обрывает живой поток, а не оставляет его дожить до конца процесса (docs/authentication.md):
 // проверка сессии стоит на входе в соединение, а соединение живёт часами.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -38,7 +38,11 @@ type Harness = {
 };
 
 function harness(
-  options: { directory?: string; sweepIntervalMilliseconds?: number } = {},
+  options: {
+    directory?: string;
+    sweepIntervalMilliseconds?: number;
+    isAccountPresent?: () => boolean;
+  } = {},
 ): Harness {
   const directory = options.directory ?? mkdtempSync(join(tmpdir(), "sovereign-sessions-"));
 
@@ -60,6 +64,7 @@ function harness(
     ...(options.sweepIntervalMilliseconds === undefined
       ? {}
       : { sweepIntervalMilliseconds: options.sweepIntervalMilliseconds }),
+    ...(options.isAccountPresent === undefined ? {} : { isAccountPresent: options.isAccountPresent }),
   });
 
   stores.push(store);
@@ -261,6 +266,24 @@ describe("createLoginSessionStore", () => {
     assert.deepEqual(closed, []);
   });
 
+  it("keeps sessions and does not announce when closeAll cannot persist", () => {
+    const { store, directory } = harness();
+    const opened = store.open();
+    const closed: string[] = [];
+
+    store.subscribe((id) => closed.push(id));
+    chmodSync(directory, 0o500);
+
+    try {
+      assert.throws(() => store.closeAll(), /permission denied/i);
+    } finally {
+      chmodSync(directory, 0o700);
+    }
+
+    assert.deepEqual(store.verify(opened.token), { kind: "live", id: opened.id });
+    assert.deepEqual(closed, []);
+  });
+
   it("sweeps expired sessions out of the file", () => {
     const { store, advance, read } = harness();
 
@@ -307,6 +330,44 @@ describe("createLoginSessionStore", () => {
 
     // Демон останавливается по сигналу, а не по последнему таймеру: уборщик обязан уметь замолчать.
     assert.equal(read().sessions.length, 1);
+  });
+
+  it("keeps an expired session and reports the write failure instead of throwing from the timer", async () => {
+    const { store, directory, advance, records } = harness({ sweepIntervalMilliseconds: 5 });
+    store.open();
+    chmodSync(directory, 0o500);
+    advance(sessionLifetimeMilliseconds);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    } finally {
+      chmodSync(directory, 0o700);
+    }
+
+    assert.equal(records.some((record) => record.level === "error"), true);
+    assert.equal(
+      (JSON.parse(readFileSync(join(directory, loginSessionsFileName), "utf8")) as { sessions: unknown[] })
+        .sessions.length,
+      1,
+    );
+  });
+
+  it("revokes sessions and announces when the account disappears", async () => {
+    let accountPresent = true;
+    const { store, advance } = harness({
+      sweepIntervalMilliseconds: 5,
+      isAccountPresent: () => accountPresent,
+    });
+    const opened = store.open();
+    const closed: string[] = [];
+
+    store.subscribe((id) => closed.push(id));
+    accountPresent = false;
+    advance(1);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.deepEqual(store.verify(opened.token), { kind: "unknown" });
+    assert.deepEqual(closed, [opened.id]);
   });
 
   it("starts from an empty set when the file cannot be read", () => {
