@@ -46,10 +46,11 @@
   gap: var(--sovereign-space-1);
   min-width: 100%;
   padding: var(--sovereign-space-1);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-sm);
-  background: var(--sovereign-panel-surface);
+  background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
   box-shadow: var(--sovereign-elevation-2);
+  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 .item {

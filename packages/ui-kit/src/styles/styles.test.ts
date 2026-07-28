@@ -109,6 +109,23 @@ describe("stylesheets of the kit", () => {
     expect(dead).toEqual([]);
   });
 
+  it("gives every elevated surface the shared glass treatment", () => {
+    const elevatedSurfaces = [
+      "components/dialog.module.css",
+      "components/menu.module.css",
+      "components/panel.module.css",
+      "components/popover.module.css",
+    ];
+
+    for (const relativePath of elevatedSurfaces) {
+      const source = readFileSync(join(kitRoot, relativePath), "utf8");
+
+      expect(usedNames(withoutComments(source)), relativePath).toEqual(
+        expect.arrayContaining(["--sovereign-backdrop-blur", "--sovereign-glass-surface"]),
+      );
+    }
+  });
+
   it("dresses every primitive it ships", () => {
     const components = readdirSync(join(kitRoot, "components"))
       .filter((name) => name.endsWith(".tsx"))

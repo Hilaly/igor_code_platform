@@ -15,13 +15,13 @@
 .content {
   position: absolute;
   z-index: var(--sovereign-z-overlay);
-  background: var(--sovereign-panel-surface);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-md);
   box-shadow: var(--sovereign-elevation-2);
   padding: var(--sovereign-space-3);
   min-width: 12rem;
-  backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 .top {

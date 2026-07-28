@@ -51,4 +51,7 @@
   /* Волосяная линия вторым акцентом: край, который видно, не рисуя границы. */
   --sovereign-hairline-secondary: inset 0 0 0 1px
     color-mix(in srgb, var(--sovereign-secondary) 55%, transparent);
+  --sovereign-backdrop-blur: blur(16px) saturate(180%);
+  /* Полупрозрачная поверхность даёт blur-слою контекст, сохраняя цвет активной схемы. */
+  --sovereign-glass-surface: color-mix(in srgb, var(--sovereign-panel-surface) 84%, transparent);
 }

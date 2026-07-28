@@ -27,10 +27,11 @@
   max-height: calc(100% - var(--sovereign-space-12));
   padding: var(--sovereign-space-6);
   overflow: hidden;
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
-  background: var(--sovereign-gradient-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
   color: var(--sovereign-text);
   box-shadow: var(--sovereign-elevation-3), var(--sovereign-hairline-secondary);
+  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 /*
