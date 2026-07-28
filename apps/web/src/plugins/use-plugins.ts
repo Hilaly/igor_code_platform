@@ -42,7 +42,10 @@ export function usePlugins(options: UsePluginsOptions): PluginsController {
   const [state, setState] = useState<PluginsState>(initialPluginsState);
 
   // Кадры приходят чаще, чем React успевает отрисовать, а правило применения смотрит на предыдущее
-  // состояние: ссылка обновляется синхронно, поэтому два кадра подряд не теряют друг друга.
+  // состояние: ссылка обновляется синхронно, поэтому два кадра подряд не теряют друг друга. Любой
+  // будущий `setState`, минующий `apply`, разнёс бы зеркало с отрисованным состоянием — поэтому
+  // ровно тот же `apply` зовёт и подписка шины ниже. Единственный источник изменения состояния —
+  // этот вызов.
   const latest = useRef<PluginsState>(initialPluginsState);
   const apply = useCallback((next: (current: PluginsState) => PluginsState) => {
     latest.current = next(latest.current);
@@ -76,8 +79,7 @@ export function usePlugins(options: UsePluginsOptions): PluginsController {
     const unsubscribe = bus.subscribe((event) => {
       const outcome = applyStreamEvent(latest.current, event);
 
-      latest.current = outcome.state;
-      setState(outcome.state);
+      apply(() => outcome.state);
 
       if (outcome.refetch) {
         reload();
@@ -85,7 +87,7 @@ export function usePlugins(options: UsePluginsOptions): PluginsController {
     });
 
     return unsubscribe;
-  }, [bus, reload]);
+  }, [apply, bus, reload]);
 
   // Снимок спрашивается на каждом подъёме соединения: за время разрыва могло произойти что угодно.
   useEffect(() => {
