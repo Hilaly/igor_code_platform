@@ -181,6 +181,64 @@ describe("createAccountStore", () => {
     assert.equal(readFileSync(join(directory, accountFileName), "utf8"), "{ это не json");
   });
 
+  it("calls a file with impossible parameters unreadable instead of failing on the hash", async () => {
+    const { store, directory } = harness();
+
+    await store.create("правильный пароль");
+
+    const stored = JSON.parse(readFileSync(join(directory, accountFileName), "utf8")) as {
+      parameters: ScryptParameters;
+    };
+
+    // Стоимость обязана быть степенью двойки: `scrypt` бросает на любой другой, и без этой проверки
+    // правка файла руками превращала бы вход в `500` вместо документированного отказа.
+    writeFileSync(
+      join(directory, accountFileName),
+      JSON.stringify({ ...stored, parameters: { ...stored.parameters, cost: 3 } }),
+      "utf8",
+    );
+
+    assert.equal(store.state().kind, "unreadable");
+    assert.equal((await store.verify("правильный пароль")).kind, "unreadable");
+  });
+
+  it("calls a file whose hash does not match its own key length unreadable", async () => {
+    const { store, directory } = harness();
+
+    await store.create("правильный пароль");
+
+    const stored = JSON.parse(readFileSync(join(directory, accountFileName), "utf8")) as {
+      passwordHash: string;
+    };
+
+    // Обрезанный хеш — это не «другой пароль», а негодная запись: длина заявлена в самом файле.
+    writeFileSync(
+      join(directory, accountFileName),
+      JSON.stringify({ ...stored, passwordHash: stored.passwordHash.slice(0, 8) }),
+      "utf8",
+    );
+
+    assert.equal(store.state().kind, "unreadable");
+  });
+
+  it("calls a file whose salt is not base64 unreadable", async () => {
+    const { store, directory } = harness();
+
+    await store.create("правильный пароль");
+
+    const stored = JSON.parse(readFileSync(join(directory, accountFileName), "utf8")) as {
+      salt: string;
+    };
+
+    writeFileSync(
+      join(directory, accountFileName),
+      JSON.stringify({ ...stored, salt: "!!!" }),
+      "utf8",
+    );
+
+    assert.equal(store.state().kind, "unreadable");
+  });
+
   it("grows the pause after every failure and drops it after a success", async () => {
     const { store, pauses } = harness();
 

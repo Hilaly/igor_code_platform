@@ -162,8 +162,9 @@ export function createAccountStore(options: CreateAccountStoreOptions): AccountS
           account.parameters,
         );
 
-        // Длины сравниваются до `timingSafeEqual`: он бросает на разной длине, а разная длина здесь
-        // законна — файл мог быть написан с другим `keyLengthBytes`.
+        // Длины сравниваются до `timingSafeEqual`: он бросает на разной длине. Сойтись они обязаны —
+        // чтение требует, чтобы хеш совпадал по длине с заявленной в файле, — но падать здесь из-за
+        // ошибки в этом требовании было бы худшим из ответов.
         if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
           failures += 1;
 
@@ -264,6 +265,16 @@ function asAccount(document: unknown): StoredAccount | undefined {
     return undefined;
   }
 
+  // Хеш и соль проверяются по декодированной длине, а не только по типу: base64 в Node молча
+  // проглатывает мусор, и обрезанный хеш иначе выглядел бы просто как «другой пароль». Длина хеша
+  // заявлена в самом файле, поэтому расхождение с ней — негодная запись, а не иной набор.
+  if (
+    Buffer.from(fields["passwordHash"], "base64").length !== parameters.keyLengthBytes ||
+    Buffer.from(fields["salt"], "base64").length === 0
+  ) {
+    return undefined;
+  }
+
   return {
     passwordHash: fields["passwordHash"],
     salt: fields["salt"],
@@ -272,6 +283,11 @@ function asAccount(document: unknown): StoredAccount | undefined {
   };
 }
 
+/**
+ * Набор проверяется по существу, а не только на «целое положительное»: `scrypt` бросает на
+ * непригодном наборе, и поправленный руками файл иначе давал бы `500` на входе вместо
+ * документированного отказа «файл негоден» (docs/data-directory.md).
+ */
 function asParameters(raw: unknown): ScryptParameters | undefined {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return undefined;
@@ -288,13 +304,30 @@ function asParameters(raw: unknown): ScryptParameters | undefined {
     }
   }
 
-  return {
+  const parameters: ScryptParameters = {
     cost: fields["cost"] as number,
     blockSize: fields["blockSize"] as number,
     parallelization: fields["parallelization"] as number,
     keyLengthBytes: fields["keyLengthBytes"] as number,
   };
+
+  // Стоимость обязана быть степенью двойки больше единицы — это требование самого алгоритма.
+  if (parameters.cost < 2 || (parameters.cost & (parameters.cost - 1)) !== 0) {
+    return undefined;
+  }
+
+  // Потолок памяти: набор задаёт, сколько демон возьмёт на одну проверку, и число из файла не имеет
+  // права ни съесть машину, ни переполнить `maxmem`, который у Node 32-битный.
+  return hashMemoryBytes(parameters) > maximumHashMemoryBytes ? undefined : parameters;
 }
+
+/** Столько памяти требует один счёт хеша: `128 * N * r * p` — формула самого scrypt. */
+function hashMemoryBytes(parameters: ScryptParameters): number {
+  return 128 * parameters.cost * parameters.blockSize * parameters.parallelization;
+}
+
+/** Действующему набору нужно 32 МиБ, то есть запас здесь тридцатикратный. */
+const maximumHashMemoryBytes = 1024 * 1024 * 1024;
 
 async function write(
   path: string,
@@ -330,7 +363,7 @@ function deriveKey(password: string, salt: Buffer, parameters: ScryptParameters)
         p: parameters.parallelization,
         // Предел памяти считается от параметров, а не берётся константой: набор `N=2^15, r=8`
         // требует ровно 32 МиБ, то есть упирается в потолок Node по умолчанию.
-        maxmem: 2 * 128 * parameters.cost * parameters.blockSize * parameters.parallelization,
+        maxmem: 2 * hashMemoryBytes(parameters),
       },
       (cause, key) => {
         if (cause !== null) {
