@@ -42,6 +42,8 @@ import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
+import { ProjectsView } from "./projects/projects-view.tsx";
+import { useProjects } from "./projects/use-projects.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearancePanel } from "./shell/appearance-panel.tsx";
@@ -233,6 +235,7 @@ export function App() {
   }, [stream]);
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
+  const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
 
   const translator = useMemo(
     () =>
@@ -343,6 +346,12 @@ export function App() {
               <Text>{translator.t("nav.home")}</Text>
             </ListRow>
             <ListRow
+              selected={page.kind === "projects"}
+              onSelect={() => navigation.navigate({ kind: "projects" })}
+            >
+              <Text>{translator.t("nav.projects")}</Text>
+            </ListRow>
+            <ListRow
               selected={page.kind === "plugins"}
               onSelect={() => navigation.navigate({ kind: "plugins" })}
             >
@@ -397,6 +406,16 @@ export function App() {
           <PluginsView
             state={plugins.state}
             onSwitch={plugins.switchPlugin}
+            translator={translator}
+          />
+        }
+        projects={
+          <ProjectsView
+            state={projects.state}
+            onCreate={projects.create}
+            onUpdate={projects.update}
+            onRemove={projects.remove}
+            onDismissComplaints={projects.dismissComplaints}
             translator={translator}
           />
         }

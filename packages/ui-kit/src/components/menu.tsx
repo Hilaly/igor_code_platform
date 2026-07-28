@@ -27,10 +27,16 @@ export type MenuProps = {
   label: string;
   /** Подпись кнопки, открывающей меню. */
   trigger: string;
+  /**
+   * Название кнопки для скринридера. Нужно, когда подпись — значок вроде `…`: видимого текста для
+   * имени тогда не хватает, и кнопка называется многоточием. Без значка не задаётся: дублировать
+   * видимую подпись в `aria-label` значит расходиться с ней при первой же правке.
+   */
+  triggerLabel?: string;
   items: MenuItemDescription[];
 };
 
-export function Menu({ label, trigger, items }: MenuProps) {
+export function Menu({ label, trigger, triggerLabel, items }: MenuProps) {
   const menuId = useId();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -116,6 +122,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
         className={styles.trigger}
         ref={triggerRef}
         aria-haspopup="menu"
+        aria-label={triggerLabel}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((current) => !current)}

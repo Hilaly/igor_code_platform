@@ -62,7 +62,11 @@ const kitTokens = new Set(
 describe("the style sheets of the application", () => {
   it("are all found", () => {
     // Тест обходит директорию: пустой список означал бы, что он ничего не проверяет и молчит об этом.
-    expect(sheets.map((sheet) => sheet.name).sort()).toEqual(["login.css", "shell.css"]);
+    expect(sheets.map((sheet) => sheet.name).sort()).toEqual([
+      "login.css",
+      "projects.css",
+      "shell.css",
+    ]);
   });
 
   it.each(sheets)("$name takes every colour from a role variable", ({ styles }) => {

@@ -1,0 +1,51 @@
+/*
+ * Раскладка вью проектов. Цвета — только переменные ролей, размеры — только шкалы кита: значения
+ * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
+ *
+ * Своим файлом, а не строками в `shell.css`: вью проектов — не оболочка, и раскладка формы создания
+ * ничего общего с раскладкой панелей вокруг не имеет.
+ */
+
+.projects,
+.projects-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
+.projects-new {
+  gap: var(--sovereign-space-2);
+}
+
+/*
+ * В строке ровно двое: сведения о проекте и его пометки с действиями. Действия держатся правого
+ * края распором между ними, а не селектором по классу примитива: имена классов кита хешируются
+ * модулями, и цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
+ *
+ * Отступ тоже здесь, а не из кита: `ListRow` даёт его только выбираемой строке, а строка проекта не
+ * выбирается — по ней ничего не открывается, действия живут в меню.
+ */
+.projects-row {
+  display: flex;
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  flex-wrap: wrap;
+}
+
+.projects-row-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  /* Длинный путь режется, а не растягивает строку: папка бывает глубокой. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.projects-row-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+}

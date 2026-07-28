@@ -1,6 +1,7 @@
 /**
- * Центральная страница: разводит адреса по вью. Своё вью есть у управления плагинами, страницы
- * плагинов появятся вместе с браузерным кодом, который собирает демон (docs/ui-extension-model.md).
+ * Центральная страница: разводит адреса по вью. Свои вью есть у проектов и у управления плагинами,
+ * страницы плагинов появятся вместе с браузерным кодом, который собирает демон
+ * (docs/ui-extension-model.md).
  */
 
 import { EmptyState, Heading, type ScopedTranslator } from "@sovereign/ui-kit";
@@ -10,16 +11,21 @@ import type { Page } from "../router.ts";
 
 export type PageViewProps = {
   page: Page;
-  /** Вью плагинов приходит собранным: страница не знает ни про шину, ни про запросы. */
+  /** Вью приходят собранными: страница не знает ни про шину, ни про запросы. */
   plugins: ReactNode;
+  projects: ReactNode;
   translator: ScopedTranslator;
 };
 
-export function PageView({ page, plugins, translator }: PageViewProps) {
+export function PageView({ page, plugins, projects, translator }: PageViewProps) {
   const { t } = translator;
 
   if (page.kind === "plugins") {
     return plugins;
+  }
+
+  if (page.kind === "projects") {
+    return projects;
   }
 
   if (page.kind === "plugin") {
