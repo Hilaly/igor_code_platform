@@ -119,10 +119,15 @@ function PanelResizer({ onResize }: PanelResizerProps) {
         const drop = (): void => {
           window.removeEventListener("pointermove", move);
           window.removeEventListener("pointerup", drop);
+          window.removeEventListener("pointercancel", drop);
         };
 
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", drop);
+        // Браузер отменяет поток pointer-событий, если пользователь сменил вкладку, открыл DevTools
+        // или ОС прервала жест: без этой ветки `pointerup` не приходит, и listener-ы висят вечно,
+        // вызывая onResize на каждом последующем движении мыши по странице.
+        window.addEventListener("pointercancel", drop);
       }}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
