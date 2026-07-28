@@ -1,9 +1,9 @@
 /**
- * SSE-поток событий ядра (ADR-0038). Шина ничего не помнит и никого не догоняет (ADR-0041) — этим
+ * SSE-поток событий ядра (docs/web-api.md). Шина ничего не помнит и никого не догоняет (docs/event-bus.md) — этим
  * занимается поток: он нумерует события, держит окно последних в памяти и по `Last-Event-ID`
  * отдаёт пропущенное.
  *
- * Пишем прямо в `ServerResponse`, без прослоек (ADR-0026): у SSE нет ничего, ради чего стоило бы
+ * Пишем прямо в `ServerResponse`, без прослоек (docs/web-api.md): у SSE нет ничего, ради чего стоило бы
  * заводить зависимость, а прослойка скрыла бы буфер сокета, за которым здесь нужно следить.
  */
 
@@ -73,7 +73,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   // публикует на шину синхронно. Вложенная публикация ушла бы в сокеты раньше той, что её вызвала,
   // и порядок отправки разошёлся бы с порядком присвоения индексов — то есть догон по
   // `Last-Event-ID` начал бы врать. Раньше такой подписчик был один — журнал, — но журнал с шины
-  // ушёл (ADR-0074).
+  // ушёл (docs/logging.md).
   const unsubscribe = options.bus.subscribe((event) => {
     const frame = {
       index: nextIndex,
@@ -81,7 +81,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
       type: event.type,
       payload: event.payload,
       // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
-      // платформенного (ADR-0072).
+      // платформенного (docs/event-bus.md).
       ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
     } as StreamEvent;
 

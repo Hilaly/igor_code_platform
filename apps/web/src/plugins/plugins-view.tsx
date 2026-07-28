@@ -1,8 +1,8 @@
 /**
- * Вью управления плагинами. Живёт в ядре, а не в плагине (ADR-0047, ADR-0066): это единственный
+ * Вью управления плагинами. Живёт в ядре, а не в плагине (docs/architecture.md): это единственный
  * путь восстановления системы, и выключить его нельзя.
  *
- * Переключает только человек (ADR-0063), и переключается каждый вклад по отдельности (ADR-0032).
+ * Переключает только человек (docs/plugins.md), и переключается каждый вклад по отдельности (docs/plugins.md).
  * Выключенный вклад показывается помеченным, а не исчезает: иначе включить его обратно было бы
  * нечем.
  */
@@ -40,7 +40,7 @@ export type PluginsViewProps = {
   translator: ScopedTranslator;
 };
 
-/** Тон значка — это смысл состояния, а не его цвет: цвет приходит из схемы (ADR-0031). */
+/** Тон значка — это смысл состояния, а не его цвет: цвет приходит из схемы (docs/ui-kit.md). */
 const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   discovered: "neutral",
   disabled: "neutral",
@@ -135,7 +135,7 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
       .map((registration) => ({ registration, off: true })),
   ].sort((left, right) => (left.registration.id < right.registration.id ? -1 : 1));
 
-  // Запись сохраняется, даже если вклад исчез вместе с версией плагина (ADR-0032): человек должен
+  // Запись сохраняется, даже если вклад исчез вместе с версией плагина (docs/plugins.md): человек должен
   // видеть, что решение осталось, а не удивляться ему при возвращении вклада.
   const forgotten = (preferences?.disabledContributions ?? []).filter(
     (id) => !declared.some((entry) => entry.registration.id === id),

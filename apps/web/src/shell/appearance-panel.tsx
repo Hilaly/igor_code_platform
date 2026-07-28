@@ -1,6 +1,6 @@
 /**
  * Выбор внешнего вида. Записывается в `preferences.json` через API: файл остаётся источником истины
- * (ADR-0033), а не копией того, что помнит вкладка.
+ * (docs/data-directory.md), а не копией того, что помнит вкладка.
  */
 
 import { appearanceVariants, type AppearancePreferences } from "@sovereign/protocol";

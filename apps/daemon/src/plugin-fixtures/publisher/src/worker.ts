@@ -8,7 +8,7 @@ export const activate: PluginModule["activate"] = async () => {
   await contribute.event(taskCreated);
 
   // Публикация повторяется, потому что объявление вступает в силу только после возврата из
-  // activate: вклады применяются одним снимком (ADR-0024), и первая попытка может быть до этого.
+  // activate: вклады применяются одним снимком (docs/ui-extension-model.md), и первая попытка может быть до этого.
   ticking = setInterval(() => {
     void taskCreated.publish({ id: "42" });
   }, 20);

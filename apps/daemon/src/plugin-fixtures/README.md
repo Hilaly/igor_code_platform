@@ -5,5 +5,5 @@
 стык с чужим кодом.
 
 Из проверки типов платформы эта папка исключена намеренно: код плагина живёт по правилам плагина
-(`--experimental-transform-types`, ADR-0004), и `typescripty` существует ровно затем, чтобы это
+(`--experimental-transform-types`, [docs/toolchain.md](../../../../docs/toolchain.md)), и `typescripty` существует ровно затем, чтобы это
 подтверждать.

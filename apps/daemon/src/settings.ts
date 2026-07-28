@@ -1,5 +1,5 @@
 /**
- * Снимок настроек и его перечитывание на живом демоне (ADR-0033). Наблюдается директория данных, а
+ * Снимок настроек и его перечитывание на живом демоне (docs/data-directory.md). Наблюдается директория данных, а
  * не файлы: наблюдатель на файле умирает после первой же атомарной замены — он держит старый inode,
  * а `rename` подставляет новый ([runtime-checks.md](../../../docs/runtime-checks.md), проверка 12).
  */
@@ -61,7 +61,7 @@ export type SettingsStore = {
 
 export type WriteOutcome =
   | { kind: "written" }
-  /** Файл на диске не читается. Записать поверх — значит стереть чужую правку (ADR-0033). */
+  /** Файл на диске не читается. Записать поверх — значит стереть чужую правку (docs/data-directory.md). */
   | { kind: "refused"; reason: string };
 
 export type CreateSettingsStoreOptions = {
@@ -116,7 +116,7 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       active.warn(diagnostic, { file: fileName });
     }
 
-    // Невалидный файл не применяется и не затирается: действует прежний снимок (ADR-0033).
+    // Невалидный файл не применяется и не затирается: действует прежний снимок (docs/data-directory.md).
     if (result.kind === "rejected") {
       active.error("the settings file was not applied, the previous values stay in effect", {
         file: fileName,
@@ -166,7 +166,7 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
 
     active.on("change", (_event, changed) => {
       // Рядом лежат лок, временные файлы записи и позже база: фильтр по имени — часть решения,
-      // а не оптимизация (ADR-0033).
+      // а не оптимизация (docs/data-directory.md).
       const fileName = typeof changed === "string" ? changed : changed?.toString();
 
       if (fileName !== configFileName && fileName !== preferencesFileName) {
@@ -251,9 +251,9 @@ type StoredPreferences =
 /**
  * Читает файл для правки. Пишется потом **этот документ** с заменённым полем, а не сериализованный
  * снимок: снимок не знает о ключах, которых нет в схеме, и запись из интерфейса молча уносила бы
- * настройку, написанную более новой версией платформы или руками (ADR-0049).
+ * настройку, написанную более новой версией платформы или руками (docs/data-directory.md).
  *
- * Разбор при этом всё равно нужен: чинить негодный файл записью поверх нельзя (ADR-0033).
+ * Разбор при этом всё равно нужен: чинить негодный файл записью поверх нельзя (docs/data-directory.md).
  */
 function readStoredPreferences(path: string): StoredPreferences {
   const raw = readFileIfExists(path);
@@ -291,7 +291,7 @@ function asObject(raw: unknown): Record<string, unknown> | undefined {
 
 /**
  * Замена целиком, а не дописывание: наблюдатель не должен увидеть половину файла, а оборванная на
- * середине запись не должна оставить настройки битыми (ADR-0033).
+ * середине запись не должна оставить настройки битыми (docs/data-directory.md).
  */
 function writeAtomically(path: string, text: string): void {
   const temporary = `${path}.${process.pid}.tmp`;

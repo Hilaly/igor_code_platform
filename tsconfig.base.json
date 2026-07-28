@@ -9,11 +9,11 @@
     "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true,
 
-    // Платформа исполняется без --experimental-transform-types (ADR-0004),
+    // Платформа исполняется без --experimental-transform-types (docs/toolchain.md),
     // поэтому нестираемый синтаксис здесь запрещён компилятором, а не договорённостью.
     "erasableSyntaxOnly": true,
 
-    // Пакеты потребляются исходниками (ADR-0006): компилятор ничего не выпускает,
+    // Пакеты потребляются исходниками (docs/repository-structure.md): компилятор ничего не выпускает,
     // импорты указывают на .ts напрямую.
     "allowImportingTsExtensions": true,
     "noEmit": true,

@@ -1,6 +1,6 @@
 /**
  * Хэндл хоста: то, через что `@sovereign/sdk` разговаривает с платформой. Ставит его бутстрап
- * воркера до импорта кода плагина (ADR-0043), а в тестах — шов из `@sovereign/sdk/testing`.
+ * воркера до импорта кода плагина (docs/plugins.md), а в тестах — шов из `@sovereign/sdk/testing`.
  * Авторам плагинов эта точка входа не нужна.
  *
  * Хэндл живёт на символе в `globalThis`, а не в переменной модуля, потому что модуля бывает два:
@@ -17,18 +17,18 @@ const hostSymbol = Symbol.for("sovereign.plugin.host");
  */
 export type PluginLogLevel = "debug" | "info" | "warn" | "error";
 
-/** Кто мы. Приходит от хоста: сам себя плагин не называет (ADR-0074). */
+/** Кто мы. Приходит от хоста: сам себя плагин не называет (docs/logging.md). */
 export type PluginIdentity = {
   id: string;
   source: string;
 };
 
 /**
- * Общий вид вклада (ADR-0054): идентификатор, метаданные отображения, произвольная нагрузка.
+ * Общий вид вклада (docs/plugins.md): идентификатор, метаданные отображения, произвольная нагрузка.
  * Типизированные виды появляются вместе со своими потребителями.
  */
 export type CustomContribution = {
-  /** Без неймспейса: его добавляет хост, объявить чужой нельзя (ADR-0024, ADR-0072). */
+  /** Без неймспейса: его добавляет хост, объявить чужой нельзя (docs/ui-extension-model.md, docs/event-bus.md). */
   id: string;
   title?: string;
   description?: string;
@@ -37,11 +37,11 @@ export type CustomContribution = {
 
 /**
  * Схема нагрузки, превращённая в данные. К хосту едет описание, а не схема: в схеме функции, а
- * граница воркера — структурное клонирование (ADR-0072).
+ * граница воркера — структурное клонирование (docs/event-bus.md).
  */
 export type PayloadSchema = Record<string, unknown>;
 
-/** Объявление события шины (ADR-0072). Идентификатор вклада — это имя события. */
+/** Объявление события шины (docs/event-bus.md). Идентификатор вклада — это имя события. */
 export type EventContribution = {
   id: string;
   title?: string;
@@ -58,13 +58,13 @@ export type PluginHost = {
   log: (level: PluginLogLevel, message: string, fields?: Record<string, unknown>) => Promise<void>;
   contribute: (contribution: PluginContribution) => Promise<void>;
   /**
-   * Нагрузка проверена схемой здесь же, в воркере публикатора (ADR-0072). Имя объявленное, без
+   * Нагрузка проверена схемой здесь же, в воркере публикатора (docs/event-bus.md). Имя объявленное, без
    * неймспейса: неймспейс ставит хост по идентичности, поэтому чужим именем не опубликуешь.
    */
   publishEvent: (declaredId: string, payload: unknown) => Promise<void>;
   /**
    * Имя полное: подписываются на чужое событие, и неймспейс в нём чужой. Ядру сообщается имя, а не
-   * обработчик, — обработчики остаются в воркере (ADR-0072).
+   * обработчик, — обработчики остаются в воркере (docs/event-bus.md).
    */
   subscribeEvent: (type: string) => Promise<void>;
   unsubscribeEvent: (type: string) => Promise<void>;
@@ -80,7 +80,7 @@ export function removePluginHost(): void {
 
 /**
  * Ошибка вместо падения по `undefined`: SDK, вызванный вне воркера плагина, обязан объяснить,
- * что произошло (ADR-0043) — иначе автор увидит «cannot read property of undefined».
+ * что произошло (docs/plugins.md) — иначе автор увидит «cannot read property of undefined».
  */
 export function currentPluginHost(): PluginHost {
   const host = (globalThis as Record<symbol, unknown>)[hostSymbol];

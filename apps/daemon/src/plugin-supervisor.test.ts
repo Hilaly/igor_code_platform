@@ -218,7 +218,7 @@ describe("createPluginSupervisor", () => {
     );
 
     // Последнее событие обязано совпасть со снимком до поля: расхождение между потоком и снимком
-    // делает догон бессмысленным (ADR-0041).
+    // делает догон бессмысленным (docs/event-bus.md).
     assert.deepEqual(
       published.at(-1),
       supervisor.statuses().find((status) => status.key === "data:hello"),
@@ -419,7 +419,7 @@ describe("createPluginSupervisor", () => {
 
     await supervisor.apply(only("hello"), preferences({}));
 
-    // Не «обнаружен»: решение применено, и оно — «выключен» (ADR-0018). Переход виден в журнале
+    // Не «обнаружен»: решение применено, и оно — «выключен» (docs/plugins.md). Переход виден в журнале
     // и без воркера: человеку нужно подтверждение, а не молчание.
     assert.equal(
       supervisor.statuses().find((status) => status.key === "data:hello")?.state,
@@ -496,7 +496,7 @@ describe("createPluginSupervisor", () => {
     assert.match(status?.contributionProblems?.[0] ?? "", /"Board Panel" must match/);
 
     // Причина обязана уехать тем же событием: для пользователя это единственный признак, что вклад
-    // не появился, а журнал в браузер не отдаётся (ADR-0074).
+    // не появился, а журнал в браузер не отдаётся (docs/logging.md).
     assert.deepEqual(lifecycleEvents(recorded.events, "data:problem").at(-1), status);
   });
 

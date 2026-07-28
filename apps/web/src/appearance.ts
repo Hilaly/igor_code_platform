@@ -1,9 +1,9 @@
 /**
  * Выбор цветовой схемы, варианта и локали. Источник истины — `preferences.json` в директории данных
- * (ADR-0033): интерфейс читает и пишет его через `/api/preferences`.
+ * (docs/data-directory.md): интерфейс читает и пишет его через `/api/preferences`.
  *
  * Выбранное дополнительно кешируется в браузере, чтобы при загрузке не мигать чужой темой
- * (ADR-0028): ответ демона приходит позже первой отрисовки.
+ * (docs/ui-kit.md): ответ демона приходит позже первой отрисовки.
  */
 
 import {
@@ -23,7 +23,7 @@ import {
   type AppearanceVariant,
 } from "@sovereign/protocol";
 
-/** Схемы поставки. Плагин добавит свои, когда демон начнёт собирать его браузерный код (ADR-0025). */
+/** Схемы поставки. Плагин добавит свои, когда демон начнёт собирать его браузерный код (docs/ui-extension-model.md). */
 export const shippedSchemes: ColorScheme[] = [baseScheme, checkScheme];
 
 export const defaultAppearancePreferences: AppearancePreferences = {
@@ -65,7 +65,7 @@ export function cacheAppearance(cache: PreferencesCache, value: AppearancePrefer
   cache.setItem(appearanceCacheKey, JSON.stringify(value));
 }
 
-/** «Системный» вариант — это не третья палитра, а выбор одной из двух (ADR-0028). */
+/** «Системный» вариант — это не третья палитра, а выбор одной из двух (docs/ui-kit.md). */
 export function resolveVariant(variant: AppearanceVariant, prefersDark: boolean): PaletteVariant {
   if (variant === "system") {
     return prefersDark ? "dark" : "light";
@@ -84,7 +84,7 @@ export type ApplyAppearanceOptions = {
 
 /**
  * Применяет схему записью CSS-переменных. Названная схема может отсутствовать — её приносил плагин,
- * которого выключили (ADR-0016), — и тогда работает встроенная: интерфейс без цветов не остаётся.
+ * которого выключили (docs/plugins.md), — и тогда работает встроенная: интерфейс без цветов не остаётся.
  */
 export function applyAppearance(options: ApplyAppearanceOptions): void {
   const schemes = options.schemes ?? shippedSchemes;

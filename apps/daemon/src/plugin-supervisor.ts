@@ -1,8 +1,8 @@
 /**
- * Супервизор плагинов (ADR-0011): по одному воркеру на плагин, падение плагина не трогает ядро,
+ * Супервизор плагинов (docs/plugins.md): по одному воркеру на плагин, падение плагина не трогает ядро,
  * загрузочная и рабочая ошибка обрабатываются одинаково.
  *
- * Здесь же ведётся жизненный цикл (ADR-0018) и его наблюдаемость: каждый переход уходит и в
+ * Здесь же ведётся жизненный цикл (docs/plugins.md) и его наблюдаемость: каждый переход уходит и в
  * журнал, и в шину. Сами состояния — контракт и живут в протоколе; супервизор ими только
  * распоряжается.
  */
@@ -43,18 +43,18 @@ export type CancelScheduled = () => void;
 export type CreatePluginSupervisorOptions = {
   logger: Logger;
   registry: ContributionRegistry;
-  /** Куда уходят переходы жизненного цикла и смена набора вкладов (ADR-0018). */
+  /** Куда уходят переходы жизненного цикла и смена набора вкладов (docs/plugins.md). */
   bus: EventBus;
-  /** Источник записи штампует ядро: плагин не может назваться чужим именем (ADR-0074). */
+  /** Источник записи штампует ядро: плагин не может назваться чужим именем (docs/logging.md). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
   schedule?: (callback: () => void, delayMilliseconds: number) => CancelScheduled;
-  /** Задержки перезапуска по номеру попытки; последняя — потолок (ADR-0011). */
+  /** Задержки перезапуска по номеру попытки; последняя — потолок (docs/plugins.md). */
   retryDelaysMilliseconds?: number[];
   deactivateTimeoutMilliseconds?: number;
   /** Сколько плагин должен продержаться, чтобы следующее падение считалось первым. */
   stabilityMilliseconds?: number;
-  /** Установка зависимостей (ADR-0042). Внедряется, чтобы тест не ходил в сеть. */
+  /** Установка зависимостей (docs/plugins.md). Внедряется, чтобы тест не ходил в сеть. */
   ensureDependencies?: (
     plugin: DiscoveredPlugin,
     onInstallStart: () => void,
@@ -80,11 +80,11 @@ type Supervised = {
   nextAttemptAt?: number;
   worker?: Worker;
   runningSince?: number;
-  /** Вклады копятся до `activated` и применяются одним снимком (ADR-0024). */
+  /** Вклады копятся до `activated` и применяются одним снимком (docs/ui-extension-model.md). */
   pending: PluginContribution[];
   /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
   contributed: PluginContribution[];
-  /** Почему объявленный вклад не появился (ADR-0054): причина живёт до следующего применения. */
+  /** Почему объявленный вклад не появился (docs/plugins.md): причина живёт до следующего применения. */
   contributionProblems: string[];
   disabledContributions: ReadonlySet<string>;
   /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
@@ -125,7 +125,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
   /**
    * Единственное место, где состояние записи превращается в статус: снимок и событие обязаны
-   * говорить одно и то же, иначе догон по потоку бессмысленен (ADR-0041).
+   * говорить одно и то же, иначе догон по потоку бессмысленен (docs/event-bus.md).
    */
   const statusOf = (entry: Supervised): PluginStatus => ({
     key: entry.plugin.key,
@@ -188,7 +188,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.contributionProblems = outcome.problems;
 
     for (const problem of outcome.problems) {
-      // Кривой вклад — событие жизненного цикла плагина, а не исключение (ADR-0054).
+      // Кривой вклад — событие жизненного цикла плагина, а не исключение (docs/plugins.md).
       logger.warn("the plugin contribution was not applied", {
         plugin: entry.plugin.key,
         reason: problem,
@@ -308,7 +308,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   };
 
   /**
-   * Установка — этап жизненного цикла, а не скрытая подготовка (ADR-0042): плагин с зависимостями
+   * Установка — этап жизненного цикла, а не скрытая подготовка (docs/plugins.md): плагин с зависимостями
    * стартует долго, и это видно. Встроенные сюда не заходят — их зависимости решены сборкой.
    */
   const install = async (entry: Supervised): Promise<boolean> => {
@@ -319,7 +319,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     const outcome = await ensureDependencies(entry.plugin, () => transition(entry, "installing"));
 
     if (outcome.kind === "failed") {
-      // Провал установки не перезапускается (ADR-0070): повтор раз в минуту не починит сеть или
+      // Провал установки не перезапускается (docs/plugins.md): повтор раз в минуту не починит сеть или
       // реестр. Повтор происходит по действию человека или по правке плагина.
       entry.attempt = 0;
       entry.nextAttemptAt = undefined;
@@ -362,7 +362,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
     const worker = new Worker(bootstrapPath, {
       workerData,
-      // Флаг живёт только здесь: платформа исполняется без него (ADR-0004, проверка 4).
+      // Флаг живёт только здесь: платформа исполняется без него (docs/toolchain.md, проверка 4).
       // Предупреждение о его экспериментальности гасится — оно печаталось бы на каждый старт
       // каждого плагина и говорило бы то, что уже записано в решении.
       execArgv: ["--experimental-transform-types", "--no-warnings=ExperimentalWarning"],
@@ -390,7 +390,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     const worker = entry.worker;
 
     // Даже без воркера переход пишется в журнал: «выключен» — такое же наблюдаемое состояние, как
-    // «запущен», и человек, выключивший плагин, должен увидеть подтверждение (ADR-0018).
+    // «запущен», и человек, выключивший плагин, должен увидеть подтверждение (docs/plugins.md).
     if (worker === undefined) {
       dropContributions(entry);
       transition(entry, finalState);
@@ -541,7 +541,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       }
 
       // Переключение вклада не трогает плагин: он остаётся запущенным, меняется только набор
-      // действующих вкладов (ADR-0032, ADR-0063).
+      // действующих вкладов (docs/plugins.md).
       if (switched && entry.state === "running") {
         applyContributions(entry);
       }
@@ -556,7 +556,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       for (const entry of supervised.values()) {
         // Плагин, которому сейчас ставят зависимости, перезагружать нечего: он и так поднимется с
-        // новыми исходниками, а перезапуск начал бы установку заново (ADR-0042).
+        // новыми исходниками, а перезапуск начал бы установку заново (docs/plugins.md).
         if (
           !affected.has(entry.plugin.directory) ||
           !entry.enabled ||

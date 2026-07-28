@@ -4,8 +4,8 @@
  * SDK при этом остаётся без зависимостей — он знает только интерфейс хоста.
  *
  * Сообщения односторонние. Ответа на `log`, `contribute` и `publish` нет: вклады применяются одним
- * снимком после `activate` (ADR-0024), а о проблеме плагин узнаёт событием жизненного цикла, а не
- * исключением на месте вызова (ADR-0054).
+ * снимком после `activate` (docs/ui-extension-model.md), а о проблеме плагин узнаёт событием жизненного цикла, а не
+ * исключением на месте вызова (docs/plugins.md).
  */
 
 import type { PluginContribution, PluginLogLevel } from "@sovereign/sdk";
@@ -27,7 +27,7 @@ export type PluginOutgoing =
       fields?: Record<string, unknown>;
     }
   | { kind: "contribute"; contribution: PluginContribution }
-  /** Имя объявленное: неймспейс ставит ядро по идентичности воркера (ADR-0072). */
+  /** Имя объявленное: неймспейс ставит ядро по идентичности воркера (docs/event-bus.md). */
   | { kind: "publish"; declaredId: string; payload: unknown }
   /** Здесь имя, наоборот, полное: подписываются на чужое событие. */
   | { kind: "subscribe"; type: string }

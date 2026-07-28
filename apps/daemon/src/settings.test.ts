@@ -56,7 +56,7 @@ function write(directory: string, fileName: string, content: string): void {
   writeFileSync(join(directory, fileName), content);
 }
 
-/** Атомарная запись, как её делает платформа: временный файл плюс `rename` (ADR-0020). */
+/** Атомарная запись, как её делает платформа: временный файл плюс `rename` (docs/data-directory.md). */
 function writeAtomically(directory: string, fileName: string, content: string): void {
   const temporary = join(directory, `${fileName}.tmp`);
 
@@ -184,7 +184,7 @@ test("an atomic replace is picked up twice in a row", async () => {
 
   assert.equal(first.config.logLevel, "debug");
 
-  // Вторая замена — та самая проверка, на которой наблюдатель за файлом молчит (ADR-0033).
+  // Вторая замена — та самая проверка, на которой наблюдатель за файлом молчит (docs/data-directory.md).
   const second = await applyAtomically(store, directory, configFileName, `{ "logLevel": "error" }`);
 
   assert.equal(second.config.logLevel, "error");
@@ -264,7 +264,7 @@ test("writing one plugin keeps a key the schema does not know", () => {
     { kind: "written" },
   );
 
-  // Ключ из более новой версии платформы или из чужой правки переживает запись (ADR-0049): иначе
+  // Ключ из более новой версии платформы или из чужой правки переживает запись (docs/data-directory.md): иначе
   // нажатие переключателя молча уносит настройку.
   assert.deepEqual(JSON.parse(readFileSync(join(directory, preferencesFileName), "utf8")), {
     pinnedViews: ["plugins"],

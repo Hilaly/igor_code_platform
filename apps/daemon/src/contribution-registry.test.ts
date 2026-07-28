@@ -101,7 +101,7 @@ describe("createContributionRegistry", () => {
     );
     registry.apply(dataHello, [board], new Set(["hello.board"]));
 
-    // Выключенный вклад не перекрывает встроенный: он не участвует ни в чём (ADR-0032).
+    // Выключенный вклад не перекрывает встроенный: он не участвует ни в чём (docs/plugins.md).
     assert.deepEqual(
       registry.resolved().map((registration) => [registration.source, registration.title]),
       [["builtin", "Built-in board"]],

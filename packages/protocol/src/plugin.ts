@@ -1,5 +1,5 @@
 /**
- * Манифест плагина — поле `sovereign` в его `package.json` (ADR-0044). Разбор живёт в протоколе, а
+ * Манифест плагина — поле `sovereign` в его `package.json` (docs/plugins.md). Разбор живёт в протоколе, а
  * не в демоне, потому что имена полей это публичный контракт: по ним автор пишет манифест, по ним же
  * интерфейс объясняет, почему плагин не взяли.
  *
@@ -16,7 +16,7 @@ export const manifestField = "sovereign";
 export const platformVersion = "0.1.0";
 
 /**
- * Источники плагинов в порядке возрастания специфичности (ADR-0030, ADR-0036): более специфичный
+ * Источники плагинов в порядке возрастания специфичности (docs/plugins.md, docs/repository-structure.md): более специфичный
  * перекрывает менее специфичный при споре вкладов. Папка проекта появится здесь вместе с проектами.
  */
 export const pluginSources = ["builtin", "data"] as const;
@@ -24,8 +24,8 @@ export const pluginSources = ["builtin", "data"] as const;
 export type PluginSource = (typeof pluginSources)[number];
 
 /**
- * Плагин, о котором в предпочтениях ещё ничего не сказано: встроенный работает сразу (ADR-0019),
- * любой другой ждёт явного включения — включение это граница доверия (ADR-0016, ADR-0018).
+ * Плагин, о котором в предпочтениях ещё ничего не сказано: встроенный работает сразу (docs/plugins.md),
+ * любой другой ждёт явного включения — включение это граница доверия (docs/plugins.md).
  */
 export function pluginEnabledByDefault(source: PluginSource): boolean {
   return source === "builtin";
@@ -35,7 +35,7 @@ export function pluginEnabledByDefault(source: PluginSource): boolean {
 export const pluginIdPattern = /^[a-z0-9][a-z0-9-]*$/;
 
 export type PluginManifest = {
-  /** Не имя npm-пакета: у имени со скоупом есть слэш, а идентификатор идёт в путь (ADR-0044). */
+  /** Не имя npm-пакета: у имени со скоупом есть слэш, а идентификатор идёт в путь (docs/plugins.md). */
   id: string;
   /** Путь к воркерной точке входа относительно папки плагина. */
   worker: string;
@@ -49,7 +49,7 @@ export type PluginManifestParseResult =
   | { kind: "parsed"; value: PluginManifest; diagnostics: string[] }
   /** Папка не объявляет себя плагином: это чужой пакет, а не сломанный плагин. */
   | { kind: "absent" }
-  /** Плагин объявлен, но взять его нельзя. Причина показывается человеку (ADR-0044). */
+  /** Плагин объявлен, но взять его нельзя. Причина показывается человеку (docs/plugins.md). */
   | { kind: "refused"; reason: string; diagnostics: string[] };
 
 const manifestKeys = ["id", "worker", "browser", "platform"];

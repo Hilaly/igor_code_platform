@@ -16,7 +16,7 @@ describe("the zod re-exported by the sdk", () => {
     const description = z.toJSONSchema(z.object({ id: z.string() }));
 
     // Схема сама по себе не клонируется — в ней функции. Уезжает описание, и оно обязано пережить
-    // структурное клонирование, иначе объявление вклада не дойдёт до демона (ADR-0072).
+    // структурное клонирование, иначе объявление вклада не дойдёт до демона (docs/event-bus.md).
     assert.deepEqual(structuredClone(description), description);
   });
 });

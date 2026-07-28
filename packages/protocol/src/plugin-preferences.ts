@@ -1,7 +1,7 @@
 /**
  * Маршрут переключения плагина. Тело запроса — `PluginPreferences`, то есть ровно та запись, что
  * лежит в `preferences.json`: файл остаётся источником истины, а API — вторым способом его
- * изменить (ADR-0032, ADR-0033, ADR-0063).
+ * изменить (docs/plugins.md, docs/data-directory.md).
  */
 
 import type { PluginPreferences } from "./settings.ts";

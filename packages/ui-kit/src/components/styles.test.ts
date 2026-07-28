@@ -10,7 +10,7 @@ const styles = readFileSync(join(import.meta.dirname, "..", "styles.css"), "utf8
 /**
  * Линтер следит за цветовыми литералами в коде, но не в CSS (eslint.config.js). Здесь та же проверка
  * для файла стилей: цвет мимо токена не переключается ни при смене варианта, ни при смене схемы, и
- * находится он на чужой схеме, а не у нас (ADR-0031).
+ * находится он на чужой схеме, а не у нас (docs/ui-kit.md).
  */
 describe("styles.css", () => {
   it("takes every colour from a role variable", () => {

@@ -1,9 +1,9 @@
 /**
- * Реестр вкладов (ADR-0054). Плагин объявляет вклады во время `activate`, реестр решает, какие из
+ * Реестр вкладов (docs/plugins.md). Плагин объявляет вклады во время `activate`, реестр решает, какие из
  * них действуют, и держит связь «вклад — плагин»: без неё выключение плагина не может снять всё, что
- * он зарегистрировал (ADR-0016).
+ * он зарегистрировал (docs/plugins.md).
  *
- * Видов два: общий и событие шины (ADR-0072). Остальные типизированные виды появятся вместе со
+ * Видов два: общий и событие шины (docs/event-bus.md). Остальные типизированные виды появятся вместе со
  * своими потребителями — контракт без потребителя проверить нечем.
  */
 
@@ -21,7 +21,7 @@ const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 
 export type ContributionApplyOutcome = {
   registered: ContributionRegistration[];
-  /** Кривой вклад — событие жизненного цикла плагина, а не исключение (ADR-0054). */
+  /** Кривой вклад — событие жизненного цикла плагина, а не исключение (docs/plugins.md). */
   problems: string[];
 };
 
@@ -36,8 +36,8 @@ export type ContributionRegistry = {
   revision: () => number;
   /**
    * Заменяет весь набор плагина целиком: наблюдатель видит либо прежний набор, либо новый
-   * (ADR-0024). Выключенные человеком вклады отсеиваются здесь же, до разрешения споров
-   * (ADR-0032) — выключенный вклад не участвует ни в чём, в том числе в перекрытии.
+   * (docs/ui-extension-model.md). Выключенные человеком вклады отсеиваются здесь же, до разрешения споров
+   * (docs/plugins.md) — выключенный вклад не участвует ни в чём, в том числе в перекрытии.
    */
   apply: (
     plugin: ContributingPlugin,
@@ -49,7 +49,7 @@ export type ContributionRegistry = {
   /**
    * Объявленное, но выключенное человеком. Реестр помнит его целиком, а не только применённое:
    * иначе выключенный вклад исчезал бы из интерфейса вместе с возможностью включить его обратно
-   * (ADR-0032).
+   * (docs/plugins.md).
    */
   switchedOff: () => ContributionRegistration[];
   conflicts: () => ContributionConflict[];
@@ -85,7 +85,7 @@ export function createContributionRegistry(): ContributionRegistry {
     const nextConflicts: ContributionConflict[] = [];
 
     for (const [id, claimants] of [...claims].sort(([left], [right]) => (left < right ? -1 : 1))) {
-      // Более специфичный источник перекрывает менее специфичный (ADR-0030).
+      // Более специфичный источник перекрывает менее специфичный (docs/plugins.md).
       const rank = (registration: ContributionRegistration): number =>
         pluginSources.indexOf(registration.source);
       const best = Math.max(...claimants.map(rank));
@@ -93,7 +93,7 @@ export function createContributionRegistry(): ContributionRegistry {
       const winner = winners[0];
 
       if (winners.length > 1 && winner !== undefined) {
-        // Равный ранг — выбирать не по чему, поэтому не применяется ни один (ADR-0040).
+        // Равный ранг — выбирать не по чему, поэтому не применяется ни один (docs/plugins.md).
         nextConflicts.push({
           id,
           source: winner.source,
@@ -137,7 +137,7 @@ export function createContributionRegistry(): ContributionRegistry {
 
         const id = `${plugin.id}.${contribution.id}`;
 
-        // Неймспейс ядра принадлежит ядру (ADR-0072): плагин с идентификатором `core` иначе объявил
+        // Неймспейс ядра принадлежит ядру (docs/event-bus.md): плагин с идентификатором `core` иначе объявил
         // бы событие `core.plugin.lifecycle` и стал бы неотличим от платформы.
         if (contribution.kind === "event" && id.startsWith(`${coreEventNamespace}.`)) {
           problems.push(
@@ -175,7 +175,7 @@ export function createContributionRegistry(): ContributionRegistry {
         const single = group[0];
 
         // Дважды объявленный идентификатор — тот же спор с равным рангом, что и между плагинами:
-        // не применяется ни один (ADR-0040).
+        // не применяется ни один (docs/plugins.md).
         if (group.length > 1 || single === undefined) {
           problems.push(`the contribution ${id} is declared ${group.length} times by one plugin`);
 

@@ -90,7 +90,7 @@ describe("createPluginEvents", () => {
   it("refuses an event whose contribution the human switched off", () => {
     const { registry, events: plugins, published, records } = events();
 
-    // Выключенный вклад — это публикация, которой больше нет (ADR-0032, ADR-0072).
+    // Выключенный вклад — это публикация, которой больше нет (docs/plugins.md, docs/event-bus.md).
     registry.apply(tracker, [taskCreated], new Set(["tracker.task.created"]));
     plugins.publish(tracker, "task.created", { id: "42" });
 
@@ -105,7 +105,7 @@ describe("createPluginEvents", () => {
     registry.apply(tracker, [taskCreated], new Set());
     registry.apply(twin, [taskCreated], new Set());
 
-    // Спор равных источников не применяет ни один вклад (ADR-0040), значит публиковать нечего.
+    // Спор равных источников не применяет ни один вклад (docs/plugins.md), значит публиковать нечего.
     plugins.publish(tracker, "task.created", { id: "42" });
     plugins.publish(twin, "task.created", { id: "42" });
 

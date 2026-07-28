@@ -1,5 +1,5 @@
 /**
- * Вклад, зарегистрированный в реестре (ADR-0054), — то, чем плагин расширяет платформу. Реестр
+ * Вклад, зарегистрированный в реестре (docs/plugins.md), — то, чем плагин расширяет платформу. Реестр
  * живёт в демоне, а его результат уходит и в снимок состояния, и в события шины, поэтому форма
  * записи — контракт.
  *
@@ -11,12 +11,12 @@ import type { PluginSource } from "./plugin.ts";
 
 /**
  * Схема нагрузки в виде данных — то, что отдаёт `z.toJSONSchema()`. Сама схема сюда попасть не
- * может: в ней функции, а между воркером и ядром ходит структурное клонирование (ADR-0072).
+ * может: в ней функции, а между воркером и ядром ходит структурное клонирование (docs/event-bus.md).
  */
 export type PayloadSchema = Record<string, unknown>;
 
 type RegistrationCommon = {
-  /** С неймспейсом: `<pluginId>.<объявленный>` (ADR-0024, ADR-0072). */
+  /** С неймспейсом: `<pluginId>.<объявленный>` (docs/ui-extension-model.md, docs/event-bus.md). */
   id: string;
   declaredId: string;
   pluginKey: string;
@@ -32,7 +32,7 @@ export type CustomContributionRegistration = RegistrationCommon & {
   payload?: unknown;
 };
 
-/** Событие шины, объявленное плагином (ADR-0072). Идентификатор вклада — имя события. */
+/** Событие шины, объявленное плагином (docs/event-bus.md). Идентификатор вклада — имя события. */
 export type EventContributionRegistration = RegistrationCommon & {
   kind: "event";
   payloadSchema: PayloadSchema;
@@ -45,7 +45,7 @@ export type ContributionKind = ContributionRegistration["kind"];
 
 /**
  * Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника: не применяется ни
- * один (ADR-0040). Форма — контракт, потому что спор уходит в снимок: диагностика обязана быть
+ * один (docs/plugins.md). Форма — контракт, потому что спор уходит в снимок: диагностика обязана быть
  * заметной в интерфейсе, а не строкой в журнале.
  */
 export type ContributionConflict = {

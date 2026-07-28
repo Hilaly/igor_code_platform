@@ -1,5 +1,5 @@
 /**
- * Файлы настроек (ADR-0033): `config.json` пишет человек, `preferences.json` — платформа по
+ * Файлы настроек (docs/data-directory.md): `config.json` пишет человек, `preferences.json` — платформа по
  * действию пользователя. Разбор живёт здесь, а не в демоне, потому что схема — часть контракта:
  * по ней же интерфейс объясняет, что в файле не так.
  *
@@ -14,7 +14,7 @@ import { pluginIdPattern, pluginSources, type PluginSource } from "./plugin.ts";
 export const configFileName = "config.json";
 export const preferencesFileName = "preferences.json";
 
-/** Параметров развёртывания здесь нет: порт и путь приходят аргументами запуска (ADR-0034). */
+/** Параметров развёртывания здесь нет: порт и путь приходят аргументами запуска (docs/data-directory.md). */
 export type Config = {
   /** Применяется живьём. */
   logLevel: LogLevel;
@@ -22,22 +22,22 @@ export type Config = {
 
 /**
  * Что человек включил и выключил. Отсутствие записи — не «выключено», а «не видели»: значение по
- * умолчанию зависит от источника плагина (ADR-0018, ADR-0019), и запись появляется, только когда
+ * умолчанию зависит от источника плагина (docs/plugins.md), и запись появляется, только когда
  * решение принято.
  */
 export type PluginPreferences = {
   enabled: boolean;
-  /** Идентификаторы вкладов, выключенных человеком (ADR-0032). Остальные включены. */
+  /** Идентификаторы вкладов, выключенных человеком (docs/plugins.md). Остальные включены. */
   disabledContributions: string[];
 };
 
-/** Светлый и тёмный — варианты внутри схемы, а не две схемы (ADR-0028). */
+/** Светлый и тёмный — варианты внутри схемы, а не две схемы (docs/ui-kit.md). */
 export const appearanceVariants = ["light", "dark", "system"] as const;
 
 export type AppearanceVariant = (typeof appearanceVariants)[number];
 
 export type Appearance = {
-  /** Идентификатор цветовой схемы; схему может добавить плагин (ADR-0028). */
+  /** Идентификатор цветовой схемы; схему может добавить плагин (docs/ui-kit.md). */
   colorScheme: string;
   variant: AppearanceVariant;
 };
@@ -45,11 +45,11 @@ export type Appearance = {
 /** Идентификатор встроенной схемы. Она есть всегда: заменить её нечем, пока плагинов нет. */
 export const baseColorScheme = "base";
 
-/** Базовая локаль английская, русская идёт в поставке (ADR-0028). */
+/** Базовая локаль английская, русская идёт в поставке (docs/ui-kit.md). */
 export const baseLocale = "en";
 
 export type Preferences = {
-  /** Ключ — `<источник>:<id>`: перекрывающая копия плагина это другой плагин (ADR-0067). */
+  /** Ключ — `<источник>:<id>`: перекрывающая копия плагина это другой плагин (docs/plugins.md). */
   plugins: Record<string, PluginPreferences>;
   appearance: Appearance;
   /** Тег локали для `Intl`. */
@@ -78,7 +78,7 @@ const defaultPluginPreferences: PluginPreferences = { enabled: true, disabledCon
 
 export type SettingsParseResult<Value> =
   | { kind: "parsed"; value: Value; diagnostics: string[] }
-  /** Файл прочитан, но применить его нельзя: частичного применения нет (ADR-0033). */
+  /** Файл прочитан, но применить его нельзя: частичного применения нет (docs/data-directory.md). */
   | { kind: "rejected"; diagnostics: string[] };
 
 export function parseConfig(raw: unknown): SettingsParseResult<Config> {
@@ -155,7 +155,7 @@ export function parsePreferences(raw: unknown): SettingsParseResult<Preferences>
 
 /**
  * Внешний вид и локаль. Отдельно от файла, потому что тем же телом они меняются через веб-API: форма
- * одна, файл остаётся источником истины (ADR-0033).
+ * одна, файл остаётся источником истины (docs/data-directory.md).
  */
 export function parseAppearance(
   raw: unknown,
@@ -316,7 +316,7 @@ function parsePluginsSection(raw: unknown): SettingsParseResult<Record<string, P
 
 /**
  * Предпочтения одного плагина. Отдельно от файла, потому что тем же телом плагин переключается через
- * веб-API: форма одна, файл остаётся источником истины (ADR-0033), и разойтись им не на чем.
+ * веб-API: форма одна, файл остаётся источником истины (docs/data-directory.md), и разойтись им не на чем.
  */
 export function parsePluginPreferences(
   raw: unknown,

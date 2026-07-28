@@ -45,7 +45,7 @@ const lock = (() => {
 
 const settings = createSettingsStore({ directory });
 
-// Логгер зовётся здесь напрямую: запись уходит в `stdout` и на шину не возвращается (ADR-0074),
+// Логгер зовётся здесь напрямую: запись уходит в `stdout` и на шину не возвращается (docs/logging.md),
 // поэтому цикла «упавший подписчик → журнал → тот же подписчик» больше нет.
 const bus = createEventBus({
   onListenerError: (cause, event) => {
@@ -136,7 +136,7 @@ server.listen(port, "127.0.0.1", () => {
 });
 
 // Лок держится ровно столько, сколько живёт процесс: после kill -9 файл остаётся, и его
-// подхватит проверка на протухание при следующем старте (ADR-0008).
+// подхватит проверка на протухание при следующем старте (docs/data-directory.md).
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     logger.info("daemon stopping", { signal });
