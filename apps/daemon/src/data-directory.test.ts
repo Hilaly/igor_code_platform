@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { ensureDataDirectory, resolveDataDirectory } from "./data-directory.ts";
+import {
+  ensureDataDirectory,
+  pluginsDirectoryName,
+  resolveDataDirectory,
+  workDirectoryName,
+} from "./data-directory.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-data-directory-"));
 
@@ -33,6 +38,17 @@ test("a missing directory is created together with its parents", () => {
 
   assert.equal(ensureDataDirectory(directory), directory);
   assert.ok(statSync(directory).isDirectory());
+});
+
+test("the plugin root and the ephemeral project folder are created too", () => {
+  // Эфемерный проект есть всегда (docs/sessions-and-projects.md), а без папки на диске «есть
+  // всегда» означало бы «первая же сессия в нём падает».
+  const directory = join(workspace, "with-folders");
+
+  ensureDataDirectory(directory);
+
+  assert.ok(statSync(join(directory, pluginsDirectoryName)).isDirectory());
+  assert.ok(statSync(join(directory, workDirectoryName)).isDirectory());
 });
 
 test("an existing directory is accepted as is", () => {

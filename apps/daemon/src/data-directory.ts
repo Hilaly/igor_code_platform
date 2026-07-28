@@ -20,6 +20,13 @@ export function resolveDataDirectory(path: string, home: string = homedir()): st
 /** Папка плагинов создаётся вместе с директорией данных: класть плагин человеку некуда иначе. */
 export const pluginsDirectoryName = "plugins";
 
+/**
+ * Папка эфемерного проекта (docs/sessions-and-projects.md). Создаётся здесь же и по той же причине:
+ * эфемерный проект есть всегда, а «есть всегда» без папки на диске значит «первая же сессия в нём
+ * падает». Записи о нём в `projects.json` нет — что слово «эфемерный» и значит.
+ */
+export const workDirectoryName = "work";
+
 export function ensureDataDirectory(path: string): string {
   const directory = resolveDataDirectory(path);
   const existing = statSync(directory, { throwIfNoEntry: false });
@@ -29,6 +36,7 @@ export function ensureDataDirectory(path: string): string {
   }
 
   mkdirSync(join(directory, pluginsDirectoryName), { recursive: true });
+  mkdirSync(join(directory, workDirectoryName), { recursive: true });
 
   return directory;
 }
