@@ -72,7 +72,15 @@ async function serve() {
   const call = (method: string, body?: string): Promise<Answer> =>
     new Promise((resolve, reject) => {
       const outgoing = sendRequest(
-        { host: "127.0.0.1", port, method, path: preferencesPath },
+        {
+          host: "127.0.0.1",
+          port,
+          method,
+          path: preferencesPath,
+          // Изменяющий запрос обязан называть себя json, как это делает интерфейс: иначе диспетчер
+          // отвечает `415` (docs/web-api.md).
+          headers: { "content-type": "application/json" },
+        },
         (incoming) => {
           let text = "";
 

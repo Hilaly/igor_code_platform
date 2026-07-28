@@ -58,18 +58,36 @@ async function serve(routes: Route[], options: ServeOptions = {}) {
 
   const { port } = server.address() as AddressInfo;
 
-  const call = (method: string, path: string, body?: string): Promise<Answer> =>
+  /**
+   * По умолчанию запрос выглядит как запрос интерфейса: свой `content-type` у изменяющих методов и
+   * `Sec-Fetch-Site: same-origin`. Отсутствие того и другого — отдельные тесты.
+   */
+  const call = (
+    method: string,
+    path: string,
+    body?: string,
+    headers: Record<string, string> | undefined = undefined,
+  ): Promise<Answer> =>
     new Promise((resolve, reject) => {
-      const outgoing = sendRequest({ host: "127.0.0.1", port, method, path }, (incoming) => {
-        let text = "";
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk: string) => {
-          text += chunk;
-        });
-        incoming.on("end", () =>
-          resolve({ status: incoming.statusCode ?? 0, headers: incoming.headers, body: text }),
-        );
-      });
+      const outgoing = sendRequest(
+        {
+          host: "127.0.0.1",
+          port,
+          method,
+          path,
+          headers: headers ?? (method === "GET" ? {} : { "content-type": "application/json" }),
+        },
+        (incoming) => {
+          let text = "";
+          incoming.setEncoding("utf8");
+          incoming.on("data", (chunk: string) => {
+            text += chunk;
+          });
+          incoming.on("end", () =>
+            resolve({ status: incoming.statusCode ?? 0, headers: incoming.headers, body: text }),
+          );
+        },
+      );
 
       outgoing.on("error", reject);
       outgoing.end(body);
@@ -243,6 +261,81 @@ describe("createDispatcher", () => {
 
     assert.equal((await call("GET", "/api/nothing")).status, 404);
     assert.equal((await call("DELETE", "/api/plugins")).status, 405);
+  });
+
+  it("refuses a changing request the browser calls cross-site", async () => {
+    // Маршрут регистрации открыт по необходимости, и `SameSite=Strict` его не защищает: чужая
+    // страница ничего не читает, но отправить запрос может. `Sec-Fetch-Site` ставит браузер, и
+    // подделать его страница не может (docs/web-api.md).
+    const { call } = await serve([{ ...echo("/api/account", "POST"), access: "open" }]);
+
+    const answer = await call("POST", "/api/account", "{}", {
+      "content-type": "application/json",
+      "sec-fetch-site": "cross-site",
+    });
+
+    assert.equal(answer.status, 403);
+    assert.match(JSON.parse(answer.body).error, /cross-site/);
+  });
+
+  it("lets a same-origin request through and asks nothing of curl", async () => {
+    const { call } = await serve([echo("/api/plugins", "PUT")]);
+
+    assert.equal(
+      (
+        await call("PUT", "/api/plugins", "{}", {
+          "content-type": "application/json",
+          "sec-fetch-site": "same-origin",
+        })
+      ).status,
+      200,
+    );
+
+    // У запроса вне браузера заголовка нет вовсе, и это не повод отказывать: без него запрос не
+    // может быть межсайтовым.
+    assert.equal(
+      (await call("PUT", "/api/plugins", "{}", { "content-type": "application/json" })).status,
+      200,
+    );
+  });
+
+  it("refuses a changing request that does not call itself json", async () => {
+    // Второй замок на ту же дверь: `Sec-Fetch-Site` есть не у всякого браузера, а `text/plain`
+    // делает запрос «простым» — он уходит без предзапроса, и CORS его не останавливает. С
+    // `application/json` предзапрос обязателен, и мы на него не отвечаем.
+    const { call } = await serve([{ ...echo("/api/account", "POST"), access: "open" }]);
+
+    const answer = await call("POST", "/api/account", "{}", { "content-type": "text/plain" });
+
+    assert.equal(answer.status, 415);
+    assert.match(JSON.parse(answer.body).error, /application\/json/);
+
+    assert.equal((await call("POST", "/api/account", "{}", {})).status, 415);
+  });
+
+  it("takes the parameters of a json content type in stride", async () => {
+    const { call } = await serve([echo("/api/plugins", "PUT")]);
+
+    assert.equal(
+      (
+        await call("PUT", "/api/plugins", "{}", {
+          "content-type": "Application/JSON; charset=utf-8",
+        })
+      ).status,
+      200,
+    );
+  });
+
+  it("asks no content type of a request that carries no body", async () => {
+    // У `GET` и `DELETE` тела нет по определению, и требовать от них `content-type` значило бы
+    // требовать заголовок про то, чего нет. Межсайтовость у `DELETE` проверяется всё равно.
+    const { call } = await serve([echo("/api/session", "DELETE")]);
+
+    assert.equal((await call("DELETE", "/api/session", undefined, {})).status, 200);
+    assert.equal(
+      (await call("DELETE", "/api/session", undefined, { "sec-fetch-site": "cross-site" })).status,
+      403,
+    );
   });
 
   it("waits for an asynchronous handler", async () => {

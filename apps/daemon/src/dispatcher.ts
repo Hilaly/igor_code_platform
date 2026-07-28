@@ -127,6 +127,18 @@ export function createDispatcher(
       return;
     }
 
+    // Форма запроса проверяется до сессии: ответ на негодный запрос не имеет права зависеть от
+    // того, есть ли cookie, — иначе отказ рассказывал бы о состоянии входа.
+    if (request.method !== "GET") {
+      const refusal = refuseUnsafeRequest(request);
+
+      if (refusal !== undefined) {
+        respondWithError(response, refusal.status, refusal.error);
+
+        return;
+      }
+    }
+
     // Проверка сессии — после разбора пути и до чтения тела. После разбора, потому что открытость
     // это свойство маршрута; до тела, потому что буферизовать килобайты для того, кто получит
     // отказ, незачем.
@@ -185,6 +197,41 @@ export function createDispatcher(
       respondWithError(response, 500, "internal error");
     }
   }
+}
+
+/**
+ * Два замка на изменяющем запросе (docs/web-api.md). `SameSite=Strict` защищает всё, что за сессией:
+ * межсайтовый запрос приходит без cookie и получает `401`. Но маршруты входа открыты по
+ * необходимости, а чужая страница вправе отправить туда запрос, даже не имея права прочитать ответ, —
+ * и на чистом демоне это значило бы, что пароль платформе назначает кто угодно.
+ *
+ * Первый замок — `Sec-Fetch-Site`: его ставит браузер, и страница его не подделает. Второй —
+ * обязательный `application/json`: заголовка `Sec-Fetch-Site` нет у старых браузеров, а `text/plain`
+ * делает запрос «простым», то есть он уходит вообще без предзапроса. С `application/json` предзапрос
+ * обязателен, а мы на `OPTIONS` не отвечаем.
+ *
+ * Списка доверенных `Origin` при этом нет: он потребовал бы настройки — интерфейс приезжает то с
+ * порта Vite, то из туннеля, — а защиты сверх этих двух проверок не добавил бы.
+ */
+function refuseUnsafeRequest(
+  request: IncomingMessage,
+): { status: number; error: string } | undefined {
+  const site = request.headers["sec-fetch-site"];
+
+  if (typeof site === "string" && site !== "same-origin") {
+    return { status: 403, error: "a cross-site request cannot change anything here" };
+  }
+
+  // У `DELETE` тела нет по определению — требовать от него заголовок про тело незачем.
+  if (request.method === "DELETE") {
+    return undefined;
+  }
+
+  const type = (request.headers["content-type"] ?? "").split(";")[0]?.trim().toLowerCase();
+
+  return type === "application/json"
+    ? undefined
+    : { status: 415, error: "the request body must be application/json" };
 }
 
 function segmentsOf(path: string): string[] {

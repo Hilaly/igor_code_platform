@@ -78,7 +78,15 @@ async function serve(settings: Pick<SettingsStore, "writePluginPreferences">) {
   const put = (pluginKey: string, body: string): Promise<Answer> =>
     new Promise((resolve, reject) => {
       const outgoing = sendRequest(
-        { host: "127.0.0.1", port, method: "PUT", path: pluginPreferencesPath(pluginKey) },
+        {
+          host: "127.0.0.1",
+          port,
+          method: "PUT",
+          path: pluginPreferencesPath(pluginKey),
+          // Изменяющий запрос обязан называть себя json, как это делает интерфейс: иначе диспетчер
+          // отвечает `415` (docs/web-api.md).
+          headers: { "content-type": "application/json" },
+        },
         (incoming) => {
           let text = "";
 
