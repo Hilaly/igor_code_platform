@@ -56,3 +56,15 @@ Formatting was applied to changed tests with `pnpm exec prettier --write ...`; f
 
 - No startup-specific test was extracted; startup ordering is enforced by awaiting the existing serialized application promise and refresh directly before route/server setup.
 - Runtime diagnostics and documentation outside this slice were intentionally untouched.
+
+## Round 1 documentation fix
+
+Updated `docs/sessions-and-projects.md` and `docs/web-api.md` to document the current safe behavior: `DELETE /api/projects/:id` returns `409` and leaves project/session records unchanged when `sessionCount > 0`; individual session deletion and cascade are deferred to Slice 10. Added the rationale under «Почему так».
+
+Verification:
+
+```text
+pnpm exec prettier --check docs/sessions-and-projects.md docs/web-api.md
+```
+
+Result: all matched files use Prettier code style.
