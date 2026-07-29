@@ -4,28 +4,38 @@ import tseslint from "typescript-eslint";
 
 /**
  * Правило зависимостей из docs/repository-structure.md (раздел «Три корневых каталога») живёт
- * здесь: приложения не знают друг о друге, пакеты не знают о приложениях. Непроверяемое правило
- * считается отсутствующим.
+ * здесь: приложения не знают друг о друге, пакеты не знают о приложениях, а про Pi знает один
+ * пакет. Непроверяемое правило считается отсутствующим.
+ *
+ * Группы вынесены в константы, потому что в плоском конфиге опции правила у более узкого блока
+ * **заменяют**, а не дополняют опции у более широкого. Разрешающий блок агентного рантайма обязан
+ * повторить остальные запреты целиком, иначе он молча их снимет.
  */
+const applicationPackages = [
+  "@sovereign/daemon",
+  "@sovereign/daemon/*",
+  "@sovereign/web",
+  "@sovereign/web/*",
+];
+
+/** Подпакеты Pi (`@earendil-works/pi-ai/providers/all`) отдельным шаблоном: `*` не переходит `/`. */
+const agentRuntimePackages = ["@earendil-works/*", "@earendil-works/*/**"];
+
+const noApplicationImports = {
+  group: applicationPackages,
+  message: "Приложения не зависят друг от друга — общий код выносится в packages/.",
+};
+
+const noAgentRuntimeImports = {
+  group: agentRuntimePackages,
+  message:
+    "Импорт Pi разрешён только внутри packages/agent-runtime-pi (docs/architecture.md): наружу выходят типы протокола, а не типы рантайма.",
+};
+
 const appsMustNotImportApps = {
   files: ["apps/**/*.{ts,tsx}"],
   rules: {
-    "no-restricted-imports": [
-      "error",
-      {
-        patterns: [
-          {
-            group: [
-              "@sovereign/daemon",
-              "@sovereign/daemon/*",
-              "@sovereign/web",
-              "@sovereign/web/*",
-            ],
-            message: "Приложения не зависят друг от друга — общий код выносится в packages/.",
-          },
-        ],
-      },
-    ],
+    "no-restricted-imports": ["error", { patterns: [noApplicationImports, noAgentRuntimeImports] }],
   },
 };
 
@@ -37,18 +47,47 @@ const packagesMustNotImportApps = {
       {
         patterns: [
           {
-            group: [
-              "@sovereign/daemon",
-              "@sovereign/daemon/*",
-              "@sovereign/web",
-              "@sovereign/web/*",
-            ],
+            ...noApplicationImports,
             message:
               "Пакеты не зависят от приложений: зависимости идут только из apps/ в packages/.",
           },
+          noAgentRuntimeImports,
         ],
       },
     ],
+  },
+};
+
+/**
+ * Плагины ставятся снаружи и живут на воркерах: им доступен `sdk`, а не наши внутренности
+ * (docs/repository-structure.md, docs/plugins.md).
+ */
+const pluginsMustNotImportAppsOrRuntime = {
+  files: ["plugins/**/*.{ts,tsx}"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            ...noApplicationImports,
+            message: "Плагин обращается к платформе через @sovereign/sdk, а не импортом ядра.",
+          },
+          noAgentRuntimeImports,
+        ],
+      },
+    ],
+  },
+};
+
+/**
+ * Единственное место, где Pi легален. Запрет на приложения повторён здесь дословно: без повтора
+ * блок снял бы его вместе с запретом на Pi. Исключений из правила «Pi только здесь» сегодня нет.
+ */
+const agentRuntimeMayImportPi = {
+  files: ["packages/agent-runtime-pi/**/*.ts"],
+  rules: {
+    "no-restricted-imports": ["error", { patterns: [noApplicationImports] }],
   },
 };
 
@@ -104,6 +143,8 @@ export default tseslint.config(
   tseslint.configs.recommended,
   appsMustNotImportApps,
   packagesMustNotImportApps,
+  pluginsMustNotImportAppsOrRuntime,
+  agentRuntimeMayImportPi,
   daemonAndPackagesLogThroughTheLogger,
   colorsComeFromTokensOnly,
   prettier,

@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.82.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
   }
 }
