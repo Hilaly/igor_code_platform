@@ -7,19 +7,19 @@
  * индекс.
  */
 
-import type { StreamEvent } from "@sovereign/protocol";
+import type { BusStreamEvent } from "@sovereign/protocol";
 
-export type FrontendBusListener = (event: StreamEvent) => void;
+export type FrontendBusListener = (event: BusStreamEvent) => void;
 
 export type FrontendBus = {
-  publish: (event: StreamEvent) => void;
+  publish: (event: BusStreamEvent) => void;
   /** Возвращает функцию отписки. */
   subscribe: (listener: FrontendBusListener) => () => void;
 };
 
 export type CreateFrontendBusOptions = {
   /** Обязателен: упавший подписчик — это потерянный кадр, и молчать о нём нельзя. */
-  onListenerError: (cause: unknown, event: StreamEvent) => void;
+  onListenerError: (cause: unknown, event: BusStreamEvent) => void;
 };
 
 export function createFrontendBus(options: CreateFrontendBusOptions): FrontendBus {

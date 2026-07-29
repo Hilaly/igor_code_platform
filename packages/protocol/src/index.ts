@@ -15,5 +15,6 @@ export * from "./plugin.ts";
 export * from "./plugins-snapshot.ts";
 export * from "./preferences-api.ts";
 export * from "./project.ts";
+export * from "./provider-login.ts";
 export * from "./provider.ts";
 export * from "./settings.ts";

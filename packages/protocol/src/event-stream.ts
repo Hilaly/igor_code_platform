@@ -5,6 +5,7 @@
  */
 
 import type { CoreEventPayloads, PluginEventOrigin } from "./events.ts";
+import type { LoginStep } from "./provider-login.ts";
 
 export const eventsPath = "/api/events";
 
@@ -58,13 +59,48 @@ export type PluginStreamEvent = StreamFrame & {
   plugin: PluginEventOrigin;
 };
 
+/**
+ * Шаг интерактивного входа в провайдера (docs/models-and-providers.md).
+ *
+ * **Это не событие шины.** Событие шины — уведомление всем подписчикам, а шаг входа адресован
+ * одному инициатору и ждёт ответа; запрос-ответ по шине запрещён (docs/event-bus.md). До плагина
+ * шаг через шину не доходит: у попытки плагина шаги едут в его воркер.
+ *
+ * Соединением при этом пользуется тем же: второго SSE на вкладку в системе нет (docs/web-api.md).
+ * Кадр нумеруется общей нумерацией и попадает в окно догона, но корректность на окно не опирается —
+ * переподключившаяся вкладка перечитывает `GET /api/provider-logins`.
+ */
+export const loginStepFrameKind = "login-step";
+
+export type LoginStepFrame = StreamFrame & {
+  frame: typeof loginStepFrameKind;
+  attemptId: string;
+  providerId: string;
+  step: LoginStep;
+};
+
+/**
+ * Кадры, которые пришли с шины. Шаг входа сюда не входит по определению — он не событие шины, — и
+ * это отдельный тип, а не комментарий: подписчик шины не должен уметь его получить.
+ */
+export type BusStreamEvent = CoreStreamEvent | PluginStreamEvent;
+
 /** Кадр потока целиком: он же тело `data:`, разбирать SSE-поля клиенту не нужно. */
-export type StreamEvent = CoreStreamEvent | PluginStreamEvent;
+export type StreamEvent = BusStreamEvent | LoginStepFrame;
 
 /**
  * Различает кадры так же, как шина различает события, — по наличию `plugin`. Без этого имя
  * события ядра перестаёт сужать нагрузку: у события плагина имя произвольное.
  */
-export function isPluginStreamEvent(event: StreamEvent): event is PluginStreamEvent {
+export function isPluginStreamEvent(event: BusStreamEvent): event is PluginStreamEvent {
   return "plugin" in event;
+}
+
+/**
+ * Кадр шага входа различается наличием `frame` — тем же приёмом, что и кадр плагина. Поля `frame`
+ * нет ни у одного кадра события, поэтому охранники исключают друг друга, и это под тестом: разойдись
+ * они, шаг входа приехал бы подписчику на события как событие с пустой нагрузкой.
+ */
+export function isLoginStepFrame(event: StreamEvent): event is LoginStepFrame {
+  return "frame" in event;
 }

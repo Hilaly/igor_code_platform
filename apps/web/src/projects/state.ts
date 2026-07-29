@@ -12,7 +12,7 @@ import {
   streamGapType,
   type Project,
   type ProjectsSnapshot,
-  type StreamEvent,
+  type BusStreamEvent,
 } from "@sovereign/protocol";
 
 export type ProjectsState = {
@@ -35,7 +35,7 @@ export type StreamOutcome = {
   refetch: boolean;
 };
 
-export function applyStreamEvent(state: ProjectsState, event: StreamEvent): StreamOutcome {
+export function applyStreamEvent(state: ProjectsState, event: BusStreamEvent): StreamOutcome {
   // События плагинов вью не касаются.
   if (isPluginStreamEvent(event)) {
     return { state, refetch: false };

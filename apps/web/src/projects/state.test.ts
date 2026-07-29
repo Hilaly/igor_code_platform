@@ -3,7 +3,7 @@ import {
   streamGapType,
   type Project,
   type ProjectsSnapshot,
-  type StreamEvent,
+  type BusStreamEvent,
 } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
@@ -46,8 +46,8 @@ const snapshot = (projects: Project[], archived: Project[] = []): ProjectsSnapsh
 const withSnapshot = (value: ProjectsSnapshot): ProjectsState =>
   applySnapshot(initialProjectsState, value);
 
-const frame = (type: string, payload: unknown = {}): StreamEvent =>
-  ({ index: 1, time: "2026-07-29T00:00:00.000Z", type, payload }) as StreamEvent;
+const frame = (type: string, payload: unknown = {}): BusStreamEvent =>
+  ({ index: 1, time: "2026-07-29T00:00:00.000Z", type, payload }) as BusStreamEvent;
 
 describe("applyStreamEvent", () => {
   it("asks for the list again on any project event", () => {
@@ -77,7 +77,7 @@ describe("applyStreamEvent", () => {
       type: "tracker.task.created",
       payload: {},
       plugin: { key: "data:tracker", id: "tracker", source: "data" },
-    } as StreamEvent;
+    } as BusStreamEvent;
 
     expect(applyStreamEvent(initialProjectsState, event).refetch).toBe(false);
   });

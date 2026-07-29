@@ -13,8 +13,10 @@
 
 import {
   eventsPath,
+  isLoginStepFrame,
   lastEventIdParameter,
   streamGapType,
+  type LoginStepFrame,
   type StreamEvent,
 } from "@sovereign/protocol";
 
@@ -49,6 +51,12 @@ export type ConnectEventStreamOptions = {
   onStatus: (status: StreamStatus) => void;
   /** Негодный кадр, разрыв и пропуск — это диагностика, а не тишина: журнала у браузера нет. */
   onDiagnostic: (diagnostic: string) => void;
+  /**
+   * Шаг интерактивного входа в провайдера. Не событие шины: он адресован одному инициатору и ждёт
+   * ответа (docs/models-and-providers.md). Необязателен — вкладка, не показывающая провайдеров,
+   * шаги просто роняет, а диалог всё равно восстанавливается снимком `GET /api/provider-logins`.
+   */
+  onLoginStep?: (frame: LoginStepFrame) => void;
   /**
    * Браузер закрыл `EventSource` навсегда, и поток переоткрывается своей попыткой. Зовётся на каждый
    * такой разрыв, а не один раз: у `EventSource` нет кода ответа, поэтому закрытая сессия выглядит
@@ -135,6 +143,15 @@ export function connectEventStream(options: ConnectEventStreamOptions): StreamCo
       }
 
       lastIndex = frame.index;
+
+      // Шаг входа в провайдера едет тем же соединением, но событием шины не является: он адресован
+      // одному инициатору и ждёт ответа (docs/models-and-providers.md). На шину он не попадает —
+      // и не может: `FrontendBus` его формы не принимает.
+      if (isLoginStepFrame(frame)) {
+        options.onLoginStep?.(frame);
+
+        return;
+      }
 
       if (frame.type === streamGapType) {
         options.onDiagnostic(

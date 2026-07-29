@@ -14,7 +14,7 @@ import {
   streamGapType,
   type PluginPreferences,
   type PluginsSnapshot,
-  type StreamEvent,
+  type BusStreamEvent,
 } from "@sovereign/protocol";
 
 export type PluginsState = {
@@ -33,7 +33,7 @@ export type StreamOutcome = {
   refetch: boolean;
 };
 
-export function applyStreamEvent(state: PluginsState, event: StreamEvent): StreamOutcome {
+export function applyStreamEvent(state: PluginsState, event: BusStreamEvent): StreamOutcome {
   // События плагинов вью не касаются: своих вкладов они не меняют.
   if (isPluginStreamEvent(event)) {
     return { state, refetch: false };

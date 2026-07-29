@@ -2,7 +2,7 @@ import {
   type ContributionRegistration,
   type PluginsSnapshot,
   type PluginStatus,
-  type StreamEvent,
+  type BusStreamEvent,
 } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
@@ -44,8 +44,8 @@ const snapshot = (revision: number, plugins: PluginStatus[] = [hello]): PluginsS
 const shown = (revision = 1, plugins: PluginStatus[] = [hello]): PluginsState =>
   applySnapshot(initialPluginsState, snapshot(revision, plugins));
 
-const frame = (event: Omit<StreamEvent, "index" | "time">): StreamEvent =>
-  ({ index: 1, time: "2026-07-27T08:12:08.713Z", ...event }) as StreamEvent;
+const frame = (event: Omit<BusStreamEvent, "index" | "time">): BusStreamEvent =>
+  ({ index: 1, time: "2026-07-27T08:12:08.713Z", ...event }) as BusStreamEvent;
 
 describe("applyStreamEvent", () => {
   it("replaces the plugin row from the lifecycle payload without asking for a snapshot", () => {

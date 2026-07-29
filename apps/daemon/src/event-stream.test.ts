@@ -7,7 +7,9 @@ import { after, describe, it } from "node:test";
 import {
   coreEventTypes,
   eventsPath,
+  isLoginStepFrame,
   isPluginStreamEvent,
+  loginStepFrameKind,
   streamGapType,
   type LogRecord,
   type PluginStatus,
@@ -156,11 +158,20 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
   };
 }
 
+/**
+ * Кадр шага входа в поток тоже ходит, и `type` у него нет вовсе (docs/models-and-providers.md):
+ * читать имя события у кадра можно только после охранника.
+ */
+const nameOf = (event: StreamEvent): string =>
+  isLoginStepFrame(event) ? loginStepFrameKind : event.type;
+
 const keysOf = (events: StreamEvent[]): string[] =>
   events.map((event) =>
-    !isPluginStreamEvent(event) && event.type === coreEventTypes.pluginLifecycle
+    !isLoginStepFrame(event) &&
+    !isPluginStreamEvent(event) &&
+    event.type === coreEventTypes.pluginLifecycle
       ? event.payload.key
-      : event.type,
+      : nameOf(event),
   );
 
 describe("createEventStream", () => {
@@ -221,12 +232,13 @@ describe("createEventStream", () => {
     const reader = await read(0);
     const [gap] = await reader.waitFor(1);
 
-    assert.equal(gap?.type, streamGapType);
-    assert.deepEqual(gap?.type === streamGapType ? gap.payload : undefined, {
+    assert.ok(gap && !isLoginStepFrame(gap));
+    assert.equal(gap.type, streamGapType);
+    assert.deepEqual(gap.type === streamGapType ? gap.payload : undefined, {
       requestedIndex: 0,
       oldestIndex: 2,
     });
-    assert.equal(gap?.index, 3);
+    assert.equal(gap.index, 3);
   });
 
   it("treats an index from a previous run of the daemon as a gap", async () => {
@@ -237,7 +249,8 @@ describe("createEventStream", () => {
     const reader = await read(42);
     const [gap] = await reader.waitFor(1);
 
-    assert.equal(gap?.type, streamGapType);
+    assert.ok(gap && !isLoginStepFrame(gap));
+    assert.equal(gap.type, streamGapType);
   });
 
   it("keeps only the last events of the window", async () => {
