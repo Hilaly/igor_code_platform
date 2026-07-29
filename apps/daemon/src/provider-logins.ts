@@ -66,8 +66,12 @@ export type ProviderLogins = {
   /** Идёт ли вход в этого провайдера прямо сейчас. */
   runningFor: (providerId: string) => LoginAttemptState | undefined;
   list: () => LoginAttemptState[];
-  /** Шаг попытки. Кадр в поток отдаёт тот, кто это слушает, — реестр про SSE не знает. */
-  subscribe: (listener: (attemptId: string, step: LoginStep) => void) => () => void;
+  /**
+   * Шаг попытки. Кадр в поток отдаёт тот, кто это слушает, — реестр про SSE не знает. Состояние
+   * попытки передаётся целиком: на завершающем шаге её в реестре уже нет, а получателю всё равно
+   * надо знать провайдера и то, чья это попытка.
+   */
+  subscribe: (listener: (attempt: LoginAttemptState, step: LoginStep) => void) => () => void;
 };
 
 export type CreateProviderLoginsOptions = {
@@ -121,11 +125,11 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
   const attemptTimeoutMs = options.attemptTimeoutMs ?? defaultAttemptTimeoutMs;
 
   const attempts = new Map<string, Attempt>();
-  const listeners = new Set<(attemptId: string, step: LoginStep) => void>();
+  const listeners = new Set<(attempt: LoginAttemptState, step: LoginStep) => void>();
 
-  const announce = (attemptId: string, step: LoginStep): void => {
+  const announce = (state: LoginAttemptState, step: LoginStep): void => {
     for (const listener of listeners) {
-      listener(attemptId, step);
+      listener(state, step);
     }
   };
 
@@ -138,7 +142,7 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
     clearStepTimer(attempt);
     attempt.cancelAttemptTimer();
     attempts.delete(attemptId);
-    announce(attemptId, step);
+    announce(attempt.state, step);
   };
 
   const giveUp = (attemptId: string, attempt: Attempt, reason: string): void => {
@@ -204,7 +208,7 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
             attempt.stepPatienceMs = notice.expiresInSeconds * 1000;
           }
 
-          announce(attemptId, { kind: "notice", notice });
+          announce(state, { kind: "notice", notice });
         },
         ask: (prompt: LoginPrompt): Promise<string> =>
           new Promise<string>((resolve, reject) => {
@@ -221,7 +225,7 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
               },
               Math.max(stepTimeoutMs, attempt.stepPatienceMs ?? 0),
             );
-            announce(attemptId, { kind: "prompt", prompt });
+            announce(state, { kind: "prompt", prompt });
           }),
       };
 

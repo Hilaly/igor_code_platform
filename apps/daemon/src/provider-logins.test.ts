@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import type { LoginNotice, LoginPrompt, LoginStep } from "@sovereign/protocol";
+import type { LoginAttemptState, LoginNotice, LoginPrompt, LoginStep } from "@sovereign/protocol";
 
 import { createLogger, type Logger } from "./logger.ts";
 import { createProviderLogins, type LoginRunner, type ProviderLogins } from "./provider-logins.ts";
@@ -74,9 +74,9 @@ function logins(options: Partial<Parameters<typeof createProviderLogins>[0]> = {
     },
     ...options,
   });
-  const steps: { attemptId: string; step: LoginStep }[] = [];
+  const steps: { attempt: LoginAttemptState; step: LoginStep }[] = [];
 
-  registry.subscribe((attemptId, step) => steps.push({ attemptId, step }));
+  registry.subscribe((attempt, step) => steps.push({ attempt, step }));
 
   return { registry, driver, steps };
 }

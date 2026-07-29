@@ -4,12 +4,7 @@
  * `credential-store.ts`, здесь собирается ответ.
  */
 
-import {
-  createProviderCatalogue,
-  type Environment,
-  type ModelCatalogVault,
-  type ProviderCatalogue,
-} from "@sovereign/agent-runtime-pi";
+import type { ProviderCatalogue } from "@sovereign/agent-runtime-pi";
 import {
   coreEventTypes,
   providerModelsPathPattern,
@@ -24,21 +19,18 @@ import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 
 export type ProvidersRouteOptions = {
-  credentials: CredentialStore;
+  /**
+   * Каталог один на демон, а не свой у каждого набора маршрутов: он же ведёт вход в провайдера
+   * (`provider-logins.ts`), и второй экземпляр означал бы вторую коллекцию провайдеров.
+   */
+  catalogue: ProviderCatalogue;
+  credentials: Pick<CredentialStore, "problem">;
   logger: Logger;
   bus: Pick<EventBus, "publish">;
-  /** Кэш динамических списков моделей. Без него они читаются из сети на каждый старт демона. */
-  catalogs?: ModelCatalogVault;
-  /** Окружение, из которого провайдер вправе взять кред. Подменяется только тестами. */
-  environment?: Environment;
 };
 
 export function providersRoutes(options: ProvidersRouteOptions): Route[] {
-  const catalogue: ProviderCatalogue = createProviderCatalogue({
-    credentials: options.credentials,
-    ...(options.catalogs === undefined ? {} : { catalogs: options.catalogs }),
-    ...(options.environment === undefined ? {} : { environment: options.environment }),
-  });
+  const { catalogue } = options;
 
   return [
     {

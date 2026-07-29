@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
+import { createProviderCatalogue } from "@sovereign/agent-runtime-pi";
 import { emptyEnvironment } from "@sovereign/agent-runtime-pi/testing";
 import {
   coreEventTypes,
@@ -63,15 +64,14 @@ async function serve(options: { contents?: string; variables?: Record<string, st
 
   bus.subscribe((event) => events.push(event));
 
+  const catalogue = createProviderCatalogue({
+    credentials,
+    catalogs,
+    environment: emptyEnvironment(options.variables),
+  });
   const server = createServer(
     createDispatcher({
-      routes: providersRoutes({
-        credentials,
-        logger,
-        bus,
-        catalogs,
-        environment: emptyEnvironment(options.variables),
-      }),
+      routes: providersRoutes({ catalogue, credentials, logger, bus }),
       logger,
       authenticate: () => ({ kind: "session" as const, id: "the-session" }),
     }),

@@ -13,7 +13,9 @@ import {
   eventsPath,
   isPluginBusEvent,
   lastEventIdParameter,
+  loginStepFrameKind,
   streamGapType,
+  type LoginStepFrame,
   type StreamEvent,
 } from "@sovereign/protocol";
 
@@ -23,6 +25,13 @@ import type { Logger } from "./logger.ts";
 
 export type EventStream = {
   route: () => Route;
+  /**
+   * Отправить кадр, пришедший не с шины. Единственный такой кадр — шаг интерактивного входа: он
+   * адресован одному инициатору и ждёт ответа, а событие шины ни того, ни другого не умеет
+   * (docs/models-and-providers.md). Нумерация общая: два счётчика на одно соединение сломали бы
+   * догон по `Last-Event-ID`.
+   */
+  emit: (frame: Omit<LoginStepFrame, "index" | "time" | "frame">) => void;
   /**
    * Отцепить соединения названной сессии входа. Проверка сессии стоит на входе в соединение, а
    * соединение живёт часами: без этого выход не обрывал бы живой поток, а оставлял бы его дожить до
@@ -82,17 +91,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   // и порядок отправки разошёлся бы с порядком присвоения индексов — то есть догон по
   // `Last-Event-ID` начал бы врать. Раньше такой подписчик был один — журнал, — но журнал с шины
   // ушёл (docs/logging.md).
-  const unsubscribe = options.bus.subscribe((event) => {
-    const frame = {
-      index: nextIndex,
-      time: new Date(now()).toISOString(),
-      type: event.type,
-      payload: event.payload,
-      // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
-      // платформенного (docs/event-bus.md).
-      ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
-    } as StreamEvent;
-
+  const send = (frame: StreamEvent): void => {
     nextIndex += 1;
 
     remember(frame);
@@ -100,6 +99,18 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     for (const client of [...clients]) {
       deliver(client, frame);
     }
+  };
+
+  const unsubscribe = options.bus.subscribe((event) => {
+    send({
+      index: nextIndex,
+      time: new Date(now()).toISOString(),
+      type: event.type,
+      payload: event.payload,
+      // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
+      // платформенного (docs/event-bus.md).
+      ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
+    } as StreamEvent);
   });
 
   const ping = setInterval(() => {
@@ -112,6 +123,14 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   ping.unref();
 
   return {
+    emit: (frame) => {
+      send({
+        ...frame,
+        frame: loginStepFrameKind,
+        index: nextIndex,
+        time: new Date(now()).toISOString(),
+      });
+    },
     route: () => ({
       method: "GET",
       path: eventsPath,

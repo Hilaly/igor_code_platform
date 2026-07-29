@@ -6,6 +6,8 @@ import { createContributionRegistry } from "./contribution-registry.ts";
 import { createCredentialStore } from "./credential-store.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
+import { createProviderCatalogue, processEnvironment } from "@sovereign/agent-runtime-pi";
+
 import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
@@ -22,6 +24,8 @@ import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
+import { carryLoginSteps, providerLoginRoutes } from "./provider-login-routes.ts";
+import { createProviderLogins } from "./provider-logins.ts";
 import { providersRoutes } from "./providers.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
@@ -86,6 +90,16 @@ const credentials = createCredentialStore({ directory, logger });
 
 // Кэш динамических списков моделей: без него они читаются из сети на каждый старт демона.
 const modelCatalogs = createModelCatalogStore({ directory, logger });
+
+const providers = createProviderCatalogue({
+  credentials,
+  catalogs: modelCatalogs,
+  environment: processEnvironment(),
+});
+
+// Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
+// пережить не может (docs/models-and-providers.md).
+const providerLogins = createProviderLogins({ runner: providers, logger });
 
 // Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
 // отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
@@ -182,6 +196,12 @@ const loginSessions = createLoginSessionStore({
 // проверка сессии стоит на входе в соединение, а соединение живёт часами.
 loginSessions.subscribe((sessionId) => events.disconnect(sessionId));
 
+// Тем же выходом гаснут и начатые этой сессией входы в провайдеров: отвечать на их вопросы стало
+// некому. Попытки плагинов при этом живут — они не про вкладку.
+loginSessions.subscribe((sessionId) => providerLogins.cancelOwnedBy(sessionId));
+
+carryLoginSteps({ logins: providerLogins, events });
+
 const server = createDaemonServer({
   logger,
   // Проверка одна на все маршруты и живёт в диспетчере, а не в обработчиках: новый маршрут не может
@@ -199,7 +219,8 @@ const server = createDaemonServer({
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
     }),
-    ...providersRoutes({ credentials, logger, bus, catalogs: modelCatalogs }),
+    ...providersRoutes({ catalogue: providers, credentials, logger, bus }),
+    ...providerLoginRoutes({ logins: providerLogins, credentials }),
     events.route(),
   ],
 });
