@@ -1,6 +1,6 @@
 /**
- * Центральная страница: разводит адреса по вью. Свои вью есть у проектов и у управления плагинами,
- * страницы плагинов появятся вместе с браузерным кодом, который собирает демон
+ * Центральная страница: разводит адреса по вью. Свои вью есть у проектов, у провайдеров и у
+ * управления плагинами, страницы плагинов появятся вместе с браузерным кодом, который собирает демон
  * (docs/ui-extension-model.md).
  */
 
@@ -14,10 +14,11 @@ export type PageViewProps = {
   /** Вью приходят собранными: страница не знает ни про шину, ни про запросы. */
   plugins: ReactNode;
   projects: ReactNode;
+  providers: ReactNode;
   translator: ScopedTranslator;
 };
 
-export function PageView({ page, plugins, projects, translator }: PageViewProps) {
+export function PageView({ page, plugins, projects, providers, translator }: PageViewProps) {
   const { t } = translator;
 
   if (page.kind === "plugins") {
@@ -26,6 +27,10 @@ export function PageView({ page, plugins, projects, translator }: PageViewProps)
 
   if (page.kind === "projects") {
     return projects;
+  }
+
+  if (page.kind === "providers") {
+    return providers;
   }
 
   if (page.kind === "plugin") {

@@ -1,0 +1,78 @@
+/*
+ * Раскладка вью провайдеров. Цвета — только переменные ролей, размеры — только шкалы кита: значения
+ * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
+ *
+ * Своим файлом, а не строками в `shell.css`: вью провайдеров — не оболочка.
+ */
+
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
+/*
+ * В строке провайдера двое: кто он и в каком он состоянии. Пометки держатся правого края распором
+ * между ними, а не селектором по классу примитива: имена классов кита хешируются модулями, и
+ * цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
+ *
+ * Отступа здесь нет: строка провайдера выбирается — по ней раскрываются модели, — и отступ ей даёт
+ * сам `ListRow`. Элементы строчные, потому что содержимое выбираемой строки лежит внутри кнопки.
+ */
+.providers-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  flex-wrap: wrap;
+}
+
+.providers-row-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  align-items: flex-start;
+  /* Длинная подпись способа входа режется, а не растягивает строку. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.providers-row-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+}
+
+/*
+ * Строка модели не выбирается: по ней ничего не открывается. Поэтому отступ здесь свой — `ListRow`
+ * даёт его только выбираемой строке.
+ */
+.providers-model {
+  display: flex;
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  flex-wrap: wrap;
+}
+
+.providers-model-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Окно и цена — в столбик: у сотен моделей одинаковой формы взгляд идёт вниз по колонке, а не по
+ * строке.
+ */
+.providers-model-marks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  align-items: flex-end;
+  text-align: right;
+}

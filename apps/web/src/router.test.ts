@@ -22,6 +22,15 @@ describe("matchPage", () => {
     });
   });
 
+  it("keeps the providers on their own address", () => {
+    expect(matchPage("/providers")).toEqual({ kind: "providers" });
+    // Провайдер своей страницы не получает: модели раскрываются внутри вью, а не по адресу.
+    expect(matchPage("/providers/anthropic")).toEqual({
+      kind: "unknown",
+      path: "/providers/anthropic",
+    });
+  });
+
   it("reads the plugin page namespace", () => {
     expect(matchPage("/p/tracker/board")).toEqual({
       kind: "plugin",
@@ -53,6 +62,7 @@ describe("pathOf", () => {
       "/",
       "/plugins",
       "/projects",
+      "/providers",
       "/p/tracker/board",
       "/p/tracker/board/15/edit",
       "/settings",

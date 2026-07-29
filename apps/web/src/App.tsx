@@ -44,6 +44,8 @@ import { PluginsView } from "./plugins/plugins-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { useProjects } from "./projects/use-projects.ts";
+import { ProvidersView } from "./providers/providers-view.tsx";
+import { useProviders } from "./providers/use-providers.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearancePanel } from "./shell/appearance-panel.tsx";
@@ -236,6 +238,7 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
+  const providers = useProviders({ stream, onDiagnostic: diagnostics.record });
 
   const translator = useMemo(
     () =>
@@ -352,6 +355,12 @@ export function App() {
               <Text>{translator.t("nav.projects")}</Text>
             </ListRow>
             <ListRow
+              selected={page.kind === "providers"}
+              onSelect={() => navigation.navigate({ kind: "providers" })}
+            >
+              <Text>{translator.t("nav.providers")}</Text>
+            </ListRow>
+            <ListRow
               selected={page.kind === "plugins"}
               onSelect={() => navigation.navigate({ kind: "plugins" })}
             >
@@ -418,6 +427,9 @@ export function App() {
             onDismissComplaints={projects.dismissComplaints}
             translator={translator}
           />
+        }
+        providers={
+          <ProvidersView state={providers.state} onOpen={providers.open} translator={translator} />
         }
         translator={translator}
       />

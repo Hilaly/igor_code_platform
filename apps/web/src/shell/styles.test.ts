@@ -65,6 +65,7 @@ describe("the style sheets of the application", () => {
     expect(sheets.map((sheet) => sheet.name).sort()).toEqual([
       "login.css",
       "projects.css",
+      "providers.css",
       "shell.css",
     ]);
   });
