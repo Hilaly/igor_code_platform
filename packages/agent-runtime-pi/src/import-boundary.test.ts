@@ -43,7 +43,7 @@ describe("the agent runtime boundary", () => {
       "apps/daemon/src/providers.ts",
       "apps/web/src/providers/api.ts",
       "packages/sdk/src/providers.ts",
-      "plugins/demo/src/index.ts",
+      "plugins/base-agent/src/worker.ts",
     ]) {
       assert.equal((await messagesFor(path, importsPi)).length, 1, `подпакет Pi прошёл в ${path}`);
       assert.equal(
@@ -58,7 +58,7 @@ describe("the agent runtime boundary", () => {
     for (const path of [
       "apps/web/src/providers/api.ts",
       "packages/sdk/src/providers.ts",
-      "plugins/demo/src/index.ts",
+      "plugins/base-agent/src/worker.ts",
       "packages/agent-runtime-pi/src/catalogue.ts",
     ]) {
       assert.equal(

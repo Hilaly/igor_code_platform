@@ -1,0 +1,21 @@
+{
+  "name": "@sovereign/plugin-base-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@sovereign/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  },
+  "sovereign": {
+    "id": "base-agent",
+    "worker": "src/worker.ts",
+    "platform": "^0.1.0"
+  }
+}

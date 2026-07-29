@@ -7,6 +7,7 @@ import { after, describe, it } from "node:test";
 import { platformVersion } from "@sovereign/protocol";
 
 import {
+  defaultPluginRoots,
   discoverPlugins,
   pluginKey,
   projectPluginRoots,
@@ -166,6 +167,20 @@ describe("discoverPlugins", () => {
     assert.deepEqual(discovery.plugins[0]?.diagnostics, [
       "sovereign.future is unknown and ignored",
     ]);
+  });
+});
+
+describe("defaultPluginRoots", () => {
+  it("finds the base agent shipped with the platform", () => {
+    // Встроенный корень — каталог `plugins/` репозитория, и путь до него считается от исходников:
+    // разъедься он с раскладкой, единственный агент поставки исчез бы молча.
+    const discovery = discoverPlugins([defaultPluginRoots(freshRoot())[0] as PluginRoot]);
+
+    assert.deepEqual(
+      discovery.plugins.map((plugin) => plugin.key),
+      ["builtin:base-agent"],
+    );
+    assert.deepEqual(discovery.refused, []);
   });
 });
 
