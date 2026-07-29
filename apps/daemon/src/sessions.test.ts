@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { scriptedSessionStore, type ScriptedTurn } from "@sovereign/agent-runtime-pi/testing";
+import type { AgentSession, AgentSessionStore } from "@sovereign/agent-runtime-pi";
 import {
   agentsPath,
   coreEventTypes,
@@ -63,11 +64,25 @@ const baseAgent: AgentContributionRegistration = {
 
 type Answer = { status: number; body: Record<string, unknown> };
 
+function gate() {
+  let open = (): void => undefined;
+  let entered = (): void => undefined;
+  const wait = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const entry = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+
+  return { wait, entry, open, entered };
+}
+
 async function serve(
   options: {
     turns?: ScriptedTurn[];
     contributions?: ContributionRegistration[];
     limit?: number;
+    modelChangeGate?: ReturnType<typeof gate>;
   } = {},
 ) {
   const directory = ensureDataDirectory(mkdtempSync(join(workspace, "case-")));
@@ -79,10 +94,35 @@ async function serve(
   assert.equal(created.kind, "created");
 
   const projectId = created.kind === "created" ? created.project.id : "";
-  const { store, model } = scriptedSessionStore({
+  const { store: sessionStore, model } = scriptedSessionStore({
     directory: join(directory, "sessions"),
     turns: options.turns ?? [{ text: "готово" }],
   });
+  const delayModelChange = (session: AgentSession): AgentSession => ({
+    ...session,
+    setModel: async (reference) => {
+      options.modelChangeGate?.entered();
+      await options.modelChangeGate?.wait;
+
+      return session.setModel(reference);
+    },
+  });
+  const store: AgentSessionStore =
+    options.modelChangeGate === undefined
+      ? sessionStore
+      : {
+          ...sessionStore,
+          create: async (input) => {
+            const createdSession = await sessionStore.create(input);
+
+            return "kind" in createdSession ? createdSession : delayModelChange(createdSession);
+          },
+          open: async (id, agent) => {
+            const openedSession = await sessionStore.open(id, agent);
+
+            return openedSession === undefined ? undefined : delayModelChange(openedSession);
+          },
+        };
   const bus = createEventBus({
     onListenerError: (cause) => {
       throw cause;
@@ -318,6 +358,85 @@ describe("running a turn over http", () => {
     await untilIdle(call, sessionId);
   });
 
+  it("admits only one concurrent overridden turn", async () => {
+    const modelChangeGate = gate();
+    const { call, start, model } = await serve({
+      turns: [{ text: "первый" }],
+      modelChangeGate,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    const accepted = call("POST", sessionTurnsPath(sessionId), {
+      text: "первый",
+      model,
+      thinkingLevel: "high",
+    });
+    await modelChangeGate.entry;
+    const refused = await call("POST", sessionTurnsPath(sessionId), {
+      text: "второй",
+      model,
+      thinkingLevel: "low",
+    });
+    modelChangeGate.open();
+
+    assert.equal((await accepted).status, 200);
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /busy/);
+    assert.equal((await call("GET", sessionPath(sessionId))).body["thinkingLevel"], "high");
+
+    await untilIdle(call, sessionId);
+  });
+
+  it("refuses an unavailable model promptly while the global queue is saturated", async () => {
+    const { call, start } = await serve({ limit: 0 });
+    const sessionId = String((await start()).body["id"]);
+
+    const answer = await call("POST", sessionTurnsPath(sessionId), {
+      text: "скажи",
+      model: "missing/model",
+    });
+
+    assert.equal(answer.status, 409);
+    assert.match(String(answer.body["error"]), /not available/);
+  });
+
+  it("keeps a cancelled validation admitted until it has deterministically refused", async () => {
+    const modelChangeGate = gate();
+    const { call, start, model } = await serve({
+      turns: [{ text: "после отмены" }],
+      modelChangeGate,
+    });
+    const sessionId = String((await start()).body["id"]);
+    const pendingValidation = call("POST", sessionTurnsPath(sessionId), {
+      text: "отмени",
+      model,
+      thinkingLevel: "high",
+    });
+
+    await modelChangeGate.entry;
+    assert.deepEqual((await call("DELETE", sessionTurnsPath(sessionId))).body, {
+      sessionId,
+      interrupted: true,
+    });
+
+    const retryDuringCancellation = await call("POST", sessionTurnsPath(sessionId), {
+      text: "слишком рано",
+    });
+
+    assert.equal(retryDuringCancellation.status, 409);
+    assert.match(String(retryDuringCancellation.body["error"]), /busy/);
+
+    modelChangeGate.open();
+    assert.equal((await pendingValidation).status, 409);
+    assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "idle");
+
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "после отмены" })).status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+  });
+
   it("refuses a turn without text", async () => {
     const { call, start } = await serve();
     const sessionId = String((await start()).body["id"]);
@@ -385,6 +504,27 @@ describe("running a turn over http", () => {
 });
 
 describe("reading sessions", () => {
+  it("shows turn overrides in summaries without waiting for a refresh", async () => {
+    const { call, start, model } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    const started = await call("POST", sessionTurnsPath(sessionId), {
+      text: "скажи",
+      model,
+      thinkingLevel: "high",
+    });
+
+    assert.equal(started.status, 200);
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]
+        ?.thinkingLevel,
+      "high",
+    );
+    assert.equal((await call("GET", sessionPath(sessionId))).body["thinkingLevel"], "high");
+
+    await untilIdle(call, sessionId);
+  });
+
   it("lists the sessions and filters them by project", async () => {
     const { call, start, projectId } = await serve();
 

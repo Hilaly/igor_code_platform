@@ -23,6 +23,7 @@ export type TurnJob = {
 };
 
 export type TurnPlace = {
+  kind: "accepted";
   turnId: string;
   /** Состояние на момент постановки. Дальше оно меняется, и спрашивать надо у очереди. */
   state: "queued" | "running";
@@ -33,8 +34,26 @@ export type TurnPlace = {
   cancel: () => boolean;
 };
 
+/** У сессии уже есть работа в очереди или занявшая слот — вторую не ставим и не подменяем первую. */
+export type TurnRefusal = { kind: "busy" };
+
+export type TurnReservation = {
+  kind: "accepted";
+  turnId: string;
+  /** Запустить зарезервированную работу после подготовки сессии. */
+  start: (job: Omit<TurnJob, "sessionId">) => TurnPlace | undefined;
+  /** Отказаться от reservation после неуспешной подготовки. */
+  release: () => void;
+  /** Отменили ли reservation, пока вызывающий готовил работу. */
+  cancelled: () => boolean;
+  /** Отмечает reservation отменённым или снимает поставленный turn; идущий turn не прерывает. */
+  cancel: () => boolean;
+};
+
 export type TurnQueue = {
-  submit: (job: TurnJob) => TurnPlace;
+  /** Атомарно занять sessionId до асинхронной подготовки turn. */
+  reserve: (sessionId: string) => TurnReservation | TurnRefusal;
+  submit: (job: TurnJob) => TurnPlace | TurnRefusal;
   stateOf: (sessionId: string) => "idle" | "queued" | "running";
   size: () => { running: number; queued: number };
 };
@@ -62,6 +81,7 @@ type Waiting = {
 export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
   const waiting: Waiting[] = [];
   const running = new Set<string>();
+  const reserved = new Set<string>();
 
   let turns = 0;
 
@@ -102,37 +122,113 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
     })();
   };
 
-  return {
-    submit: (job) => {
-      const turnId = createTurnId();
-      const place: Waiting = { job, turnId, cancelled: false };
+  const reserve = (sessionId: string): TurnReservation | TurnRefusal => {
+    if (
+      running.has(sessionId) ||
+      waiting.some((entry) => entry.job.sessionId === sessionId) ||
+      reserved.has(sessionId)
+    ) {
+      return { kind: "busy" };
+    }
 
-      // Работа встаёт в хвост даже когда место есть: очередь разбирается по порядку постановки, и
-      // «место освободилось» не повод пропустить вперёд того, кто пришёл позже.
-      waiting.push(place);
-      drain();
+    const turnId = createTurnId();
+    let started = false;
+    let cancelled = false;
+    let released = false;
+    let place: Waiting | undefined;
 
-      if (!waiting.includes(place)) {
-        return { turnId, state: "running", cancel: () => false };
+    reserved.add(sessionId);
+
+    const release = (): void => {
+      if (!released) {
+        released = true;
+        reserved.delete(sessionId);
+      }
+    };
+
+    const cancel = (): boolean => {
+      if (cancelled) {
+        return false;
       }
 
-      options.onChange?.(job.sessionId);
+      const queued = place !== undefined && waiting.includes(place);
 
-      return {
-        turnId,
-        state: "queued",
-        cancel: () => {
-          if (place.cancelled || !waiting.includes(place)) {
-            return false;
-          }
+      if (started && !queued) {
+        return false;
+      }
 
-          place.cancelled = true;
-          waiting.splice(waiting.indexOf(place), 1);
-          options.onChange?.(job.sessionId);
+      cancelled = true;
 
-          return true;
-        },
-      };
+      if (place !== undefined) {
+        place.cancelled = true;
+        waiting.splice(waiting.indexOf(place), 1);
+        release();
+        options.onChange?.(sessionId);
+      }
+
+      // До `start` reservation остаётся за сессией: асинхронная подготовка обязана заметить
+      // отмену и закончиться отказом, прежде чем следующий запрос сможет занять sessionId.
+      return true;
+    };
+
+    return {
+      kind: "accepted",
+      turnId,
+      start: (job) => {
+        if (cancelled || started) {
+          release();
+
+          return undefined;
+        }
+
+        started = true;
+        place = {
+          job: {
+            ...job,
+            sessionId,
+            run: async (activeTurnId) => {
+              try {
+                await job.run(activeTurnId);
+              } finally {
+                release();
+              }
+            },
+          },
+          turnId,
+          cancelled: false,
+        };
+
+        waiting.push(place);
+        drain();
+
+        if (waiting.includes(place)) {
+          options.onChange?.(sessionId);
+        }
+
+        return {
+          kind: "accepted",
+          turnId,
+          state: waiting.includes(place) ? "queued" : "running",
+          cancel,
+        };
+      },
+      release,
+      cancelled: () => cancelled,
+      cancel,
+    };
+  };
+
+  return {
+    reserve,
+    submit: (job) => {
+      const reservation = reserve(job.sessionId);
+
+      if (reservation.kind === "busy") {
+        return reservation;
+      }
+
+      // Между синхронными `reserve` и `start` отменить reservation некому.
+      return reservation.start({ kind: job.kind, run: job.run }) as TurnPlace;
     },
     stateOf: (sessionId) => {
       if (running.has(sessionId)) {

@@ -23,12 +23,18 @@ function pending() {
 
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
+function admitted(place: ReturnType<ReturnType<typeof createTurnQueue>["submit"]>) {
+  assert.equal(place.kind, "accepted");
+
+  return place;
+}
+
 describe("createTurnQueue", () => {
   it("starts a turn at once while there is room", async () => {
     const queue = createTurnQueue({ limit: () => 2 });
     const work = pending();
 
-    const place = queue.submit({ sessionId: "s1", kind: "turn", run: work.run });
+    const place = admitted(queue.submit({ sessionId: "s1", kind: "turn", run: work.run }));
 
     await settle();
 
@@ -42,6 +48,41 @@ describe("createTurnQueue", () => {
     assert.equal(queue.stateOf("s1"), "idle");
   });
 
+  it("refuses a second turn for a session that already owns a place", async () => {
+    const queue = createTurnQueue({ limit: () => 1 });
+    const first = pending();
+    const second = pending();
+
+    queue.submit({ sessionId: "s1", kind: "turn", run: first.run });
+    const duplicate = queue.submit({ sessionId: "s1", kind: "turn", run: second.run });
+
+    await settle();
+
+    assert.deepEqual(duplicate, { kind: "busy" });
+    assert.deepEqual(queue.size(), { running: 1, queued: 0 });
+    assert.deepEqual(second.started, []);
+
+    first.finish();
+    await settle();
+  });
+
+  it("keeps a cancelled reservation owned until validation releases it", () => {
+    const queue = createTurnQueue({ limit: () => 1 });
+    const reservation = queue.reserve("s1");
+
+    assert.equal(reservation.kind, "accepted");
+    assert.equal(reservation.cancel(), true);
+    assert.deepEqual(queue.reserve("s1"), { kind: "busy" });
+    assert.equal(queue.stateOf("s1"), "idle");
+
+    reservation.release();
+
+    const retry = queue.reserve("s1");
+
+    assert.equal(retry.kind, "accepted");
+    retry.release();
+  });
+
   it("makes the turn over the limit wait, and starts it when the room frees up", async () => {
     const queue = createTurnQueue({ limit: () => 1 });
     const first = pending();
@@ -49,7 +90,7 @@ describe("createTurnQueue", () => {
 
     queue.submit({ sessionId: "s1", kind: "turn", run: first.run });
 
-    const waiting = queue.submit({ sessionId: "s2", kind: "turn", run: second.run });
+    const waiting = admitted(queue.submit({ sessionId: "s2", kind: "turn", run: second.run }));
 
     await settle();
 
@@ -125,7 +166,7 @@ describe("createTurnQueue", () => {
 
     queue.submit({ sessionId: "s1", kind: "turn", run: first.run });
 
-    const waiting = queue.submit({ sessionId: "s2", kind: "turn", run: second.run });
+    const waiting = admitted(queue.submit({ sessionId: "s2", kind: "turn", run: second.run }));
 
     await settle();
 
@@ -144,7 +185,7 @@ describe("createTurnQueue", () => {
     const queue = createTurnQueue({ limit: () => 1 });
     const work = pending();
 
-    const place = queue.submit({ sessionId: "s1", kind: "turn", run: work.run });
+    const place = admitted(queue.submit({ sessionId: "s1", kind: "turn", run: work.run }));
 
     await settle();
 
@@ -161,7 +202,7 @@ describe("createTurnQueue", () => {
 
     queue.submit({ sessionId: "s1", kind: "compaction", run: compaction.run });
 
-    const waiting = queue.submit({ sessionId: "s2", kind: "turn", run: turn.run });
+    const waiting = admitted(queue.submit({ sessionId: "s2", kind: "turn", run: turn.run }));
 
     await settle();
 

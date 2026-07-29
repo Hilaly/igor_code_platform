@@ -135,8 +135,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     projectId: summary.projectId,
     folder: summary.folder,
     agentId: summary.agentId,
-    model: summary.model,
-    thinkingLevel: summary.thinkingLevel,
+    // Модель и уровень ризонинга меняются в открытом harness и пишутся в JSONL. Снимок списка
+    // намеренно не обновляем на каждый турн, поэтому для живой сессии берём именно её summary.
+    model: live.get(summary.id)?.summary().model ?? summary.model,
+    thinkingLevel: live.get(summary.id)?.summary().thinkingLevel ?? summary.thinkingLevel,
     // Очередь знает про ожидание и работу, рантайм — про всё остальное. Спрашиваем сначала очередь:
     // сессия в очереди для рантайма ещё простаивает (docs/architecture.md).
     phase: phaseOf(summary.id),
@@ -341,20 +343,45 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: `no agent ${summary.agentId} is enabled right now` };
     }
 
-    if (request.model !== undefined) {
-      const applied = await session.setModel(request.model);
+    const place = options.queue.reserve(sessionId);
 
-      if (applied.kind === "unknown-model") {
-        return { kind: "refused", reason: `the model ${request.model} is not available right now` };
+    if (place.kind === "busy") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    places.set(sessionId, place);
+
+    try {
+      if (request.model !== undefined) {
+        const applied = await session.setModel(request.model);
+
+        if (applied.kind === "unknown-model") {
+          place.release();
+          places.delete(sessionId);
+          return {
+            kind: "refused",
+            reason: `the model ${request.model} is not available right now`,
+          };
+        }
       }
+
+      if (place.cancelled()) {
+        place.release();
+        places.delete(sessionId);
+        return { kind: "refused", reason: "the turn was cancelled" };
+      }
+
+      if (request.thinkingLevel !== undefined) {
+        await session.setThinkingLevel(request.thinkingLevel);
+      }
+    } catch (cause) {
+      place.release();
+      places.delete(sessionId);
+
+      throw cause;
     }
 
-    if (request.thinkingLevel !== undefined) {
-      await session.setThinkingLevel(request.thinkingLevel);
-    }
-
-    const place = options.queue.submit({
-      sessionId,
+    const started = place.start({
       kind: "turn",
       run: async (turnId) => {
         try {
@@ -373,14 +400,17 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       },
     });
 
-    places.set(sessionId, place);
+    if (started === undefined) {
+      places.delete(sessionId);
+      return { kind: "refused", reason: "the turn was cancelled" };
+    }
 
     // Ожидание в очереди — наблюдаемое состояние, и узнать о нём надо не только из ответа: за
     // сессией смотрят и другие вкладки (docs/architecture.md).
-    if (place.state === "queued") {
+    if (started.state === "queued") {
       options.emitDelta({
         sessionId,
-        turnId: place.turnId,
+        turnId: started.turnId,
         delta: { kind: "phase", phase: "queued" },
       });
     }
@@ -389,7 +419,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     return {
       kind: "accepted",
-      turn: { sessionId, turnId: place.turnId, phase: phaseOf(sessionId) },
+      turn: { sessionId, turnId: started.turnId, phase: phaseOf(sessionId) },
     };
   };
 
