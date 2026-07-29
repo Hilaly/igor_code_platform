@@ -285,9 +285,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   /** Операции. Маршруты и мост плагинов зовут их одни и те же: набор обязан быть один. */
   const agents = (): AgentSummary[] => agentsOf().map(describeAgent);
 
+  const visible = (summary: AgentSessionSummary): boolean => {
+    const project = options.projects.find(summary.projectId);
+
+    return project !== undefined && !project.archived;
+  };
+
   const list = (projectId?: string): Session[] =>
     summaries
       .filter((summary) => projectId === undefined || summary.projectId === projectId)
+      .filter(visible)
       .map(describeSession);
 
   const create = async (draft: SessionDraft): Promise<CreateSessionOutcome> => {
@@ -350,6 +357,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return undefined;
     }
 
+    const summary = summaries.find((candidate) => candidate.id === sessionId);
+
+    if (summary === undefined || !visible(summary)) {
+      return undefined;
+    }
+
     const persisted = await options.store.open(sessionId);
 
     if (persisted === undefined) {
@@ -365,6 +378,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     const sessionId = request.sessionId;
 
     if (!isSessionId(sessionId)) {
+      return { kind: "unknown" };
+    }
+
+    const persistedSummary = summaries.find((candidate) => candidate.id === sessionId);
+
+    if (persistedSummary === undefined || !visible(persistedSummary)) {
       return { kind: "unknown" };
     }
 

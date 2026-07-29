@@ -231,6 +231,7 @@ async function serve(
   return {
     call,
     service,
+    projects,
     events,
     deltas,
     folder,
@@ -632,6 +633,32 @@ describe("reading sessions", () => {
         (await call("GET", `${sessionsPath}?projectId=${projectId}`))
           .body as unknown as SessionsSnapshot
       ).sessions.length,
+      1,
+    );
+  });
+
+  it("hides sessions of archived projects and shows them again after restore", async () => {
+    const { call, start, projectId, projects } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    const archived = projects.update(projectId, { name: "Demo", archived: true });
+    assert.equal(archived.kind, "updated");
+
+    assert.deepEqual(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions,
+      [],
+    );
+    assert.equal((await call("GET", sessionEntriesPath(sessionId))).status, 404);
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "продолжи" })).status,
+      404,
+    );
+
+    const restored = projects.update(projectId, { name: "Demo", archived: false });
+    assert.equal(restored.kind, "updated");
+
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions.length,
       1,
     );
   });

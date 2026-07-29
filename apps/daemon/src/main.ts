@@ -185,7 +185,7 @@ const pluginWatcher = createPluginWatcher({
 let applying = Promise.resolve();
 let armedRoots = "";
 
-const applyPlugins = (changedDirectories: string[] = []): void => {
+const applyPlugins = (changedDirectories: string[] = []): Promise<void> => {
   applying = applying
     .then(async () => {
       const roots = pluginRoots();
@@ -208,6 +208,8 @@ const applyPlugins = (changedDirectories: string[] = []): void => {
         reason: cause instanceof Error ? cause.message : String(cause),
       });
     });
+
+  return applying;
 };
 
 settings.subscribe((snapshot) => {
@@ -227,7 +229,7 @@ pluginWatcher.start();
 armedRoots = pluginRoots()
   .map((root) => root.directory)
   .join("\n");
-applyPlugins();
+const initialPluginApplication = applyPlugins();
 
 // Поток подписывается на шину последним из подписчиков ядра, но нумерует всё, что придёт после:
 // события до его создания рассказывать некому — клиентов ещё нет.
@@ -260,7 +262,7 @@ const sessions = createSessionService({
   availability: (project) => projectAvailability.of(project.id),
 });
 
-void sessions.refresh();
+await Promise.all([initialPluginApplication, sessions.refresh()]);
 
 pluginSessions.answer = createPluginSessions({ sessions }).answer;
 

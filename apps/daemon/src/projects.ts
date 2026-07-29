@@ -194,6 +194,40 @@ export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
       path: projectPathPattern,
       handle: ({ response, parameters }) => {
         const id = parameters["id"] ?? "";
+        if (refuseUnreadableFile(response)) {
+          return;
+        }
+
+        const existing = projects.find(id);
+
+        if (existing === undefined) {
+          respondWithError(response, 404, "not found");
+
+          return;
+        }
+
+        if (existing.id === ephemeralProjectId) {
+          respondWithError(
+            response,
+            409,
+            "the ephemeral project cannot be renamed, archived or removed",
+          );
+
+          return;
+        }
+
+        const count = sessionCount(existing.folderKey);
+
+        if (count > 0) {
+          respondWithError(
+            response,
+            409,
+            `the project still has ${count} session${count === 1 ? "" : "s"}; remove sessions first`,
+          );
+
+          return;
+        }
+
         const removed = projects.remove(id);
 
         if (removed.kind === "unknown") {

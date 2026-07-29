@@ -41,7 +41,7 @@ const quietLogger = (): Logger =>
 
 type Answer = { status: number; body: unknown };
 
-async function serve(contents?: string) {
+async function serve(contents?: string, sessionCount: (folderKey: string) => number = () => 0) {
   const directory = ensureDataDirectory(mkdtempSync(join(workspace, "case-")));
 
   if (contents !== undefined) {
@@ -64,7 +64,7 @@ async function serve(contents?: string) {
 
   const server = createServer(
     createDispatcher({
-      routes: projectsRoutes({ projects, logger, normalizePath }),
+      routes: projectsRoutes({ projects, logger, normalizePath, sessionCount }),
       logger,
       authenticate: () => ({ kind: "session" as const, id: "the-session" }),
     }),
@@ -264,6 +264,20 @@ describe("DELETE /api/projects/:id", () => {
 
     assert.equal((await remove("nope")).status, 404);
     assert.equal((await remove(ephemeralProjectId)).status, 409);
+  });
+
+  it("refuses removal while sessions still belong to the project", async () => {
+    const { create, remove, list } = await serve(undefined, () => 1);
+    const project = (await create({ folder: "/home/owner/code", name: "Код" })).body as Project;
+
+    const answer = await remove(project.id);
+
+    assert.equal(answer.status, 409);
+    assert.match((answer.body as { error: string }).error, /session/i);
+    assert.equal(
+      snapshotOf(await list()).projects.some((one) => one.id === project.id),
+      true,
+    );
   });
 });
 
