@@ -4,7 +4,7 @@ import { afterEach, describe, it } from "node:test";
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
 import { contribute, defineEvent, events, identity, log, providers, z } from "./index.ts";
-import type { ProviderSummary } from "./index.ts";
+import type { CustomProviderDefinition, ProviderSummary } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
 const anthropic: ProviderSummary = {
@@ -153,6 +153,56 @@ describe("the provider surface", () => {
     assert.deepEqual(host.providerRequests, [{ kind: "logout", providerId: "anthropic" }]);
   });
 
+  it("registers a provider made of data only, and takes it away by name", async () => {
+    const host = installTestHost({ id: "vendor" });
+    host.answerProviders((request) =>
+      request.kind === "register" ? { kind: "register" } : { kind: "unregister" },
+    );
+
+    const definition: CustomProviderDefinition = {
+      id: "vendor-local",
+      name: "Vendor Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      api: "openai-completions",
+      apiKey: { label: "Vendor key" },
+      models: [
+        { id: "vendor-large", name: "Vendor Large", contextWindow: 32_000, maxTokens: 4_096 },
+      ],
+    };
+
+    await providers.register(definition);
+    await providers.unregister("vendor-local");
+
+    assert.deepEqual(host.providerRequests, [
+      { kind: "register", definition },
+      { kind: "unregister", providerId: "vendor-local" },
+    ]);
+
+    // Определение переживает границу воркера целиком: функций в нём нет и быть не может.
+    assert.deepEqual(structuredClone(definition), definition);
+  });
+
+  it("throws when the identifier of a registered provider is taken", async () => {
+    const host = installTestHost({ id: "vendor" });
+    host.answerProviders(() => ({
+      kind: "failed",
+      reason: "the provider anthropic is already registered",
+    }));
+
+    await assert.rejects(
+      () =>
+        providers.register({
+          id: "anthropic",
+          name: "Не Anthropic",
+          baseUrl: "http://127.0.0.1:11434/v1",
+          api: "openai-completions",
+          apiKey: { label: "Vendor key" },
+          models: [],
+        }),
+      /the provider anthropic is already registered/,
+    );
+  });
+
   it("has no way to read or write the value of a credential", async () => {
     const host = installTestHost({ id: "tracker" });
     host.answerProviders(() => ({ kind: "list", providers: [anthropic] }));
@@ -164,7 +214,7 @@ describe("the provider surface", () => {
     assert.equal(providers.setCredential, undefined);
     assert.deepEqual(
       Object.keys(providers).sort(),
-      ["list", "login", "logout", "models", "refresh", "status"],
+      ["list", "login", "logout", "models", "refresh", "register", "status", "unregister"],
       "поверхность провайдеров изменилась — проверь, не появилось ли в ней значение креда",
     );
 

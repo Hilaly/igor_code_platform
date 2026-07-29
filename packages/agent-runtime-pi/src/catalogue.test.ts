@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { CustomProviderDefinition } from "@sovereign/protocol";
+
 import { createProviderCatalogue } from "./catalogue.ts";
 import type { CredentialVault } from "./credentials.ts";
 import { emptyEnvironment, inMemoryVault } from "./testing.ts";
@@ -143,5 +145,100 @@ describe("the provider catalogue", () => {
     assert.ok(models.length > 0);
     assert.ok(models.every((model) => model.providerId === "anthropic"));
     assert.equal(catalogue().models("выдуманный"), undefined);
+  });
+});
+
+const vendor: CustomProviderDefinition = {
+  id: "vendor-local",
+  name: "Vendor Local",
+  baseUrl: "http://127.0.0.1:11434/v1",
+  api: "openai-completions",
+  apiKey: { label: "Vendor key", environmentVariables: ["VENDOR_API_KEY"] },
+  models: [{ id: "vendor-large", name: "Vendor Large", contextWindow: 32_000, maxTokens: 4_096 }],
+};
+
+describe("a custom provider", () => {
+  it("joins the catalogue marked as custom, with its models", async () => {
+    const one = catalogue();
+
+    assert.deepEqual(one.setCustomProvider(vendor), { kind: "registered" });
+
+    const snapshot = await one.snapshot();
+    const registered = snapshot.providers.find((provider) => provider.id === vendor.id);
+
+    assert.equal(registered?.custom, true);
+    assert.equal(registered?.name, "Vendor Local");
+    assert.equal(registered?.modelCount, 1);
+    assert.deepEqual(registered?.logins, [{ type: "api_key", label: "Vendor key" }]);
+    // Встроенные так и остаются не кастомными: метка про принадлежность, а не про способ сборки.
+    assert.equal(snapshot.providers.filter((provider) => provider.custom).length, 1);
+
+    assert.deepEqual(one.models(vendor.id), [
+      {
+        id: "vendor-large",
+        name: "Vendor Large",
+        providerId: "vendor-local",
+        contextWindow: 32_000,
+        maxTokens: 4_096,
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0 },
+      },
+    ]);
+  });
+
+  it("refuses an identifier somebody already holds instead of replacing it", async () => {
+    const one = catalogue();
+
+    // `setProvider` у рантайма перезаписывает по `id`, и встроенный провайдер исчез бы молча.
+    assert.deepEqual(one.setCustomProvider({ ...vendor, id: "anthropic" }), { kind: "taken" });
+    assert.deepEqual(one.setCustomProvider(vendor), { kind: "registered" });
+    assert.deepEqual(one.setCustomProvider({ ...vendor, name: "Другой" }), { kind: "taken" });
+
+    const anthropic = (await one.snapshot()).providers.find(
+      (provider) => provider.id === "anthropic",
+    );
+
+    assert.equal(anthropic?.name, "Anthropic");
+    assert.equal(anthropic?.custom, false);
+  });
+
+  it("goes away when it is deleted, and takes no builtin with it", async () => {
+    const one = catalogue();
+
+    one.setCustomProvider(vendor);
+
+    assert.equal(one.deleteCustomProvider(vendor.id), true);
+    assert.equal(one.models(vendor.id), undefined);
+
+    // Встроенного этим не удалить: удаление по чужому идентификатору обеднило бы каталог навсегда.
+    assert.equal(one.deleteCustomProvider("anthropic"), false);
+    assert.ok((await one.snapshot()).providers.some((provider) => provider.id === "anthropic"));
+    assert.equal(one.deleteCustomProvider(vendor.id), false);
+  });
+
+  it("keeps the credential of a custom provider in the common store", async () => {
+    const credentials = inMemoryVault();
+    const one = catalogue({ credentials });
+
+    one.setCustomProvider(vendor);
+    await credentials.modify(vendor.id, async () => ({ type: "api_key", key: "s3cret" }));
+
+    assert.deepEqual(await one.status(vendor.id), {
+      kind: "configured",
+      type: "api_key",
+      source: "stored credential",
+    });
+
+    // Провайдер ушёл вместе с плагином и вернулся — кред пережил обоих: он лежит в общем файле.
+    one.deleteCustomProvider(vendor.id);
+    one.setCustomProvider(vendor);
+
+    assert.deepEqual(await one.status(vendor.id), {
+      kind: "configured",
+      type: "api_key",
+      source: "stored credential",
+    });
+    assert.deepEqual(credentials.list(), [vendor.id]);
   });
 });

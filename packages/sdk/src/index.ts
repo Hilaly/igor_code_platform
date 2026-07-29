@@ -26,6 +26,9 @@ export type {
 export { providers } from "./providers.ts";
 
 export type {
+  CustomModelDefinition,
+  CustomProviderApi,
+  CustomProviderDefinition,
   LoginConclusion,
   LoginDialogue,
   LoginInput,

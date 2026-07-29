@@ -8,7 +8,7 @@ import {
   scriptedProvider,
   type ScriptedStep,
 } from "@sovereign/agent-runtime-pi/testing";
-import { coreEventTypes, type BusEvent } from "@sovereign/protocol";
+import { coreEventTypes, type BusEvent, type CustomProviderDefinition } from "@sovereign/protocol";
 import type { LoginStep } from "@sovereign/sdk";
 
 import { createEventBus } from "./event-bus.ts";
@@ -357,5 +357,164 @@ describe("a logout asked for by a plugin", () => {
     );
 
     assert.deepEqual(answer, { kind: "failed", reason: "credentials.json is not valid json" });
+  });
+});
+
+const vendor: CustomProviderDefinition = {
+  id: "vendor-local",
+  name: "Vendor Local",
+  baseUrl: "http://127.0.0.1:11434/v1",
+  api: "openai-completions",
+  apiKey: { label: "Vendor key" },
+  models: [{ id: "vendor-large", name: "Vendor Large", contextWindow: 32_000, maxTokens: 4_096 }],
+};
+
+const another = { key: "data:other", id: "other", source: "data" as const };
+
+describe("a provider registered by a plugin", () => {
+  it("joins the catalogue and tells the bus the catalogue changed", async () => {
+    const { providers, events } = bridge();
+    const answer = await providers.request(
+      plugin,
+      { kind: "register", definition: vendor },
+      collector().call,
+    );
+    const list = await providers.request(plugin, { kind: "list" }, collector().call);
+
+    assert.deepEqual(answer, { kind: "register" });
+    assert.ok(list.kind === "list");
+    assert.equal(list.providers.find((provider) => provider.id === vendor.id)?.custom, true);
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providersChanged],
+    );
+  });
+
+  it("refuses an identifier somebody already holds instead of replacing it", async () => {
+    const { providers, events } = bridge();
+    const answer = await providers.request(
+      plugin,
+      { kind: "register", definition: { ...vendor, id: "anthropic" } },
+      collector().call,
+    );
+
+    assert.deepEqual(answer, {
+      kind: "failed",
+      reason: "the provider anthropic is already registered",
+    });
+    assert.deepEqual(events, []);
+  });
+
+  it("goes away with the plugin, and the bus hears about it", async () => {
+    const { providers, events } = bridge();
+
+    await providers.request(plugin, { kind: "register", definition: vendor }, collector().call);
+    providers.remove(plugin.key);
+
+    const list = await providers.request(plugin, { kind: "list" }, collector().call);
+
+    assert.ok(list.kind === "list");
+    assert.equal(
+      list.providers.some((provider) => provider.id === vendor.id),
+      false,
+    );
+    // Оба перехода видны: появился и исчез.
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providersChanged, coreEventTypes.providersChanged],
+    );
+  });
+
+  it("says nothing to the bus when the plugin that left had no providers", () => {
+    const { providers, events } = bridge();
+
+    providers.remove(plugin.key);
+
+    assert.deepEqual(events, []);
+  });
+
+  it("cannot be taken away by another plugin", async () => {
+    const { providers } = bridge();
+
+    await providers.request(plugin, { kind: "register", definition: vendor }, collector().call);
+
+    const answer = await providers.request(
+      another,
+      { kind: "unregister", providerId: vendor.id },
+      collector().call,
+    );
+    const list = await providers.request(plugin, { kind: "list" }, collector().call);
+
+    assert.deepEqual(answer, {
+      kind: "failed",
+      reason: "the provider vendor-local was not registered by this plugin",
+    });
+    assert.ok(list.kind === "list");
+    assert.ok(list.providers.some((provider) => provider.id === vendor.id));
+  });
+
+  it("is taken away by its own plugin before it is unloaded", async () => {
+    const { providers } = bridge();
+
+    await providers.request(plugin, { kind: "register", definition: vendor }, collector().call);
+
+    const answer = await providers.request(
+      plugin,
+      { kind: "unregister", providerId: vendor.id },
+      collector().call,
+    );
+    const list = await providers.request(plugin, { kind: "list" }, collector().call);
+
+    assert.deepEqual(answer, { kind: "unregister" });
+    assert.ok(list.kind === "list");
+    assert.equal(
+      list.providers.some((provider) => provider.id === vendor.id),
+      false,
+    );
+
+    // Освободившийся идентификатор снова свободен: занятость про живого провайдера, а не про имя.
+    assert.deepEqual(
+      await providers.request(plugin, { kind: "register", definition: vendor }, collector().call),
+      { kind: "register" },
+    );
+  });
+
+  it("can be logged into like any other, and the credential outlives it", async () => {
+    const { providers } = bridge();
+
+    await providers.request(plugin, { kind: "register", definition: vendor }, collector().call);
+
+    const asked = collector();
+    const finished = providers.request(
+      plugin,
+      { kind: "login", providerId: vendor.id, method: "api_key" },
+      asked.call,
+    );
+
+    await settled();
+
+    const prompt = asked.steps.find((step) => step.kind === "prompt");
+
+    assert.ok(prompt?.kind === "prompt");
+    providers.reply(plugin, {
+      kind: "login-answer",
+      requestId: "1",
+      stepId: prompt.prompt.stepId,
+      value: "sk-вендор",
+    });
+
+    assert.deepEqual(await finished, { kind: "login", conclusion: { kind: "succeeded" } });
+
+    // Провайдер уходит вместе с плагином, а кред остаётся в общем хранилище и ждёт его возврата.
+    providers.remove(plugin.key);
+    await providers.request(plugin, { kind: "register", definition: vendor }, collector().call);
+
+    assert.deepEqual(
+      await providers.request(plugin, { kind: "status", providerId: vendor.id }, collector().call),
+      {
+        kind: "status",
+        status: { kind: "configured", type: "api_key", source: "stored credential" },
+      },
+    );
   });
 });

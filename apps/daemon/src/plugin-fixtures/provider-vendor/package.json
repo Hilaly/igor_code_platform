@@ -1,0 +1,11 @@
+{
+  "name": "provider-vendor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "provider-vendor",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

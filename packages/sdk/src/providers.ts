@@ -153,6 +153,45 @@ export type LoginInput = {
 };
 
 /**
+ * Как разговаривать с провайдером. Перечень закрыт: это протокол API, реализацию которого даёт
+ * платформа, а на незнакомое имя ей нечем ответить.
+ */
+export type CustomProviderApi =
+  "openai-completions" | "openai-responses" | "anthropic-messages" | "google-generative-ai";
+
+/** Модель своего провайдера. `providerId` берётся у провайдера, необязательные поля — с умолчанием. */
+export type CustomModelDefinition = {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  /** По умолчанию модель не рассуждает. */
+  reasoning?: boolean;
+  /** Что модель принимает на вход. По умолчанию — только текст. */
+  input?: ("text" | "image")[];
+  /** Цена за миллион токенов. Не названа — считается нулевой. */
+  cost?: ModelCost;
+};
+
+/**
+ * Свой провайдер — **только данные**: функции границу воркера не переживают, а определение едет
+ * через неё. Ни своего кода запроса, ни своего способа входа плагин не приносит
+ * (docs/models-and-providers.md).
+ */
+export type CustomProviderDefinition = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  api: CustomProviderApi;
+  /**
+   * Способ ключа: подпись для интерфейса и переменные окружения, из которых кред берётся сам.
+   * Значение ключа сюда не кладут — его пишет платформа после входа.
+   */
+  apiKey: { label: string; environmentVariables?: string[] };
+  models: CustomModelDefinition[];
+};
+
+/**
  * Запрос к платформе. Это **единственная пара «запрос-ответ»** в канале плагина, и она ограничена
  * провайдерами намеренно: общего RPC у платформы нет (docs/plugins.md).
  */
@@ -163,7 +202,9 @@ export type ProviderRequest =
   | { kind: "refresh" }
   /** Диалога здесь нет: функции границу воркера не переживают, шаги едут отдельными сообщениями. */
   | { kind: "login"; providerId: string; method: ProviderAuthType }
-  | { kind: "logout"; providerId: string };
+  | { kind: "logout"; providerId: string }
+  | { kind: "register"; definition: CustomProviderDefinition }
+  | { kind: "unregister"; providerId: string };
 
 export type ProviderResponse =
   | { kind: "list"; providers: ProviderSummary[] }
@@ -174,6 +215,8 @@ export type ProviderResponse =
   /** Ответ приходит в конце диалога: до него плагин получает шаги. */
   | { kind: "login"; conclusion: LoginConclusion }
   | { kind: "logout" }
+  | { kind: "register" }
+  | { kind: "unregister" }
   /** Операция не удалась. Причина приходит словами платформы и показывается автору как есть. */
   | { kind: "failed"; reason: string };
 
@@ -227,5 +270,21 @@ export const providers = {
   /** Выход. Кред из окружения этим не убрать: он не наш, и провайдер останется настроенным. */
   logout: async (providerId: string): Promise<void> => {
     await ask({ kind: "logout", providerId }, "logout");
+  },
+
+  /**
+   * Добавить свой провайдер. Он живёт, пока жив плагин: выгрузка, падение и перезагрузка его
+   * убирают, поэтому регистрация делается в `activate` — как и подписка на шину.
+   *
+   * **Занятый идентификатор — отказ, а не замена:** встроенного провайдера так не подменить.
+   * Кред при этом переживает плагина — он лежит в общем хранилище платформы.
+   */
+  register: async (definition: CustomProviderDefinition): Promise<void> => {
+    await ask({ kind: "register", definition }, "register");
+  },
+
+  /** Убрать свой провайдер раньше выгрузки. Чужой этим не убрать: убирается только своё. */
+  unregister: async (providerId: string): Promise<void> => {
+    await ask({ kind: "unregister", providerId }, "unregister");
   },
 };

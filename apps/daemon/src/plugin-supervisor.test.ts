@@ -215,6 +215,7 @@ function providerWorld(recorded: Journal, script: ScriptedStep[] = []) {
 
   return {
     scripted,
+    catalogue,
     logins,
     /** Три хука супервизора одним объектом: маршрутизация у него, логика — здесь. */
     hooks: {
@@ -545,6 +546,62 @@ describe("createPluginSupervisor", () => {
     // Мёртвый воркер не держит провайдера занятым: иначе войти было бы нельзя до перезапуска демона.
     assert.equal(world.logins.runningFor("scripted"), undefined);
     assert.deepEqual(world.logins.list(), []);
+  });
+
+  it("keeps the provider a plugin registered while it lives and takes it away with it", async () => {
+    const recorded = journal();
+    const world = providerWorld(recorded);
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      ...world.hooks,
+    });
+    running = supervisor;
+
+    const vendor = only("provider-vendor").plugins[0];
+    assert.ok(vendor !== undefined);
+
+    const registrations = async (): Promise<string[]> =>
+      (await world.catalogue.snapshot()).providers
+        .filter((provider) => provider.custom)
+        .map((provider) => provider.id);
+
+    const changes = (): number =>
+      recorded.events.filter((event) => event.type === "core.providers.changed").length;
+
+    await supervisor.apply(only("provider-vendor"), enabled("data:provider-vendor"));
+
+    const record = await recorded.waitFor(
+      (record) => record.message === "provider-vendor registered a provider",
+      "the plugin registering a provider",
+    );
+
+    assert.deepEqual(record["custom"], ["vendor-local"]);
+    assert.deepEqual(record["models"], ["vendor-large", "vendor-small"]);
+    // Занятый идентификатор — отказ операции, а не замена встроенного провайдера.
+    assert.match(String(record["refusal"]), /the provider anthropic is already registered/);
+    assert.deepEqual(await registrations(), ["vendor-local"]);
+    assert.equal(changes(), 1);
+
+    // Перезагрузка — это выгрузка и возврат: провайдер уходит и регистрируется заново в `activate`.
+    await supervisor.reload([vendor.directory]);
+    await recorded.waitFor(
+      (record) =>
+        recorded.records.filter((seen) => seen.message === "provider-vendor registered a provider")
+          .length === 2 && record.message === "provider-vendor registered a provider",
+      "the plugin registering a provider again",
+    );
+
+    assert.deepEqual(await registrations(), ["vendor-local"]);
+
+    await supervisor.apply(only("provider-vendor"), disabled("data:provider-vendor"));
+
+    // Выключение снимает всё, что плагин зарегистрировал, — провайдера в том числе.
+    assert.deepEqual(await registrations(), []);
+    // Оба перехода видны на шине: и появление, и исчезновение.
+    assert.ok(changes() >= 2);
   });
 
   it("says nothing about contributions when the effective set did not change", async () => {

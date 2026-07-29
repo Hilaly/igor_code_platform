@@ -12,6 +12,7 @@
 import type { ProviderCatalogue } from "@sovereign/agent-runtime-pi";
 import {
   coreEventTypes,
+  type CustomProviderDefinition,
   type LoginConclusion,
   type LoginNotice,
   type LoginPrompt,
@@ -22,6 +23,7 @@ import {
   type RefreshReport,
 } from "@sovereign/protocol";
 import type {
+  CustomProviderDefinition as PluginCustomProviderDefinition,
   LoginConclusion as PluginLoginConclusion,
   LoginNotice as PluginLoginNotice,
   LoginPrompt as PluginLoginPrompt,
@@ -47,50 +49,58 @@ import type { ProviderLogins } from "./provider-logins.ts";
  * копией**: он ставится извне и внутренних пакетов не тянет (docs/plugins.md). Копия обязана
  * совпадать с протоколом до поля, и ловится это здесь.
  *
- * Присваивание идёт в **обе стороны**: `toPlugin` требует, чтобы тип протокола присваивался копии,
- * `toCore` — чтобы копия присваивалась протоколу. Разъехавшись, копии перестанут компилироваться в
+ * Присваивание идёт в **обе стороны**: `forward` требует, чтобы первый тип присваивался второму,
+ * `backward` — чтобы второй присваивался первому. Разъехавшись, копии перестанут компилироваться в
  * этом файле — раньше, чем автор плагина увидит поле, которого у него нет.
+ *
+ * Возвращается только `forward`: годится он лишь потому, что рядом скомпилировался `backward`.
  */
-function sameShape<Core, Plugin>(bothWays: {
-  toPlugin: (value: Core) => Plugin;
-  toCore: (value: Plugin) => Core;
-}): (value: Core) => Plugin {
-  return bothWays.toPlugin;
+function sameShape<Left, Right>(bothWays: {
+  forward: (value: Left) => Right;
+  backward: (value: Right) => Left;
+}): (value: Left) => Right {
+  return bothWays.forward;
 }
 
 const providerForPlugin = sameShape<ProviderSummary, PluginProviderSummary>({
-  toPlugin: (summary) => summary,
-  toCore: (summary) => summary,
+  forward: (summary) => summary,
+  backward: (summary) => summary,
 });
 
 const modelForPlugin = sameShape<ModelSummary, PluginModelSummary>({
-  toPlugin: (model) => model,
-  toCore: (model) => model,
+  forward: (model) => model,
+  backward: (model) => model,
 });
 
 const authStateForPlugin = sameShape<ProviderAuthState, PluginProviderAuthState>({
-  toPlugin: (state) => state,
-  toCore: (state) => state,
+  forward: (state) => state,
+  backward: (state) => state,
 });
 
 const refreshReportForPlugin = sameShape<RefreshReport, PluginRefreshReport>({
-  toPlugin: (report) => report,
-  toCore: (report) => report,
+  forward: (report) => report,
+  backward: (report) => report,
 });
 
 const promptForPlugin = sameShape<LoginPrompt, PluginLoginPrompt>({
-  toPlugin: (prompt) => prompt,
-  toCore: (prompt) => prompt,
+  forward: (prompt) => prompt,
+  backward: (prompt) => prompt,
 });
 
 const noticeForPlugin = sameShape<LoginNotice, PluginLoginNotice>({
-  toPlugin: (notice) => notice,
-  toCore: (notice) => notice,
+  forward: (notice) => notice,
+  backward: (notice) => notice,
 });
 
 const conclusionForPlugin = sameShape<LoginConclusion, PluginLoginConclusion>({
-  toPlugin: (conclusion) => conclusion,
-  toCore: (conclusion) => conclusion,
+  forward: (conclusion) => conclusion,
+  backward: (conclusion) => conclusion,
+});
+
+/** Единственный тип, который едет в обратную сторону: определение приносит плагин. */
+const definitionFromPlugin = sameShape<PluginCustomProviderDefinition, CustomProviderDefinition>({
+  forward: (definition) => definition,
+  backward: (definition) => definition,
 });
 
 /**
@@ -126,7 +136,16 @@ export type CreatePluginProvidersOptions = {
    * Каталог тот же, что у веб-API и у входа: второй экземпляр означал бы вторую коллекцию
    * провайдеров, и зарегистрированное плагином не было бы видно человеку.
    */
-  catalogue: Pick<ProviderCatalogue, "snapshot" | "models" | "status" | "refresh" | "logout">;
+  catalogue: Pick<
+    ProviderCatalogue,
+    | "snapshot"
+    | "models"
+    | "status"
+    | "refresh"
+    | "logout"
+    | "setCustomProvider"
+    | "deleteCustomProvider"
+  >;
   /** Реестр попыток тот же, что у маршрутов: провайдер занят один на всю платформу. */
   logins: Pick<
     ProviderLogins,
@@ -149,6 +168,12 @@ export function createPluginProviders(options: CreatePluginProvidersOptions): Pl
 
   /** Идущие входы плагинов: ключ вызова — идентификатор попытки, которую он начал. */
   const running = new Map<string, string>();
+
+  /**
+   * Чей провайдер. Реестр нужен по той же причине, что и реестр вкладов: выключение обязано снять
+   * всё, что плагин зарегистрировал, а рантайм о принадлежности провайдера не знает.
+   */
+  const registered = new Map<string, Set<string>>();
 
   /**
    * Вход целиком: от начала попытки до её конца. Обещание разрешается концом диалога, поэтому
@@ -250,6 +275,25 @@ export function createPluginProviders(options: CreatePluginProvidersOptions): Pl
           running.delete(key);
         }
       }
+
+      const own = registered.get(pluginKey);
+
+      if (own === undefined || own.size === 0) {
+        return;
+      }
+
+      for (const providerId of own) {
+        catalogue.deleteCustomProvider(providerId);
+      }
+
+      registered.delete(pluginKey);
+      options.logger.info("the custom providers of a plugin are gone", {
+        plugin: pluginKey,
+        providers: [...own],
+      });
+      // Каталог изменился, и об этом узнают все: вернувшийся плагин зарегистрируется заново, но
+      // между выгрузкой и возвратом провайдера действительно нет.
+      options.bus.publish(coreEventTypes.providersChanged, {});
     },
     request: async (plugin, request, call) => {
       switch (request.kind) {
@@ -317,6 +361,49 @@ export function createPluginProviders(options: CreatePluginProvidersOptions): Pl
           });
 
           return { kind: "logout" };
+        }
+        case "register": {
+          const definition = definitionFromPlugin(request.definition);
+          const outcome = catalogue.setCustomProvider(definition);
+
+          if (outcome.kind === "taken") {
+            return {
+              kind: "failed",
+              reason: `the provider ${definition.id} is already registered`,
+            };
+          }
+
+          const own = registered.get(plugin.key) ?? new Set<string>();
+
+          own.add(definition.id);
+          registered.set(plugin.key, own);
+          options.bus.publish(coreEventTypes.providersChanged, {});
+          options.logger.info("a plugin registered a custom provider", {
+            plugin: plugin.key,
+            providerId: definition.id,
+            models: definition.models.length,
+          });
+
+          return { kind: "register" };
+        }
+        case "unregister": {
+          // Убирается только своё: чужой провайдер убрал бы не тот, кто за него отвечает.
+          if (registered.get(plugin.key)?.has(request.providerId) !== true) {
+            return {
+              kind: "failed",
+              reason: `the provider ${request.providerId} was not registered by this plugin`,
+            };
+          }
+
+          catalogue.deleteCustomProvider(request.providerId);
+          registered.get(plugin.key)?.delete(request.providerId);
+          options.bus.publish(coreEventTypes.providersChanged, {});
+          options.logger.info("a plugin took its custom provider away", {
+            plugin: plugin.key,
+            providerId: request.providerId,
+          });
+
+          return { kind: "unregister" };
         }
       }
     },

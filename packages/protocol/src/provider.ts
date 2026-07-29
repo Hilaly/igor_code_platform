@@ -120,6 +120,54 @@ export type ProviderModels = {
 };
 
 /**
+ * Как разговаривать с провайдером. Перечень закрыт: это протокол API, реализацию которого даёт
+ * рантайм, а на незнакомое имя ему нечем ответить (docs/models-and-providers.md).
+ */
+export type CustomProviderApi =
+  "openai-completions" | "openai-responses" | "anthropic-messages" | "google-generative-ai";
+
+/**
+ * Модель кастомного провайдера. Полей меньше, чем в `ModelSummary`: `providerId` берётся у
+ * провайдера, а необязательные имеют безопасное умолчание.
+ */
+export type CustomModelDefinition = {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  /** По умолчанию модель не рассуждает. */
+  reasoning?: boolean;
+  /** Что модель принимает на вход. По умолчанию — только текст. */
+  input?: ("text" | "image")[];
+  /** Цена за миллион токенов. Не названа — считается нулевой. */
+  cost?: ModelCost;
+};
+
+/**
+ * Кастомный провайдер — **только данные** (docs/models-and-providers.md). Функций здесь нет и быть
+ * не может: определение приходит от плагина через границу воркера, а она — структурное
+ * клонирование.
+ */
+export type CustomProviderDefinition = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  api: CustomProviderApi;
+  /**
+   * Способ ключа: подпись для интерфейса и переменные окружения, из которых кред берётся сам, если
+   * сохранённого нет. Значение ключа сюда не кладут — его пишет платформа после входа.
+   */
+  apiKey: { label: string; environmentVariables?: string[] };
+  models: CustomModelDefinition[];
+};
+
+/**
+ * Итог регистрации. Занятый идентификатор — **отказ операции, а не замена**: у рантайма
+ * `setProvider` перезаписывает провайдера по `id`, и встроенный подменился бы молча.
+ */
+export type CustomProviderOutcome = { kind: "registered" } | { kind: "taken" };
+
+/**
  * Итог обновления по одному провайдеру. Ошибка провайдера — не отказ маршрута: его прежний список
  * остаётся в силе, а человеку надо сказать, что нового не приехало и почему.
  */
