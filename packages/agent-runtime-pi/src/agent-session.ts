@@ -143,14 +143,14 @@ export function createAgentSessionStore(
 ): AgentSessionStore {
   const storage = new NodeExecutionEnv({ cwd: options.directory });
   const repo = new JsonlSessionRepo({ fs: storage, sessionsRoot: options.directory });
-  const problems: string[] = [];
+  let problems: string[] = [];
 
-  const listMetadata = async (): Promise<JsonlSessionMetadata[]> => {
+  const listMetadata = async (scanProblems: string[]): Promise<JsonlSessionMetadata[]> => {
     try {
       return await repo.list();
     } catch (cause) {
       // Нечитаемый корень — не отказ поверхности: сессий просто не видно, и об этом надо сказать.
-      problems.push(`the sessions could not be listed: ${describe(cause)}`);
+      scanProblems.push(`the sessions could not be listed: ${describe(cause)}`);
 
       return [];
     }
@@ -183,7 +183,10 @@ export function createAgentSessionStore(
       );
     },
     open: async (id) => {
-      const metadata = (await listMetadata()).find((candidate) => candidate.id === id);
+      const scanProblems: string[] = [];
+      const metadata = (await listMetadata(scanProblems)).find((candidate) => candidate.id === id);
+
+      problems = scanProblems;
 
       if (metadata === undefined) {
         return undefined;
@@ -194,17 +197,20 @@ export function createAgentSessionStore(
       return persistedSession(session, options.models, await summaryOf(session));
     },
     list: async () => {
+      const scanProblems: string[] = [];
       const summaries = await Promise.all(
-        (await listMetadata()).map(async (metadata) => {
+        (await listMetadata(scanProblems)).map(async (metadata) => {
           try {
             return await summaryOfMetadata(repo, metadata);
           } catch (cause) {
-            problems.push(`the session ${metadata.id} could not be read: ${describe(cause)}`);
+            scanProblems.push(`the session ${metadata.id} could not be read: ${describe(cause)}`);
 
             return undefined;
           }
         }),
       );
+
+      problems = scanProblems;
 
       return summaries.filter((summary): summary is AgentSessionSummary => summary !== undefined);
     },

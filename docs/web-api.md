@@ -454,7 +454,8 @@ curl -b jar -X DELETE http://localhost:5273/api/projects/b7Kq3xv9pQdT
 
 `availability` — состояние папки на этот момент: `available` или `missing`. Оно меняется само по
 себе, поэтому смену приносит событие `core.projects.changed`, а не ответ запроса
-([event-bus.md](event-bus.md)). `sessionCount` до появления хранилища сессий всегда `0`.
+([event-bus.md](event-bus.md)). `sessionCount` считается для снимка по JSONL-заголовкам сессий:
+сравнивается `folderKey`, поэтому записи дерева читать не требуется.
 
 ## Провайдеры и модели
 

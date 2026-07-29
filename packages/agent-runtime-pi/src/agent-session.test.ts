@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -229,7 +229,42 @@ describe("an agent session over pi", () => {
       { kind: "unknown-model" },
     );
   });
+
+  it("replaces diagnostics with the latest storage scan", async () => {
+    const { directory, open, store } = await withStore([]);
+    const session = await open();
+
+    await session.close();
+
+    const path = await onlySessionFile(directory);
+    const contents = await readFile(path, "utf8");
+
+    await appendFile(path, '{"broken"\n');
+
+    assert.deepEqual(await store.list(), []);
+    assert.equal(store.problems().length, 1);
+
+    assert.deepEqual(await store.list(), []);
+    assert.equal(store.problems().length, 1);
+
+    await writeFile(path, contents);
+
+    assert.equal((await store.list()).length, 1);
+    assert.deepEqual(store.problems(), []);
+  });
 });
+
+async function onlySessionFile(directory: string): Promise<string> {
+  const [sessionDirectory] = await readdir(directory);
+
+  assert.ok(sessionDirectory !== undefined);
+
+  const [sessionFile] = await readdir(join(directory, sessionDirectory));
+
+  assert.ok(sessionFile !== undefined);
+
+  return join(directory, sessionDirectory, sessionFile);
+}
 
 /** Второй стор на той же директории: так проверяется переживание перезапуска демона. */
 async function freshStore(directory: string): Promise<AgentSessionStore> {
