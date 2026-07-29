@@ -6,7 +6,7 @@
  * который всё равно случится (docs/runtime-checks.md, проверка 28).
  */
 
-import type { MutableModels } from "@earendil-works/pi-ai";
+import type { MutableModels, Provider } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type {
   ModelSummary,
@@ -19,6 +19,7 @@ import type {
 import { toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
 import { describeModels, describeProvider } from "./describe.ts";
 import { processEnvironment, toRuntimeAuthContext, type Environment } from "./environment.ts";
+import { toRuntimeInteraction, type LoginDialogue } from "./interaction.ts";
 import { toRuntimeModelsStore, type ModelCatalogVault } from "./model-catalogs.ts";
 
 export type ProviderCatalogue = {
@@ -32,6 +33,21 @@ export type ProviderCatalogue = {
    * OAuth-токены. Разбирать его оркестрацию ради фильтра значило бы переписать её у себя.
    */
   refresh: () => Promise<RefreshReport>;
+  /**
+   * Провести вход. Диалог ведёт вызывающий: платформа спрашивает человека или плагин, а кред
+   * записывает рантайм — сам, тем же сериализованным путём, что и обновление токена.
+   */
+  login: (input: LoginRequest) => Promise<void>;
+  /** Выход. Ambient-кред этим не убрать: он не наш, и провайдер останется настроенным. */
+  logout: (providerId: string) => Promise<void>;
+};
+
+export type LoginRequest = {
+  providerId: string;
+  method: "api_key" | "oauth";
+  dialogue: LoginDialogue;
+  /** Гасит вход целиком: отмена попытки человеком, выход из платформы, выгрузка плагина. */
+  signal?: AbortSignal;
 };
 
 export type CreateProviderCatalogueOptions = {
@@ -40,6 +56,11 @@ export type CreateProviderCatalogueOptions = {
   catalogs?: ModelCatalogVault;
   /** По умолчанию — настоящее окружение процесса. Подменяется только тестами. */
   environment?: Environment;
+  /**
+   * Провайдеры сверх встроенных. Тип здесь — рантаймовый, поэтому воспользоваться этим может только
+   * код внутри пакета: тесты, которым нужен двойник со сценарием входа (`./testing.ts`).
+   */
+  additionalProviders?: Provider[];
 };
 
 export function createProviderCatalogue(
@@ -52,6 +73,10 @@ export function createProviderCatalogue(
       ? {}
       : { modelsStore: toRuntimeModelsStore(options.catalogs) }),
   });
+
+  for (const provider of options.additionalProviders ?? []) {
+    models.setProvider(provider);
+  }
 
   return {
     snapshot: async () => {
@@ -98,6 +123,14 @@ export function createProviderCatalogue(
 
       return { refreshed, aborted: result.aborted };
     },
+    login: async (input) => {
+      await models.login(
+        input.providerId,
+        input.method,
+        toRuntimeInteraction(input.dialogue, input.signal),
+      );
+    },
+    logout: (providerId) => models.logout(providerId),
   };
 }
 
