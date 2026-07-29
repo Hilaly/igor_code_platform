@@ -3,12 +3,14 @@
  * них действуют, и держит связь «вклад — плагин»: без неё выключение плагина не может снять всё, что
  * он зарегистрировал (docs/plugins.md).
  *
- * Видов два: общий и событие шины (docs/event-bus.md). Остальные типизированные виды появятся вместе со
- * своими потребителями — контракт без потребителя проверить нечем.
+ * Видов три: общий, событие шины (docs/event-bus.md) и агент (docs/sessions-and-projects.md).
+ * Остальные типизированные виды появятся вместе со своими потребителями — контракт без потребителя
+ * проверить нечем.
  */
 
 import {
   coreEventNamespace,
+  isThinkingLevel,
   pluginSourceRank,
   type ContributionConflict,
   type ContributionRegistration,
@@ -159,16 +161,13 @@ export function createContributionRegistry(): ContributionRegistry {
             : { description: contribution.description }),
         };
 
-        claimed.set(id, [
-          ...(claimed.get(id) ?? []),
-          contribution.kind === "event"
-            ? { ...common, kind: "event", payloadSchema: contribution.payloadSchema }
-            : {
-                ...common,
-                kind: "custom",
-                ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
-              },
-        ]);
+        const registration = toRegistration(common, contribution, problems);
+
+        if (registration === undefined) {
+          continue;
+        }
+
+        claimed.set(id, [...(claimed.get(id) ?? []), registration]);
       }
 
       for (const [id, group] of claimed) {
@@ -212,4 +211,89 @@ export function createContributionRegistry(): ContributionRegistry {
         .sort(byIdentifier),
     conflicts: () => conflicts,
   };
+}
+
+/** Общие поля записи: их считает вызывающий, здесь дописывается только то, что зависит от вида. */
+type RegistrationCommon = {
+  id: string;
+  declaredId: string;
+  pluginKey: string;
+  pluginId: string;
+  source: PluginSource;
+  title?: string;
+  description?: string;
+};
+
+/**
+ * Перевод объявленного вклада в запись реестра. Кривое объявление — не исключение, а проблема в
+ * событии жизненного цикла плагина: остальные его вклады обязаны примениться (docs/plugins.md).
+ */
+function toRegistration(
+  common: RegistrationCommon,
+  contribution: PluginContribution,
+  problems: string[],
+): ContributionRegistration | undefined {
+  if (contribution.kind === "event") {
+    return { ...common, kind: "event", payloadSchema: contribution.payloadSchema };
+  }
+
+  if (contribution.kind === "custom") {
+    return {
+      ...common,
+      kind: "custom",
+      ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
+    };
+  }
+
+  const instructions =
+    typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
+
+  if (instructions === "") {
+    problems.push(`the agent ${common.id} declares no instructions`);
+
+    return undefined;
+  }
+
+  const include = asStringArray(contribution.tools?.include);
+  const exclude = asStringArray(contribution.tools?.exclude ?? []);
+
+  if (include === undefined || exclude === undefined) {
+    problems.push(`the agent ${common.id} must select tools by lists of name patterns`);
+
+    return undefined;
+  }
+
+  if (contribution.thinkingLevel !== undefined && !isThinkingLevel(contribution.thinkingLevel)) {
+    problems.push(
+      `the agent ${common.id} names an unknown reasoning level ${JSON.stringify(contribution.thinkingLevel)}`,
+    );
+
+    return undefined;
+  }
+
+  const skills = asStringArray(contribution.skills ?? []);
+
+  if (skills === undefined) {
+    problems.push(`the agent ${common.id} must name its skills by a list of identifiers`);
+
+    return undefined;
+  }
+
+  return {
+    ...common,
+    kind: "agent",
+    instructions,
+    tools: { include, exclude },
+    ...(contribution.model === undefined ? {} : { model: contribution.model }),
+    ...(contribution.thinkingLevel === undefined
+      ? {}
+      : { thinkingLevel: contribution.thinkingLevel }),
+    skills,
+  };
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? (value as string[])
+    : undefined;
 }

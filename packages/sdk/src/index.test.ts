@@ -39,6 +39,10 @@ describe("the sdk without a host", () => {
     await assert.rejects(() => log.info("hello"), /sdk is not initialised/);
     await assert.rejects(() => contribute.custom({ id: "board" }), /sdk is not initialised/);
     await assert.rejects(() => contribute.event(taskCreated), /sdk is not initialised/);
+    await assert.rejects(
+      () => contribute.agent({ id: "agent", instructions: "делай", tools: { include: ["*"] } }),
+      /sdk is not initialised/,
+    );
     await assert.rejects(() => taskCreated.publish({ id: "42" }), /sdk is not initialised/);
     await assert.rejects(
       () => events.subscribe("tracker.task.created", () => {}),
@@ -251,6 +255,29 @@ describe("the testing seam", () => {
 
     assert.deepEqual(host.contributions, [
       { kind: "custom", id: "board", title: "Board", payload: { columns: 3 } },
+    ]);
+  });
+
+  it("records an agent the way the plugin declared it", async () => {
+    const host = installTestHost();
+
+    await contribute.agent({
+      id: "agent",
+      title: "Base agent",
+      instructions: "делай, что просят",
+      tools: { include: ["*"] },
+    });
+
+    // Умолчаний SDK не подставляет: ни пустого exclude, ни пустых скилов. Их ставит ядро, и вторая
+    // точка, где решается «что значит не сказано», означала бы два разных ответа на один вопрос.
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "agent",
+        id: "agent",
+        title: "Base agent",
+        instructions: "делай, что просят",
+        tools: { include: ["*"] },
+      },
     ]);
   });
 

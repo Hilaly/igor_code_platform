@@ -35,6 +35,7 @@
 | --------------------------------------------- | ---------------------------------------------------- |
 | `@sovereign/sdk` и `@sovereign/sdk/testing`   | [plugins.md](plugins.md)                             |
 | Поверхность `providers.*` и её типы в SDK     | [models-and-providers.md](models-and-providers.md)   |
+| Отбор инструментов агента: синтаксис шаблонов | [plugins.md](plugins.md)                             |
 | Манифест: поле `sovereign` и состав его полей | [plugins.md](plugins.md)                             |
 | Виды вкладов и состав каждого                 | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
 | Имена мест и правила разрешения провайдеров   | [ui-extension-model.md](ui-extension-model.md)       |

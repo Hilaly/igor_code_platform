@@ -56,9 +56,44 @@ export type EventContribution = {
   payloadSchema: PayloadSchema;
 };
 
+/**
+ * Уровень ризонинга. Копия списка из протокола, как и остальные типы здесь: внутренние пакеты в
+ * папку внешнего плагина не тянутся, а расхождение копии ловит компилятор в мосте демона
+ * (docs/public-contract.md).
+ */
+export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+export type ThinkingLevel = (typeof thinkingLevels)[number];
+
+/**
+ * Отбор инструментов агента шаблонами имён. Метасимвол один — `*`; `exclude` приоритетнее `include`
+ * (docs/plugins.md).
+ */
+export type AgentToolSelection = {
+  include: string[];
+  exclude?: string[];
+};
+
+/**
+ * Объявление агента (docs/plugins.md). Модель и уровень ризонинга — умолчания, а не запрет: при
+ * создании сессии их переопределяют.
+ */
+export type AgentContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  instructions: string;
+  tools: AgentToolSelection;
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+  skills?: string[];
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
-  ({ kind: "custom" } & CustomContribution) | ({ kind: "event" } & EventContribution);
+  | ({ kind: "custom" } & CustomContribution)
+  | ({ kind: "event" } & EventContribution)
+  | ({ kind: "agent" } & AgentContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

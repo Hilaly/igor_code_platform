@@ -19,3 +19,4 @@ export * from "./provider-login.ts";
 export * from "./provider.ts";
 export * from "./session.ts";
 export * from "./settings.ts";
+export * from "./tool-pattern.ts";

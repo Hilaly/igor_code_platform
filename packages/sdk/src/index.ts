@@ -8,11 +8,20 @@
 import { z } from "zod";
 
 import { subscribeToEvent } from "./events.ts";
-import { currentPluginHost, type CustomContribution, type PluginLogLevel } from "./host.ts";
+import {
+  currentPluginHost,
+  type AgentContribution,
+  type CustomContribution,
+  type PluginLogLevel,
+} from "./host.ts";
 
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
+export { thinkingLevels } from "./host.ts";
+
 export type {
+  AgentContribution,
+  AgentToolSelection,
   CustomContribution,
   EventContribution,
   PayloadSchema,
@@ -20,6 +29,7 @@ export type {
   PluginHost,
   PluginIdentity,
   PluginLogLevel,
+  ThinkingLevel,
 } from "./host.ts";
 
 /** Провайдеры LLM: операции над ними и типы, которыми платформа о них рассказывает. */
@@ -136,6 +146,13 @@ export const contribute = {
       id: event.id,
       payloadSchema: { ...z.toJSONSchema(event.schema) },
     }),
+
+  /**
+   * Объявить агента. Умолчаний SDK не подставляет — ни модели, ни пустых списков: их ставит ядро,
+   * и подстановка здесь означала бы два места, где решается, что значит «не сказано».
+   */
+  agent: async (agent: AgentContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "agent", ...agent }),
 };
 
 export const events = {

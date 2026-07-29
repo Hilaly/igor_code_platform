@@ -240,6 +240,84 @@ describe("createContributionRegistry", () => {
     );
   });
 
+  it("registers an agent with its instructions and tool selection", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.apply(
+      dataHello,
+      [
+        {
+          kind: "agent",
+          id: "agent",
+          instructions: "делай, что просят",
+          tools: { include: ["*"], exclude: ["bash"] },
+          model: "anthropic/claude",
+          thinkingLevel: "high",
+        },
+      ],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(outcome.registered, [
+      {
+        kind: "agent",
+        id: "hello.agent",
+        declaredId: "agent",
+        pluginKey: "data:hello",
+        pluginId: "hello",
+        source: "data",
+        instructions: "делай, что просят",
+        tools: { include: ["*"], exclude: ["bash"] },
+        model: "anthropic/claude",
+        thinkingLevel: "high",
+        skills: [],
+      },
+    ]);
+  });
+
+  it("refuses an agent whose declaration cannot be applied", () => {
+    const registry = createContributionRegistry();
+    const base = { kind: "agent", id: "agent", instructions: "делай" } as const;
+
+    for (const broken of [
+      { ...base, instructions: "   ", tools: { include: ["*"] } },
+      { ...base, tools: { include: "*" } },
+      { ...base, tools: { include: ["*"], exclude: [7] } },
+      { ...base, tools: { include: ["*"] }, thinkingLevel: "выше крыши" },
+      { ...base, tools: { include: ["*"] }, skills: "one" },
+    ]) {
+      const outcome = registry.apply(
+        dataHello,
+        [broken as unknown as PluginContribution],
+        nothingDisabled,
+      );
+
+      assert.deepEqual(outcome.registered, [], JSON.stringify(broken));
+      assert.equal(outcome.problems.length, 1, JSON.stringify(broken));
+    }
+  });
+
+  it("lets an agent of a more specific source override the built-in one", () => {
+    const registry = createContributionRegistry();
+    const agent = (instructions: string): PluginContribution => ({
+      kind: "agent",
+      id: "agent",
+      instructions,
+      tools: { include: ["*"] },
+    });
+
+    registry.apply(builtinHello, [agent("встроенные инструкции")], nothingDisabled);
+    registry.apply(dataHello, [agent("свои инструкции")], nothingDisabled);
+
+    const resolved = registry.resolved().filter((registration) => registration.kind === "agent");
+
+    assert.deepEqual(
+      resolved.map((registration) => [registration.source, registration.instructions]),
+      [["data", "свои инструкции"]],
+    );
+  });
+
   it("refuses an event in the namespace of the core", () => {
     const registry = createContributionRegistry();
     const asCore: ContributingPlugin = { key: "data:core", id: "core", source: "data" };

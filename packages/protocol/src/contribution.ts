@@ -8,6 +8,8 @@
  */
 
 import type { PluginSource } from "./plugin.ts";
+import type { ThinkingLevel } from "./session.ts";
+import type { AgentToolSelection } from "./tool-pattern.ts";
 
 /**
  * Схема нагрузки в виде данных — то, что отдаёт `z.toJSONSchema()`. Сама схема сюда попасть не
@@ -38,8 +40,25 @@ export type EventContributionRegistration = RegistrationCommon & {
   payloadSchema: PayloadSchema;
 };
 
+/**
+ * Агент: инструкции плюс отбор инструментов (docs/plugins.md). Модель и уровень ризонинга —
+ * умолчания, а не запрет: при создании сессии их переопределяют.
+ *
+ * Проверить отбор при регистрации нельзя — шаблон вправе не совпасть ни с одним инструментом,
+ * потому что набор собирается на каждый турн и зависит от того, какие плагины сейчас включены.
+ * Поэтому «агент, у которого не осталось ни одного инструмента» — законное состояние.
+ */
+export type AgentContributionRegistration = RegistrationCommon & {
+  kind: "agent";
+  instructions: string;
+  tools: AgentToolSelection;
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+  skills: string[];
+};
+
 export type ContributionRegistration =
-  CustomContributionRegistration | EventContributionRegistration;
+  CustomContributionRegistration | EventContributionRegistration | AgentContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
