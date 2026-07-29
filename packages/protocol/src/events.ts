@@ -41,6 +41,14 @@ export const coreEventTypes = {
    * публикуют — у них свои, иначе вью перезапрашивало бы список дважды на одно действие.
    */
   providersChanged: "core.providers.changed",
+  /**
+   * Вход в провайдера удался. Событие есть, потому что войти может любой включённый плагин, а
+   * состояние это глобальное: без него вход, сделанный одним, для остальных выглядит внезапной
+   * переменой (docs/models-and-providers.md).
+   */
+  providerLogin: "core.provider.login",
+  /** Выход из провайдера. Есть по той же причине: иначе чужой разлогин выглядит поломкой. */
+  providerLogout: "core.provider.logout",
 } as const;
 
 /**
@@ -70,12 +78,28 @@ export type ProjectsChanged = Record<string, never>;
 /** Нагрузки нет по той же причине: состояние спрашивается у владельца — `GET /api/providers`. */
 export type ProvidersChanged = Record<string, never>;
 
+/**
+ * У входа и выхода нагрузка есть, в отличие от остальных событий ядра: это факт о случившемся, а не
+ * «состояние изменилось, перечитай». Подписчику важно, в кого именно вошли, — перечитывать ради
+ * этого весь список провайдеров он не обязан.
+ */
+export type ProviderLogin = {
+  providerId: string;
+  method: "api_key" | "oauth";
+};
+
+export type ProviderLogout = {
+  providerId: string;
+};
+
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
   "core.projects.changed": ProjectsChanged;
   "core.providers.changed": ProvidersChanged;
+  "core.provider.login": ProviderLogin;
+  "core.provider.logout": ProviderLogout;
 };
 
 export type CoreEventType = keyof CoreEventPayloads;

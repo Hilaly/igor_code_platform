@@ -14,19 +14,26 @@ import {
   scriptedProvider,
 } from "@sovereign/agent-runtime-pi/testing";
 import {
+  coreEventTypes,
   providerLoginAnswerPath,
   providerLoginPath,
   providerLoginsPath,
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
+  type BusEvent,
   type LoginStepFrame,
 } from "@sovereign/protocol";
 
 import { createCredentialStore, credentialsFileName } from "./credential-store.ts";
+import { createEventBus } from "./event-bus.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createDispatcher } from "./dispatcher.ts";
 import { createLogger, type Logger } from "./logger.ts";
-import { carryLoginSteps, providerLoginRoutes } from "./provider-login-routes.ts";
+import {
+  carryLoginSteps,
+  providerLoginRoutes,
+  publishLoginOutcomes,
+} from "./provider-login-routes.ts";
 import { createProviderLogins } from "./provider-logins.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-provider-login-routes-"));
@@ -74,8 +81,16 @@ async function serve(options: { contents?: string; questions?: number } = {}) {
   });
   const logins = createProviderLogins({ runner: catalogue, logger });
   const emitted: Emitted[] = [];
+  const bus = createEventBus({
+    onListenerError: (cause) => {
+      throw cause;
+    },
+  });
+  const published: BusEvent[] = [];
 
+  bus.subscribe((event) => published.push(event));
   carryLoginSteps({ logins, events: { emit: (frame) => emitted.push(frame) } });
+  publishLoginOutcomes({ logins, bus });
 
   const server = createServer(
     createDispatcher({
@@ -132,6 +147,7 @@ async function serve(options: { contents?: string; questions?: number } = {}) {
 
   return {
     emitted,
+    published,
     logins,
     untilAsked,
     list: () => call("GET", providerLoginsPath),
@@ -195,7 +211,7 @@ describe("POST /api/provider-logins", () => {
 
 describe("POST /api/provider-logins/:attemptId/answer", () => {
   it("carries the answer to the step that is waiting", async () => {
-    const { start, answer, untilAsked, emitted } = await serve();
+    const { start, answer, untilAsked, emitted, published } = await serve();
 
     await start(startBody);
 
@@ -215,6 +231,15 @@ describe("POST /api/provider-logins/:attemptId/answer", () => {
       kind: "conclusion",
       conclusion: { kind: "succeeded" },
     });
+    // Войти может любой включённый плагин, и без события вход, сделанный одним, для остальных
+    // выглядит внезапной переменой. core.providers.changed при этом не публикуется: вью,
+    // слушающее оба, перезапрашивало бы список дважды на одно действие.
+    assert.deepEqual(published, [
+      {
+        type: coreEventTypes.providerLogin,
+        payload: { providerId: "scripted", method: "api_key" },
+      },
+    ]);
   });
 
   it("refuses an answer to a step that is no longer waiting", async () => {
@@ -240,7 +265,7 @@ describe("POST /api/provider-logins/:attemptId/answer", () => {
 
 describe("GET and DELETE of a login attempt", () => {
   it("shows what is running and takes it back", async () => {
-    const { start, list, cancel, untilAsked, emitted } = await serve();
+    const { start, list, cancel, untilAsked, emitted, published } = await serve();
 
     await start(startBody);
 
@@ -265,6 +290,8 @@ describe("GET and DELETE of a login attempt", () => {
       conclusion: { kind: "cancelled" },
     });
     assert.deepEqual(((await list()).body as LoginAttemptsSnapshot).attempts, []);
+    // Отменённый вход на шину не идёт: там факт о случившемся, а не о несостоявшемся.
+    assert.deepEqual(published, []);
   });
 
   it("answers 404 when there is nothing to cancel", async () => {

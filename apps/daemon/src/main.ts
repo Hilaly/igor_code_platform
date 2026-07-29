@@ -24,7 +24,11 @@ import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
-import { carryLoginSteps, providerLoginRoutes } from "./provider-login-routes.ts";
+import {
+  carryLoginSteps,
+  providerLoginRoutes,
+  publishLoginOutcomes,
+} from "./provider-login-routes.ts";
 import { createProviderLogins } from "./provider-logins.ts";
 import { providersRoutes } from "./providers.ts";
 import { createDaemonServer } from "./server.ts";
@@ -201,6 +205,7 @@ loginSessions.subscribe((sessionId) => events.disconnect(sessionId));
 loginSessions.subscribe((sessionId) => providerLogins.cancelOwnedBy(sessionId));
 
 carryLoginSteps({ logins: providerLogins, events });
+publishLoginOutcomes({ logins: providerLogins, bus });
 
 const server = createDaemonServer({
   logger,
@@ -219,7 +224,7 @@ const server = createDaemonServer({
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
     }),
-    ...providersRoutes({ catalogue: providers, credentials, logger, bus }),
+    ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     events.route(),
   ],

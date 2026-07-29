@@ -10,6 +10,7 @@
  * и смена рантайма не должна ломать вью провайдеров.
  */
 
+import type { ProviderAuthType } from "./provider.ts";
 import type { SettingsParseResult } from "./settings.ts";
 
 export const providerLoginsPath = "/api/provider-logins";
@@ -87,7 +88,7 @@ export type LoginOrigin = "session" | "plugin";
 export type LoginAttemptState = {
   attemptId: string;
   providerId: string;
-  method: string;
+  method: ProviderAuthType;
   origin: LoginOrigin;
   /**
    * Может ли на шаг ответить эта вкладка. У попытки плагина — нет: отвечает плагин, а человек
@@ -108,7 +109,7 @@ export type LoginAttemptsSnapshot = {
 /** Тело начала входа. `method` — то, что провайдер объявил в `logins`. */
 export type LoginStart = {
   providerId: string;
-  method: "api_key" | "oauth";
+  method: ProviderAuthType;
 };
 
 /** Тело ответа на шаг. `stepId` обязателен: без него ответ уехал бы не на тот вопрос. */

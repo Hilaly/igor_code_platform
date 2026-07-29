@@ -11,16 +11,19 @@ import { createProviderCatalogue } from "@sovereign/agent-runtime-pi";
 import { emptyEnvironment } from "@sovereign/agent-runtime-pi/testing";
 import {
   coreEventTypes,
+  providerCredentialPath,
   providerModelsPath,
   providersPath,
   providersRefreshPath,
   type BusEvent,
   type ProviderModels,
+  type ProviderSummary,
   type ProvidersSnapshot,
   type RefreshReport,
 } from "@sovereign/protocol";
 
 import { createCredentialStore, credentialsFileName } from "./credential-store.ts";
+import { createProviderLogins } from "./provider-logins.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createDispatcher } from "./dispatcher.ts";
 import { createEventBus } from "./event-bus.ts";
@@ -69,9 +72,10 @@ async function serve(options: { contents?: string; variables?: Record<string, st
     catalogs,
     environment: emptyEnvironment(options.variables),
   });
+  const logins = createProviderLogins({ runner: catalogue, logger });
   const server = createServer(
     createDispatcher({
-      routes: providersRoutes({ catalogue, credentials, logger, bus }),
+      routes: providersRoutes({ catalogue, credentials, logger, bus, logins }),
       logger,
       authenticate: () => ({ kind: "session" as const, id: "the-session" }),
     }),
@@ -113,6 +117,7 @@ async function serve(options: { contents?: string; variables?: Record<string, st
     credentials,
     events,
     list: () => call("GET", providersPath),
+    logout: (providerId: string) => call("DELETE", providerCredentialPath(providerId)),
     models: (providerId: string) => call("GET", providerModelsPath(providerId)),
     refresh: () => call("POST", providersRefreshPath),
   };
@@ -194,6 +199,54 @@ describe("POST /api/providers/refresh", () => {
       events.map((event) => event.type),
       [coreEventTypes.providersChanged],
     );
+  });
+});
+
+describe("DELETE /api/providers/:providerId/credential", () => {
+  it("removes the credential, tells the bus and answers with the new status", async () => {
+    const { logout, credentials, events } = await serve();
+
+    await credentials.modify("anthropic", async () => ({ type: "api_key", key: "s3cret" }));
+
+    const answer = await logout("anthropic");
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual((answer.body as ProviderSummary).auth, { kind: "unconfigured" });
+    assert.deepEqual(credentials.list(), []);
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providerLogout],
+    );
+  });
+
+  it("says the provider is still configured when the credential came from the environment", async () => {
+    // Ловушка «нажал выход, ничего не изменилось»: кред из окружения не наш, и убрать его нечем.
+    const { logout, credentials } = await serve({
+      variables: { ANTHROPIC_API_KEY: "не-настоящий" },
+    });
+
+    await credentials.modify("anthropic", async () => ({ type: "api_key", key: "s3cret" }));
+
+    const summary = (await logout("anthropic")).body as ProviderSummary;
+
+    assert.deepEqual(credentials.list(), []);
+    assert.deepEqual(summary.auth, {
+      kind: "configured",
+      type: "api_key",
+      source: "ANTHROPIC_API_KEY",
+    });
+  });
+
+  it("refuses to write over a credentials file it could not read", async () => {
+    const { logout } = await serve({ contents: "{ это не json" });
+
+    assert.equal((await logout("anthropic")).status, 409);
+  });
+
+  it("answers 404 for a provider nobody registered", async () => {
+    const { logout } = await serve();
+
+    assert.equal((await logout("выдуманный")).status, 404);
   });
 });
 

@@ -7,6 +7,7 @@
  */
 
 import {
+  coreEventTypes,
   parseLoginAnswer,
   parseLoginStart,
   providerLoginAnswerPathPattern,
@@ -17,6 +18,7 @@ import {
 
 import type { CredentialStore } from "./credential-store.ts";
 import { respondWithError, respondWithJson, type Route } from "./dispatcher.ts";
+import type { EventBus } from "./event-bus.ts";
 import type { EventStream } from "./event-stream.ts";
 import type { ProviderLogins } from "./provider-logins.ts";
 
@@ -160,5 +162,28 @@ export function carryLoginSteps(options: CarryLoginStepsOptions): () => void {
       providerId: attempt.providerId,
       step,
     });
+  });
+}
+
+export type PublishLoginOutcomesOptions = {
+  logins: ProviderLogins;
+  bus: Pick<EventBus, "publish">;
+};
+
+/**
+ * Удавшийся вход — на шину. Войти может любой включённый плагин, и без события вход, сделанный
+ * одним, для остальных выглядит внезапной переменой (docs/models-and-providers.md).
+ *
+ * `core.providers.changed` при этом **не** публикуется: у входа своё событие, и вью, слушающее оба,
+ * перезапрашивало бы список дважды на одно действие.
+ */
+export function publishLoginOutcomes(options: PublishLoginOutcomesOptions): () => void {
+  return options.logins.subscribe((attempt, step) => {
+    if (step.kind === "conclusion" && step.conclusion.kind === "succeeded") {
+      options.bus.publish(coreEventTypes.providerLogin, {
+        providerId: attempt.providerId,
+        method: attempt.method,
+      });
+    }
   });
 }
