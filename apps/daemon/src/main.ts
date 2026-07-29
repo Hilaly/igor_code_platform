@@ -126,7 +126,13 @@ const contributions = createContributionRegistry();
 // Мост провайдеров: единственная пара «запрос-ответ» в канале плагина
 // (docs/models-and-providers.md). Каталог тот же, что у веб-API, — иначе плагин и человек видели бы
 // разные коллекции провайдеров.
-const pluginProviders = createPluginProviders({ catalogue: providers, bus, logger });
+const pluginProviders = createPluginProviders({
+  catalogue: providers,
+  logins: providerLogins,
+  credentials,
+  bus,
+  logger,
+});
 
 const plugins = createPluginSupervisor({
   logger,
@@ -135,6 +141,8 @@ const plugins = createPluginSupervisor({
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
   onRequest: pluginProviders.request,
+  onLoginReply: pluginProviders.reply,
+  onPluginGone: pluginProviders.remove,
 });
 
 const pluginWatcher = createPluginWatcher({

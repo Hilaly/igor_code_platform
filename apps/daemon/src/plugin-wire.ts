@@ -13,6 +13,7 @@
  */
 
 import type {
+  LoginStep,
   PluginContribution,
   PluginLogLevel,
   ProviderRequest,
@@ -43,6 +44,13 @@ export type PluginOutgoing =
   | { kind: "unsubscribe"; type: string }
   /** Запрос о провайдерах. `requestId` уникален внутри воркера — этого хватает: пара живёт в нём. */
   | { kind: "request"; requestId: string; request: ProviderRequest }
+  /**
+   * Ответ на вопрос входа. Ключуется `requestId` **самого вызова `login`**, а не попытки: шаги —
+   * часть контракта операции, а не отдельный поток (docs/models-and-providers.md).
+   */
+  | { kind: "login-answer"; requestId: string; stepId: string; value: string }
+  /** Отмена входа: плагин отказался отвечать. Отличается от отказа провайдера, и это видно в конце. */
+  | { kind: "login-cancel"; requestId: string }
   | { kind: "activated" }
   /** Выгрузка завершена; `problem` заполнен, если `deactivate` бросил. */
   | { kind: "deactivated"; problem?: string }
@@ -54,4 +62,9 @@ export type PluginIncoming =
   /** Событие с шины. `plugin` есть только у события плагина: у события ядра автора нет. */
   | { kind: "event"; type: string; payload: unknown; plugin?: PluginEventOrigin }
   /** Ответ на `request`, тем же `requestId`. */
-  | { kind: "response"; requestId: string; response: ProviderResponse };
+  | { kind: "response"; requestId: string; response: ProviderResponse }
+  /** Вопрос или сообщение по ходу входа. Конец диалога приезжает ответом, а не шагом. */
+  | { kind: "login-step"; requestId: string; step: LoginStep };
+
+/** Что плагин говорит в ответ на шаг входа. Супервизор это только маршрутизирует. */
+export type PluginLoginReply = Extract<PluginOutgoing, { kind: "login-answer" | "login-cancel" }>;

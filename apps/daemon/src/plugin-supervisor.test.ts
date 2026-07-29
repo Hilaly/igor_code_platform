@@ -8,6 +8,7 @@ import {
   emptyEnvironment,
   inMemoryVault,
   scriptedProvider,
+  type ScriptedStep,
 } from "@sovereign/agent-runtime-pi/testing";
 import {
   defaultPreferences,
@@ -21,6 +22,8 @@ import {
 
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
+import { carryLoginSteps } from "./provider-login-routes.ts";
+import { createProviderLogins } from "./provider-logins.ts";
 import { createEventBus, type EventBus } from "./event-bus.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import {
@@ -189,17 +192,37 @@ function manualClock() {
 }
 
 /**
- * Настоящий каталог с двойником провайдера: мост обязан проверяться на том, что отдаёт рантайм, а
- * не на фальшивом ответе. Входа в настоящих провайдеров тест не ведёт — креды и окружение пусты.
+ * Настоящий каталог с двойником провайдера, настоящий реестр попыток и настоящий мост: провайдеры
+ * обязаны проверяться на том, что отдаёт рантайм, а не на фальшивом ответе. В настоящих провайдеров
+ * тест не входит — креды и окружение пусты.
  */
-function catalogue(credentials: Record<string, unknown> = {}) {
-  const scripted = scriptedProvider({ script: [] });
-
-  return createProviderCatalogue({
-    credentials: inMemoryVault(credentials),
+function providerWorld(recorded: Journal, script: ScriptedStep[] = []) {
+  const scripted = scriptedProvider({ script });
+  const credentials = inMemoryVault();
+  const catalogue = createProviderCatalogue({
+    credentials,
     environment: emptyEnvironment(),
     additionalProviders: [scripted.provider],
   });
+  const logins = createProviderLogins({ runner: catalogue, logger: recorded.logger });
+  const bridge = createPluginProviders({
+    catalogue,
+    logins,
+    credentials,
+    bus: recorded.bus,
+    logger: recorded.logger,
+  });
+
+  return {
+    scripted,
+    logins,
+    /** Три хука супервизора одним объектом: маршрутизация у него, логика — здесь. */
+    hooks: {
+      onRequest: bridge.request,
+      onLoginReply: bridge.reply,
+      onPluginGone: bridge.remove,
+    },
+  };
 }
 
 let running: PluginSupervisor | undefined;
@@ -384,11 +407,7 @@ describe("createPluginSupervisor", () => {
       bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry: createContributionRegistry(),
-      onRequest: createPluginProviders({
-        catalogue: catalogue(),
-        bus: recorded.bus,
-        logger: recorded.logger,
-      }).request,
+      ...providerWorld(recorded).hooks,
     });
     running = supervisor;
 
@@ -428,6 +447,104 @@ describe("createPluginSupervisor", () => {
         /answers nothing about providers/.test(String(record["reason"])),
       "the plugin failing with the reason",
     );
+  });
+
+  it("walks a whole interactive login through the channel of the plugin", async () => {
+    const recorded = journal();
+    const world = providerWorld(recorded, [
+      { say: { type: "info", message: "открой страницу провайдера" } },
+      { ask: { type: "secret", message: "ключ?" } },
+    ]);
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      ...world.hooks,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("provider-guest"), enabled("data:provider-guest"));
+
+    const record = await recorded.waitFor(
+      (record) => record.message === "provider-guest finished a login",
+      "the plugin finishing its login",
+    );
+
+    // Вопрос дошёл до плагина, ответ дошёл до провайдера, кред записала платформа.
+    assert.deepEqual(world.scripted.answers, ["ответ на secret"]);
+    assert.equal(record["conclusion"], "succeeded");
+    assert.deepEqual(record["heard"], ["info"]);
+    assert.equal(record["before"], "configured");
+    // Выход — операция того же плагина, и провайдер после неё не настроен.
+    assert.equal(record["after"], "unconfigured");
+
+    assert.deepEqual(world.logins.list(), []);
+  });
+
+  it("keeps the steps of a plugin login out of the event stream", async () => {
+    const recorded = journal();
+    const world = providerWorld(recorded, [
+      { say: { type: "info", message: "открой страницу провайдера" } },
+      { ask: { type: "secret", message: "ключ?" } },
+    ]);
+    const frames: unknown[] = [];
+
+    carryLoginSteps({ logins: world.logins, events: { emit: (frame) => frames.push(frame) } });
+
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      ...world.hooks,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("provider-guest"), enabled("data:provider-guest"));
+    await recorded.waitFor(
+      (record) => record.message === "provider-guest finished a login",
+      "the plugin finishing its login",
+    );
+
+    // Шаги попытки плагина едут в его воркер и никуда больше: окажись они ещё и в потоке, у одного
+    // вопроса стало бы два отвечающих (docs/models-and-providers.md).
+    assert.deepEqual(frames, []);
+  });
+
+  it("frees the provider when a plugin is unloaded in the middle of a login", async () => {
+    const recorded = journal();
+    const world = providerWorld(recorded, [{ ask: { type: "secret", message: "ключ?" } }]);
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      ...world.hooks,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("provider-hesitant"), enabled("data:provider-hesitant"));
+    await recorded.waitFor(
+      (record) => record.message === "provider-hesitant started a login it will not finish",
+      "the plugin starting a login",
+    );
+
+    while (world.logins.runningFor("scripted") === undefined) {
+      await wait(10);
+    }
+
+    await supervisor.apply(only("provider-hesitant"), disabled("data:provider-hesitant"));
+
+    // Гашение доезжает до конца через рантайм: попытка снимается, когда его вызов входа отклонился.
+    await recorded.waitFor(
+      (record) => record.message === "a provider login ended without a credential",
+      "the login of the unloaded plugin ending",
+    );
+
+    // Мёртвый воркер не держит провайдера занятым: иначе войти было бы нельзя до перезапуска демона.
+    assert.equal(world.logins.runningFor("scripted"), undefined);
+    assert.deepEqual(world.logins.list(), []);
   });
 
   it("says nothing about contributions when the effective set did not change", async () => {

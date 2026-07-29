@@ -14,7 +14,13 @@ import {
   type PluginIdentity,
   type PluginLogLevel,
 } from "./host.ts";
-import type { ProviderRequest, ProviderResponse } from "./providers.ts";
+import type {
+  LoginConclusion,
+  LoginInput,
+  LoginStep,
+  ProviderRequest,
+  ProviderResponse,
+} from "./providers.ts";
 
 export type RecordedLog = {
   level: PluginLogLevel;
@@ -45,6 +51,15 @@ export type PluginTestHost = {
   answerProviders: (
     answer: (request: ProviderRequest) => ProviderResponse | Promise<ProviderResponse>,
   ) => void;
+  /** Входы, которые плагин начал, в порядке вызова. */
+  logins: LoginInput[];
+  /** Ответы плагина на вопросы входа, в порядке вопросов. */
+  loginAnswers: string[];
+  /**
+   * Что платформа скажет по ходу входа и чем его кончит. Без этого вход кончается удачей молча:
+   * плагину, которому диалог неинтересен, писать сценарий незачем.
+   */
+  answerLogin: (script: { steps?: LoginStep[]; conclusion?: LoginConclusion }) => void;
   /** Доставить событие подписчику — то, что в живой платформе делает ядро. */
   deliver: (type: string, payload: unknown, origin?: EventOrigin) => Promise<void>;
   /** Снимает шов и подписки. Без этого следующий тест увидит чужой хост. */
@@ -61,6 +76,10 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const published: RecordedEvent[] = [];
   const subscriptions: string[] = [];
   const providerRequests: ProviderRequest[] = [];
+  const logins: LoginInput[] = [];
+  const loginAnswers: string[] = [];
+
+  let loginScript: { steps?: LoginStep[]; conclusion?: LoginConclusion } = {};
 
   let answerProviderRequest: (
     request: ProviderRequest,
@@ -97,6 +116,21 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
 
       return answerProviderRequest(request);
     },
+    login: async (input) => {
+      logins.push(input);
+
+      // Шаги идут по одному и по порядку: платформа задаёт следующий вопрос, дождавшись ответа на
+      // предыдущий, и плагин, который на это рассчитывает, обязан проверяться так же.
+      for (const step of loginScript.steps ?? []) {
+        if (step.kind === "notice") {
+          input.dialogue.tell?.(step.notice);
+        } else {
+          loginAnswers.push(await input.dialogue.ask(step.prompt));
+        }
+      }
+
+      return loginScript.conclusion ?? { kind: "succeeded" };
+    },
   });
 
   return {
@@ -108,6 +142,11 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     providerRequests,
     answerProviders: (answer) => {
       answerProviderRequest = answer;
+    },
+    logins,
+    loginAnswers,
+    answerLogin: (script) => {
+      loginScript = script;
     },
     deliver: deliverEvent,
     restore: () => {

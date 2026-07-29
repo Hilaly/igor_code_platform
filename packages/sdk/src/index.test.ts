@@ -100,6 +100,59 @@ describe("the provider surface", () => {
     await assert.rejects(() => providers.list(), /answered models to a list request/);
   });
 
+  it("walks the whole login dialogue and gives back what it ended with", async () => {
+    const host = installTestHost({ id: "tracker" });
+    const heard: string[] = [];
+
+    host.answerLogin({
+      steps: [
+        { kind: "notice", notice: { kind: "progress", message: "ждём провайдера" } },
+        {
+          kind: "prompt",
+          prompt: { stepId: "a1b2-1", kind: "secret", message: "ключ?" },
+        },
+      ],
+    });
+
+    const conclusion = await providers.login({
+      providerId: "anthropic",
+      method: "api_key",
+      dialogue: {
+        tell: (notice) => heard.push(notice.kind),
+        ask: (prompt) => `ответ на ${prompt.stepId}`,
+      },
+    });
+
+    assert.deepEqual(conclusion, { kind: "succeeded" });
+    assert.deepEqual(heard, ["progress"]);
+    assert.deepEqual(host.loginAnswers, ["ответ на a1b2-1"]);
+    assert.equal(host.logins[0]?.providerId, "anthropic");
+  });
+
+  it("gives back a cancelled login as a conclusion, not as a failure", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerLogin({ conclusion: { kind: "cancelled" } });
+
+    assert.deepEqual(
+      await providers.login({
+        providerId: "anthropic",
+        method: "oauth",
+        // Плагину, которому диалог неинтересен, `tell` не нужен: он необязателен.
+        dialogue: { ask: () => "" },
+      }),
+      { kind: "cancelled" },
+    );
+  });
+
+  it("asks the platform to log a provider out", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders(() => ({ kind: "logout" }));
+
+    await providers.logout("anthropic");
+
+    assert.deepEqual(host.providerRequests, [{ kind: "logout", providerId: "anthropic" }]);
+  });
+
   it("has no way to read or write the value of a credential", async () => {
     const host = installTestHost({ id: "tracker" });
     host.answerProviders(() => ({ kind: "list", providers: [anthropic] }));
@@ -111,7 +164,7 @@ describe("the provider surface", () => {
     assert.equal(providers.setCredential, undefined);
     assert.deepEqual(
       Object.keys(providers).sort(),
-      ["list", "models", "refresh", "status"],
+      ["list", "login", "logout", "models", "refresh", "status"],
       "поверхность провайдеров изменилась — проверь, не появилось ли в ней значение креда",
     );
 

@@ -224,6 +224,15 @@ const list = await providers.list();
 const models = await providers.models("anthropic");
 const status = await providers.status("anthropic");
 const report = await providers.refresh();
+
+// Вход целиком, своим диалогом; конец приходит возвращаемым значением.
+const conclusion = await providers.login({
+  providerId: "anthropic",
+  method: "api_key",
+  dialogue: { ask: (prompt) => "sk-…" },
+});
+
+await providers.logout("anthropic");
 ```
 
 **Значение креда через SDK не читается и не записывается** — ни методом, ни полем. Единственный

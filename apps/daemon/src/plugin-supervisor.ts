@@ -10,7 +10,12 @@
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
-import type { PluginContribution, ProviderRequest, ProviderResponse } from "@sovereign/sdk";
+import type {
+  LoginStep,
+  PluginContribution,
+  ProviderRequest,
+  ProviderResponse,
+} from "@sovereign/sdk";
 import {
   coreEventTypes,
   type LogSource,
@@ -26,7 +31,12 @@ import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-depen
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";
 import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
-import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
+import type {
+  PluginIncoming,
+  PluginLoginReply,
+  PluginOutgoing,
+  PluginWorkerData,
+} from "./plugin-wire.ts";
 
 export type PluginSupervisor = {
   statuses: () => PluginStatus[];
@@ -39,6 +49,17 @@ export type PluginSupervisor = {
 
 /** Отмена запланированного действия. Возвращается планировщиком, чтобы таймер можно было снять. */
 export type CancelScheduled = () => void;
+
+/** Один вызов плагина глазами того, кто на него отвечает. */
+export type PluginCall = {
+  /**
+   * Идентификатор вызова. Им же ключуются шаги входа и ответы на них: шаг — часть контракта самой
+   * операции, а не отдельный поток (docs/models-and-providers.md).
+   */
+  requestId: string;
+  /** Шаг входа плагину: он приходит по ходу операции, а не в её ответе. */
+  sendLoginStep: (step: LoginStep) => void;
+};
 
 export type CreatePluginSupervisorOptions = {
   logger: Logger;
@@ -65,7 +86,19 @@ export type CreatePluginSupervisorOptions = {
    *
    * Супервизор здесь **только маршрутизирует**: он не знает ни о каталоге, ни о попытках входа.
    */
-  onRequest?: (plugin: ContributingPlugin, request: ProviderRequest) => Promise<ProviderResponse>;
+  onRequest?: (
+    plugin: ContributingPlugin,
+    request: ProviderRequest,
+    call: PluginCall,
+  ) => Promise<ProviderResponse>;
+  /** Ответ плагина на шаг входа или отказ отвечать. */
+  onLoginReply?: (plugin: ContributingPlugin, reply: PluginLoginReply) => void;
+  /**
+   * Плагина больше нет: выгрузка, падение или перезагрузка. Зовётся там же, где снимаются вклады и
+   * подписки, — мёртвый воркер не имеет права держать провайдера занятым
+   * (docs/models-and-providers.md).
+   */
+  onPluginGone?: (pluginKey: string) => void;
 };
 
 const defaultRetryDelays = [1_000, 5_000, 15_000, 30_000, 60_000];
@@ -233,6 +266,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // Подписки снимаются здесь же, где вклады: перезагруженный плагин подпишется заново, и две
     // подписки на одно имя означали бы двойную доставку.
     events.remove(entry.plugin.key);
+
+    // По той же причине здесь снимается и всё, что плагин занял у провайдеров: воркера больше нет,
+    // а идущий вход держал бы провайдера занятым до перезапуска демона.
+    options.onPluginGone?.(entry.plugin.key);
     publishContributions();
   };
 
@@ -298,10 +335,23 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         events.unsubscribe(entry.plugin.key, message.type);
 
         return;
+      case "login-answer":
+      case "login-cancel":
+        options.onLoginReply?.(entry.plugin, message);
+
+        return;
       case "request": {
         const requestId = message.requestId;
+        const sendLoginStep = (step: LoginStep): void => {
+          // Тот же вопрос, что и с ответом: воркер мог смениться, пока шёл диалог.
+          if (entry.worker === worker) {
+            const carried: PluginIncoming = { kind: "login-step", requestId, step };
 
-        void answerRequest(entry.plugin, message.request)
+            worker.postMessage(carried);
+          }
+        };
+
+        void answerRequest(entry.plugin, message.request, { requestId, sendLoginStep })
           .catch(
             (cause: unknown) =>
               ({

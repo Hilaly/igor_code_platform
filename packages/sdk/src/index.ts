@@ -26,6 +26,14 @@ export type {
 export { providers } from "./providers.ts";
 
 export type {
+  LoginConclusion,
+  LoginDialogue,
+  LoginInput,
+  LoginLink,
+  LoginNotice,
+  LoginOption,
+  LoginPrompt,
+  LoginStep,
   ModelCost,
   ModelSummary,
   ProviderAuthState,

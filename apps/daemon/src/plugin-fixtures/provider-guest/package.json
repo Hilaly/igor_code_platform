@@ -1,0 +1,11 @@
+{
+  "name": "provider-guest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "provider-guest",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

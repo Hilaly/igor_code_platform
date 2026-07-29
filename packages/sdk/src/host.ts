@@ -9,7 +9,12 @@
  * проверка 15). У воркера свой `globalThis`, поэтому чужой плагин к чужому хосту не дотянется.
  */
 
-import type { ProviderRequest, ProviderResponse } from "./providers.ts";
+import type {
+  LoginConclusion,
+  LoginInput,
+  ProviderRequest,
+  ProviderResponse,
+} from "./providers.ts";
 
 const hostSymbol = Symbol.for("sovereign.plugin.host");
 
@@ -76,6 +81,12 @@ export type PluginHost = {
    * ответа, а общего RPC у платформы нет (docs/plugins.md, docs/models-and-providers.md).
    */
   providers: (request: ProviderRequest) => Promise<ProviderResponse>;
+  /**
+   * Вход стоит отдельно от остальных операций, потому что у него есть обратный канал: вопросы
+   * приходят по ходу диалога. Сам диалог границу воркера не пересекает — в нём функции, а граница
+   * это структурное клонирование; наружу уезжают только шаги (docs/models-and-providers.md).
+   */
+  login: (input: LoginInput) => Promise<LoginConclusion>;
 };
 
 export function installPluginHost(host: PluginHost): void {

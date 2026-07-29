@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 
 import { deliverEvent } from "@sovereign/sdk/events";
 import { installPluginHost } from "@sovereign/sdk/host";
-import type { PluginModule, ProviderResponse } from "@sovereign/sdk";
+import type { LoginDialogue, LoginStep, PluginModule, ProviderResponse } from "@sovereign/sdk";
 
 import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
 
@@ -37,6 +37,18 @@ const describe = (cause: unknown): string =>
 const awaitingAnswer = new Map<string, (response: ProviderResponse) => void>();
 let requestsSent = 0;
 
+const nextRequestId = (): string => {
+  requestsSent += 1;
+
+  return String(requestsSent);
+};
+
+/**
+ * Диалоги идущих входов по идентификатору вызова. Диалог остаётся здесь и границу не пересекает: в
+ * нём функции, а граница воркера — структурное клонирование (docs/models-and-providers.md).
+ */
+const loginDialogues = new Map<string, LoginDialogue>();
+
 installPluginHost({
   identity: { id: data.id, source: data.source },
   log: async (level, message, fields) => {
@@ -60,14 +72,80 @@ installPluginHost({
   },
   providers: (request) =>
     new Promise((resolve) => {
-      requestsSent += 1;
-
-      const requestId = String(requestsSent);
+      const requestId = nextRequestId();
 
       awaitingAnswer.set(requestId, resolve);
       send({ kind: "request", requestId, request });
     }),
+  login: (input) =>
+    new Promise((resolve, reject) => {
+      const requestId = nextRequestId();
+
+      loginDialogues.set(requestId, input.dialogue);
+      awaitingAnswer.set(requestId, (response) => {
+        loginDialogues.delete(requestId);
+
+        if (response.kind === "login") {
+          resolve(response.conclusion);
+
+          return;
+        }
+
+        reject(
+          new Error(
+            response.kind === "failed"
+              ? response.reason
+              : `the platform answered ${response.kind} to a login request`,
+          ),
+        );
+      });
+      send({
+        kind: "request",
+        requestId,
+        request: { kind: "login", providerId: input.providerId, method: input.method },
+      });
+    }),
 });
+
+/**
+ * Провести один шаг диалога. Ответ уезжает тем же `requestId`, что и сам вызов входа: шаг — часть
+ * контракта операции, и отвечать на него имеет право только тот, кто её начал.
+ */
+const walkLoginStep = async (requestId: string, step: LoginStep): Promise<void> => {
+  const dialogue = loginDialogues.get(requestId);
+
+  // Диалога уже нет: вход кончился, а шаг разъехался с концом. Отвечать некому и незачем.
+  if (dialogue === undefined) {
+    return;
+  }
+
+  if (step.kind === "notice") {
+    dialogue.tell?.(step.notice);
+
+    return;
+  }
+
+  const prompt = step.prompt;
+
+  try {
+    send({
+      kind: "login-answer",
+      requestId,
+      stepId: prompt.stepId,
+      value: await dialogue.ask(prompt),
+    });
+  } catch (cause) {
+    // Плагин отказался отвечать — это отмена входа, а не поломка канала. Причина всё равно уходит
+    // в журнал: молча проглоченный отказ выглядел бы как зависший вход.
+    send({
+      kind: "log",
+      level: "warn",
+      message: "the plugin did not answer a login step and the login was cancelled",
+      fields: { reason: describe(cause) },
+    });
+    send({ kind: "login-cancel", requestId });
+  }
+};
 
 let plugin: PluginModule | undefined;
 
@@ -88,6 +166,12 @@ port.on("message", (message: PluginIncoming) => {
     const waiting = awaitingAnswer.get(message.requestId);
     awaitingAnswer.delete(message.requestId);
     waiting?.(message.response);
+
+    return;
+  }
+
+  if (message.kind === "login-step") {
+    void walkLoginStep(message.requestId, message.step);
 
     return;
   }

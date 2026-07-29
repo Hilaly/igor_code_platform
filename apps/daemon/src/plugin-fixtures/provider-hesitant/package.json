@@ -1,0 +1,11 @@
+{
+  "name": "provider-hesitant",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "provider-hesitant",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}
