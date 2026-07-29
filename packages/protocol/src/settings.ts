@@ -18,6 +18,12 @@ export const preferencesFileName = "preferences.json";
 export type Config = {
   /** Применяется живьём. */
   logLevel: LogLevel;
+  /**
+   * Сколько сессий разом ходят к модели (docs/architecture.md). Считается любой поход, а не только
+   * турн: компакция и суммаризация ветки тоже занимают слот. Применяется живьём — предел
+   * спрашивается в момент, когда слот освобождается, а не при старте демона.
+   */
+  maxConcurrentTurns: number;
 };
 
 /**
@@ -76,7 +82,7 @@ export type AppearancePreferences = {
   locale: string;
 };
 
-export const defaultConfig: Config = { logLevel: "info" };
+export const defaultConfig: Config = { logLevel: "info", maxConcurrentTurns: 4 };
 export const defaultAppearance: Appearance = {
   colorScheme: baseColorScheme,
   variant: "system",
@@ -103,7 +109,10 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
   }
 
-  const diagnostics = diagnoseUnknownKeys(configFileName, fields, ["logLevel"]);
+  const diagnostics = diagnoseUnknownKeys(configFileName, fields, [
+    "logLevel",
+    "maxConcurrentTurns",
+  ]);
   const value: Config = { ...defaultConfig };
   const logLevel = fields["logLevel"];
 
@@ -117,6 +126,20 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     }
 
     value.logLevel = logLevel;
+  }
+
+  const maxConcurrentTurns = fields["maxConcurrentTurns"];
+
+  if (maxConcurrentTurns !== undefined) {
+    if (!Number.isInteger(maxConcurrentTurns) || (maxConcurrentTurns as number) < 1) {
+      diagnostics.push(
+        `${configFileName}: maxConcurrentTurns must be an integer above zero, got ${JSON.stringify(maxConcurrentTurns)}`,
+      );
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    value.maxConcurrentTurns = maxConcurrentTurns as number;
   }
 
   return { kind: "parsed", value, diagnostics };

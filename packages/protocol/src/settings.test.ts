@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  defaultConfig,
   defaultPreferences,
   interfaceScales,
+  parseConfig,
   parsePreferences,
   type Preferences,
 } from "./settings.ts";
@@ -181,5 +183,31 @@ describe("parsePreferences: appearance and locale", () => {
     assert.match(result.diagnostics.join("\n"), /pinned/);
     assert.match(result.diagnostics.join("\n"), /hello/);
     assert.match(result.diagnostics.join("\n"), /locale/);
+  });
+});
+
+describe("parseConfig", () => {
+  const parsedConfig = (raw: unknown) => {
+    const result = parseConfig(raw);
+
+    assert.equal(result.kind, "parsed", result.kind === "rejected" ? result.diagnostics[0] : "");
+
+    return result.kind === "parsed" ? result.value : defaultConfig;
+  };
+
+  it("takes an empty file as the defaults", () => {
+    assert.deepEqual(parsedConfig({}), defaultConfig);
+  });
+
+  it("reads the limit of concurrent turns", () => {
+    assert.equal(parsedConfig({ maxConcurrentTurns: 8 }).maxConcurrentTurns, 8);
+  });
+
+  it("refuses a limit that would let nothing run", () => {
+    // Ноль остановил бы платформу целиком, и молчаливая подстановка умолчания это скрыла бы:
+    // человек правил файл и обязан узнать, что правка не применена (docs/data-directory.md).
+    for (const value of [0, -1, 2.5, "8", null]) {
+      assert.equal(parseConfig({ maxConcurrentTurns: value }).kind, "rejected", String(value));
+    }
   });
 });
