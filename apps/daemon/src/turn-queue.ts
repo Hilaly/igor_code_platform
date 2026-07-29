@@ -15,7 +15,11 @@ export type TurnKind = "turn" | "compaction" | "branch-summary";
 export type TurnJob = {
   sessionId: string;
   kind: TurnKind;
-  run: () => Promise<void>;
+  /**
+   * Идентификатор турна выдаёт очередь и отдаёт его работе аргументом: он же уезжает в ответ на
+   * запуск и в дельты потока, и родись он позже старта — первые дельты приехали бы без него.
+   */
+  run: (turnId: string) => Promise<void>;
 };
 
 export type TurnPlace = {
@@ -77,17 +81,17 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
         continue;
       }
 
-      start(next.job);
+      start(next.job, next.turnId);
     }
   };
 
-  const start = (job: TurnJob): void => {
+  const start = (job: TurnJob, turnId: string): void => {
     running.add(job.sessionId);
     options.onChange?.(job.sessionId);
 
     void (async () => {
       try {
-        await job.run();
+        await job.run(turnId);
       } catch (cause) {
         options.onFailure?.(job.sessionId, cause);
       } finally {

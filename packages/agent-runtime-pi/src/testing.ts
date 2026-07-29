@@ -3,7 +3,11 @@
  * собраны они из типов Pi: демону они недоступны (docs/architecture.md).
  */
 
-import { createAssistantMessageEventStream, createProvider } from "@earendil-works/pi-ai";
+import {
+  createAssistantMessageEventStream,
+  createModels,
+  createProvider,
+} from "@earendil-works/pi-ai";
 import type {
   Api,
   ApiKeyCredential,
@@ -20,6 +24,7 @@ import type {
   Usage,
 } from "@earendil-works/pi-ai";
 
+import { createAgentSessionStore, type AgentSessionStore } from "./agent-session.ts";
 import type { CredentialVault } from "./credentials.ts";
 import type { Environment } from "./environment.ts";
 
@@ -307,5 +312,24 @@ function emptyUsage(): Usage {
     cacheWrite: 0,
     totalTokens: 0,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
+}
+
+/**
+ * Хранилище сессий на двойнике модели. Живёт здесь, а не в тестах демона, по той же причине, что и
+ * остальные двойники: собрано оно из типов Pi, а демону они недоступны (docs/architecture.md).
+ */
+export function scriptedSessionStore(options: { directory: string; turns?: ScriptedTurn[] }): {
+  store: AgentSessionStore;
+  model: string;
+} {
+  const scripted = scriptedModelProvider({ turns: options.turns ?? [] });
+  const models = createModels();
+
+  models.setProvider(scripted.provider);
+
+  return {
+    store: createAgentSessionStore({ models, directory: options.directory }),
+    model: `${scripted.model.provider}/${scripted.model.id}`,
   };
 }

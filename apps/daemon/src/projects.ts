@@ -34,12 +34,18 @@ export type ProjectsRouteOptions = {
   availability?: (project: StoredProject) => ProjectAvailability;
   /** Тот же нормализатор, что у стора: складка обязана быть общей (`project-path.ts`). */
   normalizePath?: ProjectPathNormalizer;
+  /**
+   * Сколько сессий в папке проекта. По умолчанию ноль: маршрут проектов поднимается и без службы
+   * сессий, а «пропадёт 0 сессий» вью говорит честно (docs/sessions-and-projects.md).
+   */
+  sessionCount?: (folderKey: string) => number;
 };
 
 export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
   const { projects, logger } = options;
   const availabilityOf = options.availability ?? ((project) => probeProjectFolder(project.folder));
   const normalizePath = options.normalizePath ?? ((raw) => normalizeProjectPath(raw));
+  const sessionCount = options.sessionCount ?? (() => 0);
 
   const describe = (project: StoredProject): Project => ({
     id: project.id,
@@ -48,9 +54,9 @@ export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
     folderKey: project.folderKey,
     archived: project.archived,
     availability: availabilityOf(project),
-    // Считалка сессий появится вместе с их хранилищем (docs/sessions-and-projects.md). Ноль здесь —
-    // единственное место, где он стоит, и вью говорит о нём честно, а не «пропадёт 0 сессий».
-    sessionCount: 0,
+    // Считается по заголовкам файлов сессий, без чтения записей: принадлежность выражена папкой
+    // (docs/sessions-and-projects.md), поэтому сравнение идёт по тому же `folderKey`.
+    sessionCount: sessionCount(project.folderKey),
     ephemeral: project.id === ephemeralProjectId,
     createdAt: project.createdAt,
   });

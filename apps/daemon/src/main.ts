@@ -1,12 +1,18 @@
+import { join } from "node:path";
+
 import { createAccountStore } from "./account.ts";
 import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
 import { parseArguments } from "./arguments.ts";
 import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createCredentialStore } from "./credential-store.ts";
-import { ensureDataDirectory } from "./data-directory.ts";
+import { ensureDataDirectory, sessionsDirectoryName } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
-import { createProviderCatalogue, processEnvironment } from "@sovereign/agent-runtime-pi";
+import {
+  createAgentSessionStore,
+  createProviderCatalogue,
+  processEnvironment,
+} from "@sovereign/agent-runtime-pi";
 
 import { createEventStream } from "./event-stream.ts";
 import { healthRoute } from "./health.ts";
@@ -24,6 +30,10 @@ import { pluginsRoute } from "./plugins-snapshot.ts";
 import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
+import { coreToolSource } from "./core-tools.ts";
+import { createSessionService } from "./sessions.ts";
+import { createToolCollector } from "./tool-collection.ts";
+import { createTurnQueue } from "./turn-queue.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
 import {
   carryLoginSteps,
@@ -204,6 +214,35 @@ applyPlugins();
 // события до его создания рассказывать некому — клиентов ещё нет.
 const events = createEventStream({ bus, logger });
 
+// Сессии агента. Хранилище, очередь и сборка инструментов заводятся здесь, а не внутри службы:
+// коллекция моделей у сессий та же, что у каталога провайдеров, — второй экземпляр означал бы
+// вторые креды и второй набор кастомных провайдеров (docs/models-and-providers.md).
+const toolCollector = createToolCollector();
+
+toolCollector.register(coreToolSource());
+
+const sessions = createSessionService({
+  store: createAgentSessionStore({
+    models: providers.models,
+    directory: join(directory, sessionsDirectoryName),
+  }),
+  projects,
+  contributions: () => contributions.resolved(),
+  tools: toolCollector,
+  queue: createTurnQueue({
+    // Предел читается живьём: правка `config.json` применяется без перезапуска демона.
+    limit: () => settings.current().config.maxConcurrentTurns,
+    onFailure: (sessionId, reason) =>
+      logger.error("a turn failed", { session: sessionId, reason: String(reason) }),
+  }),
+  bus,
+  emitDelta: (frame) => events.emitSessionDelta(frame),
+  logger,
+  availability: (project) => projectAvailability.of(project.id),
+});
+
+void sessions.refresh();
+
 const account = createAccountStore({ directory, logger });
 const loginSessions = createLoginSessionStore({
   directory,
@@ -238,7 +277,9 @@ const server = createDaemonServer({
       logger,
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
+      sessionCount: (folderKey) => sessions.countByFolderKey(folderKey),
     }),
+    ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     events.route(),
@@ -268,6 +309,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     pluginWatcher.close();
     loginSessions.stop();
     projectAvailability.stop();
+    void sessions.close();
 
     // Лок снимается последним и в любом случае: воркер, зависший на выгрузке, не имеет права
     // оставить директорию данных запертой.

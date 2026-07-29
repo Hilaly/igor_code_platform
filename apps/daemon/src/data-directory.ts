@@ -27,6 +27,12 @@ export const pluginsDirectoryName = "plugins";
  */
 export const workDirectoryName = "work";
 
+/**
+ * Папка записей сессий агента (docs/data-directory.md). Создаётся при старте: агентный рантайм
+ * пишет в неё сам, а корень, которого нет, он не заводит.
+ */
+export const sessionsDirectoryName = "sessions";
+
 export function ensureDataDirectory(path: string): string {
   const directory = resolveDataDirectory(path);
   const existing = statSync(directory, { throwIfNoEntry: false });
@@ -37,6 +43,7 @@ export function ensureDataDirectory(path: string): string {
 
   mkdirSync(join(directory, pluginsDirectoryName), { recursive: true });
   mkdirSync(join(directory, workDirectoryName), { recursive: true });
+  mkdirSync(join(directory, sessionsDirectoryName), { recursive: true });
 
   return directory;
 }
