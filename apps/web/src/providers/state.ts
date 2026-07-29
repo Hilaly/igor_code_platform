@@ -2,13 +2,21 @@
  * Состояние вью провайдеров и его правила. Логика живёт здесь, а не в хуке, потому что проверяется
  * она тестом, а не глазами.
  *
- * Разбирать кадры шины тут нечего: событий про провайдеров ядро пока не публикует
- * (docs/event-bus.md), а вход и выход, которые их принесут, приезжают отдельно
- * (docs/models-and-providers.md). Поэтому ни `stale`, ни перезапроса по событию здесь нет —
- * заводить их «на будущее» значит писать необъяснимый код.
+ * Диалоги входа лежат отдельным полем и по своим правилам (`login-state.ts`): каталог провайдеров и
+ * живой диалог с провайдером — разные темы, и общего у них только вью.
  */
 
-import type { ModelSummary, ProviderSummary, ProvidersSnapshot } from "@sovereign/protocol";
+import {
+  coreEventTypes,
+  isPluginStreamEvent,
+  streamGapType,
+  type BusStreamEvent,
+  type ModelSummary,
+  type ProviderSummary,
+  type ProvidersSnapshot,
+} from "@sovereign/protocol";
+
+import { initialLoginsState, type LoginsState } from "./login-state.ts";
 
 /**
  * Модели одного провайдера: их спрашивают по раскрытию строки, и каждый провайдер живёт своей
@@ -27,9 +35,43 @@ export type ProvidersState = {
   openProviderId?: string;
   /** Прочитанное остаётся в памяти вкладки: каталог моделей лежит в пакете рантайма и не меняется. */
   models: Record<string, ProviderModelsEntry>;
+  /** Диалоги входа: правила в `login-state.ts`, здесь они только живут. */
+  logins: LoginsState;
 };
 
-export const initialProvidersState: ProvidersState = { models: {} };
+export const initialProvidersState: ProvidersState = { models: {}, logins: initialLoginsState };
+
+export type StreamOutcome = {
+  state: ProvidersState;
+  /** Перезапросить снимок провайдеров. */
+  providers: boolean;
+  /** Перезапросить идущие попытки входа. */
+  logins: boolean;
+};
+
+/**
+ * Событий про провайдеров три, и все они означают одно — спросить снимок заново. Что именно
+ * изменилось, в нагрузке не написано, и это правильно: вход мог сделать плагин, а состояние
+ * авторизации всё равно спрашивается у владельца (docs/event-bus.md).
+ */
+export function applyStreamEvent(state: ProvidersState, event: BusStreamEvent): StreamOutcome {
+  if (isPluginStreamEvent(event)) {
+    return { state, providers: false, logins: false };
+  }
+
+  // Пропуск в потоке уносит и кадры шагов входа: они нумеруются общей нумерацией (docs/web-api.md).
+  // Поэтому перечитывается и то и другое — иначе диалог остался бы на позапрошлом вопросе.
+  if (event.type === streamGapType) {
+    return { state, providers: true, logins: true };
+  }
+
+  const changed =
+    event.type === coreEventTypes.providerLogin ||
+    event.type === coreEventTypes.providerLogout ||
+    event.type === coreEventTypes.providersChanged;
+
+  return { state, providers: changed, logins: false };
+}
 
 /**
  * Настроенные — первыми. Провайдеров 38 (docs/web-api.md), а кред обычно есть у единиц: без

@@ -3,18 +3,32 @@
 /**
  * Вью провайдеров на настоящем DOM. Проверяется то, чего не видно ни в разметке первого кадра, ни
  * глазами за один проход: что беда с кредами не прячет список, что три состояния авторизации
- * различимы (а не сведены к «есть/нет»), что способы входа показаны, но войти пока нечем, и что
- * модели спрашиваются по раскрытию строки, а не приезжают вместе со списком.
+ * различимы (а не сведены к «есть/нет»), что модели спрашиваются по раскрытию строки, и что
+ * интерактивный вход проходится целиком — все четыре вопроса, все четыре сообщения, конфликт,
+ * устаревший шаг, отмена, исход и ловушка выхода из провайдера с кредом из окружения.
  *
  * Переводчик здесь бросает на любой ненайденный ключ: непереведённая строка в интерфейсе — не
  * «мелочь на потом», а то, ради чего диагностика вообще заведена (docs/ui-kit.md).
  */
 
-import type { ModelSummary, ProviderSummary } from "@sovereign/protocol";
+import type {
+  LoginAttemptState,
+  LoginNotice,
+  LoginPrompt,
+  ModelSummary,
+  ProviderSummary,
+} from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  applyLogout,
+  applyStaleAnswer,
+  applyStarted,
+  applyTaken,
+  type LoginsState,
+} from "./login-state.ts";
 import { ProvidersView } from "./providers-view.tsx";
 import {
   applyModels,
@@ -66,11 +80,24 @@ const model = (id: string, overrides: Partial<ModelSummary> = {}): ModelSummary 
 });
 
 function show(state: ProvidersState) {
-  const onOpen = vi.fn();
+  const handlers = {
+    onOpen: vi.fn(),
+    onLogIn: vi.fn(),
+    onAnswer: vi.fn(),
+    onCancelLogin: vi.fn(),
+    onCloseLogin: vi.fn(),
+    onLogOut: vi.fn(),
+  };
 
-  render(<ProvidersView state={state} onOpen={onOpen} translator={translator} />);
+  const { rerender } = render(
+    <ProvidersView state={state} {...handlers} translator={translator} />,
+  );
 
-  return { onOpen };
+  return {
+    ...handlers,
+    again: (next: ProvidersState) =>
+      rerender(<ProvidersView state={next} {...handlers} translator={translator} />),
+  };
 }
 
 const withProviders = (providers: ProviderSummary[], problem?: string): ProvidersState =>
@@ -78,6 +105,29 @@ const withProviders = (providers: ProviderSummary[], problem?: string): Provider
     providers,
     ...(problem === undefined ? {} : { problem }),
   });
+
+const attempt = (overrides: Partial<LoginAttemptState> = {}): LoginAttemptState => ({
+  attemptId: "a1b2",
+  providerId: "anthropic",
+  method: "oauth",
+  origin: "session",
+  answerable: true,
+  notices: [],
+  startedAt: "2026-07-29T09:11:04.512Z",
+  ...overrides,
+});
+
+/** Провайдер раскрыт и в него идёт вход: диалог показывается вместе со списком. */
+const withLogin = (state: ProvidersState, logins: LoginsState): ProvidersState => ({
+  ...state,
+  logins,
+});
+
+const asking = (prompt: LoginPrompt, state = withProviders([provider("anthropic")])) =>
+  withLogin(state, applyStarted(state.logins, attempt({ pending: prompt })));
+
+const saying = (notice: LoginNotice, state = withProviders([provider("anthropic")])) =>
+  withLogin(state, applyStarted(state.logins, attempt({ notices: [notice] })));
 
 /** Строка провайдера: значки и подписи ищутся внутри своей строки, а не по всей странице. */
 const rowOf = (name: string): HTMLElement => {
@@ -100,7 +150,7 @@ describe("ProvidersView", () => {
   });
 
   it("says why the providers could not be read", () => {
-    show({ models: {}, failure: "the daemon answered 500" });
+    show({ ...initialProvidersState, failure: "the daemon answered 500" });
 
     expect(screen.getByText(/the daemon answered 500/)).toBeDefined();
   });
@@ -146,9 +196,7 @@ describe("ProvidersView", () => {
     expect(within(rowOf("Anthropic")).getByText(/ANTHROPIC_API_KEY/)).toBeDefined();
   });
 
-  it("shows the ways in without offering a single button to log in with", () => {
-    // Интерактивный вход приезжает отдельно (docs/models-and-providers.md): кнопка, которая ничего
-    // не делает, врёт про возможность.
+  it("names the ways in on the row of the provider", () => {
     show(
       withProviders([
         provider("anthropic", {
@@ -164,7 +212,6 @@ describe("ProvidersView", () => {
 
     expect(within(row).getByText(/Anthropic API key/)).toBeDefined();
     expect(within(row).getByText(/Sign in with Claude Pro\/Max/)).toBeDefined();
-    expect(screen.queryByRole("button", { name: /Войти/ })).toBeNull();
   });
 
   it("says outright that a provider with no ways in cannot be logged into", () => {
@@ -239,5 +286,368 @@ describe("ProvidersView", () => {
     show(state);
 
     expect(screen.queryByText("claude-opus-4")).toBeNull();
+  });
+});
+
+describe("the way into a provider", () => {
+  const opened = (overrides: Partial<ProviderSummary> = {}): ProvidersState =>
+    openProvider(withProviders([provider("anthropic", overrides)]), "anthropic").state;
+
+  it("offers a button per way in, labelled by the provider itself", () => {
+    // Подпись приходит от провайдера: «Anthropic API key», «Sign in with SuperGrok» — своей мы бы
+    // назвали вход не тем именем, каким его знает человек (docs/web-api.md).
+    const { onLogIn } = show(
+      opened({
+        logins: [
+          { type: "api_key", label: "Anthropic API key" },
+          { type: "oauth", label: "Sign in with Claude Pro/Max" },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in with Claude Pro/Max" }));
+
+    expect(onLogIn).toHaveBeenCalledWith("anthropic", "oauth");
+    expect(screen.getByRole("button", { name: "Anthropic API key" })).toBeDefined();
+  });
+
+  it("offers no button at all when the provider declares no way in", () => {
+    show(opened({ logins: [] }));
+
+    expect(screen.getByText("Вход в Anthropic")).toBeDefined();
+    expect(screen.queryByRole("button", { name: /API key/ })).toBeNull();
+  });
+
+  it("does not offer a second login while the first is running", () => {
+    // Второй вход в того же провайдера маршрут отклоняет (docs/web-api.md): кнопка, ведущая в
+    // заведомый отказ, врёт про возможность.
+    const state = opened();
+
+    show(withLogin(state, applyStarted(state.logins, attempt())));
+
+    expect(screen.getByRole("button", { name: "anthropic API key" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("says the login did not start at all", () => {
+    const state = opened();
+
+    show(withLogin(state, { ...state.logins, failure: "the daemon answered 500" }));
+
+    expect(screen.getByText(/Вход не начался: the daemon answered 500/)).toBeDefined();
+  });
+});
+
+describe("a login that is already running", () => {
+  it("shows who took the provider and that a plugin answers its questions", () => {
+    const state = withProviders([provider("anthropic")]);
+
+    show(
+      withLogin(state, applyTaken(state.logins, attempt({ origin: "plugin", answerable: false }))),
+    );
+
+    expect(screen.getByText("Вход в этого провайдера уже идёт")).toBeDefined();
+    expect(screen.getByText(/Его начал плагин/)).toBeDefined();
+  });
+
+  it("shows the question of a plugin login without a form to answer it with", () => {
+    const state = withProviders([provider("anthropic")]);
+    const running = attempt({
+      origin: "plugin",
+      answerable: false,
+      pending: { stepId: "a1b2-1", kind: "text", message: "Имя организации" },
+    });
+
+    show(withLogin(state, applyTaken(state.logins, running)));
+
+    expect(screen.getByText("Имя организации")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Отправить ответ" })).toBeNull();
+    // Отменить чужую попытку маршрут не даст (docs/web-api.md): кнопка вела бы в заведомый отказ.
+    expect(screen.queryByRole("button", { name: "Отменить вход" })).toBeNull();
+  });
+
+  it("cancels the login instead of hiding it", () => {
+    const state = withProviders([provider("anthropic")]);
+    const { onCancelLogin, onCloseLogin } = show(
+      withLogin(state, applyStarted(state.logins, attempt())),
+    );
+
+    expect(onCloseLogin).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Отменить вход" }));
+
+    expect(onCancelLogin).toHaveBeenCalledWith("anthropic");
+  });
+});
+
+describe("the four questions of a login", () => {
+  const send = (): void => {
+    fireEvent.click(screen.getByRole("button", { name: "Отправить ответ" }));
+  };
+
+  it("asks for a text and sends what was typed", () => {
+    const { onAnswer } = show(
+      asking({ stepId: "a1b2-1", kind: "text", message: "Имя организации" }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Имя организации"), { target: { value: "acme" } });
+    send();
+
+    expect(onAnswer).toHaveBeenCalledWith("anthropic", "a1b2-1", "acme");
+  });
+
+  it("hides a secret while it is typed and says where it goes", () => {
+    show(asking({ stepId: "a1b2-1", kind: "secret", message: "Ключ API" }));
+
+    const field = screen.getByLabelText("Ключ API");
+
+    expect(field).toHaveProperty("type", "password");
+    expect(screen.getByText(/не показывается/)).toBeDefined();
+  });
+
+  it("sends the identifier of the chosen option, not its label", () => {
+    // Ответом уезжает `id` (docs/models-and-providers.md): подпись видит человек, а провайдер ждёт
+    // идентификатор.
+    const { onAnswer } = show(
+      asking({
+        stepId: "a1b2-1",
+        kind: "select",
+        message: "Какой аккаунт",
+        options: [
+          { id: "personal", label: "Личный" },
+          { id: "work", label: "Рабочий", description: "команда acme" },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Какой аккаунт" }));
+    fireEvent.click(screen.getByText(/Рабочий/));
+    send();
+
+    expect(onAnswer).toHaveBeenCalledWith("anthropic", "a1b2-1", "work");
+  });
+
+  it("says where the code of a manual step comes from", () => {
+    const { onAnswer } = show(
+      asking({ stepId: "a1b2-1", kind: "manual-code", message: "Код из браузера" }),
+    );
+
+    expect(screen.getByText(/Забери код на странице провайдера/)).toBeDefined();
+    fireEvent.change(screen.getByLabelText("Код из браузера"), { target: { value: "AB12" } });
+    send();
+
+    expect(onAnswer).toHaveBeenCalledWith("anthropic", "a1b2-1", "AB12");
+  });
+
+  it("keeps the secret out of the markup and out of the state once it is sent", () => {
+    // Единственное место, куда уезжает значение, — тело `POST` (docs/models-and-providers.md).
+    const state = asking({ stepId: "a1b2-1", kind: "secret", message: "Ключ API" });
+    const { again, onAnswer } = show(state);
+
+    fireEvent.change(screen.getByLabelText("Ключ API"), { target: { value: "sk-ant-secret" } });
+    send();
+
+    expect(onAnswer).toHaveBeenCalledWith("anthropic", "a1b2-1", "sk-ant-secret");
+
+    // Ответ уехал — вопрос снимается, и вместе с ним исчезает единственное место, где значение
+    // жило. В состоянии его не было ни на одном шаге.
+    const answered = withLogin(state, {
+      ...state.logins,
+      dialogs: {
+        anthropic: { attempt: attempt() },
+      },
+    });
+
+    again(answered);
+
+    expect(JSON.stringify(answered)).not.toContain("sk-ant-secret");
+    expect(document.body.innerHTML).not.toContain("sk-ant-secret");
+  });
+});
+
+describe("the four things a login says", () => {
+  it("shows a message with the links it came with", () => {
+    show(
+      saying({
+        kind: "info",
+        message: "Разреши доступ в браузере",
+        links: [{ url: "https://console.anthropic.com/keys", label: "Ключи" }],
+      }),
+    );
+
+    const link = screen.getByRole("link", { name: "Ключи" });
+
+    expect(screen.getByText("Разреши доступ в браузере")).toBeDefined();
+    expect(link.getAttribute("href")).toBe("https://console.anthropic.com/keys");
+    expect(link.getAttribute("rel")).toBe("noreferrer");
+  });
+
+  it("shows the address to log in at as a link, not as text", () => {
+    show(
+      saying({
+        kind: "auth-url",
+        url: "https://claude.ai/oauth/authorize",
+        instructions: "Открой страницу входа",
+      }),
+    );
+
+    expect(screen.getByText("Открой страницу входа")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "https://claude.ai/oauth/authorize" }).getAttribute("rel"),
+    ).toBe("noreferrer");
+  });
+
+  it("shows the device code, where to enter it and how long it is good for", () => {
+    show(
+      saying({
+        kind: "device-code",
+        userCode: "WDJB-MJHT",
+        verificationUri: "https://github.com/login/device",
+        expiresInSeconds: 900,
+      }),
+    );
+
+    expect(screen.getByText("WDJB-MJHT")).toBeDefined();
+    expect(screen.getByRole("link", { name: "https://github.com/login/device" })).toBeDefined();
+    expect(screen.getByText(/900/)).toBeDefined();
+    // Ожидание — это полоса, а не строка: сказать «идёт» и «ничего не происходит» это разные вещи.
+    expect(
+      screen.getByRole("progressbar", { name: "Ждём подтверждения от провайдера" }),
+    ).toBeDefined();
+  });
+
+  it("shows progress as progress", () => {
+    show(saying({ kind: "progress", message: "Меняем код на токен" }));
+
+    expect(screen.getByRole("progressbar", { name: "Меняем код на токен" })).toBeDefined();
+  });
+});
+
+describe("the end of a login", () => {
+  it("says the login succeeded and lets the human put the dialog away", () => {
+    const state = withProviders([provider("anthropic")]);
+    const { onCloseLogin } = show(
+      withLogin(state, {
+        ...state.logins,
+        dialogs: { anthropic: { attempt: attempt(), conclusion: { kind: "succeeded" } } },
+      }),
+    );
+
+    expect(screen.getByText("Вход удался")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть" }));
+
+    expect(onCloseLogin).toHaveBeenCalledWith("anthropic");
+  });
+
+  it("tells a cancellation from a refusal of the provider", () => {
+    const state = withProviders([provider("anthropic")]);
+
+    show(
+      withLogin(state, {
+        ...state.logins,
+        dialogs: {
+          anthropic: { attempt: attempt(), conclusion: { kind: "cancelled" } },
+          openai: {
+            attempt: attempt({ providerId: "openai", attemptId: "c3d4" }),
+            conclusion: { kind: "failed", reason: "the provider refused the key" },
+          },
+        },
+      }),
+    );
+
+    expect(screen.getByText("Вход отменён")).toBeDefined();
+    expect(screen.getByText(/the provider refused the key/)).toBeDefined();
+  });
+
+  it("says a step no longer waits for an answer instead of keeping quiet", () => {
+    const state = asking({ stepId: "a1b2-1", kind: "text", message: "Имя организации" });
+
+    show(
+      withLogin(
+        state,
+        applyStaleAnswer(state.logins, "anthropic", "that login step is no longer waiting"),
+      ),
+    );
+
+    expect(screen.getByText(/that login step is no longer waiting/)).toBeDefined();
+    // Формы больше нет: отвечать этому шагу нечем, а форма обещала бы обратное.
+    expect(screen.queryByRole("button", { name: "Отправить ответ" })).toBeNull();
+  });
+
+  it("says the login ended while the connection was down", () => {
+    const state = withProviders([provider("anthropic")]);
+
+    show(
+      withLogin(state, {
+        ...state.logins,
+        dialogs: { anthropic: { attempt: attempt(), lost: true } },
+      }),
+    );
+
+    expect(screen.getByText("Вход закончился, пока не было связи")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Закрыть" })).toBeDefined();
+  });
+});
+
+describe("logging out of a provider", () => {
+  const configured = (source?: string): ProvidersState =>
+    openProvider(
+      withProviders([
+        provider("anthropic", {
+          auth: {
+            kind: "configured",
+            type: "api_key",
+            ...(source === undefined ? {} : { source }),
+          },
+        }),
+      ]),
+      "anthropic",
+    ).state;
+
+  it("offers the way out only where there is a credential to remove", () => {
+    const { onLogOut } = show(configured("stored credential"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Выйти из провайдера" }));
+
+    expect(onLogOut).toHaveBeenCalledWith("anthropic");
+  });
+
+  it("offers no way out of a provider nobody logged into", () => {
+    show(openProvider(withProviders([provider("anthropic")]), "anthropic").state);
+
+    expect(screen.queryByRole("button", { name: "Выйти из провайдера" })).toBeNull();
+  });
+
+  it("says the logout changed nothing and names the environment variable", () => {
+    // Ловушка «нажал выход, ничего не изменилось»: кред из окружения платформе не принадлежит, и
+    // убрать его нечем (docs/web-api.md).
+    const state = configured("ANTHROPIC_API_KEY");
+    const summary = state.snapshot?.providers[0];
+
+    if (summary === undefined) {
+      throw new Error("the provider is missing from the snapshot");
+    }
+
+    show(withLogin(state, applyLogout(state.logins, summary)));
+
+    expect(screen.getByText("Выход ничего не изменил")).toBeDefined();
+    // Имя переменной названо и в подписи строки, и в объяснении: спрашивается второе.
+    expect(screen.getByText(/Кред приходит из ANTHROPIC_API_KEY/)).toBeDefined();
+    expect(screen.getByText(/Убери его из окружения/)).toBeDefined();
+  });
+
+  it("says as much when the runtime did not name the source", () => {
+    const state = configured();
+    const summary = state.snapshot?.providers[0];
+
+    if (summary === undefined) {
+      throw new Error("the provider is missing from the snapshot");
+    }
+
+    show(withLogin(state, applyLogout(state.logins, summary)));
+
+    expect(screen.getByText("Выход ничего не изменил")).toBeDefined();
+    expect(screen.getByText(/провайдер остался настроенным/)).toBeDefined();
   });
 });

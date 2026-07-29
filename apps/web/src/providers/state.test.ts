@@ -1,4 +1,10 @@
-import type { ModelSummary, ProviderSummary } from "@sovereign/protocol";
+import {
+  coreEventTypes,
+  streamGapType,
+  type BusStreamEvent,
+  type ModelSummary,
+  type ProviderSummary,
+} from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +12,7 @@ import {
   applyModels,
   applyModelsFailure,
   applySnapshot,
+  applyStreamEvent,
   configuredCount,
   initialProvidersState,
   openProvider,
@@ -161,6 +168,56 @@ describe("applyModelsFailure", () => {
     expect(next.models["a"]).toEqual({ kind: "failed", reason: "not found" });
     // Отказ по одному провайдеру не трогает список: он читается отдельным запросом.
     expect(next.failure).toBeUndefined();
+  });
+});
+
+describe("applyStreamEvent", () => {
+  const event = (type: string, payload: unknown = {}): BusStreamEvent =>
+    ({ index: 1, time: "2026-07-29T09:11:04.512Z", type, payload }) as BusStreamEvent;
+
+  it("asks for the providers again on a login, a logout and a refreshed catalogue", () => {
+    // Что именно изменилось, в нагрузке не написано: вход мог сделать плагин, а состояние
+    // авторизации спрашивается у владельца (docs/event-bus.md).
+    for (const type of [
+      coreEventTypes.providerLogin,
+      coreEventTypes.providerLogout,
+      coreEventTypes.providersChanged,
+    ]) {
+      const outcome = applyStreamEvent(initialProvidersState, event(type));
+
+      expect(outcome.providers, type).toBe(true);
+      expect(outcome.logins, type).toBe(false);
+    }
+  });
+
+  it("asks for the running logins too when part of the stream was missed", () => {
+    // Кадр шага входа нумеруется общей нумерацией и пропадает вместе с окном (docs/web-api.md).
+    const outcome = applyStreamEvent(
+      initialProvidersState,
+      event(streamGapType, { requestedIndex: 1, oldestIndex: 9 }),
+    );
+
+    expect(outcome.providers).toBe(true);
+    expect(outcome.logins).toBe(true);
+  });
+
+  it("asks for nothing on an event of somebody else", () => {
+    const plugin = {
+      index: 1,
+      time: "2026-07-29T09:11:04.512Z",
+      type: "tracker.task.done",
+      payload: {},
+      plugin: { id: "tracker", name: "Tracker" },
+    } as BusStreamEvent;
+
+    expect(applyStreamEvent(initialProvidersState, plugin)).toEqual({
+      state: initialProvidersState,
+      providers: false,
+      logins: false,
+    });
+    expect(
+      applyStreamEvent(initialProvidersState, event(coreEventTypes.projectsChanged)).providers,
+    ).toBe(false);
   });
 });
 

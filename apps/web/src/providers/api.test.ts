@@ -1,7 +1,25 @@
-import { providerModelsPath, providersPath, type ModelSummary } from "@sovereign/protocol";
+import {
+  providerCredentialPath,
+  providerLoginAnswerPath,
+  providerLoginPath,
+  providerLoginsPath,
+  providerModelsPath,
+  providersPath,
+  type LoginAttemptState,
+  type ModelSummary,
+  type ProviderSummary,
+} from "@sovereign/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchProviderModels, fetchProvidersSnapshot } from "./api.ts";
+import {
+  answerLoginStep,
+  cancelProviderLogin,
+  fetchLoginAttempts,
+  fetchProviderModels,
+  fetchProvidersSnapshot,
+  logOutProvider,
+  startProviderLogin,
+} from "./api.ts";
 
 type Answer = { status: number; body: unknown };
 
@@ -66,6 +84,125 @@ describe("fetchProvidersSnapshot", () => {
     daemon({ status: 500, body: {} });
 
     await expect(fetchProvidersSnapshot()).rejects.toThrow("the daemon answered 500");
+  });
+});
+
+const attempt: LoginAttemptState = {
+  attemptId: "a1b2",
+  providerId: "anthropic",
+  method: "oauth",
+  origin: "session",
+  answerable: true,
+  notices: [],
+  startedAt: "2026-07-29T09:11:04.512Z",
+};
+
+const summary: ProviderSummary = {
+  id: "anthropic",
+  name: "Anthropic",
+  logins: [{ type: "oauth", label: "Sign in" }],
+  auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
+  dynamic: false,
+  custom: false,
+  modelCount: 2,
+};
+
+describe("fetchLoginAttempts", () => {
+  it("asks the route that holds the running logins", async () => {
+    const calls = daemon({ status: 200, body: { attempts: [attempt] } });
+
+    await expect(fetchLoginAttempts()).resolves.toEqual({ attempts: [attempt] });
+    expect(calls[0]?.url).toBe(providerLoginsPath);
+  });
+});
+
+describe("startProviderLogin", () => {
+  it("names the provider and the way in", async () => {
+    const calls = daemon({ status: 200, body: attempt });
+
+    await expect(startProviderLogin({ providerId: "anthropic", method: "oauth" })).resolves.toEqual(
+      { kind: "started", attempt },
+    );
+    expect(calls[0]?.url).toBe(providerLoginsPath);
+    expect(calls[0]?.init?.body).toBe('{"providerId":"anthropic","method":"oauth"}');
+  });
+
+  it("gives back the running attempt instead of throwing the conflict away", async () => {
+    // Вью обязано показать, чем занят провайдер: по `origin` и `answerable` видно, отвечает ли
+    // здесь человек или плагин (docs/web-api.md).
+    const busy = { ...attempt, origin: "plugin" as const, answerable: false };
+
+    daemon({ status: 409, body: { error: "a login is already running", conflict: busy } });
+
+    await expect(startProviderLogin({ providerId: "anthropic", method: "oauth" })).resolves.toEqual(
+      { kind: "taken", error: "a login is already running", conflict: busy },
+    );
+  });
+
+  it("carries a refusal that has no conflict in it", async () => {
+    // Негодный `credentials.json` — тоже `409`, но занявшей попытки в нём нет (docs/web-api.md).
+    daemon({ status: 409, body: { error: "credentials.json is not valid json" } });
+
+    await expect(startProviderLogin({ providerId: "anthropic", method: "oauth" })).rejects.toThrow(
+      "credentials.json is not valid json",
+    );
+  });
+});
+
+describe("answerLoginStep", () => {
+  it("names the step it answers", async () => {
+    const calls = daemon({ status: 200, body: {} });
+
+    await expect(answerLoginStep("a1b2", { stepId: "a1b2-1", value: "sk-ant" })).resolves.toEqual({
+      kind: "answered",
+    });
+    expect(calls[0]?.url).toBe(providerLoginAnswerPath("a1b2"));
+    expect(calls[0]?.init?.body).toBe('{"stepId":"a1b2-1","value":"sk-ant"}');
+  });
+
+  it("calls a step that no longer waits an outcome, not a failure", async () => {
+    daemon({ status: 409, body: { error: "that login step is no longer waiting for an answer" } });
+
+    await expect(answerLoginStep("a1b2", { stepId: "a1b2-1", value: "x" })).resolves.toEqual({
+      kind: "stale",
+      reason: "that login step is no longer waiting for an answer",
+    });
+  });
+
+  it("carries a refusal of any other kind", async () => {
+    daemon({ status: 404, body: { error: "not found" } });
+
+    await expect(answerLoginStep("a1b2", { stepId: "a1b2-1", value: "x" })).rejects.toThrow(
+      "not found",
+    );
+  });
+});
+
+describe("cancelProviderLogin", () => {
+  it("deletes the attempt", async () => {
+    const calls = daemon({ status: 200, body: {} });
+
+    await cancelProviderLogin("a1b2");
+
+    expect(calls[0]?.url).toBe(providerLoginPath("a1b2"));
+    expect(calls[0]?.init?.method).toBe("DELETE");
+  });
+});
+
+describe("logOutProvider", () => {
+  it("gives back the status of the provider, not an empty answer", async () => {
+    // Кред из окружения выходом не убрать, и ответ говорит об этом прямо (docs/web-api.md).
+    const calls = daemon({ status: 200, body: summary });
+
+    await expect(logOutProvider("anthropic")).resolves.toEqual(summary);
+    expect(calls[0]?.url).toBe(providerCredentialPath("anthropic"));
+    expect(calls[0]?.init?.method).toBe("DELETE");
+  });
+
+  it("carries the refusal of a credentials file nobody can read", async () => {
+    daemon({ status: 409, body: { error: "credentials.json is not valid json" } });
+
+    await expect(logOutProvider("anthropic")).rejects.toThrow("credentials.json is not valid json");
   });
 });
 

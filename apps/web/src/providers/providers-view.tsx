@@ -2,17 +2,22 @@
  * Вью провайдеров. Живёт в ядре, как вью проектов и вью плагинов (docs/architecture.md): выбрать
  * модель нужно на пустой платформе, без единого плагина.
  *
- * Своих запросов здесь нет: всё приходит пропами, а раскрытие провайдера уходит наверх. Так вью
- * проверяется без сети — той же дисциплины держатся соседние вью.
+ * Своих запросов здесь нет: всё приходит пропами, а нажатия уходят наверх. Так вью проверяется без
+ * сети — той же дисциплины держатся соседние вью.
  *
- * Кнопок входа здесь нет намеренно: интерактивный вход — операция с диалогом
- * (docs/models-and-providers.md), и приезжает он отдельно. Показаны только объявленные способы
- * входа: кнопка, которая ничего не делает, врёт про возможность.
+ * Кнопки входа показаны только на объявленные провайдером способы (`logins`): кнопка, которая
+ * ничего не делает, врёт про возможность. Сам диалог входа рисует `login-view.tsx`.
  */
 
-import type { ModelSummary, ProviderAuthState, ProviderSummary } from "@sovereign/protocol";
+import type {
+  ModelSummary,
+  ProviderAuthState,
+  ProviderAuthType,
+  ProviderSummary,
+} from "@sovereign/protocol";
 import {
   Badge,
+  Button,
   Code,
   CodeBlock,
   EmptyState,
@@ -26,23 +31,68 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
+import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
 
 export type ProvidersViewProps = {
   state: ProvidersState;
   /** Раскрыть или свернуть провайдера. Модели спрашивает владелец состояния, а не вью. */
   onOpen: (providerId: string) => void;
+  onLogIn: (providerId: string, method: ProviderAuthType) => void;
+  onAnswer: (providerId: string, stepId: string, value: string) => void;
+  onCancelLogin: (providerId: string) => void;
+  onCloseLogin: (providerId: string) => void;
+  onLogOut: (providerId: string) => void;
   translator: ScopedTranslator;
 };
 
-export function ProvidersView({ state, onOpen, translator }: ProvidersViewProps) {
+export function ProvidersView({
+  state,
+  onOpen,
+  onLogIn,
+  onAnswer,
+  onCancelLogin,
+  onCloseLogin,
+  onLogOut,
+  translator,
+}: ProvidersViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
+  const dialogs = Object.entries(state.logins.dialogs);
+  /** Имя провайдера из снимка; провайдера может там и не быть — тогда говорит идентификатор. */
+  const nameOf = (providerId: string): string =>
+    snapshot?.providers.find((provider) => provider.id === providerId)?.name ?? providerId;
+
+  // Диалоги показываются раньше списка и независимо от него: вход мог начаться до того, как список
+  // приехал, а бросить наполовину пройденный диалог из-за отказа чужого запроса нельзя.
+  const logins = (
+    <>
+      {state.logins.failure === undefined ? undefined : (
+        <Notice
+          tone="danger"
+          title={t("providers.login.start.failed", { reason: state.logins.failure })}
+        />
+      )}
+      {dialogs.map(([providerId, dialog]) => (
+        <ProviderLogin
+          key={providerId}
+          providerId={providerId}
+          name={nameOf(providerId)}
+          dialog={dialog}
+          onAnswer={onAnswer}
+          onCancel={onCancelLogin}
+          onClose={onCloseLogin}
+          translator={translator}
+        />
+      ))}
+    </>
+  );
 
   if (snapshot === undefined) {
     return (
       <div className="providers">
         <Heading level={1}>{t("page.providers.title")}</Heading>
+        {logins}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -71,6 +121,8 @@ export function ProvidersView({ state, onOpen, translator }: ProvidersViewProps)
         <Notice tone="danger" title={t("providers.failed", { reason: state.failure })} />
       )}
 
+      {logins}
+
       <Text tone="muted">
         {t("providers.summary", {
           count: configuredCount(snapshot.providers),
@@ -98,9 +150,84 @@ export function ProvidersView({ state, onOpen, translator }: ProvidersViewProps)
       </Panel>
 
       {open === undefined ? undefined : (
-        <ProviderModels provider={open} entry={state.models[open.id]} translator={translator} />
+        <>
+          <ProviderAccess
+            provider={open}
+            stubborn={state.logins.stubborn[open.id]}
+            busy={state.logins.dialogs[open.id] !== undefined}
+            onLogIn={onLogIn}
+            onLogOut={onLogOut}
+            translator={translator}
+          />
+          <ProviderModels provider={open} entry={state.models[open.id]} translator={translator} />
+        </>
       )}
     </div>
+  );
+}
+
+type ProviderAccessProps = {
+  provider: ProviderSummary;
+  /** Выход по этому провайдеру уже нажимали, и он ничего не изменил. */
+  stubborn: { source?: string } | undefined;
+  /** Вход в этого провайдера уже идёт: второй отклоняется маршрутом (docs/web-api.md). */
+  busy: boolean;
+  onLogIn: (providerId: string, method: ProviderAuthType) => void;
+  onLogOut: (providerId: string) => void;
+  translator: ScopedTranslator;
+};
+
+/**
+ * Вход и выход у раскрытого провайдера. Кнопки стоят здесь, а не в строке списка: строка целиком —
+ * кнопка раскрытия, и кнопке внутри кнопки в разметке места нет.
+ */
+function ProviderAccess({
+  provider,
+  stubborn,
+  busy,
+  onLogIn,
+  onLogOut,
+  translator,
+}: ProviderAccessProps) {
+  const { t } = translator;
+
+  return (
+    <Panel title={t("providers.access.title", { name: provider.name })}>
+      <div className="providers-access">
+        {provider.logins.length === 0 ? (
+          <Text tone="muted">{t("providers.logins.none")}</Text>
+        ) : (
+          provider.logins.map((login) => (
+            <Button
+              key={login.type}
+              tone="accent"
+              disabled={busy}
+              onClick={() => onLogIn(provider.id, login.type)}
+            >
+              {login.label}
+            </Button>
+          ))
+        )}
+
+        {provider.auth.kind === "configured" ? (
+          <Button tone="danger" onClick={() => onLogOut(provider.id)}>
+            {t("providers.logout")}
+          </Button>
+        ) : undefined}
+      </div>
+
+      {stubborn === undefined ? undefined : (
+        // Ловушка «нажал выход, ничего не изменилось»: кред из окружения платформе не принадлежит, и
+        // убрать его нечем (docs/web-api.md).
+        <Notice tone="warning" title={t("providers.logout.stubborn")}>
+          <Text tone="muted">
+            {stubborn.source === undefined
+              ? t("providers.logout.stubborn.hint")
+              : t("providers.logout.stubborn.source", { source: stubborn.source })}
+          </Text>
+        </Notice>
+      )}
+    </Panel>
   );
 }
 

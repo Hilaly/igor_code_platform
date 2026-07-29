@@ -69,6 +69,7 @@ export const coreEnglish: CatalogRegistration = {
     "page.projects.title": "Projects",
     "page.providers.title": "Providers",
     "common.cancel": "Cancel",
+    "providers.access.title": "Getting into {name}",
     "providers.auth.api_key": "API key",
     "providers.auth.oauth": "Subscription",
     "providers.auth.source": "credential from {source}",
@@ -79,9 +80,42 @@ export const coreEnglish: CatalogRegistration = {
     "providers.empty": "No providers at all",
     "providers.failed": "The providers could not be read: {reason}",
     "providers.hint": "Pick a provider to see its models.",
+    "providers.login.answer": "Send the answer",
+    "providers.login.authUrl": "Log in at the provider by this address:",
+    "providers.login.cancel": "Cancel the login",
+    "providers.login.cancelled": "The login was cancelled",
+    "providers.login.close": "Close",
+    "providers.login.device.code": "The code to hand over:",
+    "providers.login.device.expires": "The code is good for {count} seconds.",
+    "providers.login.device.waiting": "Waiting for the provider to confirm",
+    "providers.login.device.where": "Enter it at this address:",
+    "providers.login.failed": "The login did not go through: {reason}",
+    "providers.login.lost": "The login ended while the connection was down",
+    "providers.login.lost.hint":
+      "What it ended with there is no way to say: only running logins are kept. The state of the provider is in the list.",
+    "providers.login.manual.hint": "Take the code from the page of the provider and paste it here.",
+    "providers.login.refused": "The answer did not go through: {reason}",
+    "providers.login.secret.hint":
+      "The value goes into the daemon and nowhere else: it is not shown in the interface and never reaches the log.",
+    "providers.login.start.failed": "The login could not be started: {reason}",
+    "providers.login.succeeded": "The login succeeded",
+    "providers.login.taken": "A login into this provider is already running",
+    "providers.login.taken.plugin":
+      "It was started by a plugin: the plugin answers its questions, not this tab.",
+    "providers.login.taken.session":
+      "It was started earlier — in another tab, say. Carry it on here or cancel it.",
+    "providers.login.title": "Logging into {name}",
+    "providers.login.watching":
+      "The questions of this login are answered elsewhere; here it is only visible.",
     "providers.logins": "Ways in: {methods}",
     "providers.logins.none":
       "There is no way to log in: the credential comes only from the environment.",
+    "providers.logout": "Log out of the provider",
+    "providers.logout.stubborn": "The logout changed nothing",
+    "providers.logout.stubborn.hint":
+      "The credential does not belong to the platform: there was nothing here to remove, and the provider is still configured.",
+    "providers.logout.stubborn.source":
+      "The credential comes from {source} and does not belong to the platform: there was nothing here to remove. Take it out of the environment and restart the daemon.",
     "providers.model.context": "Context: {count} tokens",
     "providers.model.cost": "Per 1M tokens: ${input} in, ${output} out",
     "providers.models.count.one": "{count} model",

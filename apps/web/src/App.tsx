@@ -12,6 +12,7 @@ import {
   type AppearancePreferences,
   type AuthenticationState,
   type Health,
+  type LoginStepFrame,
 } from "@sovereign/protocol";
 import {
   Button,
@@ -155,6 +156,11 @@ export function App() {
       );
   });
 
+  // Шаг входа в провайдера — не событие шины: он адресован одному инициатору и ждёт ответа
+  // (docs/models-and-providers.md). Ссылкой, а не зависимостью соединения, по той же причине, что и
+  // `reload`: пересоздавать поток из-за смены обработчика незачем.
+  const loginStep = useRef<(frame: LoginStepFrame) => void>(() => {});
+
   // У `EventSource` нет кода ответа, поэтому закрытая сессия выглядит из потока так же, как лежащий
   // демон: различает их только отдельный запрос (docs/authentication.md).
   const recheck = useRef(() => {
@@ -181,6 +187,7 @@ export function App() {
       bus,
       onStatus: setStream,
       onDiagnostic: diagnostics.record,
+      onLoginStep: (frame) => loginStep.current(frame),
       onGaveUp: () => recheck.current(),
     });
 
@@ -238,7 +245,13 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
-  const providers = useProviders({ stream, onDiagnostic: diagnostics.record });
+  const providers = useProviders({ bus, stream, onDiagnostic: diagnostics.record });
+
+  // Обработчик кадра берётся у вью провайдеров, а соединение живёт своей жизнью: связывает их
+  // ссылка, и переустановка её не трогает поток.
+  useEffect(() => {
+    loginStep.current = providers.receiveLoginStep;
+  }, [providers.receiveLoginStep]);
 
   const translator = useMemo(
     () =>
@@ -429,7 +442,16 @@ export function App() {
           />
         }
         providers={
-          <ProvidersView state={providers.state} onOpen={providers.open} translator={translator} />
+          <ProvidersView
+            state={providers.state}
+            onOpen={providers.open}
+            onLogIn={providers.logIn}
+            onAnswer={providers.answer}
+            onCancelLogin={providers.cancelLogin}
+            onCloseLogin={providers.closeLogin}
+            onLogOut={providers.logOut}
+            translator={translator}
+          />
         }
         translator={translator}
       />
