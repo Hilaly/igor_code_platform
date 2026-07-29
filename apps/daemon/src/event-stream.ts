@@ -14,8 +14,11 @@ import {
   isPluginBusEvent,
   lastEventIdParameter,
   loginStepFrameKind,
+  sessionDeltaFrameKind,
   streamGapType,
   type LoginStepFrame,
+  type NumberedStreamEvent,
+  type SessionDeltaFrame,
   type StreamEvent,
 } from "@sovereign/protocol";
 
@@ -32,6 +35,13 @@ export type EventStream = {
    * догон по `Last-Event-ID`.
    */
   emit: (frame: Omit<LoginStepFrame, "index" | "time" | "frame">) => void;
+  /**
+   * Отправить дельту турна агента. Кадр **не занимает индекс и не попадает в окно догона**
+   * (docs/web-api.md): дельт на один ответ модели сотни, и займи они позиции — тысяча кадров окна
+   * выродилась бы в один ответ модели. После разрыва клиент перечитывает записи сессии маршрутом,
+   * а не доигрывает дельты.
+   */
+  emitSessionDelta: (frame: Omit<SessionDeltaFrame, "time" | "frame">) => void;
   /**
    * Отцепить соединения названной сессии входа. Проверка сессии стоит на входе в соединение, а
    * соединение живёт часами: без этого выход не обрывал бы живой поток, а оставлял бы его дожить до
@@ -81,7 +91,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   const slowClientLimitBytes = options.slowClientLimitBytes ?? defaultSlowClientLimitBytes;
   const now = options.now ?? Date.now;
 
-  const recent: StreamEvent[] = [];
+  const recent: NumberedStreamEvent[] = [];
   const clients = new Set<Client>();
 
   let nextIndex = 1;
@@ -91,11 +101,16 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   // и порядок отправки разошёлся бы с порядком присвоения индексов — то есть догон по
   // `Last-Event-ID` начал бы врать. Раньше такой подписчик был один — журнал, — но журнал с шины
   // ушёл (docs/logging.md).
-  const send = (frame: StreamEvent): void => {
+  const send = (frame: NumberedStreamEvent): void => {
     nextIndex += 1;
 
     remember(frame);
 
+    broadcast(frame);
+  };
+
+  /** Отправка без нумерации и без окна: так едут дельты турна и только они. */
+  const broadcast = (frame: StreamEvent): void => {
     for (const client of [...clients]) {
       deliver(client, frame);
     }
@@ -110,7 +125,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
       // Событие плагина едет в поток с происхождением: без него клиент не отличит его от
       // платформенного (docs/event-bus.md).
       ...(isPluginBusEvent(event) ? { plugin: event.plugin } : {}),
-    } as StreamEvent);
+    } as NumberedStreamEvent);
   });
 
   const ping = setInterval(() => {
@@ -128,6 +143,13 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
         ...frame,
         frame: loginStepFrameKind,
         index: nextIndex,
+        time: new Date(now()).toISOString(),
+      });
+    },
+    emitSessionDelta: (frame) => {
+      broadcast({
+        ...frame,
+        frame: sessionDeltaFrameKind,
         time: new Date(now()).toISOString(),
       });
     },
@@ -159,7 +181,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     },
   };
 
-  function remember(event: StreamEvent): void {
+  function remember(event: NumberedStreamEvent): void {
     recent.push(event);
 
     if (recent.length > windowSize) {
@@ -220,7 +242,13 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
   function deliver(client: Client, event: StreamEvent): void {
     // Тип и время лежат внутри `data`, а не в полях `id`/`event`: клиент разбирает один json, а не
     // сначала кадр SSE, потом его нагрузку.
-    client.response.write(`id: ${event.index}\ndata: ${JSON.stringify(event)}\n\n`);
+    //
+    // `id:` пишется только у нумерованного кадра. У дельты турна позиции нет, и поставь мы ей `id:`,
+    // браузер запомнил бы его как последний виденный, а такого индекса в окне не существует —
+    // переподключение получило бы ложный `core.stream.gap`.
+    const identifier = "index" in event ? `id: ${String(event.index)}\n` : "";
+
+    client.response.write(`${identifier}data: ${JSON.stringify(event)}\n\n`);
 
     if (client.response.writableLength <= slowClientLimitBytes) {
       return;
@@ -232,7 +260,7 @@ export function createEventStream(options: CreateEventStreamOptions): EventStrea
     options.logger.warn("the event stream client fell behind and was disconnected", {
       client: client.address,
       pendingBytes: client.response.writableLength,
-      index: event.index,
+      ...("index" in event ? { index: event.index } : { frame: event.frame }),
     });
   }
 }

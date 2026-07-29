@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  isBusStreamEvent,
   isLoginStepFrame,
   isPluginStreamEvent,
+  isSessionDeltaFrame,
+  sessionDeltaFrameKind,
   loginStepFrameKind,
   type LoginStepFrame,
   type PluginStreamEvent,
@@ -111,10 +114,30 @@ describe("the login step frame", () => {
     payload: {},
   };
 
+  const deltaFrame: StreamEvent = {
+    frame: sessionDeltaFrameKind,
+    time: "2026-07-29T09:00:03.000Z",
+    sessionId: "s1",
+    turnId: "t1",
+    delta: { kind: "turn-end" },
+  };
+
   it("is told apart from every other frame, and they from it", () => {
+    // Классов кадра три, и охранники обязаны исключать друг друга: «есть frame» перестало означать
+    // «это шаг входа» ровно в тот момент, когда появился второй класс.
     assert.equal(isLoginStepFrame(loginFrame), true);
     assert.equal(isLoginStepFrame(pluginFrame), false);
     assert.equal(isLoginStepFrame(coreFrame), false);
+    assert.equal(isLoginStepFrame(deltaFrame), false);
+
+    assert.equal(isSessionDeltaFrame(deltaFrame), true);
+    assert.equal(isSessionDeltaFrame(loginFrame), false);
+    assert.equal(isSessionDeltaFrame(coreFrame), false);
+
+    assert.equal(isBusStreamEvent(coreFrame), true);
+    assert.equal(isBusStreamEvent(pluginFrame), true);
+    assert.equal(isBusStreamEvent(loginFrame), false);
+    assert.equal(isBusStreamEvent(deltaFrame), false);
 
     // Охранник шины кадр шага входа не принимает вовсе — это ловит компилятор, а не тест:
     // `isPluginStreamEvent` объявлен над `BusStreamEvent`. Здесь проверяется то, что компилятор

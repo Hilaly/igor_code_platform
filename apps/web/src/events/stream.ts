@@ -14,9 +14,11 @@
 import {
   eventsPath,
   isLoginStepFrame,
+  isSessionDeltaFrame,
   lastEventIdParameter,
   streamGapType,
   type LoginStepFrame,
+  type SessionDeltaFrame,
   type StreamEvent,
 } from "@sovereign/protocol";
 
@@ -57,6 +59,12 @@ export type ConnectEventStreamOptions = {
    * шаги просто роняет, а диалог всё равно восстанавливается снимком `GET /api/provider-logins`.
    */
   onLoginStep?: (frame: LoginStepFrame) => void;
+  /**
+   * Живой ход турна агента. Тоже не событие шины и тоже необязателен: вкладка без открытой сессии
+   * дельты роняет, а состояние восстанавливается записями сессии
+   * (docs/sessions-and-projects.md).
+   */
+  onSessionDelta?: (frame: SessionDeltaFrame) => void;
   /**
    * Браузер закрыл `EventSource` навсегда, и поток переоткрывается своей попыткой. Зовётся на каждый
    * такой разрыв, а не один раз: у `EventSource` нет кода ответа, поэтому закрытая сессия выглядит
@@ -138,6 +146,15 @@ export function connectEventStream(options: ConnectEventStreamOptions): StreamCo
       if (frame === undefined) {
         // Кадр собирает демон из типов протокола: негодный json означает, что стороны разошлись.
         options.onDiagnostic("the event stream sent a frame that is not valid json");
+
+        return;
+      }
+
+      // Дельта турна позиции в потоке не занимает и `id:` не пишет (docs/web-api.md): её приезд не
+      // двигает позицию догона. Присвой мы `lastIndex` здесь, первый же разрыв после турна начал бы
+      // поток с текущего конца и молча потерял бы пропущенные события шины.
+      if (isSessionDeltaFrame(frame)) {
+        options.onSessionDelta?.(frame);
 
         return;
       }

@@ -7,8 +7,11 @@ import { after, describe, it } from "node:test";
 import {
   coreEventTypes,
   eventsPath,
+  isBusStreamEvent,
   isLoginStepFrame,
   isPluginStreamEvent,
+  isSessionDeltaFrame,
+  sessionDeltaFrameKind,
   loginStepFrameKind,
   streamGapType,
   type LogRecord,
@@ -41,6 +44,8 @@ const status = (key: string): PluginStatus => ({
 /** Читает кадры потока и даёт дождаться нужного их количества: события приходят по сети. */
 type Reader = {
   events: StreamEvent[];
+  /** Кадр как он приехал по проводу: по нему видно, есть ли у него `id:`. */
+  raw: string[];
   response: IncomingMessage;
   waitFor: (count: number) => Promise<StreamEvent[]>;
   comments: string[];
@@ -87,6 +92,7 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
 
     const reader: Reader = {
       events: [],
+      raw: [],
       response,
       comments: [],
       waitFor: (count) =>
@@ -136,6 +142,7 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
         const data = /^data: (.*)$/m.exec(frame)?.[1];
 
         if (data !== undefined) {
+          reader.raw.push(frame);
           reader.events.push(JSON.parse(data) as StreamEvent);
         }
       }
@@ -146,9 +153,17 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
 
   const publish = (key: string): void => bus.publish(coreEventTypes.pluginLifecycle, status(key));
 
+  const emitDelta = (text: string): void =>
+    events.emitSessionDelta({
+      sessionId: "s1",
+      turnId: "t1",
+      delta: { kind: "message-delta", messageId: "t1:0", channel: "text", text },
+    });
+
   return {
     read,
     publish,
+    emitDelta,
     records,
     asSession: (id: string) => {
       sessionId = id;
@@ -163,16 +178,24 @@ async function stream(options: Partial<CreateEventStreamOptions> = {}) {
  * читать имя события у кадра можно только после охранника.
  */
 const nameOf = (event: StreamEvent): string =>
-  isLoginStepFrame(event) ? loginStepFrameKind : event.type;
+  isLoginStepFrame(event)
+    ? loginStepFrameKind
+    : isSessionDeltaFrame(event)
+      ? sessionDeltaFrameKind
+      : event.type;
 
 const keysOf = (events: StreamEvent[]): string[] =>
   events.map((event) =>
-    !isLoginStepFrame(event) &&
+    isBusStreamEvent(event) &&
     !isPluginStreamEvent(event) &&
     event.type === coreEventTypes.pluginLifecycle
       ? event.payload.key
       : nameOf(event),
   );
+
+/** Индексы только у нумерованных кадров: у дельты турна позиции в потоке нет вовсе. */
+const indexesOf = (events: StreamEvent[]): number[] =>
+  events.filter((event) => "index" in event).map((event) => event.index);
 
 describe("createEventStream", () => {
   it("numbers events monotonically and delivers them one by one", async () => {
@@ -184,10 +207,7 @@ describe("createEventStream", () => {
 
     const events = await reader.waitFor(2);
 
-    assert.deepEqual(
-      events.map((event) => event.index),
-      [1, 2],
-    );
+    assert.deepEqual(indexesOf(events), [1, 2]);
     assert.deepEqual(keysOf(events), ["first", "second"]);
     assert.equal(events[0]?.time, new Date(events[0]?.time ?? "").toISOString());
   });
@@ -215,10 +235,7 @@ describe("createEventStream", () => {
     const events = await reader.waitFor(2);
 
     assert.deepEqual(keysOf(events), ["two", "three"]);
-    assert.deepEqual(
-      events.map((event) => event.index),
-      [2, 3],
-    );
+    assert.deepEqual(indexesOf(events), [2, 3]);
   });
 
   it("tells a client whose index is older than the window that the rest is lost", async () => {
@@ -232,13 +249,47 @@ describe("createEventStream", () => {
     const reader = await read(0);
     const [gap] = await reader.waitFor(1);
 
-    assert.ok(gap && !isLoginStepFrame(gap));
+    assert.ok(gap && isBusStreamEvent(gap));
     assert.equal(gap.type, streamGapType);
     assert.deepEqual(gap.type === streamGapType ? gap.payload : undefined, {
       requestedIndex: 0,
       oldestIndex: 2,
     });
     assert.equal(gap.index, 3);
+  });
+
+  it("carries a session delta without an index and without a place in the window", async () => {
+    const { read, publish, emitDelta } = await stream({ windowSize: 3 });
+    const reader = await read();
+
+    publish("before");
+
+    for (let sent = 0; sent < 100; sent += 1) {
+      emitDelta("ток");
+    }
+
+    publish("after");
+
+    const events = await reader.waitFor(102);
+
+    // Дельты доехали живому клиенту все до одной.
+    assert.equal(events.filter((event) => isSessionDeltaFrame(event)).length, 100);
+
+    // `id:` у них нет: браузер иначе запомнил бы позицию, которой в нумерации не существует.
+    assert.equal(
+      reader.raw.filter(
+        (frame) => frame.includes(`"${sessionDeltaFrameKind}"`) && /^id:/m.test(frame),
+      ).length,
+      0,
+    );
+
+    // Нумерация от них не сдвинулась, окно ими не забилось: клиент, дочитавший до первого события,
+    // догоняет второе, а не получает разрыв.
+    assert.deepEqual(indexesOf(events), [1, 2]);
+
+    const late = await read(1);
+
+    assert.deepEqual(keysOf(await late.waitFor(1)), ["after"]);
   });
 
   it("treats an index from a previous run of the daemon as a gap", async () => {
@@ -249,7 +300,7 @@ describe("createEventStream", () => {
     const reader = await read(42);
     const [gap] = await reader.waitFor(1);
 
-    assert.ok(gap && !isLoginStepFrame(gap));
+    assert.ok(gap && isBusStreamEvent(gap));
     assert.equal(gap.type, streamGapType);
   });
 

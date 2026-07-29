@@ -149,6 +149,24 @@ export type SessionEntriesPage = {
   seen: number;
 };
 
+/**
+ * Живой ход турна. Едет отдельным классом кадра SSE, а не шиной (docs/web-api.md): на один ответ
+ * модели дельт сотни, а событие шины доставляется каждому подписчику, включая воркеры плагинов.
+ *
+ * Идентификатор сообщения здесь синтетический и живёт ровно один турн: запись дерева получает свой
+ * идентификатор только в момент, когда она дописана, то есть уже после последней дельты.
+ */
+export type SessionDelta =
+  | { kind: "phase"; phase: SessionPhase }
+  | { kind: "message-start"; messageId: string; role: "user" | "agent" }
+  | { kind: "message-delta"; messageId: string; channel: "text" | "reasoning"; text: string }
+  | { kind: "message-end"; messageId: string }
+  | { kind: "tool-start"; toolCallId: string; toolName: string; input: unknown }
+  | { kind: "tool-end"; toolCallId: string; failed: boolean }
+  | { kind: "turn-end" }
+  | { kind: "turn-aborted" }
+  | { kind: "turn-failed"; reason: string };
+
 /** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
 export type AgentSummary = {
   id: string;

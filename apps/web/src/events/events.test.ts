@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { coreEventTypes, streamGapType, type StreamEvent } from "@sovereign/protocol";
+import {
+  coreEventTypes,
+  streamGapType,
+  type BusStreamEvent,
+  type StreamEvent,
+} from "@sovereign/protocol";
 
 import { createFrontendBus } from "./bus.ts";
 import { connectEventStream, type EventSourceLike, type StreamStatus } from "./stream.ts";
@@ -17,6 +22,14 @@ const gap: StreamEvent = {
   time: "2026-07-27T07:06:07.923Z",
   type: streamGapType,
   payload: { requestedIndex: 3, oldestIndex: 39 },
+};
+
+const sessionDelta: StreamEvent = {
+  frame: "session-delta",
+  time: "2026-07-27T07:06:08.001Z",
+  sessionId: "s1",
+  turnId: "t1",
+  delta: { kind: "message-delta", messageId: "t1:0", channel: "text", text: "при" },
 };
 
 /** Поддельный источник: `EventSource` в тестовой среде отсутствует, а разрывы проверять надо. */
@@ -66,7 +79,7 @@ function connected() {
   const sources: ReturnType<typeof fakeSource>[] = [];
   const paths: string[] = [];
   const scheduled: { callback: () => void; delay: number }[] = [];
-  const delivered: StreamEvent[] = [];
+  const delivered: BusStreamEvent[] = [];
   const diagnostics: string[] = [];
   const statuses: StreamStatus[] = [];
   const bus = createFrontendBus({
@@ -152,6 +165,22 @@ describe("connectEventStream", () => {
     expect(stream.delivered).toEqual([lifecycle]);
     expect(stream.statuses).toEqual(["open"]);
     expect(stream.paths).toEqual(["/api/events"]);
+  });
+
+  it("keeps a session delta off the bus and out of the catch-up position", () => {
+    const stream = connected();
+
+    stream.latest().open();
+    stream.latest().send(lifecycle);
+    stream.latest().send(sessionDelta);
+    stream.latest().give_up();
+    stream.scheduled[0]?.callback();
+
+    // Дельта не событие шины и позицию догона не двигает: переподключение просит продолжить с
+    // индекса последнего события шины, а не с несуществующего индекса дельты.
+    expect(stream.delivered).toEqual([lifecycle]);
+    expect(stream.diagnostics.join("\n")).not.toMatch(/not valid json|asked for again/);
+    expect(stream.paths).toEqual(["/api/events", "/api/events?lastEventId=18"]);
   });
 
   it("says the state has to be asked for again on a gap", () => {
