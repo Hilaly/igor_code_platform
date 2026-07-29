@@ -12,6 +12,7 @@ import { Badge } from "./badge.tsx";
 import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { Disclosure } from "./disclosure.tsx";
+import { Link } from "./link.tsx";
 import { List, ListRow } from "./list.tsx";
 import { Notice } from "./notice.tsx";
 import { Panel } from "./panel.tsx";
@@ -123,6 +124,24 @@ export const Surfaces = () => (
       </ListRow>
       <ListRow>Строка, которую нельзя выбрать</ListRow>
     </List>
+  </div>
+);
+
+export const Links = () => (
+  <div style={column}>
+    <Text>
+      Ссылка внутри платформы ведёт на свою страницу: <Link href="/providers">провайдеры</Link>.
+    </Text>
+    <Text>
+      Внешняя уходит новой вкладкой, потому что диалог входа продолжается на нашей:{" "}
+      <Link href="https://claude.ai/oauth/authorize" external>
+        войти у провайдера
+      </Link>
+      .
+    </Text>
+    <Link href="https://github.com/login/device" external>
+      https://github.com/login/device
+    </Link>
   </div>
 );
 
