@@ -101,7 +101,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   /** Открытые сессии: harness поднят, подписка на дельты стоит. */
   const live = new Map<string, AgentSession>();
   /** Один подъём harness на сессию: параллельные первые обращения ждут один и тот же результат. */
-  const opening = new Map<string, Promise<AgentSession | undefined>>();
+  const opening = new Map<string, Promise<OpenSessionOutcome>>();
 
   let summaries: AgentSessionSummary[] = [];
   let closing = false;
@@ -166,16 +166,21 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return state === "running" && runtime === "idle" ? "turn" : runtime;
   };
 
-  /** Открыть сессию, если она ещё не открыта. `undefined` — такой сессии нет или агент исчез. */
-  const openSession = async (sessionId: string): Promise<AgentSession | undefined> => {
+  type OpenSessionOutcome =
+    | { kind: "opened"; session: AgentSession }
+    | { kind: "unknown" }
+    | { kind: "unavailable"; reason: string };
+
+  /** Поднять harness с текущими агентом и моделью. Одна попытка на параллельные обращения. */
+  const openSession = async (sessionId: string): Promise<OpenSessionOutcome> => {
     if (closing) {
-      return undefined;
+      return { kind: "unknown" };
     }
 
     const known = live.get(sessionId);
 
     if (known !== undefined) {
-      return known;
+      return { kind: "opened", session: known };
     }
 
     const pending = opening.get(sessionId);
@@ -188,28 +193,40 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       const summary = summaries.find((candidate) => candidate.id === sessionId);
 
       if (summary === undefined) {
-        return undefined;
+        return { kind: "unknown" } as const;
       }
 
       const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
 
       if (agent === undefined) {
-        return undefined;
+        return {
+          kind: "unavailable",
+          reason: `no agent ${summary.agentId} is enabled right now`,
+        } as const;
       }
 
-      const session = await options.store.open(sessionId, {
+      const persisted = await options.store.open(sessionId);
+
+      if (persisted === undefined) {
+        return { kind: "unknown" } as const;
+      }
+
+      const activated = persisted.activate({
         id: agent.id,
         instructions: agent.instructions,
       });
 
-      if (session === undefined) {
-        return undefined;
+      if ("kind" in activated) {
+        return {
+          kind: "unavailable",
+          reason: `the model ${persisted.summary().model} is not available right now`,
+        } as const;
       }
 
-      watch(session);
-      live.set(sessionId, session);
+      watch(activated);
+      live.set(sessionId, activated);
 
-      return session;
+      return { kind: "opened", session: activated } as const;
     })();
 
     opening.set(sessionId, open);
@@ -333,15 +350,15 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return undefined;
     }
 
-    const session = await openSession(sessionId);
+    const persisted = await options.store.open(sessionId);
 
-    if (session === undefined) {
+    if (persisted === undefined) {
       return undefined;
     }
 
     const from = after !== undefined && Number.isSafeInteger(after) && after > 0 ? after : 0;
 
-    return { sessionId, ...(await session.entries(from)) };
+    return { sessionId, ...(await persisted.entries(from)) };
   };
 
   const prompt = async (request: PromptRequest): Promise<PromptOutcome> => {
@@ -351,12 +368,17 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "unknown" };
     }
 
-    const session = await openSession(sessionId);
+    const opened = await openSession(sessionId);
 
-    if (session === undefined) {
+    if (opened.kind === "unknown") {
       return { kind: "unknown" };
     }
 
+    if (opened.kind === "unavailable") {
+      return { kind: "refused", reason: opened.reason };
+    }
+
+    const session = opened.session;
     if (phaseOf(sessionId) !== "idle") {
       return { kind: "refused", reason: "the session is busy" };
     }

@@ -80,7 +80,7 @@ function gate() {
 async function serve(
   options: {
     turns?: ScriptedTurn[];
-    contributions?: ContributionRegistration[];
+    contributions?: ContributionRegistration[] | (() => ContributionRegistration[]);
     limit?: number;
     modelChangeGate?: ReturnType<typeof gate>;
     openGate?: ReturnType<typeof gate>;
@@ -139,15 +139,24 @@ async function serve(
 
             return "kind" in createdSession ? createdSession : delayModelChange(createdSession);
           },
-          open: async (id, agent) => {
+          open: async (id) => {
             openCalls += 1;
             options.openGate?.entered();
             await options.openGate?.wait;
-            const openedSession = await sessionStore.open(id, agent);
+            const openedSession = await sessionStore.open(id);
 
-            return openedSession === undefined || options.modelChangeGate === undefined
-              ? openedSession
-              : delayModelChange(openedSession);
+            if (openedSession === undefined || options.modelChangeGate === undefined) {
+              return openedSession;
+            }
+
+            return {
+              ...openedSession,
+              activate: (agent) => {
+                const activated = openedSession.activate(agent);
+
+                return "kind" in activated ? activated : delayModelChange(activated);
+              },
+            };
           },
         };
   const bus = createEventBus({
@@ -167,7 +176,10 @@ async function serve(
   const service = createSessionService({
     store,
     projects,
-    contributions: () => options.contributions ?? [baseAgent],
+    contributions: () =>
+      typeof options.contributions === "function"
+        ? options.contributions()
+        : (options.contributions ?? [baseAgent]),
     tools: collector,
     queue: createTurnQueue({ limit: () => options.limit ?? 4 }),
     bus,
@@ -644,6 +656,37 @@ describe("reading sessions", () => {
 
     assert.deepEqual(rest.entries, []);
     assert.equal(rest.seen, page.seen);
+  });
+
+  it("keeps persisted entries readable when the agent is gone", async () => {
+    let contributions: ContributionRegistration[] = [];
+    const { call, coldSessionId } = await serve({
+      coldSession: true,
+      contributions: () => contributions,
+    });
+
+    assert.ok(coldSessionId);
+    assert.equal((await call("GET", sessionsPath)).status, 200);
+
+    const page = await call("GET", sessionEntriesPath(coldSessionId));
+
+    assert.equal(page.status, 200);
+    assert.deepEqual(
+      (page.body as unknown as SessionEntriesPage).entries.map((entry) => entry.kind),
+      ["model-change", "thinking-level-change"],
+    );
+
+    const prompt = await call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" });
+
+    assert.equal(prompt.status, 409);
+    assert.match(String(prompt.body["error"]), new RegExp(baseAgent.id));
+
+    contributions = [baseAgent];
+    assert.equal(
+      (await call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" })).status,
+      200,
+    );
+    await untilIdle(call, coldSessionId);
   });
 
   it("answers 404 for a session nobody created", async () => {

@@ -80,6 +80,15 @@ export type AgentSession = {
   close: () => Promise<void>;
 };
 
+/** Запись сессии на диске. Читать её можно без действующих агента и модели. */
+export type PersistedAgentSession = {
+  summary: () => AgentSessionSummary;
+  /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
+  entries: (after?: number) => Promise<{ entries: SessionEntry[]; seen: number }>;
+  /** Поднять harness с текущими зависимостями. Запись остаётся читаемой при отказе. */
+  activate: (agent: AgentDefinition) => AgentSession | { kind: "unknown-model" };
+};
+
 export type TurnOutcome = { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
 
 export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
@@ -96,8 +105,8 @@ export type CreateAgentSessionInput = {
 
 export type AgentSessionStore = {
   create: (input: CreateAgentSessionInput) => Promise<AgentSession | { kind: "unknown-model" }>;
-  /** `undefined` — такой сессии нет. Открытая сессия поднимает harness и живёт в памяти. */
-  open: (id: string, agent: AgentDefinition) => Promise<AgentSession | undefined>;
+  /** `undefined` — такой сессии нет. Открытие читает JSONL, но не поднимает harness. */
+  open: (id: string) => Promise<PersistedAgentSession | undefined>;
   list: () => Promise<AgentSessionSummary[]>;
   /** Файлы, которые прочитать не вышло. Одна битая сессия не отменяет остальные. */
   problems: () => string[];
@@ -169,9 +178,11 @@ export function createAgentSessionStore(
       await session.appendModelChange(model.provider, model.id);
       await session.appendThinkingLevelChange(input.thinkingLevel);
 
-      return liveSession(session, options.models, input.agent, await summaryOf(session));
+      return persistedSession(session, options.models, await summaryOf(session)).activate(
+        input.agent,
+      );
     },
-    open: async (id, agent) => {
+    open: async (id) => {
       const metadata = (await listMetadata()).find((candidate) => candidate.id === id);
 
       if (metadata === undefined) {
@@ -180,7 +191,7 @@ export function createAgentSessionStore(
 
       const session = await repo.open(metadata);
 
-      return liveSession(session, options.models, agent, await summaryOf(session));
+      return persistedSession(session, options.models, await summaryOf(session));
     },
     list: async () => {
       const summaries = await Promise.all(
@@ -249,13 +260,11 @@ function liveSession(
   models: MutableModels,
   agent: AgentDefinition,
   summary: AgentSessionSummary,
-): AgentSession {
+): AgentSession | { kind: "unknown-model" } {
   const model = resolveModel(models, summary.model);
 
   if (model === undefined) {
-    // Сессию открыли, а модели в каталоге больше нет: плагин с кастомным провайдером выключили.
-    // Это отказ турна с названной причиной, а не отказ открытия — сессия жива (docs/sessions-and-projects.md).
-    throw new Error(`the session ${summary.id} names the model ${summary.model}, which is gone`);
+    return { kind: "unknown-model" };
   }
 
   const environment = new NodeExecutionEnv({ cwd: summary.folder });
@@ -361,9 +370,7 @@ function liveSession(
       );
     },
     entries: async (after = 0) => {
-      const found = await session.getEntries({ afterEntrySeq: after });
-
-      return { entries: found.flatMap(describeEntry), seen: after + found.length };
+      return entriesOf(session, after);
     },
     subscribe: (listener) => {
       listeners.add(listener);
@@ -374,6 +381,27 @@ function liveSession(
       await environment.cleanup();
     },
   };
+}
+
+function persistedSession(
+  session: PiSession,
+  models: MutableModels,
+  summary: AgentSessionSummary,
+): PersistedAgentSession {
+  return {
+    summary: () => ({ ...summary }),
+    entries: (after = 0) => entriesOf(session, after),
+    activate: (agent) => liveSession(session, models, agent, summary),
+  };
+}
+
+async function entriesOf(
+  session: PiSession,
+  after: number,
+): Promise<{ entries: SessionEntry[]; seen: number }> {
+  const found = await session.getEntries({ afterEntrySeq: after });
+
+  return { entries: found.flatMap(describeEntry), seen: after + found.length };
 }
 
 /**

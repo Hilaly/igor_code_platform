@@ -183,12 +183,34 @@ describe("an agent session over pi", () => {
     );
     assert.match(listed[0]?.model ?? "", /^scripted-model\//);
 
-    // Открытие поднимает harness заново и видит записанное: сессия переживает перезапуск демона.
-    const reopened = await (await freshStore(directory)).open(listed[0]?.id ?? "", agent);
+    // Активация поднимает harness заново и видит записанное: сессия переживает перезапуск демона.
+    const persisted = await (await freshStore(directory)).open(listed[0]?.id ?? "");
 
-    assert.ok(reopened !== undefined);
+    assert.ok(persisted !== undefined);
+    const reopened = persisted.activate(agent);
+
+    assert.ok(!("kind" in reopened));
     assert.equal((await reopened.entries()).entries.length, 5);
     await reopened.close();
+  });
+
+  it("reads a persisted session after its model disappears", async () => {
+    const { open, directory } = await withStore([{ text: "привет" }]);
+    const session = await open();
+
+    await session.prompt("скажи", "t1");
+    const sessionId = session.summary().id;
+    await session.close();
+
+    const models = createModels();
+    const restarted = createAgentSessionStore({ models, directory });
+    const listed = await restarted.list();
+    const persisted = await restarted.open(sessionId);
+
+    assert.equal(listed[0]?.id, sessionId);
+    assert.ok(persisted !== undefined);
+    assert.equal((await persisted.entries()).entries.length, 5);
+    assert.deepEqual(persisted.activate(agent), { kind: "unknown-model" });
   });
 
   it("refuses to create a session on a model nobody has", async () => {
