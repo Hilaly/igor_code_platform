@@ -3,6 +3,7 @@ import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appeara
 import { parseArguments } from "./arguments.ts";
 import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
+import { createCredentialStore } from "./credential-store.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
 import { createEventStream } from "./event-stream.ts";
@@ -20,6 +21,7 @@ import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
+import { providersRoutes } from "./providers.ts";
 import { createDaemonServer } from "./server.ts";
 import { createSettingsStore } from "./settings.ts";
 
@@ -77,6 +79,9 @@ settings.start(logger);
 // проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
 const normalizeProjectFolder = createProjectPathNormalizer();
 const projects = createProjectStore({ directory, logger, normalizePath: normalizeProjectFolder });
+
+// Единственный писатель кредов в системе (docs/models-and-providers.md).
+const credentials = createCredentialStore({ directory, logger });
 
 // Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
 // отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
@@ -190,6 +195,7 @@ const server = createDaemonServer({
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
     }),
+    ...providersRoutes({ credentials, logger }),
     events.route(),
   ],
 });
