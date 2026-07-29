@@ -7,17 +7,28 @@
 import {
   createProviderCatalogue,
   type Environment,
+  type ModelCatalogVault,
   type ProviderCatalogue,
 } from "@sovereign/agent-runtime-pi";
-import { providerModelsPathPattern, providersPath, type ProviderModels } from "@sovereign/protocol";
+import {
+  coreEventTypes,
+  providerModelsPathPattern,
+  providersPath,
+  providersRefreshPath,
+  type ProviderModels,
+} from "@sovereign/protocol";
 
 import type { CredentialStore } from "./credential-store.ts";
 import { respondWithError, respondWithJson, type Route } from "./dispatcher.ts";
+import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 
 export type ProvidersRouteOptions = {
   credentials: CredentialStore;
   logger: Logger;
+  bus: Pick<EventBus, "publish">;
+  /** Кэш динамических списков моделей. Без него они читаются из сети на каждый старт демона. */
+  catalogs?: ModelCatalogVault;
   /** Окружение, из которого провайдер вправе взять кред. Подменяется только тестами. */
   environment?: Environment;
 };
@@ -25,6 +36,7 @@ export type ProvidersRouteOptions = {
 export function providersRoutes(options: ProvidersRouteOptions): Route[] {
   const catalogue: ProviderCatalogue = createProviderCatalogue({
     credentials: options.credentials,
+    ...(options.catalogs === undefined ? {} : { catalogs: options.catalogs }),
     ...(options.environment === undefined ? {} : { environment: options.environment }),
   });
 
@@ -36,6 +48,22 @@ export function providersRoutes(options: ProvidersRouteOptions): Route[] {
         // Негодный файл кредов здесь не отказ, в отличие от проектов: каталог провайдеров от него не
         // зависит, статус у всех становится «сказать нечем», и беда едет в теле снимка.
         respondWithJson(response, 200, await catalogue.snapshot());
+      },
+    },
+    {
+      method: "POST",
+      path: providersRefreshPath,
+      handle: async ({ response }) => {
+        const report = await catalogue.refresh();
+
+        // Событие публикуется всегда, а не «если что-то изменилось»: сравнивать списки моделей
+        // ради экономии одного перезапроса дороже самого перезапроса.
+        options.bus.publish(coreEventTypes.providersChanged, {});
+        options.logger.info("dynamic model catalogues were refreshed", {
+          providers: report.refreshed.length,
+          failed: report.refreshed.filter((outcome) => outcome.error !== undefined).length,
+        });
+        respondWithJson(response, 200, report);
       },
     },
     {

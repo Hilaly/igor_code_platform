@@ -11,6 +11,7 @@ import { healthRoute } from "./health.ts";
 import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 import { createLoginSessionStore } from "./login-sessions.ts";
 import { createLogger } from "./logger.ts";
+import { createModelCatalogStore } from "./model-catalog-store.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins, projectPluginRoots } from "./plugin-sources.ts";
@@ -82,6 +83,9 @@ const projects = createProjectStore({ directory, logger, normalizePath: normaliz
 
 // Единственный писатель кредов в системе (docs/models-and-providers.md).
 const credentials = createCredentialStore({ directory, logger });
+
+// Кэш динамических списков моделей: без него они читаются из сети на каждый старт демона.
+const modelCatalogs = createModelCatalogStore({ directory, logger });
 
 // Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
 // отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
@@ -195,7 +199,7 @@ const server = createDaemonServer({
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
     }),
-    ...providersRoutes({ credentials, logger }),
+    ...providersRoutes({ credentials, logger, bus, catalogs: modelCatalogs }),
     events.route(),
   ],
 });

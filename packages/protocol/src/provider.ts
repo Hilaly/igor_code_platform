@@ -10,15 +10,18 @@ export const providersPath = "/api/providers";
 
 /** Шаблоны для таблицы маршрутов демона. `:providerId` — идентификатор провайдера у рантайма. */
 export const providerModelsPathPattern = `${providersPath}/:providerId/models`;
-export const providerRefreshPathPattern = `${providersPath}/:providerId/refresh`;
 export const providerCredentialPathPattern = `${providersPath}/:providerId/credential`;
+
+/**
+ * Обновление динамических списков — одно на всех, а не по провайдеру: у рантайма `refresh()`
+ * обходит все настроенные динамические провайдеры разом, а обновления одного он не умеет вовсе.
+ * Разбирать его оркестрацию (обновить OAuth-токен, потом сходить в сеть, потом записать кэш) ради
+ * фильтра по одному провайдеру значило бы переписать её у себя.
+ */
+export const providersRefreshPath = `${providersPath}/refresh`;
 
 export function providerModelsPath(providerId: string): string {
   return `${providersPath}/${encodeURIComponent(providerId)}/models`;
-}
-
-export function providerRefreshPath(providerId: string): string {
-  return `${providersPath}/${encodeURIComponent(providerId)}/refresh`;
 }
 
 export function providerCredentialPath(providerId: string): string {
@@ -117,11 +120,20 @@ export type ProviderModels = {
 };
 
 /**
- * Итог `refresh`. Ошибка провайдера — не отказ маршрута: список остаётся прежним, а человеку надо
- * сказать, что нового не приехало и почему.
+ * Итог обновления по одному провайдеру. Ошибка провайдера — не отказ маршрута: его прежний список
+ * остаётся в силе, а человеку надо сказать, что нового не приехало и почему.
  */
 export type RefreshOutcome = {
   providerId: string;
   modelCount: number;
   error?: string;
+};
+
+/**
+ * Итог обновления целиком. `aborted` — обход прервали (например, демон останавливается); тогда
+ * часть провайдеров осталась непройденной, и это не то же самое, что «у всех получилось».
+ */
+export type RefreshReport = {
+  refreshed: RefreshOutcome[];
+  aborted: boolean;
 };

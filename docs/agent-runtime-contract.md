@@ -297,6 +297,36 @@ interface AuthContext {
 Вывод, важный для [data-directory.md](data-directory.md): `~/.pi/agent/auth.json` — хранилище их
 CLI, а не библиотеки. Конфликта с требованием «всё внутри нашей директории данных» нет.
 
+### Кэш списков моделей — второе внедряемое хранилище
+
+Про него легко не узнать: он не упомянут ни в описании авторизации, ни рядом с провайдерами.
+
+```ts
+interface ModelsStore {
+  read(providerId: string): Promise<ModelsStoreEntry | undefined>;
+  write(providerId: string, entry: ModelsStoreEntry): Promise<void>;
+  delete(providerId: string): Promise<void>;
+}
+
+interface ModelsStoreEntry {
+  models: readonly Model[];
+  lastModified?: number; // из Last-Modified каталога провайдера
+  checkedAt?: number;
+  etag?: string; // хранится дословно, с кавычками, и уезжает обратно как If-None-Match
+}
+```
+
+По умолчанию он в памяти, то есть за пределы нашей директории данных Pi не пишет и без нас. Своя
+реализация нужна не ради правила, а ради экономии: иначе динамический список читается из сети на
+каждый старт демона ([data-directory.md](data-directory.md)).
+
+**Обновления одного провайдера у рантайма нет.** `Models.refresh()` обходит все настроенные
+динамические провайдеры разом, сам обновляя перед этим OAuth-токены, и возвращает
+`{ aborted, errors }` — ошибка провайдера не отклоняет обход. Отсюда форма нашего маршрута
+([web-api.md](web-api.md)): один `POST /api/providers/refresh` без сегмента провайдера. Провайдеру
+при обходе достаётся `RefreshModelsContext` с уже разрешённым кредом и хранилищем, суженным до него
+одного, — каталоги чужих провайдеров провайдеру недоступны.
+
 ### Модели и провайдеры
 
 Вью «Модели и провайдеры» из [vision.md](vision.md) опирается на готовое: `getProviders`,

@@ -9,16 +9,22 @@ import { after, describe, it } from "node:test";
 
 import { emptyEnvironment } from "@sovereign/agent-runtime-pi/testing";
 import {
+  coreEventTypes,
   providerModelsPath,
   providersPath,
+  providersRefreshPath,
+  type BusEvent,
   type ProviderModels,
   type ProvidersSnapshot,
+  type RefreshReport,
 } from "@sovereign/protocol";
 
 import { createCredentialStore, credentialsFileName } from "./credential-store.ts";
 import { ensureDataDirectory } from "./data-directory.ts";
 import { createDispatcher } from "./dispatcher.ts";
+import { createEventBus } from "./event-bus.ts";
 import { createLogger, type Logger } from "./logger.ts";
+import { createModelCatalogStore } from "./model-catalog-store.ts";
 import { providersRoutes } from "./providers.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-providers-route-"));
@@ -47,11 +53,23 @@ async function serve(options: { contents?: string; variables?: Record<string, st
 
   const logger = quietLogger();
   const credentials = createCredentialStore({ directory, logger });
+  const catalogs = createModelCatalogStore({ directory, logger });
+  const bus = createEventBus({
+    onListenerError: (cause) => {
+      throw cause;
+    },
+  });
+  const events: BusEvent[] = [];
+
+  bus.subscribe((event) => events.push(event));
+
   const server = createServer(
     createDispatcher({
       routes: providersRoutes({
         credentials,
         logger,
+        bus,
+        catalogs,
         environment: emptyEnvironment(options.variables),
       }),
       logger,
@@ -67,20 +85,25 @@ async function serve(options: { contents?: string; variables?: Record<string, st
 
   const call = (method: string, path: string): Promise<Answer> =>
     new Promise((resolve, reject) => {
-      const outgoing = sendRequest({ host: "127.0.0.1", port, method, path }, (incoming) => {
-        let text = "";
+      const outgoing = sendRequest(
+        // Изменяющий запрос обязан назвать себя json, иначе диспетчер отвечает 415
+        // (docs/web-api.md). Тела у обновления нет — обновляется всё, что настроено.
+        { host: "127.0.0.1", port, method, path, headers: { "content-type": "application/json" } },
+        (incoming) => {
+          let text = "";
 
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk: string) => {
-          text += chunk;
-        });
-        incoming.on("end", () =>
-          resolve({
-            status: incoming.statusCode ?? 0,
-            body: text === "" ? undefined : JSON.parse(text),
-          }),
-        );
-      });
+          incoming.setEncoding("utf8");
+          incoming.on("data", (chunk: string) => {
+            text += chunk;
+          });
+          incoming.on("end", () =>
+            resolve({
+              status: incoming.statusCode ?? 0,
+              body: text === "" ? undefined : JSON.parse(text),
+            }),
+          );
+        },
+      );
 
       outgoing.on("error", reject);
       outgoing.end();
@@ -88,8 +111,10 @@ async function serve(options: { contents?: string; variables?: Record<string, st
 
   return {
     credentials,
+    events,
     list: () => call("GET", providersPath),
     models: (providerId: string) => call("GET", providerModelsPath(providerId)),
+    refresh: () => call("POST", providersRefreshPath),
   };
 }
 
@@ -140,6 +165,35 @@ describe("GET /api/providers", () => {
     assert.match(snapshot.problem ?? "", /credentials\.json/);
     assert.ok(snapshot.providers.length >= 38);
     assert.ok(snapshot.providers.every((provider) => provider.auth.kind === "unknown"));
+  });
+});
+
+describe("POST /api/providers/refresh", () => {
+  it("answers with an outcome per dynamic provider and touches nothing else", async () => {
+    const { refresh } = await serve();
+    const answer = await refresh();
+    const report = answer.body as RefreshReport;
+
+    assert.equal(answer.status, 200);
+    assert.equal(report.aborted, false);
+    // Динамический список моделей у встроенных провайдеров ровно один (docs/runtime-checks.md,
+    // проверка 31), и без креда рантайм его пропускает: сети в тесте нет.
+    assert.deepEqual(
+      report.refreshed.map((outcome) => outcome.providerId),
+      ["radius"],
+    );
+    assert.equal(report.refreshed[0]?.error, undefined);
+  });
+
+  it("tells the open browser that the catalogue changed", async () => {
+    const { refresh, events } = await serve();
+
+    await refresh();
+
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providersChanged],
+    );
   });
 });
 

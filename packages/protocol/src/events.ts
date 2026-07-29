@@ -35,6 +35,12 @@ export const coreEventTypes = {
    * восстановление, удаление и смену доступности — подписчик всё равно перечитывает список целиком.
    */
   projectsChanged: "core.projects.changed",
+  /**
+   * Каталог провайдеров изменился: обновился динамический список моделей либо появился или исчез
+   * кастомный провайдер плагина (docs/models-and-providers.md). Вход и выход это событие **не**
+   * публикуют — у них свои, иначе вью перезапрашивало бы список дважды на одно действие.
+   */
+  providersChanged: "core.providers.changed",
 } as const;
 
 /**
@@ -61,11 +67,15 @@ export type PreferencesChanged = Record<string, never>;
  */
 export type ProjectsChanged = Record<string, never>;
 
+/** Нагрузки нет по той же причине: состояние спрашивается у владельца — `GET /api/providers`. */
+export type ProvidersChanged = Record<string, never>;
+
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
   "core.projects.changed": ProjectsChanged;
+  "core.providers.changed": ProvidersChanged;
 };
 
 export type CoreEventType = keyof CoreEventPayloads;

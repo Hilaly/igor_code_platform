@@ -7,3 +7,4 @@ export * from "./catalogue.ts";
 export * from "./credentials.ts";
 export * from "./describe.ts";
 export * from "./environment.ts";
+export * from "./model-catalogs.ts";

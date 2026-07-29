@@ -13,21 +13,31 @@ import type {
   ProviderAuthState,
   ProvidersSnapshot,
   ProviderSummary,
+  RefreshReport,
 } from "@sovereign/protocol";
 
 import { toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
 import { describeModels, describeProvider } from "./describe.ts";
 import { processEnvironment, toRuntimeAuthContext, type Environment } from "./environment.ts";
+import { toRuntimeModelsStore, type ModelCatalogVault } from "./model-catalogs.ts";
 
 export type ProviderCatalogue = {
   /** Провайдеры со статусом авторизации. Моделей в снимке нет: их больше тысячи. */
   snapshot: () => Promise<ProvidersSnapshot>;
   /** Модели одного провайдера. `undefined` — такого провайдера нет. */
   models: (providerId: string) => ModelSummary[] | undefined;
+  /**
+   * Перечитать динамические списки моделей. Обновление по одному провайдеру рантайм не умеет:
+   * `refresh()` обходит все настроенные динамические провайдеры разом, сам обновляя перед этим
+   * OAuth-токены. Разбирать его оркестрацию ради фильтра значило бы переписать её у себя.
+   */
+  refresh: () => Promise<RefreshReport>;
 };
 
 export type CreateProviderCatalogueOptions = {
   credentials: CredentialVault;
+  /** Кэш динамических списков моделей. Без него они читаются из сети на каждый старт демона. */
+  catalogs?: ModelCatalogVault;
   /** По умолчанию — настоящее окружение процесса. Подменяется только тестами. */
   environment?: Environment;
 };
@@ -38,6 +48,9 @@ export function createProviderCatalogue(
   const models: MutableModels = builtinModels({
     credentials: toRuntimeCredentialStore(options.credentials),
     authContext: toRuntimeAuthContext(options.environment ?? processEnvironment()),
+    ...(options.catalogs === undefined
+      ? {}
+      : { modelsStore: toRuntimeModelsStore(options.catalogs) }),
   });
 
   return {
@@ -66,6 +79,24 @@ export function createProviderCatalogue(
       const provider = models.getProvider(providerId);
 
       return provider === undefined ? undefined : describeModels(provider);
+    },
+    refresh: async () => {
+      const result = await models.refresh();
+      // Обход не отклоняется на ошибке провайдера: у одного список не приехал, у остальных приехал,
+      // и человеку надо сказать и то, и другое.
+      const refreshed = [...models.getProviders()]
+        .filter((provider) => typeof provider.refreshModels === "function")
+        .map((provider) => {
+          const failure = result.errors.get(provider.id);
+
+          return {
+            providerId: provider.id,
+            modelCount: describeModels(provider).length,
+            ...(failure === undefined ? {} : { error: failure.message }),
+          };
+        });
+
+      return { refreshed, aborted: result.aborted };
     },
   };
 }
