@@ -10,12 +10,7 @@
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
-import type {
-  LoginStep,
-  PluginContribution,
-  ProviderRequest,
-  ProviderResponse,
-} from "@sovereign/sdk";
+import type { LoginStep, PluginContribution } from "@sovereign/sdk";
 import {
   coreEventTypes,
   type LogSource,
@@ -35,6 +30,8 @@ import type {
   PluginIncoming,
   PluginLoginReply,
   PluginOutgoing,
+  PluginRequest,
+  PluginResponse,
   PluginWorkerData,
 } from "./plugin-wire.ts";
 
@@ -88,9 +85,9 @@ export type CreatePluginSupervisorOptions = {
    */
   onRequest?: (
     plugin: ContributingPlugin,
-    request: ProviderRequest,
+    request: PluginRequest,
     call: PluginCall,
-  ) => Promise<ProviderResponse>;
+  ) => Promise<PluginResponse>;
   /** Ответ плагина на шаг входа или отказ отвечать. */
   onLoginReply?: (plugin: ContributingPlugin, reply: PluginLoginReply) => void;
   /**
@@ -311,7 +308,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const answerRequest =
     options.onRequest ??
     (async () =>
-      ({ kind: "failed", reason: "this daemon answers nothing about providers" }) as const);
+      ({ kind: "failed", reason: "this daemon answers no requests from plugins" }) as const);
 
   const handle = (entry: Supervised, worker: Worker, message: PluginOutgoing): void => {
     switch (message.kind) {

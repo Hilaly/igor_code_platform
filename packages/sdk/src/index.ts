@@ -35,6 +35,23 @@ export type {
 /** Провайдеры LLM: операции над ними и типы, которыми платформа о них рассказывает. */
 export { providers } from "./providers.ts";
 
+/** Сессии агента: тот же набор, что у веб-API (docs/sessions-and-projects.md). */
+export { sessions } from "./sessions.ts";
+
+export type {
+  AgentSummary,
+  Session,
+  SessionContentBlock,
+  SessionDraft,
+  SessionEntriesPage,
+  SessionEntry,
+  SessionPhase,
+  SessionRequest,
+  SessionResponse,
+  TurnAccepted,
+  TurnRequest,
+} from "./sessions.ts";
+
 export type {
   CustomModelDefinition,
   CustomProviderApi,

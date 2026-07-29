@@ -21,6 +21,7 @@ import type {
   ProviderRequest,
   ProviderResponse,
 } from "./providers.ts";
+import type { SessionRequest, SessionResponse } from "./sessions.ts";
 
 export type RecordedLog = {
   level: PluginLogLevel;
@@ -51,6 +52,12 @@ export type PluginTestHost = {
   answerProviders: (
     answer: (request: ProviderRequest) => ProviderResponse | Promise<ProviderResponse>,
   ) => void;
+  /** Что плагин спросил о сессиях, в порядке вызова. */
+  sessionRequests: SessionRequest[];
+  /** Чем отвечать на запросы о сессиях. Без ответа шов отказывает с объяснением, как и у провайдеров. */
+  answerSessions: (
+    answer: (request: SessionRequest) => SessionResponse | Promise<SessionResponse>,
+  ) => void;
   /** Входы, которые плагин начал, в порядке вызова. */
   logins: LoginInput[];
   /** Ответы плагина на вопросы входа, в порядке вопросов. */
@@ -76,6 +83,7 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const published: RecordedEvent[] = [];
   const subscriptions: string[] = [];
   const providerRequests: ProviderRequest[] = [];
+  const sessionRequests: SessionRequest[] = [];
   const logins: LoginInput[] = [];
   const loginAnswers: string[] = [];
 
@@ -88,6 +96,15 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     reason:
       `the test host was not told what to answer to a ${request.kind} request about providers; ` +
       "install an answer with answerProviders()",
+  });
+
+  let answerSessionRequest: (
+    request: SessionRequest,
+  ) => SessionResponse | Promise<SessionResponse> = (request) => ({
+    kind: "failed",
+    reason:
+      `the test host was not told what to answer to a ${request.kind} request about sessions; ` +
+      "install an answer with answerSessions()",
   });
 
   installPluginHost({
@@ -116,6 +133,11 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
 
       return answerProviderRequest(request);
     },
+    sessions: async (request) => {
+      sessionRequests.push(request);
+
+      return answerSessionRequest(request);
+    },
     login: async (input) => {
       logins.push(input);
 
@@ -142,6 +164,10 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     providerRequests,
     answerProviders: (answer) => {
       answerProviderRequest = answer;
+    },
+    sessionRequests,
+    answerSessions: (answer) => {
+      answerSessionRequest = answer;
     },
     logins,
     loginAnswers,

@@ -46,7 +46,7 @@
 | Схемы событий ядра                            | [event-bus.md](event-bus.md)                         |
 | Хуки: перечень, виды, слияние, форма отказа   | [hooks.md](hooks.md)                                 |
 | Типы событий Pi, реэкспортированные из `sdk`  | [hooks.md](hooks.md)                                 |
-| Поверхность API сессий                        | [sessions-and-projects.md](sessions-and-projects.md) |
+| Поверхность `sessions.*` и её типы в SDK      | [sessions-and-projects.md](sessions-and-projects.md) |
 | Хранилище плагина: ключ и папка               | [plugins.md](plugins.md)                             |
 
 Публичная поверхность кита — это ровно то, что он экспортирует из `src/index.ts`: примитивы,

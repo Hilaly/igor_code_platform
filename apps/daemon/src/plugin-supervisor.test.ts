@@ -29,6 +29,7 @@ import { createLogger, type Logger } from "./logger.ts";
 import {
   createPluginSupervisor,
   type CancelScheduled,
+  type CreatePluginSupervisorOptions,
   type PluginSupervisor,
 } from "./plugin-supervisor.ts";
 import { discoverPlugins, type PluginDiscovery } from "./plugin-sources.ts";
@@ -219,7 +220,14 @@ function providerWorld(recorded: Journal, script: ScriptedStep[] = []) {
     logins,
     /** Три хука супервизора одним объектом: маршрутизация у него, логика — здесь. */
     hooks: {
-      onRequest: bridge.request,
+      // Второй канал — сессии — здесь не проверяется: супервизор только маршрутизирует, а вид
+      // запроса разводит `isSessionRequest` в проводке демона.
+      onRequest: ((plugin, request, call) =>
+        bridge.request(
+          plugin,
+          request as Parameters<typeof bridge.request>[1],
+          call,
+        )) satisfies NonNullable<CreatePluginSupervisorOptions["onRequest"]>,
       onLoginReply: bridge.reply,
       onPluginGone: bridge.remove,
     },
@@ -445,7 +453,7 @@ describe("createPluginSupervisor", () => {
     await recorded.waitFor(
       (record) =>
         reachedState("data:provider-reader", "failed")(record) &&
-        /answers nothing about providers/.test(String(record["reason"])),
+        /answers no requests from plugins/.test(String(record["reason"])),
       "the plugin failing with the reason",
     );
   });

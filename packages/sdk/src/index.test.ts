@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
-import { contribute, defineEvent, events, identity, log, providers, z } from "./index.ts";
+import { contribute, defineEvent, events, identity, log, providers, sessions, z } from "./index.ts";
 import type { CustomProviderDefinition, ProviderSummary } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
@@ -49,7 +49,70 @@ describe("the sdk without a host", () => {
       /sdk is not initialised/,
     );
     await assert.rejects(() => providers.list(), /sdk is not initialised/);
+    await assert.rejects(() => sessions.list(), /sdk is not initialised/);
     assert.throws(() => identity(), /sdk is not initialised/);
+  });
+});
+
+describe("the session surface", () => {
+  it("asks the platform for the agents and hands them over as they came", async () => {
+    const host = installTestHost({ id: "tracker" });
+    const agent = {
+      id: "base-agent.agent",
+      pluginKey: "builtin:base-agent",
+      source: "builtin",
+      skills: [],
+    };
+
+    host.answerSessions(() => ({ kind: "agent-list", agents: [agent] }));
+
+    assert.deepEqual(await sessions.agents(), [agent]);
+    assert.deepEqual(host.sessionRequests, [{ kind: "agent-list" }]);
+  });
+
+  it("creates a session and starts a turn in it", async () => {
+    const host = installTestHost({ id: "tracker" });
+    const created = {
+      id: "0199",
+      projectId: "p1",
+      folder: "/tmp/demo",
+      agentId: "base-agent.agent",
+      model: "scripted/one",
+      thinkingLevel: "off" as const,
+      phase: "idle" as const,
+      createdAt: "2026-07-29T09:00:00.000Z",
+    };
+
+    host.answerSessions((request) =>
+      request.kind === "session-create"
+        ? { kind: "session-create", session: created }
+        : { kind: "session-prompt", accepted: { sessionId: "0199", turnId: "t1", phase: "turn" } },
+    );
+
+    assert.deepEqual(
+      await sessions.create({ projectId: "p1", agentId: "base-agent.agent" }),
+      created,
+    );
+    assert.deepEqual(await sessions.prompt({ sessionId: "0199", text: "сделай" }), {
+      sessionId: "0199",
+      turnId: "t1",
+      phase: "turn",
+    });
+  });
+
+  it("turns a refusal of the platform into an error with its reason", async () => {
+    const host = installTestHost({ id: "tracker" });
+
+    host.answerSessions(() => ({ kind: "failed", reason: "the project is archived" }));
+
+    await assert.rejects(() => sessions.list(), /the project is archived/);
+  });
+
+  it("does not pretend the platform answered when nobody told it what to answer", async () => {
+    installTestHost({ id: "tracker" });
+
+    // Тест, забывший поставить ответ, обязан упасть с внятной причиной, а не получить пустой список.
+    await assert.rejects(() => sessions.list(), /answerSessions/);
   });
 });
 

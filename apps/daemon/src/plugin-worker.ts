@@ -12,9 +12,20 @@ import { pathToFileURL } from "node:url";
 
 import { deliverEvent } from "@sovereign/sdk/events";
 import { installPluginHost } from "@sovereign/sdk/host";
-import type { LoginDialogue, LoginStep, PluginModule, ProviderResponse } from "@sovereign/sdk";
+import type {
+  LoginDialogue,
+  LoginStep,
+  PluginModule,
+  ProviderResponse,
+  SessionResponse,
+} from "@sovereign/sdk";
 
-import type { PluginIncoming, PluginOutgoing, PluginWorkerData } from "./plugin-wire.ts";
+import type {
+  PluginIncoming,
+  PluginOutgoing,
+  PluginResponse,
+  PluginWorkerData,
+} from "./plugin-wire.ts";
 
 const port = parentPort;
 
@@ -34,7 +45,7 @@ const describe = (cause: unknown): string =>
  * воркера: ядро отвечает тому же воркеру, из которого пришёл запрос, поэтому глобальная
  * уникальность идентификатора не нужна.
  */
-const awaitingAnswer = new Map<string, (response: ProviderResponse) => void>();
+const awaitingAnswer = new Map<string, (response: PluginResponse) => void>();
 let requestsSent = 0;
 
 const nextRequestId = (): string => {
@@ -74,7 +85,16 @@ installPluginHost({
     new Promise((resolve) => {
       const requestId = nextRequestId();
 
-      awaitingAnswer.set(requestId, resolve);
+      // Ответ приезжает объединением обоих каналов; разбирает его тот, кто спрашивал: вид ответа
+      // задаётся видом запроса, и чужой вид для вызывающего — ошибка платформы, а не его дело.
+      awaitingAnswer.set(requestId, (response) => resolve(response as ProviderResponse));
+      send({ kind: "request", requestId, request });
+    }),
+  sessions: (request) =>
+    new Promise((resolve) => {
+      const requestId = nextRequestId();
+
+      awaitingAnswer.set(requestId, (response) => resolve(response as SessionResponse));
       send({ kind: "request", requestId, request });
     }),
   login: (input) =>

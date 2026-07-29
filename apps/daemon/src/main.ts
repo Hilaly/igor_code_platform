@@ -31,6 +31,7 @@ import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
 import { coreToolSource } from "./core-tools.ts";
+import { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
 import { createSessionService } from "./sessions.ts";
 import { createToolCollector } from "./tool-collection.ts";
 import { createTurnQueue } from "./turn-queue.ts";
@@ -144,13 +145,31 @@ const pluginProviders = createPluginProviders({
   logger,
 });
 
+/**
+ * Мост сессий подключается позже: служба сессий строится после потока событий, а супервизор нужен
+ * раньше него. Ссылка поздняя, а не служба ранняя, потому что порядок обратный невозможен — потоку
+ * нужен уже поднятый супервизор.
+ */
+const pluginSessions: { answer?: PluginSessions["answer"] } = {};
+
 const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
   bus,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
-  onRequest: pluginProviders.request,
+  onRequest: async (plugin, request, call) => {
+    if (!isSessionRequest(request)) {
+      return pluginProviders.request(plugin, request, call);
+    }
+
+    return (
+      (await pluginSessions.answer?.(request)) ?? {
+        kind: "failed",
+        reason: "this daemon answers nothing about sessions yet",
+      }
+    );
+  },
   onLoginReply: pluginProviders.reply,
   onPluginGone: pluginProviders.remove,
 });
@@ -242,6 +261,8 @@ const sessions = createSessionService({
 });
 
 void sessions.refresh();
+
+pluginSessions.answer = createPluginSessions({ sessions }).answer;
 
 const account = createAccountStore({ directory, logger });
 const loginSessions = createLoginSessionStore({

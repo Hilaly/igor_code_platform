@@ -24,7 +24,11 @@ import {
   type AgentSummary,
   type ContributionRegistration,
   type Session,
+  type SessionDraft,
+  type SessionEntriesPage,
   type SessionsSnapshot,
+  type TurnAccepted,
+  type TurnRequest,
 } from "@sovereign/protocol";
 import type {
   AgentSession,
@@ -59,7 +63,29 @@ export type SessionServiceOptions = {
   availability?: (project: StoredProject) => "available" | "missing";
 };
 
+/** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
+export type CreateSessionOutcome =
+  | { kind: "created"; session: Session }
+  | { kind: "unknown-project" }
+  | { kind: "refused"; reason: string };
+
+export type PromptRequest = TurnRequest & { sessionId: string };
+
+export type PromptOutcome =
+  | { kind: "accepted"; turn: TurnAccepted }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
+
 export type SessionService = {
+  /** Включённые агенты. Пустой список — законный ответ. */
+  agents: () => AgentSummary[];
+  list: (projectId?: string) => Session[];
+  create: (draft: SessionDraft) => Promise<CreateSessionOutcome>;
+  /** `undefined` — такой сессии нет. */
+  entries: (sessionId: string, after?: number) => Promise<SessionEntriesPage | undefined>;
+  prompt: (request: PromptRequest) => Promise<PromptOutcome>;
+  /** `false` — прерывать было нечего. */
+  abort: (sessionId: string) => Promise<boolean>;
   routes: () => Route[];
   /** Сколько сессий в папке проекта: считается по заголовкам файлов, без чтения записей. */
   countByFolderKey: (folderKey: string) => number;
@@ -212,7 +238,192 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     );
   };
 
+  /** Операции. Маршруты и мост плагинов зовут их одни и те же: набор обязан быть один. */
+  const agents = (): AgentSummary[] => agentsOf().map(describeAgent);
+
+  const list = (projectId?: string): Session[] =>
+    summaries
+      .filter((summary) => projectId === undefined || summary.projectId === projectId)
+      .map(describeSession);
+
+  const create = async (draft: SessionDraft): Promise<CreateSessionOutcome> => {
+    const project = options.projects.find(draft.projectId);
+
+    if (project === undefined) {
+      return { kind: "unknown-project" };
+    }
+
+    if (project.archived) {
+      return { kind: "refused", reason: "the project is archived" };
+    }
+
+    if (availabilityOf(project) === "missing") {
+      return { kind: "refused", reason: `the folder ${project.folder} is not there` };
+    }
+
+    const agent = agentsOf().find((candidate) => candidate.id === draft.agentId);
+
+    if (agent === undefined) {
+      return { kind: "refused", reason: `no agent ${draft.agentId} is enabled right now` };
+    }
+
+    const model = draft.model ?? agent.model;
+
+    if (model === undefined) {
+      return {
+        kind: "refused",
+        reason: `the agent ${agent.id} names no default model, so the model has to be named`,
+      };
+    }
+
+    const created = await options.store.create({
+      projectId: project.id,
+      agentId: agent.id,
+      folder: project.folder,
+      folderKey: project.folderKey,
+      model,
+      thinkingLevel: draft.thinkingLevel ?? agent.thinkingLevel ?? "off",
+      agent: { id: agent.id, instructions: agent.instructions },
+    });
+
+    if ("kind" in created) {
+      return { kind: "refused", reason: `the model ${model} is not available right now` };
+    }
+
+    watch(created);
+    live.set(created.summary().id, created);
+    await refresh();
+    announce();
+
+    return { kind: "created", session: describeSession(created.summary()) };
+  };
+
+  const entries = async (
+    sessionId: string,
+    after?: number,
+  ): Promise<SessionEntriesPage | undefined> => {
+    if (!isSessionId(sessionId)) {
+      return undefined;
+    }
+
+    const session = await openSession(sessionId);
+
+    if (session === undefined) {
+      return undefined;
+    }
+
+    const from = after !== undefined && Number.isSafeInteger(after) && after > 0 ? after : 0;
+
+    return { sessionId, ...(await session.entries(from)) };
+  };
+
+  const prompt = async (request: PromptRequest): Promise<PromptOutcome> => {
+    const sessionId = request.sessionId;
+
+    if (!isSessionId(sessionId)) {
+      return { kind: "unknown" };
+    }
+
+    const session = await openSession(sessionId);
+
+    if (session === undefined) {
+      return { kind: "unknown" };
+    }
+
+    if (phaseOf(sessionId) !== "idle") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    const summary = session.summary();
+    const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
+
+    if (agent === undefined) {
+      return { kind: "refused", reason: `no agent ${summary.agentId} is enabled right now` };
+    }
+
+    if (request.model !== undefined) {
+      const applied = await session.setModel(request.model);
+
+      if (applied.kind === "unknown-model") {
+        return { kind: "refused", reason: `the model ${request.model} is not available right now` };
+      }
+    }
+
+    if (request.thinkingLevel !== undefined) {
+      await session.setThinkingLevel(request.thinkingLevel);
+    }
+
+    const place = options.queue.submit({
+      sessionId,
+      kind: "turn",
+      run: async (turnId) => {
+        try {
+          // Набор пересобирается перед каждым турном, а не берётся снимком на старте сессии:
+          // инструменты исчезают вместе с выключенным плагином (docs/sessions-and-projects.md).
+          await applyTools(session, agent, summary.folder);
+
+          const outcome = await session.prompt(request.text, turnId);
+
+          if (outcome.kind === "failed") {
+            options.logger.warn("a turn failed", { session: sessionId, reason: outcome.reason });
+          }
+        } finally {
+          places.delete(sessionId);
+        }
+      },
+    });
+
+    places.set(sessionId, place);
+
+    // Ожидание в очереди — наблюдаемое состояние, и узнать о нём надо не только из ответа: за
+    // сессией смотрят и другие вкладки (docs/architecture.md).
+    if (place.state === "queued") {
+      options.emitDelta({
+        sessionId,
+        turnId: place.turnId,
+        delta: { kind: "phase", phase: "queued" },
+      });
+    }
+
+    announce();
+
+    return {
+      kind: "accepted",
+      turn: { sessionId, turnId: place.turnId, phase: phaseOf(sessionId) },
+    };
+  };
+
+  const abort = async (sessionId: string): Promise<boolean> => {
+    if (!isSessionId(sessionId) || !summaries.some((one) => one.id === sessionId)) {
+      return false;
+    }
+
+    // Ещё не начатый турн снимается очередью, идущий — рантаймом. Порядок именно такой: снятый с
+    // очереди не должен успеть стартовать между двумя проверками.
+    const place = places.get(sessionId);
+    const dropped = place?.cancel() ?? false;
+
+    if (dropped) {
+      places.delete(sessionId);
+    }
+
+    const session = live.get(sessionId);
+    const interrupted = dropped || (session === undefined ? false : await session.abort());
+
+    if (interrupted) {
+      announce();
+    }
+
+    return interrupted;
+  };
+
   return {
+    agents,
+    list,
+    create,
+    entries,
+    prompt,
+    abort,
     countByFolderKey: (folderKey) =>
       summaries.filter((summary) => summary.folderKey === folderKey).length,
     refresh,
@@ -229,7 +440,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         path: agentsPath,
         handle: ({ response }) => {
           // Ноль агентов — законный ответ: единственный плагин с агентом могли выключить.
-          const snapshot: AgentsSnapshot = { agents: agentsOf().map(describeAgent) };
+          const snapshot: AgentsSnapshot = { agents: agents() };
 
           respondWithJson(response, 200, snapshot);
         },
@@ -241,11 +452,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           const projectId = url.searchParams.get(sessionProjectParameter);
           const problems = options.store.problems();
           const snapshot: SessionsSnapshot = {
-            sessions: summaries
-              .filter((summary) => projectId === null || summary.projectId === projectId)
-              .map(describeSession),
-            // Битый файл сессии не отменяет остальные, в отличие от `projects.json`: сессия выпадает
-            // из списка с названной причиной (docs/data-directory.md).
+            sessions: list(projectId ?? undefined),
+            // Битый файл сессии не отменяет остальные, в отличие от `projects.json`: сессия
+            // выпадает из списка с названной причиной (docs/data-directory.md).
             ...(problems.length === 0 ? {} : { problems }),
           };
 
@@ -264,120 +473,60 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             return;
           }
 
-          const project = options.projects.find(parsed.value.projectId);
+          const created = await create(parsed.value);
 
-          if (project === undefined) {
+          if (created.kind === "unknown-project") {
             respondWithError(response, 404, "not found");
 
             return;
           }
 
-          if (project.archived) {
-            respondWithError(response, 409, "the project is archived");
+          if (created.kind === "refused") {
+            respondWithError(response, 409, created.reason);
 
             return;
           }
 
-          if (availabilityOf(project) === "missing") {
-            respondWithError(response, 409, `the folder ${project.folder} is not there`);
-
-            return;
-          }
-
-          const agent = agentsOf().find((candidate) => candidate.id === parsed.value.agentId);
-
-          if (agent === undefined) {
-            respondWithError(
-              response,
-              409,
-              `no agent ${parsed.value.agentId} is enabled right now`,
-            );
-
-            return;
-          }
-
-          const model = parsed.value.model ?? agent.model;
-
-          if (model === undefined) {
-            respondWithError(
-              response,
-              409,
-              `the agent ${agent.id} names no default model, so the model has to be named`,
-            );
-
-            return;
-          }
-
-          const created = await options.store.create({
-            projectId: project.id,
-            agentId: agent.id,
-            folder: project.folder,
-            folderKey: project.folderKey,
-            model,
-            thinkingLevel: parsed.value.thinkingLevel ?? agent.thinkingLevel ?? "off",
-            agent: { id: agent.id, instructions: agent.instructions },
-          });
-
-          if ("kind" in created) {
-            respondWithError(response, 409, `the model ${model} is not available right now`);
-
-            return;
-          }
-
-          watch(created);
-          live.set(created.summary().id, created);
-          await refresh();
-          announce();
-
-          respondWithJson(response, 200, describeSession(created.summary()));
+          respondWithJson(response, 200, created.session);
         },
       },
       {
         method: "GET",
         path: sessionPathPattern,
         handle: ({ response, parameters }) => {
-          const summary = summaries.find((candidate) => candidate.id === parameters["sessionId"]);
+          const found = list().find((session) => session.id === parameters["sessionId"]);
 
-          if (summary === undefined) {
+          if (found === undefined) {
             respondWithError(response, 404, "not found");
 
             return;
           }
 
-          respondWithJson(response, 200, describeSession(summary));
+          respondWithJson(response, 200, found);
         },
       },
       {
         method: "GET",
         path: sessionEntriesPathPattern,
         handle: async ({ response, parameters, url }) => {
-          const sessionId = parameters["sessionId"] ?? "";
+          const page = await entries(
+            parameters["sessionId"] ?? "",
+            Number(url.searchParams.get(sessionEntriesAfterParameter) ?? "0"),
+          );
 
-          if (!isSessionId(sessionId)) {
+          if (page === undefined) {
             respondWithError(response, 404, "not found");
 
             return;
           }
 
-          const session = await openSession(sessionId);
-
-          if (session === undefined) {
-            respondWithError(response, 404, "not found");
-
-            return;
-          }
-
-          const after = Number(url.searchParams.get(sessionEntriesAfterParameter) ?? "0");
-          const page = await session.entries(Number.isSafeInteger(after) && after > 0 ? after : 0);
-
-          respondWithJson(response, 200, { sessionId, ...page });
+          respondWithJson(response, 200, page);
         },
       },
       {
         method: "POST",
         path: sessionTurnsPathPattern,
         handle: async ({ response, parameters, body }) => {
-          const sessionId = parameters["sessionId"] ?? "";
           const parsed = parseTurnRequest(body);
 
           if (parsed.kind === "rejected") {
@@ -386,95 +535,24 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             return;
           }
 
-          if (!isSessionId(sessionId)) {
+          const started = await prompt({
+            sessionId: parameters["sessionId"] ?? "",
+            ...parsed.value,
+          });
+
+          if (started.kind === "unknown") {
             respondWithError(response, 404, "not found");
 
             return;
           }
 
-          const session = await openSession(sessionId);
-
-          if (session === undefined) {
-            respondWithError(response, 404, "not found");
+          if (started.kind === "refused") {
+            respondWithError(response, 409, started.reason);
 
             return;
           }
 
-          if (phaseOf(sessionId) !== "idle") {
-            respondWithError(response, 409, "the session is busy");
-
-            return;
-          }
-
-          const summary = session.summary();
-          const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
-
-          if (agent === undefined) {
-            respondWithError(response, 409, `no agent ${summary.agentId} is enabled right now`);
-
-            return;
-          }
-
-          if (parsed.value.model !== undefined) {
-            const applied = await session.setModel(parsed.value.model);
-
-            if (applied.kind === "unknown-model") {
-              respondWithError(
-                response,
-                409,
-                `the model ${parsed.value.model} is not available right now`,
-              );
-
-              return;
-            }
-          }
-
-          if (parsed.value.thinkingLevel !== undefined) {
-            await session.setThinkingLevel(parsed.value.thinkingLevel);
-          }
-
-          const place = options.queue.submit({
-            sessionId,
-            kind: "turn",
-            run: async (turnId) => {
-              try {
-                // Набор пересобирается перед каждым турном, а не берётся снимком на старте сессии:
-                // инструменты исчезают вместе с выключенным плагином (docs/sessions-and-projects.md).
-                await applyTools(session, agent, summary.folder);
-
-                const outcome = await session.prompt(parsed.value.text, turnId);
-
-                if (outcome.kind === "failed") {
-                  options.logger.warn("a turn failed", {
-                    session: sessionId,
-                    reason: outcome.reason,
-                  });
-                }
-              } finally {
-                places.delete(sessionId);
-              }
-            },
-          });
-
-          places.set(sessionId, place);
-
-          // Ожидание в очереди — наблюдаемое состояние, и узнать о нём надо не только из ответа:
-          // за сессией смотрят и другие вкладки (docs/architecture.md).
-          if (place.state === "queued") {
-            options.emitDelta({
-              sessionId,
-              turnId: place.turnId,
-              delta: { kind: "phase", phase: "queued" },
-            });
-          }
-
-          announce();
-
-          respondWithJson(response, 200, {
-            sessionId,
-            turnId: place.turnId,
-            phase: phaseOf(sessionId),
-          });
+          respondWithJson(response, 200, started.turn);
         },
       },
       {
@@ -483,29 +561,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         handle: async ({ response, parameters }) => {
           const sessionId = parameters["sessionId"] ?? "";
 
-          if (!isSessionId(sessionId) || !summaries.some((one) => one.id === sessionId)) {
+          if (!list().some((session) => session.id === sessionId)) {
             respondWithError(response, 404, "not found");
 
             return;
           }
 
-          // Ещё не начатый турн снимается очередью, идущий — рантаймом. Порядок именно такой:
-          // снятый с очереди не должен успеть стартовать между двумя проверками.
-          const place = places.get(sessionId);
-          const dropped = place?.cancel() ?? false;
-
-          if (dropped) {
-            places.delete(sessionId);
-          }
-
-          const session = live.get(sessionId);
-          const interrupted = dropped || (session === undefined ? false : await session.abort());
-
-          if (interrupted) {
-            announce();
-          }
-
-          respondWithJson(response, 200, { sessionId, interrupted });
+          respondWithJson(response, 200, {
+            sessionId,
+            interrupted: await abort(sessionId),
+          });
         },
       },
     ],

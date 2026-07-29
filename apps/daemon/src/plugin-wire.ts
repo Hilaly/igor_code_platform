@@ -18,6 +18,8 @@ import type {
   PluginLogLevel,
   ProviderRequest,
   ProviderResponse,
+  SessionRequest,
+  SessionResponse,
 } from "@sovereign/sdk";
 import type { PluginEventOrigin, PluginSource } from "@sovereign/protocol";
 
@@ -28,6 +30,11 @@ export type PluginWorkerData = {
   /** Абсолютный путь к точке входа: резолвить манифест воркеру незачем. */
   workerEntry: string;
 };
+
+/** Оба канала «запрос-ответ» в канале плагина (docs/plugins.md). */
+export type PluginRequest = ProviderRequest | SessionRequest;
+
+export type PluginResponse = ProviderResponse | SessionResponse;
 
 export type PluginOutgoing =
   | {
@@ -42,8 +49,12 @@ export type PluginOutgoing =
   /** Здесь имя, наоборот, полное: подписываются на чужое событие. */
   | { kind: "subscribe"; type: string }
   | { kind: "unsubscribe"; type: string }
-  /** Запрос о провайдерах. `requestId` уникален внутри воркера — этого хватает: пара живёт в нём. */
-  | { kind: "request"; requestId: string; request: ProviderRequest }
+  /**
+   * Запрос к платформе. `requestId` уникален внутри воркера — этого хватает: пара живёт в нём.
+   * Каналов запроса-ответа два, провайдеры и сессии, и оба ходят одним видом сообщения: второй
+   * счётчик идентификаторов на один воркер сломал бы сопоставление ответа с вызовом.
+   */
+  | { kind: "request"; requestId: string; request: PluginRequest }
   /**
    * Ответ на вопрос входа. Ключуется `requestId` **самого вызова `login`**, а не попытки: шаги —
    * часть контракта операции, а не отдельный поток (docs/models-and-providers.md).
@@ -62,7 +73,7 @@ export type PluginIncoming =
   /** Событие с шины. `plugin` есть только у события плагина: у события ядра автора нет. */
   | { kind: "event"; type: string; payload: unknown; plugin?: PluginEventOrigin }
   /** Ответ на `request`, тем же `requestId`. */
-  | { kind: "response"; requestId: string; response: ProviderResponse }
+  | { kind: "response"; requestId: string; response: PluginResponse }
   /** Вопрос или сообщение по ходу входа. Конец диалога приезжает ответом, а не шагом. */
   | { kind: "login-step"; requestId: string; step: LoginStep };
 
