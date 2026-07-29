@@ -1,4 +1,4 @@
-import { accountPath, sessionPath } from "@sovereign/protocol";
+import { accountPath, loginSessionPath } from "@sovereign/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { logIn, logOut, probeSession, register } from "./session.ts";
@@ -40,7 +40,7 @@ describe("probeSession", () => {
       const calls = daemon({ status: 200, body: { state } });
 
       await expect(probeSession()).resolves.toEqual({ kind: "state", state });
-      expect(calls[0]?.url).toBe(sessionPath);
+      expect(calls[0]?.url).toBe(loginSessionPath);
     }
   });
 
@@ -72,7 +72,7 @@ describe("logIn", () => {
     const calls = daemon({ status: 200, body: { state: "authenticated" } });
 
     await expect(logIn("правильный пароль")).resolves.toEqual({ kind: "authenticated" });
-    expect(calls[0]?.url).toBe(sessionPath);
+    expect(calls[0]?.url).toBe(loginSessionPath);
     expect(calls[0]?.init?.method).toBe("POST");
     expect(calls[0]?.init?.body).toBe(JSON.stringify({ password: "правильный пароль" }));
   });
@@ -138,7 +138,7 @@ describe("logOut", () => {
 
     await logOut();
 
-    expect(calls[0]?.url).toBe(sessionPath);
+    expect(calls[0]?.url).toBe(loginSessionPath);
     expect(calls[0]?.init?.method).toBe("DELETE");
   });
 

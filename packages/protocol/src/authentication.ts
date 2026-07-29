@@ -6,8 +6,13 @@
  * заголовки, а SSE-поток — основное соединение интерфейса (docs/web-api.md).
  */
 
-/** Состояние входа. Читается без сессии: интерфейс обязан узнать его до всякого пароля. */
-export const sessionPath = "/api/session";
+/**
+ * Состояние входа. Читается без сессии: интерфейс обязан узнать его до всякого пароля.
+ *
+ * Имя `/api/sessions` занято сессиями агента (docs/sessions-and-projects.md), и соседство
+ * `/api/session` с ним читалось бы как «одна из тех же сессий», хотя это другая сущность целиком.
+ */
+export const loginSessionPath = "/api/login-session";
 
 /** Учётная запись. Создаётся один раз, первым входом. */
 export const accountPath = "/api/account";
@@ -30,7 +35,7 @@ export const authenticationStates = [
 export type AuthenticationState = (typeof authenticationStates)[number];
 
 /**
- * Ответ и `GET /api/session`, и успешного входа: у клиента одна форма на оба случая, и после входа
+ * Ответ и `GET /api/login-session`, и успешного входа: у клиента одна форма на оба случая, и после входа
  * ему незачем перезапрашивать состояние, которое он только что изменил.
  */
 export type SessionStatus = {

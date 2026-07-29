@@ -8,7 +8,7 @@
 
 import {
   accountPath,
-  sessionPath,
+  loginSessionPath,
   type AuthenticationState,
   type SessionStatus,
 } from "@sovereign/protocol";
@@ -29,7 +29,7 @@ export type SubmitOutcome =
 
 export async function probeSession(): Promise<SessionProbe> {
   try {
-    const response = await fetch(sessionPath);
+    const response = await fetch(loginSessionPath);
 
     if (!response.ok) {
       return { kind: "unavailable", reason: await reasonOf(response) };
@@ -42,7 +42,7 @@ export async function probeSession(): Promise<SessionProbe> {
 }
 
 export function logIn(password: string): Promise<SubmitOutcome> {
-  return submit(sessionPath, password);
+  return submit(loginSessionPath, password);
 }
 
 export function register(password: string): Promise<SubmitOutcome> {
@@ -55,7 +55,7 @@ export function register(password: string): Promise<SubmitOutcome> {
  */
 export async function logOut(): Promise<void> {
   try {
-    await fetch(sessionPath, { method: "DELETE" });
+    await fetch(loginSessionPath, { method: "DELETE" });
   } catch {
     // Демон недоступен: cookie всё равно перестанет работать, а показывать отказ на выходе незачем.
   }
@@ -77,7 +77,7 @@ async function submit(path: string, password: string): Promise<SubmitOutcome> {
 
     // `409` на маршруте входа означает ровно одно: учётной записи ещё нет. На маршруте регистрации
     // тот же код означает обратное — она уже есть, — и это отказ с причиной для человека.
-    return response.status === 409 && path === sessionPath
+    return response.status === 409 && path === loginSessionPath
       ? { kind: "registration-required" }
       : { kind: "refused", reason };
   } catch (cause) {

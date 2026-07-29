@@ -140,10 +140,18 @@ async function serve(options: { directory?: string } = {}) {
 }
 
 describe("the authentication routes", () => {
+  it("does not answer on the old path of the login session", async () => {
+    const { call } = await serve();
+
+    // Переименование ломающее и обязано быть заметным: молчаливая поддержка обоих путей означала бы
+    // два имени у одного состояния входа, и оба пришлось бы держать вечно.
+    assert.equal((await call("GET", "/api/session")).status, 404);
+  });
+
   it("asks for a registration while there is no account", async () => {
     const { call } = await serve();
 
-    const answer = await call("GET", "/api/session");
+    const answer = await call("GET", "/api/login-session");
 
     assert.equal(answer.status, 200);
     assert.deepEqual(answer.body, { state: "registration-required" });
@@ -152,7 +160,7 @@ describe("the authentication routes", () => {
   it("refuses a login while there is no account", async () => {
     const { call } = await serve();
 
-    const answer = await call("POST", "/api/session", { body: { password } });
+    const answer = await call("POST", "/api/login-session", { body: { password } });
 
     // Отказ отличим от неверного пароля: интерфейс обязан показать форму регистрации, а не ошибку.
     assert.equal(answer.status, 409);
@@ -204,10 +212,10 @@ describe("the authentication routes", () => {
 
     const cookie = cookieOf(await call("POST", "/api/account", { body: { password } }));
 
-    assert.deepEqual((await call("GET", "/api/session", { cookie })).body, {
+    assert.deepEqual((await call("GET", "/api/login-session", { cookie })).body, {
       state: "authenticated",
     });
-    assert.deepEqual((await call("GET", "/api/session")).body, { state: "unauthenticated" });
+    assert.deepEqual((await call("GET", "/api/login-session")).body, { state: "unauthenticated" });
   });
 
   it("lets the right password in and keeps the wrong one out", async () => {
@@ -215,15 +223,18 @@ describe("the authentication routes", () => {
 
     await call("POST", "/api/account", { body: { password } });
 
-    const accepted = await call("POST", "/api/session", { body: { password } });
+    const accepted = await call("POST", "/api/login-session", { body: { password } });
 
     assert.equal(accepted.status, 200);
     assert.deepEqual(accepted.body, { state: "authenticated" });
-    assert.deepEqual((await call("GET", "/api/session", { cookie: cookieOf(accepted) })).body, {
-      state: "authenticated",
-    });
+    assert.deepEqual(
+      (await call("GET", "/api/login-session", { cookie: cookieOf(accepted) })).body,
+      {
+        state: "authenticated",
+      },
+    );
 
-    const refused = await call("POST", "/api/session", { body: { password: "мимо кассы" } });
+    const refused = await call("POST", "/api/login-session", { body: { password: "мимо кассы" } });
 
     assert.equal(refused.status, 401);
     assert.deepEqual(refused.setCookie, []);
@@ -234,12 +245,12 @@ describe("the authentication routes", () => {
 
     await call("POST", "/api/account", { body: { password } });
 
-    const first = await call("POST", "/api/session", { body: { password: "мимо" } });
+    const first = await call("POST", "/api/login-session", { body: { password: "мимо" } });
     const fifth = await (async () => {
       let answer = first;
 
       for (let attempt = 0; attempt < 4; attempt += 1) {
-        answer = await call("POST", "/api/session", { body: { password: "мимо" } });
+        answer = await call("POST", "/api/login-session", { body: { password: "мимо" } });
       }
 
       return answer;
@@ -266,21 +277,23 @@ describe("the authentication routes", () => {
     const answer = await call("POST", "/api/account", { body: { password: "мало" } });
 
     assert.equal(answer.status, 400);
-    assert.deepEqual((await call("GET", "/api/session")).body, { state: "registration-required" });
+    assert.deepEqual((await call("GET", "/api/login-session")).body, {
+      state: "registration-required",
+    });
   });
 
   it("closes the session on the way out and clears the cookie", async () => {
     const { call, cookieOf } = await serve();
 
     const cookie = cookieOf(await call("POST", "/api/account", { body: { password } }));
-    const answer = await call("DELETE", "/api/session", { cookie });
+    const answer = await call("DELETE", "/api/login-session", { cookie });
 
     assert.equal(answer.status, 200);
     assert.deepEqual(answer.body, { state: "unauthenticated" });
 
     // Cookie гасится ответом, но верить в это нельзя: запись сессии удалена на сервере.
     assert.match(String(answer.setCookie[0]), /Max-Age=0|Expires=Thu, 01 Jan 1970/i);
-    assert.deepEqual((await call("GET", "/api/session", { cookie })).body, {
+    assert.deepEqual((await call("GET", "/api/login-session", { cookie })).body, {
       state: "unauthenticated",
     });
     assert.equal((await call("GET", "/api/plugins", { cookie })).status, 401);
@@ -320,7 +333,7 @@ describe("the authentication routes", () => {
     rmSync(join(directory, accountFileName));
 
     assert.equal((await call("GET", "/api/plugins", { cookie })).status, 401);
-    assert.deepEqual((await call("GET", "/api/session", { cookie })).body, {
+    assert.deepEqual((await call("GET", "/api/login-session", { cookie })).body, {
       state: "registration-required",
     });
   });
@@ -345,7 +358,7 @@ describe("the authentication routes", () => {
 
     writeFileSync(join(directory, accountFileName), "{ это не json", "utf8");
 
-    const answer = await call("GET", "/api/session");
+    const answer = await call("GET", "/api/login-session");
 
     // Ни «нужна регистрация», ни «войди»: и то и другое — догадка, а починить файл может человек
     // (docs/data-directory.md).
@@ -358,7 +371,7 @@ describe("the authentication routes", () => {
 
     const cookie = cookieOf(await call("POST", "/api/account", { body: { password } }));
 
-    await call("DELETE", "/api/session", { cookie });
+    await call("DELETE", "/api/login-session", { cookie });
 
     const messages = records.map((record) => record.message);
 

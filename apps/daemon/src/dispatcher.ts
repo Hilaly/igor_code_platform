@@ -30,7 +30,7 @@ export type RequestContext = {
   body: unknown;
   /**
    * Сессия запроса. У защищённого маршрута она есть всегда — иначе обработчик не позвали бы; у
-   * открытого её может не быть, и `GET /api/session` только этим и занимается.
+   * открытого её может не быть, и `GET /api/login-session` только этим и занимается.
    */
   session: AuthenticatedSession | undefined;
 };

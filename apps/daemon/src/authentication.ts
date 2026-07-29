@@ -12,7 +12,7 @@ import {
   accountPath,
   parsePasswordSubmission,
   sessionCookieName,
-  sessionPath,
+  loginSessionPath,
   type SessionStatus,
 } from "@sovereign/protocol";
 import { parseCookie, stringifySetCookie } from "cookie";
@@ -75,7 +75,7 @@ export function authenticationRoutes(options: AuthenticationRoutesOptions): Rout
   return [
     {
       method: "GET",
-      path: sessionPath,
+      path: loginSessionPath,
       access: "open",
       handle: ({ response, session }) => {
         if (session !== undefined) {
@@ -139,7 +139,7 @@ export function authenticationRoutes(options: AuthenticationRoutesOptions): Rout
     },
     {
       method: "POST",
-      path: sessionPath,
+      path: loginSessionPath,
       access: "open",
       handle: async ({ request, response, body }) => {
         const parsed = parsePasswordSubmission(body);
@@ -177,7 +177,7 @@ export function authenticationRoutes(options: AuthenticationRoutesOptions): Rout
     },
     {
       method: "DELETE",
-      path: sessionPath,
+      path: loginSessionPath,
       handle: ({ request, response }) => {
         const token = readSessionToken(request);
 

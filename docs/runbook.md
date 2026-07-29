@@ -107,7 +107,7 @@ IPv4-адрес получит `ECONNREFUSED` ([runtime-checks.md](runtime-check
 
 Полный контракт — в [web-api.md](web-api.md); здесь только как пощупать.
 
-Без cookie отвечают только `GET`/`POST /api/session`, `POST /api/account` и `/api/health`; остальное
+Без cookie отвечают только `GET`/`POST /api/login-session`, `POST /api/account` и `/api/health`; остальное
 даёт `401`. Поэтому сначала вход, дальше — с тем же файлом cookie. Первый вход создаёт учётную
 запись:
 
@@ -116,11 +116,11 @@ curl -c jar -X POST http://localhost:5273/api/account \
   -H 'content-type: application/json' -d '{"password":"correct horse"}'
 ```
 
-Дальше — обычный вход тем же телом на `POST /api/session`; пароль короче шести символов даёт `400`,
+Дальше — обычный вход тем же телом на `POST /api/login-session`; пароль короче шести символов даёт `400`,
 неверный — `401`. Выход:
 
 ```bash
-curl -b jar -X DELETE http://localhost:5273/api/session
+curl -b jar -X DELETE http://localhost:5273/api/login-session
 ```
 
 Состояние плагинов:

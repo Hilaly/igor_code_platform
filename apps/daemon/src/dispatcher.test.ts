@@ -212,9 +212,12 @@ describe("createDispatcher", () => {
   it("answers an open route without a session", async () => {
     // Открытость называется полем, а его отсутствие значит «нужна сессия»: забытое поле делает
     // маршрут защищённым, а не открытым (docs/web-api.md).
-    const { call } = await serve([{ ...echo("/api/session"), access: "open" }], withoutSession);
+    const { call } = await serve(
+      [{ ...echo("/api/login-session"), access: "open" }],
+      withoutSession,
+    );
 
-    assert.equal((await call("GET", "/api/session")).status, 200);
+    assert.equal((await call("GET", "/api/login-session")).status, 200);
   });
 
   it("tells the handler which session asked", async () => {
@@ -226,17 +229,20 @@ describe("createDispatcher", () => {
   });
 
   it("gives an open route no session when there is none", async () => {
-    const { call } = await serve([{ ...echo("/api/session"), access: "open" }], withoutSession);
+    const { call } = await serve(
+      [{ ...echo("/api/login-session"), access: "open" }],
+      withoutSession,
+    );
 
-    assert.equal(JSON.parse((await call("GET", "/api/session")).body).session, undefined);
+    assert.equal(JSON.parse((await call("GET", "/api/login-session")).body).session, undefined);
   });
 
   it("gives an open route the session when there is one", async () => {
-    // Открытый маршрут обязан различать вошедшего и невошедшего: `GET /api/session` только этим и
+    // Открытый маршрут обязан различать вошедшего и невошедшего: `GET /api/login-session` только этим и
     // занимается.
-    const { call } = await serve([{ ...echo("/api/session"), access: "open" }]);
+    const { call } = await serve([{ ...echo("/api/login-session"), access: "open" }]);
 
-    assert.deepEqual(JSON.parse((await call("GET", "/api/session")).body).session, {
+    assert.deepEqual(JSON.parse((await call("GET", "/api/login-session")).body).session, {
       id: "the-session",
     });
   });
@@ -329,11 +335,12 @@ describe("createDispatcher", () => {
   it("asks no content type of a request that carries no body", async () => {
     // У `GET` и `DELETE` тела нет по определению, и требовать от них `content-type` значило бы
     // требовать заголовок про то, чего нет. Межсайтовость у `DELETE` проверяется всё равно.
-    const { call } = await serve([echo("/api/session", "DELETE")]);
+    const { call } = await serve([echo("/api/login-session", "DELETE")]);
 
-    assert.equal((await call("DELETE", "/api/session", undefined, {})).status, 200);
+    assert.equal((await call("DELETE", "/api/login-session", undefined, {})).status, 200);
     assert.equal(
-      (await call("DELETE", "/api/session", undefined, { "sec-fetch-site": "cross-site" })).status,
+      (await call("DELETE", "/api/login-session", undefined, { "sec-fetch-site": "cross-site" }))
+        .status,
       403,
     );
   });
