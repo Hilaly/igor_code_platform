@@ -39,6 +39,8 @@ export type CreateProjectAvailabilityWatcherOptions = {
   bus: Pick<EventBus, "publish">;
   probe?: (folder: string) => ProjectAvailability;
   pollIntervalMilliseconds?: number;
+  /** Вызывается после события о смене доступности, чтобы пересчитать зависимые источники. */
+  onChange?: () => void;
 };
 
 /**
@@ -107,6 +109,7 @@ export function createProjectAvailabilityWatcher(
   const timer = setInterval(() => {
     if (recount()) {
       options.bus.publish(coreEventTypes.projectsChanged, {});
+      options.onChange?.();
     }
   }, options.pollIntervalMilliseconds ?? defaultPollIntervalMilliseconds);
 

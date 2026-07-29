@@ -88,7 +88,21 @@ describe("createProjectAvailabilityWatcher", () => {
 
   it("publishes one event when a folder disappears and one when it comes back", async () => {
     let present = true;
-    const { watcher, events } = watch([project("a")], () => (present ? "available" : "missing"));
+    const changes: number[] = [];
+    const bus = createEventBus({
+      onListenerError: (cause) => {
+        throw cause;
+      },
+    });
+    const events: BusEvent[] = [];
+    bus.subscribe((event) => events.push(event));
+    const watcher = createProjectAvailabilityWatcher({
+      projects: { list: () => [project("a")] },
+      bus,
+      probe: () => (present ? "available" : "missing"),
+      onChange: () => changes.push(1),
+      pollIntervalMilliseconds: 5,
+    });
 
     present = false;
     await settle();
@@ -104,6 +118,7 @@ describe("createProjectAvailabilityWatcher", () => {
 
     assert.equal(watcher.of("a"), "available");
     assert.equal(events.length, 2, "the watcher is not a one-shot");
+    assert.equal(changes.length, 2, "plugin state is reapplied for both transitions");
 
     watcher.stop();
   });

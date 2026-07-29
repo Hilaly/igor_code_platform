@@ -80,7 +80,11 @@ const projects = createProjectStore({ directory, logger, normalizePath: normaliz
 
 // Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
 // отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).
-const projectAvailability = createProjectAvailabilityWatcher({ projects, bus });
+const projectAvailability = createProjectAvailabilityWatcher({
+  projects,
+  bus,
+  onChange: () => applyPlugins(),
+});
 
 // Корни перестали быть константой: папки проектов появляются и исчезают на живом демоне
 // (docs/plugins.md). Считаются они каждый раз заново — набор проектов между обходами меняется.
