@@ -42,8 +42,8 @@
 
 - [ ] Add a queue test that submits the same `sessionId` twice and observes one admitted job.
 - [ ] Run the focused queue test and confirm RED.
-- [ ] Add an HTTP regression test that issues concurrent overridden prompts and observes one 202
-      response and one busy refusal; add a summary override regression test.
+- [ ] Add an HTTP regression test that issues concurrent overridden prompts and observes one accepted
+  200 response and one busy refusal; add a summary override regression test.
 - [ ] Run the focused daemon tests and confirm RED.
 - [ ] Implement atomic duplicate rejection in the queue and route handling; use live summaries as
       the source for open sessions.
