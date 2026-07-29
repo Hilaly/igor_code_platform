@@ -36,6 +36,13 @@ export const coreEventTypes = {
    */
   projectsChanged: "core.projects.changed",
   /**
+   * Список сессий агента или состояние какой-нибудь из них изменились
+   * (docs/sessions-and-projects.md). Одно событие на всё: создание, смену фазы и удаление —
+   * подписчик перечитывает список целиком. Дельты стриминга сюда **не** идут: они едут своим классом
+   * кадра мимо шины, потому что их частота на два порядка выше (docs/web-api.md).
+   */
+  sessionsChanged: "core.sessions.changed",
+  /**
    * Каталог провайдеров изменился: обновился динамический список моделей либо появился или исчез
    * кастомный провайдер плагина (docs/models-and-providers.md). Вход и выход это событие **не**
    * публикуют — у них свои, иначе вью перезапрашивало бы список дважды на одно действие.
@@ -75,6 +82,9 @@ export type PreferencesChanged = Record<string, never>;
  */
 export type ProjectsChanged = Record<string, never>;
 
+/** Нагрузки нет по той же причине: состояние спрашивается у владельца — `GET /api/sessions`. */
+export type SessionsChanged = Record<string, never>;
+
 /** Нагрузки нет по той же причине: состояние спрашивается у владельца — `GET /api/providers`. */
 export type ProvidersChanged = Record<string, never>;
 
@@ -97,6 +107,7 @@ export type CoreEventPayloads = {
   "core.plugin.contributions": PluginContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
   "core.projects.changed": ProjectsChanged;
+  "core.sessions.changed": SessionsChanged;
   "core.providers.changed": ProvidersChanged;
   "core.provider.login": ProviderLogin;
   "core.provider.logout": ProviderLogout;
