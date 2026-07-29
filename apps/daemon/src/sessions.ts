@@ -41,6 +41,7 @@ import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 import { probeProjectFolder } from "./project-availability.ts";
 import type { ProjectStore, StoredProject } from "./project-store.ts";
+import type { ProjectLifecycle } from "./project-lifecycle.ts";
 import type { ToolCollector } from "./tool-collection.ts";
 import type { TurnQueue } from "./turn-queue.ts";
 
@@ -61,6 +62,7 @@ export type SessionServiceOptions = {
   emitDelta: SessionDeltaSink;
   logger: Logger;
   availability?: (project: StoredProject) => "available" | "missing";
+  projectLifecycle?: ProjectLifecycle;
 };
 
 /** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
@@ -97,6 +99,9 @@ export type SessionService = {
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const availabilityOf =
     options.availability ?? ((project: StoredProject) => probeProjectFolder(project.folder));
+  const projectLifecycle: ProjectLifecycle = options.projectLifecycle ?? {
+    run: async (_projectId, operation) => operation(),
+  };
 
   /** Открытые сессии: harness поднят, подписка на дельты стоит. */
   const live = new Map<string, AgentSession>();
@@ -297,57 +302,58 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       .filter(visible)
       .map(describeSession);
 
-  const create = async (draft: SessionDraft): Promise<CreateSessionOutcome> => {
-    const project = options.projects.find(draft.projectId);
+  const create = (draft: SessionDraft): Promise<CreateSessionOutcome> =>
+    projectLifecycle.run(draft.projectId, async () => {
+      const project = options.projects.find(draft.projectId);
 
-    if (project === undefined) {
-      return { kind: "unknown-project" };
-    }
+      if (project === undefined) {
+        return { kind: "unknown-project" };
+      }
 
-    if (project.archived) {
-      return { kind: "refused", reason: "the project is archived" };
-    }
+      if (project.archived) {
+        return { kind: "refused", reason: "the project is archived" };
+      }
 
-    if (availabilityOf(project) === "missing") {
-      return { kind: "refused", reason: `the folder ${project.folder} is not there` };
-    }
+      if (availabilityOf(project) === "missing") {
+        return { kind: "refused", reason: `the folder ${project.folder} is not there` };
+      }
 
-    const agent = agentsOf().find((candidate) => candidate.id === draft.agentId);
+      const agent = agentsOf().find((candidate) => candidate.id === draft.agentId);
 
-    if (agent === undefined) {
-      return { kind: "refused", reason: `no agent ${draft.agentId} is enabled right now` };
-    }
+      if (agent === undefined) {
+        return { kind: "refused", reason: `no agent ${draft.agentId} is enabled right now` };
+      }
 
-    const model = draft.model ?? agent.model;
+      const model = draft.model ?? agent.model;
 
-    if (model === undefined) {
-      return {
-        kind: "refused",
-        reason: `the agent ${agent.id} names no default model, so the model has to be named`,
-      };
-    }
+      if (model === undefined) {
+        return {
+          kind: "refused",
+          reason: `the agent ${agent.id} names no default model, so the model has to be named`,
+        };
+      }
 
-    const created = await options.store.create({
-      projectId: project.id,
-      agentId: agent.id,
-      folder: project.folder,
-      folderKey: project.folderKey,
-      model,
-      thinkingLevel: draft.thinkingLevel ?? agent.thinkingLevel ?? "off",
-      agent: { id: agent.id, instructions: agent.instructions },
+      const created = await options.store.create({
+        projectId: project.id,
+        agentId: agent.id,
+        folder: project.folder,
+        folderKey: project.folderKey,
+        model,
+        thinkingLevel: draft.thinkingLevel ?? agent.thinkingLevel ?? "off",
+        agent: { id: agent.id, instructions: agent.instructions },
+      });
+
+      if ("kind" in created) {
+        return { kind: "refused", reason: `the model ${model} is not available right now` };
+      }
+
+      watch(created);
+      live.set(created.summary().id, created);
+      await refresh();
+      announce();
+
+      return { kind: "created", session: describeSession(created.summary()) };
     });
-
-    if ("kind" in created) {
-      return { kind: "refused", reason: `the model ${model} is not available right now` };
-    }
-
-    watch(created);
-    live.set(created.summary().id, created);
-    await refresh();
-    announce();
-
-    return { kind: "created", session: describeSession(created.summary()) };
-  };
 
   const entries = async (
     sessionId: string,
@@ -409,6 +415,15 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: `no agent ${summary.agentId} is enabled right now` };
     }
 
+    const project = options.projects.find(summary.projectId);
+
+    if (project === undefined || project.archived) {
+      return {
+        kind: "refused",
+        reason: project?.archived === true ? "the project is archived" : "the project is gone",
+      };
+    }
+
     const place = options.queue.reserve(sessionId);
 
     if (place.kind === "busy") {
@@ -420,6 +435,15 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     places.set(sessionId, tracked);
 
     try {
+      if (session.validateModel().kind === "unknown-model") {
+        place.release();
+        places.delete(sessionId);
+        return {
+          kind: "refused",
+          reason: `the model ${summary.model} is not available right now`,
+        };
+      }
+
       if (request.model !== undefined) {
         const applied = await session.setModel(request.model);
 

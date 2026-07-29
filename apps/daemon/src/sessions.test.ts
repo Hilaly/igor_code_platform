@@ -12,6 +12,7 @@ import type { AgentSession, AgentSessionStore } from "@sovereign/agent-runtime-p
 import {
   agentsPath,
   coreEventTypes,
+  projectPath,
   sessionEntriesPath,
   sessionPath,
   sessionsPath,
@@ -30,6 +31,8 @@ import { createDispatcher } from "./dispatcher.ts";
 import { createEventBus } from "./event-bus.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import { createProjectStore, type ProjectStore } from "./project-store.ts";
+import { createProjectLifecycle } from "./project-lifecycle.ts";
+import { projectsRoutes } from "./projects.ts";
 import { createSessionService, type SessionDeltaSink } from "./sessions.ts";
 import { createToolCollector } from "./tool-collection.ts";
 import { createTurnQueue } from "./turn-queue.ts";
@@ -84,6 +87,7 @@ async function serve(
     limit?: number;
     modelChangeGate?: ReturnType<typeof gate>;
     openGate?: ReturnType<typeof gate>;
+    createGate?: ReturnType<typeof gate>;
     coldSession?: boolean;
   } = {},
 ) {
@@ -96,7 +100,12 @@ async function serve(
   assert.equal(created.kind, "created");
 
   const projectId = created.kind === "created" ? created.project.id : "";
-  const { store: sessionStore, model } = scriptedSessionStore({
+  const {
+    store: sessionStore,
+    model,
+    removeModel,
+    restoreModel,
+  } = scriptedSessionStore({
     directory: join(directory, "sessions"),
     turns: options.turns ?? [{ text: "готово" }],
   });
@@ -130,11 +139,15 @@ async function serve(
     },
   });
   const store: AgentSessionStore =
-    options.modelChangeGate === undefined && options.openGate === undefined
+    options.modelChangeGate === undefined &&
+    options.openGate === undefined &&
+    options.createGate === undefined
       ? sessionStore
       : {
           ...sessionStore,
           create: async (input) => {
+            options.createGate?.entered();
+            await options.createGate?.wait;
             const createdSession = await sessionStore.create(input);
 
             return "kind" in createdSession ? createdSession : delayModelChange(createdSession);
@@ -165,6 +178,7 @@ async function serve(
     },
   });
   const events: BusEvent[] = [];
+  const projectLifecycle = createProjectLifecycle();
 
   bus.subscribe((event) => events.push(event));
 
@@ -186,13 +200,23 @@ async function serve(
     emitDelta: (frame) => deltas.push(frame),
     logger,
     availability: () => "available",
+    projectLifecycle,
   });
 
   await service.refresh();
 
   const server = createServer(
     createDispatcher({
-      routes: service.routes(),
+      routes: [
+        ...projectsRoutes({
+          projects,
+          logger,
+          availability: () => "available",
+          sessionCount: (folderKey) => service.countByFolderKey(folderKey),
+          projectLifecycle,
+        }),
+        ...service.routes(),
+      ],
       logger,
       authenticate: () => ({ kind: "session" as const, id: "the-session" }),
     }),
@@ -237,11 +261,14 @@ async function serve(
     folder,
     projectId,
     model,
+    removeModel,
+    restoreModel,
     coldSessionId,
     openCalls: () => openCalls,
     directory,
     start: async (body?: Record<string, unknown>) =>
       call("POST", sessionsPath, { projectId, agentId: baseAgent.id, model, ...body }),
+    removeProject: () => call("DELETE", projectPath(projectId)),
   };
 }
 
@@ -462,6 +489,32 @@ describe("running a turn over http", () => {
     await untilIdle(call, coldSessionId);
   });
 
+  it("refuses a cold session archived while its harness opens", async () => {
+    const openGate = gate();
+    const { call, coldSessionId, projectId, projects } = await serve({
+      turns: [{ text: "не должно исполниться" }],
+      coldSession: true,
+      openGate,
+    });
+
+    assert.ok(coldSessionId);
+
+    const prompt = call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" });
+
+    await openGate.entry;
+    assert.equal(projects.update(projectId, { name: "Demo", archived: true }).kind, "updated");
+    openGate.open();
+
+    const refused = await prompt;
+    assert.equal(projects.update(projectId, { name: "Demo", archived: false }).kind, "updated");
+    const page = (await call("GET", sessionEntriesPath(coldSessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /archived/);
+    assert.equal(page.entries.filter((entry) => entry.kind === "message").length, 0);
+  });
+
   it("refuses an unavailable model promptly while the global queue is saturated", async () => {
     const { call, start } = await serve({ limit: 0 });
     const sessionId = String((await start()).body["id"]);
@@ -473,6 +526,38 @@ describe("running a turn over http", () => {
 
     assert.equal(answer.status, 409);
     assert.match(String(answer.body["error"]), /not available/);
+  });
+
+  it("refuses a live session whose current model disappeared and lets it retry", async () => {
+    const { call, start, model, removeModel, restoreModel } = await serve({
+      turns: [{ text: "после возврата" }],
+    });
+    const sessionId = String((await start()).body["id"]);
+    const before = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    removeModel();
+
+    const refused = await call("POST", sessionTurnsPath(sessionId), { text: "пока модели нет" });
+    const afterRefusal = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), new RegExp(model.replace("/", "\\/")));
+    assert.deepEqual(afterRefusal.entries, before.entries);
+
+    restoreModel();
+
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "после возврата" })).status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+
+    const afterRetry = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(afterRetry.entries.filter((entry) => entry.kind === "message").length, 2);
   });
 
   it("keeps a cancelled validation admitted until it has deterministically refused", async () => {
@@ -749,6 +834,39 @@ describe("reading sessions", () => {
     assert.equal(header.metadata?.["agentId"], baseAgent.id);
   });
 });
+
+describe("project and session lifecycle", () => {
+  it("keeps a project when session creation overlaps its removal", async () => {
+    const createGate = gate();
+    const { call, start, removeProject, projectId } = await serve({ createGate });
+
+    const creating = start();
+
+    await createGate.entry;
+    const removing = removeProject();
+    await new Promise((resolve) => setImmediate(resolve));
+    createGate.open();
+
+    const [created, refusedRemoval] = await Promise.all([creating, removing]);
+
+    assert.equal(created.status, 200);
+    assert.equal(refusedRemoval.status, 409);
+    assert.match(String(refusedRemoval.body["error"]), /session/);
+    assert.equal((await call("GET", sessionsPath)).status, 200);
+    assert.equal(projectsStillContain(await call("GET", "/api/projects"), projectId), true);
+  });
+});
+
+function projectsStillContain(answer: Answer, projectId: string): boolean {
+  const body = answer.body as {
+    projects?: { id: string }[];
+    archived?: { id: string }[];
+  };
+
+  return [...(body.projects ?? []), ...(body.archived ?? [])].some(
+    (project) => project.id === projectId,
+  );
+}
 
 function findSessionFile(root: string, sessionId: string): string | undefined {
   for (const entry of readdirSync(root)) {

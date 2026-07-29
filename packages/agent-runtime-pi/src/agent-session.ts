@@ -70,6 +70,8 @@ export type AgentSession = {
   prompt: (text: string, turnId: string) => Promise<TurnOutcome>;
   /** `false` — прерывать было нечего. */
   abort: () => Promise<boolean>;
+  /** Проверить текущую модель по живому каталогу, не меняя и не записывая её. */
+  validateModel: () => ModelOutcome;
   setModel: (reference: string) => Promise<ModelOutcome>;
   setThinkingLevel: (level: ThinkingLevel) => Promise<void>;
   setTools: (tools: AgentTool[], activeToolNames: string[]) => Promise<void>;
@@ -353,6 +355,10 @@ function liveSession(
 
       return true;
     },
+    validateModel: () =>
+      resolveModel(models, summary.model) === undefined
+        ? { kind: "unknown-model" }
+        : { kind: "applied" },
     setModel: async (reference) => {
       const next = resolveModel(models, reference);
 

@@ -30,6 +30,7 @@ import { pluginsRoute } from "./plugins-snapshot.ts";
 import { createProjectAvailabilityWatcher } from "./project-availability.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore } from "./project-store.ts";
+import { createProjectLifecycle } from "./project-lifecycle.ts";
 import { coreToolSource } from "./core-tools.ts";
 import { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
 import { createSessionService } from "./sessions.ts";
@@ -100,6 +101,7 @@ settings.start(logger);
 // проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
 const normalizeProjectFolder = createProjectPathNormalizer();
 const projects = createProjectStore({ directory, logger, normalizePath: normalizeProjectFolder });
+const projectLifecycle = createProjectLifecycle();
 
 // Единственный писатель кредов в системе (docs/models-and-providers.md).
 const credentials = createCredentialStore({ directory, logger });
@@ -259,6 +261,7 @@ const sessions = createSessionService({
   bus,
   emitDelta: (frame) => events.emitSessionDelta(frame),
   logger,
+  projectLifecycle,
   availability: (project) => projectAvailability.of(project.id),
 });
 
@@ -301,6 +304,7 @@ const server = createDaemonServer({
       normalizePath: normalizeProjectFolder,
       availability: (project) => projectAvailability.of(project.id),
       sessionCount: (folderKey) => sessions.countByFolderKey(folderKey),
+      projectLifecycle,
     }),
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),

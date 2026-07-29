@@ -322,6 +322,8 @@ function emptyUsage(): Usage {
 export function scriptedSessionStore(options: { directory: string; turns?: ScriptedTurn[] }): {
   store: AgentSessionStore;
   model: string;
+  removeModel: () => void;
+  restoreModel: () => void;
 } {
   const scripted = scriptedModelProvider({ turns: options.turns ?? [] });
   const models = createModels();
@@ -331,5 +333,7 @@ export function scriptedSessionStore(options: { directory: string; turns?: Scrip
   return {
     store: createAgentSessionStore({ models, directory: options.directory }),
     model: `${scripted.model.provider}/${scripted.model.id}`,
+    removeModel: () => models.deleteProvider(scripted.provider.id),
+    restoreModel: () => models.setProvider(scripted.provider),
   };
 }

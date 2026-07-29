@@ -20,6 +20,7 @@ import {
 import { respondWithError, respondWithJson, type Route } from "./dispatcher.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
+import type { ProjectLifecycle } from "./project-lifecycle.ts";
 import { probeProjectFolder } from "./project-availability.ts";
 import { normalizeProjectPath, type ProjectPathNormalizer } from "./project-path.ts";
 import { ephemeralProjectId, type ProjectStore, type StoredProject } from "./project-store.ts";
@@ -39,6 +40,7 @@ export type ProjectsRouteOptions = {
    * сессий, а «пропадёт 0 сессий» вью говорит честно (docs/sessions-and-projects.md).
    */
   sessionCount?: (folderKey: string) => number;
+  projectLifecycle?: ProjectLifecycle;
 };
 
 export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
@@ -46,6 +48,9 @@ export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
   const availabilityOf = options.availability ?? ((project) => probeProjectFolder(project.folder));
   const normalizePath = options.normalizePath ?? ((raw) => normalizeProjectPath(raw));
   const sessionCount = options.sessionCount ?? (() => 0);
+  const projectLifecycle: ProjectLifecycle = options.projectLifecycle ?? {
+    run: async (_projectId, operation) => operation(),
+  };
 
   const describe = (project: StoredProject): Project => ({
     id: project.id,
@@ -192,70 +197,72 @@ export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
     {
       method: "DELETE",
       path: projectPathPattern,
-      handle: ({ response, parameters }) => {
+      handle: async ({ response, parameters }) => {
         const id = parameters["id"] ?? "";
         if (refuseUnreadableFile(response)) {
           return;
         }
 
-        const existing = projects.find(id);
+        await projectLifecycle.run(id, () => {
+          const existing = projects.find(id);
 
-        if (existing === undefined) {
-          respondWithError(response, 404, "not found");
+          if (existing === undefined) {
+            respondWithError(response, 404, "not found");
 
-          return;
-        }
+            return;
+          }
 
-        if (existing.id === ephemeralProjectId) {
-          respondWithError(
-            response,
-            409,
-            "the ephemeral project cannot be renamed, archived or removed",
-          );
+          if (existing.id === ephemeralProjectId) {
+            respondWithError(
+              response,
+              409,
+              "the ephemeral project cannot be renamed, archived or removed",
+            );
 
-          return;
-        }
+            return;
+          }
 
-        const count = sessionCount(existing.folderKey);
+          const count = sessionCount(existing.folderKey);
 
-        if (count > 0) {
-          respondWithError(
-            response,
-            409,
-            `the project still has ${count} session${count === 1 ? "" : "s"}; remove sessions first`,
-          );
+          if (count > 0) {
+            respondWithError(
+              response,
+              409,
+              `the project still has ${count} session${count === 1 ? "" : "s"}; remove sessions first`,
+            );
 
-          return;
-        }
+            return;
+          }
 
-        const removed = projects.remove(id);
+          const removed = projects.remove(id);
 
-        if (removed.kind === "unknown") {
-          respondWithError(response, 404, "not found");
+          if (removed.kind === "unknown") {
+            respondWithError(response, 404, "not found");
 
-          return;
-        }
+            return;
+          }
 
-        if (removed.kind === "ephemeral") {
-          respondWithError(
-            response,
-            409,
-            "the ephemeral project cannot be renamed, archived or removed",
-          );
+          if (removed.kind === "ephemeral") {
+            respondWithError(
+              response,
+              409,
+              "the ephemeral project cannot be renamed, archived or removed",
+            );
 
-          return;
-        }
+            return;
+          }
 
-        if (removed.kind === "refused") {
-          respondWithError(response, 409, removed.reason);
+          if (removed.kind === "refused") {
+            respondWithError(response, 409, removed.reason);
 
-          return;
-        }
+            return;
+          }
 
-        // Папку пользователя платформа не удаляет никогда (docs/sessions-and-projects.md): уходит
-        // запись, а не работа.
-        logger.info("a project record was removed", { project: id });
-        respondWithJson(response, 200, { id });
+          // Папку пользователя платформа не удаляет никогда (docs/sessions-and-projects.md): уходит
+          // запись, а не работа.
+          logger.info("a project record was removed", { project: id });
+          respondWithJson(response, 200, { id });
+        });
       },
     },
   ];
