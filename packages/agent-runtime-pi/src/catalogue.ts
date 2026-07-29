@@ -28,6 +28,12 @@ export type ProviderCatalogue = {
   /** Модели одного провайдера. `undefined` — такого провайдера нет. */
   models: (providerId: string) => ModelSummary[] | undefined;
   /**
+   * Статус авторизации одного провайдера. `undefined` — такого провайдера нет. Есть отдельно от
+   * снимка, потому что снимок спрашивает статус у всех сорока: спрашивающему про одного это лишние
+   * тридцать девять обращений к хранилищу.
+   */
+  status: (providerId: string) => Promise<ProviderAuthState | undefined>;
+  /**
    * Перечитать динамические списки моделей. Обновление по одному провайдеру рантайм не умеет:
    * `refresh()` обходит все настроенные динамические провайдеры разом, сам обновляя перед этим
    * OAuth-токены. Разбирать его оркестрацию ради фильтра значило бы переписать её у себя.
@@ -104,6 +110,17 @@ export function createProviderCatalogue(
       const provider = models.getProvider(providerId);
 
       return provider === undefined ? undefined : describeModels(provider);
+    },
+    status: async (providerId) => {
+      if (models.getProvider(providerId) === undefined) {
+        return undefined;
+      }
+
+      // Негодный файл кредов делает статус «сказать нечем» ровно так же, как в снимке: два ответа
+      // на один вопрос о состоянии — это два разных состояния для того, кто их сравнивает.
+      return options.credentials.problem() === undefined
+        ? authStateOf(models, providerId)
+        : { kind: "unknown" };
     },
     refresh: async () => {
       const result = await models.refresh();

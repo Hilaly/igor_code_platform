@@ -1,0 +1,11 @@
+{
+  "name": "provider-reader",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "provider-reader",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

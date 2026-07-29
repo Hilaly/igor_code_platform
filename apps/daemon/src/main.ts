@@ -15,6 +15,7 @@ import { createLoginSessionStore } from "./login-sessions.ts";
 import { createLogger } from "./logger.ts";
 import { createModelCatalogStore } from "./model-catalog-store.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
+import { createPluginProviders } from "./plugin-providers.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
 import { defaultPluginRoots, discoverPlugins, projectPluginRoots } from "./plugin-sources.ts";
 import { createPluginWatcher } from "./plugin-watcher.ts";
@@ -122,12 +123,18 @@ const pluginRoots = (): PluginRoot[] => [
 
 const contributions = createContributionRegistry();
 
+// Мост провайдеров: единственная пара «запрос-ответ» в канале плагина
+// (docs/models-and-providers.md). Каталог тот же, что у веб-API, — иначе плагин и человек видели бы
+// разные коллекции провайдеров.
+const pluginProviders = createPluginProviders({ catalogue: providers, bus, logger });
+
 const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
   bus,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
+  onRequest: pluginProviders.request,
 });
 
 const pluginWatcher = createPluginWatcher({

@@ -3,6 +3,12 @@ import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { setTimeout as wait } from "node:timers/promises";
 
+import { createProviderCatalogue } from "@sovereign/agent-runtime-pi";
+import {
+  emptyEnvironment,
+  inMemoryVault,
+  scriptedProvider,
+} from "@sovereign/agent-runtime-pi/testing";
 import {
   defaultPreferences,
   isPluginBusEvent,
@@ -14,6 +20,7 @@ import {
 } from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
+import { createPluginProviders } from "./plugin-providers.ts";
 import { createEventBus, type EventBus } from "./event-bus.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import {
@@ -179,6 +186,20 @@ function manualClock() {
       };
     },
   };
+}
+
+/**
+ * Настоящий каталог с двойником провайдера: мост обязан проверяться на том, что отдаёт рантайм, а
+ * не на фальшивом ответе. Входа в настоящих провайдеров тест не ведёт — креды и окружение пусты.
+ */
+function catalogue(credentials: Record<string, unknown> = {}) {
+  const scripted = scriptedProvider({ script: [] });
+
+  return createProviderCatalogue({
+    credentials: inMemoryVault(credentials),
+    environment: emptyEnvironment(),
+    additionalProviders: [scripted.provider],
+  });
 }
 
 let running: PluginSupervisor | undefined;
@@ -354,6 +375,59 @@ describe("createPluginSupervisor", () => {
     );
 
     assert.equal(await deliverOnce("the delivery after the reload"), 1);
+  });
+
+  it("answers the plugin about providers, models and their status", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      onRequest: createPluginProviders({
+        catalogue: catalogue(),
+        bus: recorded.bus,
+        logger: recorded.logger,
+      }).request,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("provider-reader"), enabled("data:provider-reader"));
+
+    const record = await recorded.waitFor(
+      (record) => record.message === "provider-reader looked around",
+      "the plugin reporting what it saw",
+    );
+
+    assert.equal(typeof record["providers"], "number");
+    assert.ok((record["providers"] as number) >= 38);
+    // Провайдер, добавленный в каталог, виден плагину: коллекция у плагина и у человека одна.
+    assert.equal(record["scripted"], true);
+    assert.ok((record["models"] as number) > 0);
+    assert.equal(record["model"], "anthropic");
+    assert.equal(record["status"], "unconfigured");
+    assert.equal(record["nobody"], true);
+    assert.equal(record["secrets"], 0);
+  });
+
+  it("answers a request with a refusal when nothing bridges the catalogue", async () => {
+    const recorded = journal();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+    });
+    running = supervisor;
+
+    // Молчание оставило бы плагин на `await` навсегда, и выглядело бы это как зависший activate.
+    await supervisor.apply(only("provider-reader"), enabled("data:provider-reader"));
+    await recorded.waitFor(
+      (record) =>
+        reachedState("data:provider-reader", "failed")(record) &&
+        /answers nothing about providers/.test(String(record["reason"])),
+      "the plugin failing with the reason",
+    );
   });
 
   it("says nothing about contributions when the effective set did not change", async () => {

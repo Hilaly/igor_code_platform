@@ -22,6 +22,22 @@ export type {
   PluginLogLevel,
 } from "./host.ts";
 
+/** Провайдеры LLM: операции над ними и типы, которыми платформа о них рассказывает. */
+export { providers } from "./providers.ts";
+
+export type {
+  ModelCost,
+  ModelSummary,
+  ProviderAuthState,
+  ProviderAuthType,
+  ProviderLoginMethod,
+  ProviderRequest,
+  ProviderResponse,
+  ProviderSummary,
+  RefreshOutcome,
+  RefreshReport,
+} from "./providers.ts";
+
 /**
  * Язык схем платформы (docs/event-bus.md). Реэкспорт, а не «поставьте zod сами»: два экземпляра zod в одном
  * процессе дают два несовместимых типа схемы, и схема плагина перестала бы подходить платформе.

@@ -14,6 +14,7 @@ import {
   type PluginIdentity,
   type PluginLogLevel,
 } from "./host.ts";
+import type { ProviderRequest, ProviderResponse } from "./providers.ts";
 
 export type RecordedLog = {
   level: PluginLogLevel;
@@ -34,6 +35,16 @@ export type PluginTestHost = {
   published: RecordedEvent[];
   /** Имена, на которые плагин подписался: их и знает настоящее ядро. */
   subscriptions: string[];
+  /** Что плагин спросил о провайдерах, в порядке вызова. */
+  providerRequests: ProviderRequest[];
+  /**
+   * Чем отвечать на запросы о провайдерах. Пока ответ не поставлен, шов отказывает с объяснением:
+   * притворяться платформой без провайдеров он не станет — тест, забывший про ответ, обязан упасть
+   * с внятной причиной, а не получить пустой список.
+   */
+  answerProviders: (
+    answer: (request: ProviderRequest) => ProviderResponse | Promise<ProviderResponse>,
+  ) => void;
   /** Доставить событие подписчику — то, что в живой платформе делает ядро. */
   deliver: (type: string, payload: unknown, origin?: EventOrigin) => Promise<void>;
   /** Снимает шов и подписки. Без этого следующий тест увидит чужой хост. */
@@ -49,6 +60,16 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const contributions: PluginContribution[] = [];
   const published: RecordedEvent[] = [];
   const subscriptions: string[] = [];
+  const providerRequests: ProviderRequest[] = [];
+
+  let answerProviderRequest: (
+    request: ProviderRequest,
+  ) => ProviderResponse | Promise<ProviderResponse> = (request) => ({
+    kind: "failed",
+    reason:
+      `the test host was not told what to answer to a ${request.kind} request about providers; ` +
+      "install an answer with answerProviders()",
+  });
 
   installPluginHost({
     identity: resolved,
@@ -71,6 +92,11 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
         subscriptions.splice(index, 1);
       }
     },
+    providers: async (request) => {
+      providerRequests.push(request);
+
+      return answerProviderRequest(request);
+    },
   });
 
   return {
@@ -79,6 +105,10 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     contributions,
     published,
     subscriptions,
+    providerRequests,
+    answerProviders: (answer) => {
+      answerProviderRequest = answer;
+    },
     deliver: deliverEvent,
     restore: () => {
       clearEventHandlers();

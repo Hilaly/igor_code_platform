@@ -111,6 +111,31 @@ describe("the provider catalogue", () => {
     assert.deepEqual(anthropic?.auth, { kind: "configured", type: "oauth", source: "OAuth" });
   });
 
+  it("answers the status of one provider the same way the snapshot does", async () => {
+    const credentials = inMemoryVault({ anthropic: { type: "api_key", key: "s3cret" } });
+    const one = catalogue({ credentials });
+    const snapshot = await one.snapshot();
+
+    assert.deepEqual(
+      await one.status("anthropic"),
+      snapshot.providers.find((provider) => provider.id === "anthropic")?.auth,
+    );
+    assert.deepEqual(await one.status("openai"), { kind: "unconfigured" });
+    assert.equal(await one.status("выдуманный"), undefined);
+  });
+
+  it("says nothing about the status of one provider when the credentials file is unreadable", async () => {
+    const broken: CredentialVault = {
+      ...inMemoryVault(),
+      problem: () => "credentials.json is not valid json",
+    };
+
+    // Разные ответы на один вопрос о состоянии — это два разных состояния для того, кто их сверяет.
+    assert.deepEqual(await catalogue({ credentials: broken }).status("anthropic"), {
+      kind: "unknown",
+    });
+  });
+
   it("hands out the models of one provider and nothing for a provider it does not know", () => {
     const models = catalogue().models("anthropic");
 

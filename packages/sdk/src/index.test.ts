@@ -3,8 +3,19 @@ import { afterEach, describe, it } from "node:test";
 
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
-import { contribute, defineEvent, events, identity, log, z } from "./index.ts";
+import { contribute, defineEvent, events, identity, log, providers, z } from "./index.ts";
+import type { ProviderSummary } from "./index.ts";
 import { installTestHost } from "./testing.ts";
+
+const anthropic: ProviderSummary = {
+  id: "anthropic",
+  name: "Anthropic",
+  logins: [{ type: "api_key", label: "Anthropic API key" }],
+  auth: { kind: "configured", type: "api_key", source: "stored credential" },
+  dynamic: false,
+  custom: false,
+  modelCount: 12,
+};
 
 afterEach(() => {
   clearEventHandlers();
@@ -33,9 +44,89 @@ describe("the sdk without a host", () => {
       () => events.subscribe("tracker.task.created", () => {}),
       /sdk is not initialised/,
     );
+    await assert.rejects(() => providers.list(), /sdk is not initialised/);
     assert.throws(() => identity(), /sdk is not initialised/);
   });
 });
+
+describe("the provider surface", () => {
+  it("asks the platform for the list and hands it over as it came", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders(() => ({ kind: "list", providers: [anthropic] }));
+
+    assert.deepEqual(await providers.list(), [anthropic]);
+    assert.deepEqual(host.providerRequests, [{ kind: "list" }]);
+  });
+
+  it("tells a provider with no models apart from a provider nobody registered", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders((request) =>
+      request.kind === "models" && request.providerId === "anthropic"
+        ? { kind: "models", models: [] }
+        : { kind: "models" },
+    );
+
+    assert.deepEqual(await providers.models("anthropic"), []);
+    assert.equal(await providers.models("выдуманный"), undefined);
+  });
+
+  it("asks for the status of one provider and for a refresh of every dynamic one", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders((request) =>
+      request.kind === "status"
+        ? { kind: "status", status: { kind: "unconfigured" } }
+        : { kind: "refresh", report: { refreshed: [], aborted: false } },
+    );
+
+    assert.deepEqual(await providers.status("anthropic"), { kind: "unconfigured" });
+    assert.deepEqual(await providers.refresh(), { refreshed: [], aborted: false });
+    assert.deepEqual(host.providerRequests, [
+      { kind: "status", providerId: "anthropic" },
+      { kind: "refresh" },
+    ]);
+  });
+
+  it("throws the reason the platform gave instead of answering with nothing", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders(() => ({ kind: "failed", reason: "the catalogue is not there" }));
+
+    await assert.rejects(() => providers.list(), /the catalogue is not there/);
+  });
+
+  it("refuses to read an answer of the wrong kind rather than pretend it is empty", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders(() => ({ kind: "models", models: [] }));
+
+    await assert.rejects(() => providers.list(), /answered models to a list request/);
+  });
+
+  it("has no way to read or write the value of a credential", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerProviders(() => ({ kind: "list", providers: [anthropic] }));
+
+    // Ни метода:
+    // @ts-expect-error — читать значение креда SDK не умеет и не будет (docs/models-and-providers.md).
+    assert.equal(providers.credential, undefined);
+    // @ts-expect-error — и записывать тоже.
+    assert.equal(providers.setCredential, undefined);
+    assert.deepEqual(
+      Object.keys(providers).sort(),
+      ["list", "models", "refresh", "status"],
+      "поверхность провайдеров изменилась — проверь, не появилось ли в ней значение креда",
+    );
+
+    // Ни поля: провайдер рассказывает о себе статусом, а не кредом.
+    const [summary] = await providers.list();
+
+    assert.deepEqual(Object.keys(summary ?? {}).filter(mentionsSecret), []);
+    assert.deepEqual(Object.keys(summary?.auth ?? {}).filter(mentionsSecret), []);
+  });
+});
+
+/** Имена, за которыми могло бы приехать значение креда. Ни одного из них в поверхности нет. */
+function mentionsSecret(key: string): boolean {
+  return ["credential", "key", "apiKey", "token", "access", "refresh", "secret"].includes(key);
+}
 
 describe("the testing seam", () => {
   it("records log calls with their level and fields", async () => {

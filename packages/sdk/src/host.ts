@@ -9,6 +9,8 @@
  * проверка 15). У воркера свой `globalThis`, поэтому чужой плагин к чужому хосту не дотянется.
  */
 
+import type { ProviderRequest, ProviderResponse } from "./providers.ts";
+
 const hostSymbol = Symbol.for("sovereign.plugin.host");
 
 /**
@@ -68,6 +70,12 @@ export type PluginHost = {
    */
   subscribeEvent: (type: string) => Promise<void>;
   unsubscribeEvent: (type: string) => Promise<void>;
+  /**
+   * Единственный метод хоста, у которого есть ответ. Односторонность канала — правило, а не
+   * недоделка, и исключение сделано только для провайдеров: список, статус и вход бессмысленны без
+   * ответа, а общего RPC у платформы нет (docs/plugins.md, docs/models-and-providers.md).
+   */
+  providers: (request: ProviderRequest) => Promise<ProviderResponse>;
 };
 
 export function installPluginHost(host: PluginHost): void {

@@ -10,7 +10,7 @@
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 
-import type { PluginContribution } from "@sovereign/sdk";
+import type { PluginContribution, ProviderRequest, ProviderResponse } from "@sovereign/sdk";
 import {
   coreEventTypes,
   type LogSource,
@@ -19,7 +19,7 @@ import {
   type Preferences,
 } from "@sovereign/protocol";
 
-import type { ContributionRegistry } from "./contribution-registry.ts";
+import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { Logger } from "./logger.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
@@ -59,6 +59,13 @@ export type CreatePluginSupervisorOptions = {
     plugin: DiscoveredPlugin,
     onInstallStart: () => void,
   ) => Promise<DependencyOutcome>;
+  /**
+   * Ответить на запрос плагина о провайдерах (`plugin-providers.ts`). Необязателен: супервизор
+   * поднимает плагины и без каталога — тесты жизненного цикла о провайдерах не знают вовсе.
+   *
+   * Супервизор здесь **только маршрутизирует**: он не знает ни о каталоге, ни о попытках входа.
+   */
+  onRequest?: (plugin: ContributingPlugin, request: ProviderRequest) => Promise<ProviderResponse>;
 };
 
 const defaultRetryDelays = [1_000, 5_000, 15_000, 30_000, 60_000];
@@ -261,7 +268,15 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     }, delay);
   };
 
-  const handle = (entry: Supervised, message: PluginOutgoing): void => {
+  /**
+   * Ответить нечем, пока мост не подключён: молчание оставило бы плагин висеть на `await` навсегда.
+   */
+  const answerRequest =
+    options.onRequest ??
+    (async () =>
+      ({ kind: "failed", reason: "this daemon answers nothing about providers" }) as const);
+
+  const handle = (entry: Supervised, worker: Worker, message: PluginOutgoing): void => {
     switch (message.kind) {
       case "log":
         entry.logger[message.level](message.message, message.fields);
@@ -283,6 +298,29 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         events.unsubscribe(entry.plugin.key, message.type);
 
         return;
+      case "request": {
+        const requestId = message.requestId;
+
+        void answerRequest(entry.plugin, message.request)
+          .catch(
+            (cause: unknown) =>
+              ({
+                kind: "failed",
+                reason: cause instanceof Error ? cause.message : String(cause),
+              }) as const,
+          )
+          .then((response) => {
+            // Воркер мог умереть, пока мост отвечал: отвечать в чужой воркер, поднятый на его
+            // месте, нельзя — `requestId` уникален только внутри одного воркера.
+            if (entry.worker === worker) {
+              const answer: PluginIncoming = { kind: "response", requestId, response };
+
+              worker.postMessage(answer);
+            }
+          });
+
+        return;
+      }
       case "activated":
         entry.contributed = entry.pending;
         applyContributions(entry);
@@ -371,7 +409,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.worker = worker;
     entry.pending = [];
 
-    worker.on("message", (message: PluginOutgoing) => handle(entry, message));
+    worker.on("message", (message: PluginOutgoing) => handle(entry, worker, message));
     worker.on("error", (cause: Error) => fail(entry, cause.stack ?? cause.message));
     worker.on("exit", (code) => {
       if (entry.worker === worker) {
