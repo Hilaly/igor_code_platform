@@ -100,8 +100,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   /** Открытые сессии: harness поднят, подписка на дельты стоит. */
   const live = new Map<string, AgentSession>();
+  /** Один подъём harness на сессию: параллельные первые обращения ждут один и тот же результат. */
+  const opening = new Map<string, Promise<AgentSession | undefined>>();
 
   let summaries: AgentSessionSummary[] = [];
+  let closing = false;
 
   const announce = (): void => {
     options.bus.publish(coreEventTypes.sessionsChanged, {});
@@ -165,37 +168,59 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   /** Открыть сессию, если она ещё не открыта. `undefined` — такой сессии нет или агент исчез. */
   const openSession = async (sessionId: string): Promise<AgentSession | undefined> => {
+    if (closing) {
+      return undefined;
+    }
+
     const known = live.get(sessionId);
 
     if (known !== undefined) {
       return known;
     }
 
-    const summary = summaries.find((candidate) => candidate.id === sessionId);
+    const pending = opening.get(sessionId);
 
-    if (summary === undefined) {
-      return undefined;
+    if (pending !== undefined) {
+      return pending;
     }
 
-    const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
+    const open = (async () => {
+      const summary = summaries.find((candidate) => candidate.id === sessionId);
 
-    if (agent === undefined) {
-      return undefined;
+      if (summary === undefined) {
+        return undefined;
+      }
+
+      const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
+
+      if (agent === undefined) {
+        return undefined;
+      }
+
+      const session = await options.store.open(sessionId, {
+        id: agent.id,
+        instructions: agent.instructions,
+      });
+
+      if (session === undefined) {
+        return undefined;
+      }
+
+      watch(session);
+      live.set(sessionId, session);
+
+      return session;
+    })();
+
+    opening.set(sessionId, open);
+
+    try {
+      return await open;
+    } finally {
+      if (opening.get(sessionId) === open) {
+        opening.delete(sessionId);
+      }
     }
-
-    const session = await options.store.open(sessionId, {
-      id: agent.id,
-      instructions: agent.instructions,
-    });
-
-    if (session === undefined) {
-      return undefined;
-    }
-
-    watch(session);
-    live.set(sessionId, session);
-
-    return session;
   };
 
   /**
@@ -218,7 +243,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
    * Место в очереди у турна, который сейчас числится за сессией. Живёт от постановки до возврата в
    * простой: по нему прерывается ещё не начатый турн, и из него берётся идентификатор для дельт.
    */
-  const places = new Map<string, { turnId: string; cancel: () => boolean }>();
+  const places = new Map<string, { turnId: string; cancel: () => boolean; validating: boolean }>();
 
   /** Набор инструментов пересобирается перед каждым турном: сессия доигрывает с тем, что осталось. */
   const applyTools = async (
@@ -349,7 +374,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is busy" };
     }
 
-    places.set(sessionId, place);
+    const tracked = { turnId: place.turnId, cancel: place.cancel, validating: true };
+
+    places.set(sessionId, tracked);
 
     try {
       if (request.model !== undefined) {
@@ -405,6 +432,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the turn was cancelled" };
     }
 
+    tracked.validating = false;
+
     // Ожидание в очереди — наблюдаемое состояние, и узнать о нём надо не только из ответа: за
     // сессией смотрят и другие вкладки (docs/architecture.md).
     if (started.state === "queued") {
@@ -433,7 +462,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     const place = places.get(sessionId);
     const dropped = place?.cancel() ?? false;
 
-    if (dropped) {
+    if (dropped && place?.validating !== true) {
       places.delete(sessionId);
     }
 
@@ -458,10 +487,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       summaries.filter((summary) => summary.folderKey === folderKey).length,
     refresh,
     close: async () => {
+      closing = true;
+      await Promise.allSettled(opening.values());
+
       for (const session of live.values()) {
         await session.close();
       }
 
+      opening.clear();
       live.clear();
     },
     routes: () => [

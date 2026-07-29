@@ -83,6 +83,8 @@ async function serve(
     contributions?: ContributionRegistration[];
     limit?: number;
     modelChangeGate?: ReturnType<typeof gate>;
+    openGate?: ReturnType<typeof gate>;
+    coldSession?: boolean;
   } = {},
 ) {
   const directory = ensureDataDirectory(mkdtempSync(join(workspace, "case-")));
@@ -98,6 +100,26 @@ async function serve(
     directory: join(directory, "sessions"),
     turns: options.turns ?? [{ text: "готово" }],
   });
+  const coldSession =
+    options.coldSession === true
+      ? await sessionStore.create({
+          projectId,
+          agentId: baseAgent.id,
+          folder,
+          folderKey: folder,
+          model,
+          thinkingLevel: "off",
+          agent: { id: baseAgent.id, instructions: baseAgent.instructions },
+        })
+      : undefined;
+  const coldSessionId =
+    coldSession === undefined || "kind" in coldSession ? undefined : coldSession.summary().id;
+
+  if (coldSession !== undefined && !("kind" in coldSession)) {
+    await coldSession.close();
+  }
+
+  let openCalls = 0;
   const delayModelChange = (session: AgentSession): AgentSession => ({
     ...session,
     setModel: async (reference) => {
@@ -108,7 +130,7 @@ async function serve(
     },
   });
   const store: AgentSessionStore =
-    options.modelChangeGate === undefined
+    options.modelChangeGate === undefined && options.openGate === undefined
       ? sessionStore
       : {
           ...sessionStore,
@@ -118,9 +140,14 @@ async function serve(
             return "kind" in createdSession ? createdSession : delayModelChange(createdSession);
           },
           open: async (id, agent) => {
+            openCalls += 1;
+            options.openGate?.entered();
+            await options.openGate?.wait;
             const openedSession = await sessionStore.open(id, agent);
 
-            return openedSession === undefined ? undefined : delayModelChange(openedSession);
+            return openedSession === undefined || options.modelChangeGate === undefined
+              ? openedSession
+              : delayModelChange(openedSession);
           },
         };
   const bus = createEventBus({
@@ -197,6 +224,8 @@ async function serve(
     folder,
     projectId,
     model,
+    coldSessionId,
+    openCalls: () => openCalls,
     directory,
     start: async (body?: Record<string, unknown>) =>
       call("POST", sessionsPath, { projectId, agentId: baseAgent.id, model, ...body }),
@@ -387,6 +416,39 @@ describe("running a turn over http", () => {
     await untilIdle(call, sessionId);
   });
 
+  it("opens a cold session once for concurrent turns", async () => {
+    const openGate = gate();
+    const { call, coldSessionId, openCalls } = await serve({
+      turns: [{ text: "первый" }],
+      coldSession: true,
+      openGate,
+    });
+
+    assert.ok(coldSessionId);
+
+    const first = call("POST", sessionTurnsPath(coldSessionId), {
+      text: "первый",
+      thinkingLevel: "high",
+    });
+    const second = call("POST", sessionTurnsPath(coldSessionId), {
+      text: "второй",
+      thinkingLevel: "low",
+    });
+
+    await openGate.entry;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(openCalls(), 1);
+    openGate.open();
+
+    assert.deepEqual(
+      (await Promise.all([first, second])).map((answer) => answer.status),
+      [200, 409],
+    );
+    assert.equal(openCalls(), 1);
+    assert.equal((await call("GET", sessionPath(coldSessionId))).body["thinkingLevel"], "high");
+    await untilIdle(call, coldSessionId);
+  });
+
   it("refuses an unavailable model promptly while the global queue is saturated", async () => {
     const { call, start } = await serve({ limit: 0 });
     const sessionId = String((await start()).body["id"]);
@@ -402,7 +464,7 @@ describe("running a turn over http", () => {
 
   it("keeps a cancelled validation admitted until it has deterministically refused", async () => {
     const modelChangeGate = gate();
-    const { call, start, model } = await serve({
+    const { call, start, model, deltas } = await serve({
       turns: [{ text: "после отмены" }],
       modelChangeGate,
     });
@@ -429,6 +491,19 @@ describe("running a turn over http", () => {
     modelChangeGate.open();
     assert.equal((await pendingValidation).status, 409);
     assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "idle");
+    const entriesAfterCancellation = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.ok(
+      entriesAfterCancellation.entries.every(
+        (entry) => entry.kind !== "message" && entry.kind !== "tools-change",
+      ),
+      "cancelled validation must not persist or run a turn",
+    );
+    assert.ok(
+      deltas.filter((frame) => frame.sessionId === sessionId).every((frame) => frame.turnId !== ""),
+      "validation deltas must retain their reserved turn id until cancellation unwinds",
+    );
 
     assert.equal(
       (await call("POST", sessionTurnsPath(sessionId), { text: "после отмены" })).status,
