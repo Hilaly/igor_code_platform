@@ -3,13 +3,21 @@
  * собраны они из типов Pi: демону они недоступны (docs/architecture.md).
  */
 
-import { createProvider } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream, createProvider } from "@earendil-works/pi-ai";
 import type {
+  Api,
   ApiKeyCredential,
+  AssistantMessage,
+  AssistantMessageEventStream,
   AuthEvent,
   AuthInteraction,
   AuthPrompt,
+  Context,
+  Model,
   Provider,
+  TextContent,
+  ToolCall,
+  Usage,
 } from "@earendil-works/pi-ai";
 
 import type { CredentialVault } from "./credentials.ts";
@@ -134,4 +142,170 @@ export function scriptedProvider(options: ScriptedProviderOptions = {}): Scripte
   });
 
   return { provider, answers };
+}
+
+/** Вызов инструмента, который двойник модели просит сделать. */
+export type ScriptedToolCall = { id: string; name: string; arguments: Record<string, unknown> };
+
+/** Один ответ модели: текст, вызовы инструментов или и то, и другое. */
+export type ScriptedTurn = { text?: string; toolCalls?: ScriptedToolCall[] };
+
+export type ScriptedModelProviderOptions = {
+  id?: string;
+  modelId?: string;
+  /**
+   * Ответы по порядку обращений. Обращение сверх сценария — ошибка теста, а не пустой ответ:
+   * молчаливый лишний поход к модели значил бы, что цикл агента не останавливается.
+   */
+  turns: ScriptedTurn[];
+};
+
+export type ScriptedModelProvider = {
+  provider: Provider;
+  model: Model<Api>;
+  /** Контексты обращений в порядке запросов: по ним видно, что именно уехало модели. */
+  requests: Context[];
+};
+
+/**
+ * Провайдер, отвечающий на запросы к модели заранее написанным сценарием. Без него турн агента
+ * нечем проверить: настоящая модель требует ключа, сети и денег, а её ответ недетерминирован.
+ *
+ * Отдельно от `scriptedProvider`: тот изображает вход и нарочно отказывается стримить, и тесты
+ * входа держатся именно на этом отказе.
+ */
+export function scriptedModelProvider(
+  options: ScriptedModelProviderOptions,
+): ScriptedModelProvider {
+  const providerId = options.id ?? "scripted-model";
+  const modelId = options.modelId ?? "scripted-model-1";
+  const requests: Context[] = [];
+
+  const model: Model<Api> = {
+    id: modelId,
+    name: "Scripted model",
+    api: "openai-completions",
+    provider: providerId,
+    baseUrl: "https://scripted.invalid",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128_000,
+    maxTokens: 4096,
+  };
+
+  const stream = (streamed: Model<Api>, context: Context): AssistantMessageEventStream => {
+    const events = createAssistantMessageEventStream();
+
+    requests.push(context);
+    playTurn(events, streamed, options.turns[requests.length - 1]);
+
+    return events;
+  };
+
+  const provider = createProvider({
+    id: providerId,
+    name: "Scripted model provider",
+    models: [model],
+    api: { stream, streamSimple: stream },
+    auth: {
+      apiKey: {
+        name: "Scripted model key",
+        // Ключ у двойника всегда есть: вход — тема другого двойника, а здесь он был бы шумом.
+        resolve: () => Promise.resolve({ auth: { apiKey: "scripted" }, source: "scripted" }),
+      },
+    },
+  });
+
+  return { provider, model, requests };
+}
+
+function playTurn(
+  events: AssistantMessageEventStream,
+  model: Model<Api>,
+  turn: ScriptedTurn | undefined,
+): void {
+  const message: AssistantMessage = {
+    role: "assistant",
+    content: [],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: emptyUsage(),
+    stopReason: "stop",
+    timestamp: Date.now(),
+  };
+
+  if (turn === undefined) {
+    events.push({
+      type: "error",
+      reason: "error",
+      error: { ...message, stopReason: "error", errorMessage: "сценарий двойника кончился" },
+    });
+
+    return;
+  }
+
+  events.push({ type: "start", partial: { ...message } });
+
+  let contentIndex = 0;
+
+  if (turn.text !== undefined) {
+    const block: TextContent = { type: "text", text: "" };
+
+    message.content.push(block);
+    events.push({ type: "text_start", contentIndex, partial: { ...message } });
+
+    // Текст едет кусками, а не целиком: дельты — то самое, ради чего двойник и заведён.
+    for (const piece of splitIntoDeltas(turn.text)) {
+      block.text += piece;
+      events.push({ type: "text_delta", contentIndex, delta: piece, partial: { ...message } });
+    }
+
+    events.push({ type: "text_end", contentIndex, content: block.text, partial: { ...message } });
+    contentIndex += 1;
+  }
+
+  for (const call of turn.toolCalls ?? []) {
+    const toolCall: ToolCall = {
+      type: "toolCall",
+      id: call.id,
+      name: call.name,
+      arguments: call.arguments,
+    };
+
+    message.content.push(toolCall);
+    events.push({ type: "toolcall_start", contentIndex, partial: { ...message } });
+    events.push({ type: "toolcall_end", contentIndex, toolCall, partial: { ...message } });
+    contentIndex += 1;
+  }
+
+  message.stopReason = (turn.toolCalls?.length ?? 0) > 0 ? "toolUse" : "stop";
+  events.push({
+    type: "done",
+    reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+    message,
+  });
+}
+
+function splitIntoDeltas(text: string): string[] {
+  const size = 8;
+  const pieces: string[] = [];
+
+  for (let start = 0; start < text.length; start += size) {
+    pieces.push(text.slice(start, start + size));
+  }
+
+  return pieces.length === 0 ? [""] : pieces;
+}
+
+function emptyUsage(): Usage {
+  return {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
 }
