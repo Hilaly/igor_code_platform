@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, beforeEach, describe, it } from "node:test";
@@ -198,6 +206,33 @@ describe("the credential store", () => {
 
     // Провалившийся вход не стирает то, что уже лежало: перелогиниться человек ещё может.
     assert.deepEqual(await credentials.read("anthropic"), apiKey("first"));
+  });
+
+  it("keeps memory and disk on the last committed credential when persistence fails", async () => {
+    const { store: credentials, directory } = store();
+    const path = join(directory, credentialsFileName);
+    const backup = `${path}.backup`;
+
+    await credentials.modify("anthropic", async () => apiKey("first"));
+    renameSync(path, backup);
+    mkdirSync(path);
+
+    try {
+      await assert.rejects(
+        credentials.modify("anthropic", async () => apiKey("second")),
+        /EISDIR|directory|invalid argument/i,
+      );
+      assert.deepEqual(await credentials.read("anthropic"), apiKey("first"));
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+      renameSync(backup, path);
+    }
+
+    const reopened = createCredentialStore({
+      directory,
+      logger: createLogger({ source: "core", level: () => "debug", write: () => {} }),
+    });
+    assert.deepEqual(await reopened.read("anthropic"), apiKey("first"));
   });
 
   it("refuses every write over a file it could not read, and keeps the file", async () => {

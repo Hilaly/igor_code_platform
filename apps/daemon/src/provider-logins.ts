@@ -139,6 +139,10 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
   };
 
   const finish = (attemptId: string, attempt: Attempt, step: LoginStep): void => {
+    if (attempts.get(attemptId) !== attempt) {
+      return;
+    }
+
     clearStepTimer(attempt);
     attempt.cancelAttemptTimer();
     attempts.delete(attemptId);
@@ -146,9 +150,22 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
   };
 
   const giveUp = (attemptId: string, attempt: Attempt, reason: string): void => {
+    clearStepTimer(attempt);
     attempt.waiting?.reject(new Error(reason));
     attempt.waiting = undefined;
+    attempt.state.pending = undefined;
     attempt.controller.abort();
+  };
+
+  const timeout = (attemptId: string, attempt: Attempt): void => {
+    giveUp(attemptId, attempt, "the login took too long");
+    options.logger.info("a provider login ended without a credential", {
+      providerId: attempt.state.providerId,
+      attemptId,
+      origin: attempt.state.origin,
+      conclusion: "cancelled",
+    });
+    finish(attemptId, attempt, { kind: "conclusion", conclusion: { kind: "cancelled" } });
   };
 
   return {
@@ -185,7 +202,7 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
           const live = attempts.get(attemptId);
 
           if (live !== undefined) {
-            giveUp(attemptId, live, "the login took too long");
+            timeout(attemptId, live);
           }
         }, attemptTimeoutMs),
         steps: 0,
@@ -238,6 +255,10 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
         })
         .then(
           () => {
+            if (attempts.get(attemptId) !== attempt) {
+              return;
+            }
+
             options.logger.info("a provider login succeeded", {
               providerId: input.providerId,
               attemptId,
@@ -246,6 +267,10 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
             finish(attemptId, attempt, { kind: "conclusion", conclusion: { kind: "succeeded" } });
           },
           (cause: unknown) => {
+            if (attempts.get(attemptId) !== attempt) {
+              return;
+            }
+
             const reason = cause instanceof Error ? cause.message : String(cause);
             // Отмена и отказ провайдера — разные вещи для человека: первое сделал он сам, второе
             // надо читать. Различаются они по тому, гасили ли попытку.

@@ -329,9 +329,10 @@ describe("how an attempt ends", () => {
   });
 
   it("gives up on an attempt that never ends", async () => {
-    const { registry, driver } = logins({ attemptTimeoutMs: 5000 });
+    const { registry, driver, steps } = logins({ attemptTimeoutMs: 5000 });
 
     started(registry.start({ ...session, owner: "the-session" }));
+    const firstSignal = driver.latest().signal;
 
     const attemptTimer = timers.find((timer) => timer.delayMs === 5000);
 
@@ -340,6 +341,12 @@ describe("how an attempt ends", () => {
     await settled();
 
     // Диалог, который вечно сообщает прогресс, тоже держит слот провайдера.
-    assert.equal(driver.latest().signal?.aborted, true);
+    assert.equal(firstSignal?.aborted, true);
+    assert.deepEqual(registry.list(), []);
+    assert.deepEqual(steps.at(-1)?.step, {
+      kind: "conclusion",
+      conclusion: { kind: "cancelled" },
+    });
+    assert.equal(registry.start({ ...session, owner: "another-session" }).kind, "started");
   });
 });

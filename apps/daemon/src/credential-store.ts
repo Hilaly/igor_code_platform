@@ -68,10 +68,10 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
     return next;
   };
 
-  const persist = (): void => {
+  const persist = (snapshot: Map<string, unknown> = credentials): void => {
     writeFileAtomically(
       path,
-      `${JSON.stringify({ credentials: Object.fromEntries(credentials) }, undefined, 2)}\n`,
+      `${JSON.stringify({ credentials: Object.fromEntries(snapshot) }, undefined, 2)}\n`,
     );
   };
 
@@ -94,8 +94,10 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
           return credentials.get(providerId);
         }
 
+        const snapshot = new Map(credentials);
+        snapshot.set(providerId, written);
+        persist(snapshot);
         credentials.set(providerId, written);
-        persist();
         options.logger.info("a provider credential was written", { providerId });
 
         return written;
@@ -104,8 +106,11 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
       enqueue(providerId, async () => {
         refuseWhenUnreadable();
 
-        if (credentials.delete(providerId)) {
-          persist();
+        if (credentials.has(providerId)) {
+          const snapshot = new Map(credentials);
+          snapshot.delete(providerId);
+          persist(snapshot);
+          credentials.delete(providerId);
           options.logger.info("a provider credential was removed", { providerId });
         }
       }),
