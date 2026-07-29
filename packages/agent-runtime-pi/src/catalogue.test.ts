@@ -139,12 +139,12 @@ describe("the provider catalogue", () => {
   });
 
   it("hands out the models of one provider and nothing for a provider it does not know", () => {
-    const models = catalogue().models("anthropic");
+    const models = catalogue().modelsOf("anthropic");
 
     assert.ok(models);
     assert.ok(models.length > 0);
     assert.ok(models.every((model) => model.providerId === "anthropic"));
-    assert.equal(catalogue().models("выдуманный"), undefined);
+    assert.equal(catalogue().modelsOf("выдуманный"), undefined);
   });
 });
 
@@ -173,7 +173,7 @@ describe("a custom provider", () => {
     // Встроенные так и остаются не кастомными: метка про принадлежность, а не про способ сборки.
     assert.equal(snapshot.providers.filter((provider) => provider.custom).length, 1);
 
-    assert.deepEqual(one.models(vendor.id), [
+    assert.deepEqual(one.modelsOf(vendor.id), [
       {
         id: "vendor-large",
         name: "Vendor Large",
@@ -209,7 +209,7 @@ describe("a custom provider", () => {
     one.setCustomProvider(vendor);
 
     assert.equal(one.deleteCustomProvider(vendor.id), true);
-    assert.equal(one.models(vendor.id), undefined);
+    assert.equal(one.modelsOf(vendor.id), undefined);
 
     // Встроенного этим не удалить: удаление по чужому идентификатору обеднило бы каталог навсегда.
     assert.equal(one.deleteCustomProvider("anthropic"), false);

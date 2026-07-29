@@ -26,10 +26,16 @@ import { toRuntimeInteraction, type LoginDialogue } from "./interaction.ts";
 import { toRuntimeModelsStore, type ModelCatalogVault } from "./model-catalogs.ts";
 
 export type ProviderCatalogue = {
+  /**
+   * Коллекция моделей рантайма. Отдаётся наружу ради сессий агента: harness просит именно её, и
+   * второй экземпляр означал бы вторые креды, второй кэш списков и второй набор кастомных
+   * провайдеров. Тип из Pi, поэтому за пределами пакета этим значением можно только владеть.
+   */
+  models: MutableModels;
   /** Провайдеры со статусом авторизации. Моделей в снимке нет: их больше тысячи. */
   snapshot: () => Promise<ProvidersSnapshot>;
   /** Модели одного провайдера. `undefined` — такого провайдера нет. */
-  models: (providerId: string) => ModelSummary[] | undefined;
+  modelsOf: (providerId: string) => ModelSummary[] | undefined;
   /**
    * Статус авторизации одного провайдера. `undefined` — такого провайдера нет. Есть отдельно от
    * снимка, потому что снимок спрашивает статус у всех сорока: спрашивающему про одного это лишние
@@ -104,6 +110,7 @@ export function createProviderCatalogue(
   const custom = new Set<string>();
 
   return {
+    models,
     snapshot: async () => {
       const problem = options.credentials.problem();
       // Порядок у Pi — порядок регистрации провайдеров; вью показывает список человеку, и
@@ -125,7 +132,7 @@ export function createProviderCatalogue(
 
       return { providers: described, ...(problem === undefined ? {} : { problem }) };
     },
-    models: (providerId) => {
+    modelsOf: (providerId) => {
       const provider = models.getProvider(providerId);
 
       return provider === undefined ? undefined : describeModels(provider);

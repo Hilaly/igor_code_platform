@@ -106,7 +106,7 @@ export function providersRoutes(options: ProvidersRouteOptions): Route[] {
       path: providerModelsPathPattern,
       handle: ({ response, parameters }) => {
         const providerId = parameters["providerId"] ?? "";
-        const models = catalogue.models(providerId);
+        const models = catalogue.modelsOf(providerId);
 
         if (models === undefined) {
           respondWithError(response, 404, "not found");

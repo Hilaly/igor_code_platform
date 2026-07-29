@@ -1,0 +1,585 @@
+/**
+ * Сессия агента поверх harness Pi (docs/sessions-and-projects.md).
+ *
+ * Наружу отсюда уезжают только типы протокола: записи дерева, дельты и состояния — наши, а не Pi
+ * (docs/architecture.md). Инструменты — исключение: они уезжают в демон непрозрачной ручкой, потому
+ * что собирает набор ядро (`tools_collect`), а понимать его содержимое ему незачем.
+ *
+ * Хранилище — JSONL-реализация самого Pi, направленная в директорию данных. Своей не пишем: формат
+ * тот же, форк и компакция следующих срезов достаются даром, а дозапись в конец не нуждается в
+ * атомарной перезаписи файла, ради которой существует `writeFileAtomically` в демоне.
+ */
+
+import {
+  AgentHarness,
+  AgentHarnessError,
+  createBashTool,
+  createEditTool,
+  createReadTool,
+  createWriteTool,
+  JsonlSessionRepo,
+  type AgentHarnessEvent,
+  type AgentHarnessTool,
+  type ExecutionToolContext,
+  type JsonlSessionMetadata,
+  type SessionTreeEntry,
+} from "@earendil-works/pi-agent-core";
+import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import type { MutableModels } from "@earendil-works/pi-ai";
+import {
+  isThinkingLevel,
+  modelReference,
+  parseModelReference,
+  type SessionContentBlock,
+  type SessionDelta,
+  type SessionEntry,
+  type SessionPhase,
+  type ThinkingLevel,
+} from "@sovereign/protocol";
+
+/** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
+export type AgentTool = {
+  name: string;
+  tool: unknown;
+};
+
+/** Что известно о сессии, не открывая её. Читается из заголовка файла. */
+export type AgentSessionSummary = {
+  id: string;
+  projectId: string;
+  agentId: string;
+  folder: string;
+  /** Ключ сравнения папок, тот же, что у проектов: принадлежность выражена папкой, а не ключом. */
+  folderKey: string;
+  model: string;
+  thinkingLevel: ThinkingLevel;
+  createdAt: string;
+};
+
+/** Всё, что сессии нужно знать про агента. Собирает это ядро из реестра вкладов. */
+export type AgentDefinition = {
+  id: string;
+  instructions: string;
+};
+
+export type AgentSession = {
+  summary: () => AgentSessionSummary;
+  /** Состояние по версии рантайма. `queued` отсюда не приходит: очередь — забота ядра. */
+  phase: () => SessionPhase;
+  /** Отказ `busy` приезжает исходом, а не исключением: занятость — обычное состояние, а не сбой. */
+  prompt: (text: string, turnId: string) => Promise<TurnOutcome>;
+  /** `false` — прерывать было нечего. */
+  abort: () => Promise<boolean>;
+  setModel: (reference: string) => Promise<ModelOutcome>;
+  setThinkingLevel: (level: ThinkingLevel) => Promise<void>;
+  setTools: (tools: AgentTool[], activeToolNames: string[]) => Promise<void>;
+  /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
+  entries: (after?: number) => Promise<{ entries: SessionEntry[]; seen: number }>;
+  subscribe: (listener: (delta: SessionDelta) => void) => () => void;
+  /** Освободить среду исполнения. Зовётся, когда сессию выгружают из памяти. */
+  close: () => Promise<void>;
+};
+
+export type TurnOutcome = { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
+
+export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
+
+export type CreateAgentSessionInput = {
+  projectId: string;
+  agentId: string;
+  folder: string;
+  folderKey: string;
+  model: string;
+  thinkingLevel: ThinkingLevel;
+  agent: AgentDefinition;
+};
+
+export type AgentSessionStore = {
+  create: (input: CreateAgentSessionInput) => Promise<AgentSession | { kind: "unknown-model" }>;
+  /** `undefined` — такой сессии нет. Открытая сессия поднимает harness и живёт в памяти. */
+  open: (id: string, agent: AgentDefinition) => Promise<AgentSession | undefined>;
+  list: () => Promise<AgentSessionSummary[]>;
+  /** Файлы, которые прочитать не вышло. Одна битая сессия не отменяет остальные. */
+  problems: () => string[];
+};
+
+export type CreateAgentSessionStoreOptions = {
+  /**
+   * Коллекция моделей рантайма — та же, которой пользуется каталог провайдеров. Тип из Pi, поэтому
+   * за пределами пакета этим значением можно только владеть, но не пользоваться.
+   */
+  models: MutableModels;
+  /** Корень записей сессий внутри директории данных (docs/data-directory.md). */
+  directory: string;
+};
+
+/**
+ * Четыре инструмента поставки: они приходят из рантайма, а не из плагинов
+ * (docs/agent-runtime-contract.md).
+ *
+ * Папки среди аргументов нет намеренно: папку задаёт среда исполнения сессии, одним значением на
+ * весь турн, а не флагом у каждого инструмента.
+ */
+export function createCoreTools(): AgentTool[] {
+  return [
+    { name: "bash", tool: createBashTool() },
+    { name: "read", tool: createReadTool() },
+    { name: "write", tool: createWriteTool() },
+    { name: "edit", tool: createEditTool() },
+  ];
+}
+
+export function createAgentSessionStore(
+  options: CreateAgentSessionStoreOptions,
+): AgentSessionStore {
+  const storage = new NodeExecutionEnv({ cwd: options.directory });
+  const repo = new JsonlSessionRepo({ fs: storage, sessionsRoot: options.directory });
+  const problems: string[] = [];
+
+  const listMetadata = async (): Promise<JsonlSessionMetadata[]> => {
+    try {
+      return await repo.list();
+    } catch (cause) {
+      // Нечитаемый корень — не отказ поверхности: сессий просто не видно, и об этом надо сказать.
+      problems.push(`the sessions could not be listed: ${describe(cause)}`);
+
+      return [];
+    }
+  };
+
+  return {
+    create: async (input) => {
+      const model = resolveModel(options.models, input.model);
+
+      if (model === undefined) {
+        return { kind: "unknown-model" };
+      }
+
+      const session = await repo.create({
+        cwd: input.folder,
+        metadata: {
+          projectId: input.projectId,
+          agentId: input.agentId,
+          folderKey: input.folderKey,
+        },
+      });
+
+      // Модель и уровень ризонинга пишутся записями дерева, а не в заголовок: заголовок не
+      // переписывается никогда, а меняются они на живой сессии.
+      await session.appendModelChange(model.provider, model.id);
+      await session.appendThinkingLevelChange(input.thinkingLevel);
+
+      return liveSession(session, options.models, input.agent, await summaryOf(session));
+    },
+    open: async (id, agent) => {
+      const metadata = (await listMetadata()).find((candidate) => candidate.id === id);
+
+      if (metadata === undefined) {
+        return undefined;
+      }
+
+      const session = await repo.open(metadata);
+
+      return liveSession(session, options.models, agent, await summaryOf(session));
+    },
+    list: async () => {
+      const summaries = await Promise.all(
+        (await listMetadata()).map(async (metadata) => {
+          try {
+            return await summaryOfMetadata(repo, metadata);
+          } catch (cause) {
+            problems.push(`the session ${metadata.id} could not be read: ${describe(cause)}`);
+
+            return undefined;
+          }
+        }),
+      );
+
+      return summaries.filter((summary): summary is AgentSessionSummary => summary !== undefined);
+    },
+    problems: () => [...problems],
+  };
+}
+
+type PiSession = Awaited<ReturnType<JsonlSessionRepo["create"]>>;
+
+async function summaryOfMetadata(
+  repo: JsonlSessionRepo,
+  metadata: JsonlSessionMetadata,
+): Promise<AgentSessionSummary> {
+  return summaryOf(await repo.open(metadata));
+}
+
+/**
+ * Текущие модель и уровень ризонинга выводятся из записей дерева, а не хранятся в заголовке: их
+ * меняют на живой сессии, а заголовок дописанного файла не переписывается.
+ */
+async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
+  const metadata = await session.getMetadata();
+  const fields = (metadata.metadata ?? {}) as Record<string, unknown>;
+  const entries = await session.getEntries();
+
+  let model = "";
+  let thinkingLevel: ThinkingLevel = "off";
+
+  for (const entry of entries) {
+    if (entry.type === "model_change") {
+      model = modelReference(entry.provider, entry.modelId);
+    }
+
+    if (entry.type === "thinking_level_change" && isThinkingLevel(entry.thinkingLevel)) {
+      thinkingLevel = entry.thinkingLevel;
+    }
+  }
+
+  return {
+    id: metadata.id,
+    projectId: asText(fields["projectId"]),
+    agentId: asText(fields["agentId"]),
+    folder: metadata.cwd,
+    folderKey: asText(fields["folderKey"]),
+    model,
+    thinkingLevel,
+    createdAt: metadata.createdAt,
+  };
+}
+
+function liveSession(
+  session: PiSession,
+  models: MutableModels,
+  agent: AgentDefinition,
+  summary: AgentSessionSummary,
+): AgentSession {
+  const model = resolveModel(models, summary.model);
+
+  if (model === undefined) {
+    // Сессию открыли, а модели в каталоге больше нет: плагин с кастомным провайдером выключили.
+    // Это отказ турна с названной причиной, а не отказ открытия — сессия жива (docs/sessions-and-projects.md).
+    throw new Error(`the session ${summary.id} names the model ${summary.model}, which is gone`);
+  }
+
+  const environment = new NodeExecutionEnv({ cwd: summary.folder });
+  const harness = new AgentHarness<ExecutionToolContext>({
+    session,
+    models,
+    model,
+    thinkingLevel: summary.thinkingLevel,
+    tools: [],
+    toolContext: { env: environment },
+    systemPrompt: agent.instructions,
+  });
+
+  const listeners = new Set<(delta: SessionDelta) => void>();
+  const publish = (delta: SessionDelta): void => {
+    for (const listener of [...listeners]) {
+      listener(delta);
+    }
+  };
+
+  let phase: SessionPhase = "idle";
+  let current: { turnId: string; aborted: boolean; messages: number } | undefined;
+
+  const setPhase = (next: SessionPhase): void => {
+    if (phase === next) {
+      return;
+    }
+
+    phase = next;
+    publish({ kind: "phase", phase: next });
+  };
+
+  harness.subscribe((event) => {
+    translate(event, current, publish);
+  });
+
+  return {
+    summary: () => ({ ...summary }),
+    phase: () => phase,
+    prompt: async (text, turnId) => {
+      if (phase !== "idle") {
+        return { kind: "busy" };
+      }
+
+      current = { turnId, aborted: false, messages: 0 };
+      setPhase("turn");
+
+      try {
+        const answer = await harness.prompt(text);
+
+        if (answer.stopReason === "error") {
+          publish({ kind: "turn-failed", reason: answer.errorMessage ?? "the turn failed" });
+
+          return { kind: "failed", reason: answer.errorMessage ?? "the turn failed" };
+        }
+
+        publish(current.aborted ? { kind: "turn-aborted" } : { kind: "turn-end" });
+
+        return { kind: "done" };
+      } catch (cause) {
+        if (cause instanceof AgentHarnessError && cause.code === "busy") {
+          return { kind: "busy" };
+        }
+
+        publish({ kind: "turn-failed", reason: describe(cause) });
+
+        return { kind: "failed", reason: describe(cause) };
+      } finally {
+        current = undefined;
+        setPhase("idle");
+      }
+    },
+    abort: async () => {
+      if (current === undefined) {
+        return false;
+      }
+
+      current.aborted = true;
+      await harness.abort();
+
+      return true;
+    },
+    setModel: async (reference) => {
+      const next = resolveModel(models, reference);
+
+      if (next === undefined) {
+        return { kind: "unknown-model" };
+      }
+
+      await harness.setModel(next);
+      summary.model = reference;
+
+      return { kind: "applied" };
+    },
+    setThinkingLevel: async (level) => {
+      await harness.setThinkingLevel(level);
+      summary.thinkingLevel = level;
+    },
+    setTools: async (tools, activeToolNames) => {
+      await harness.setTools(
+        tools.map((entry) => entry.tool as AgentHarnessTool<ExecutionToolContext>),
+        activeToolNames,
+      );
+    },
+    entries: async (after = 0) => {
+      const found = await session.getEntries({ afterEntrySeq: after });
+
+      return { entries: found.flatMap(describeEntry), seen: after + found.length };
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+
+      return () => listeners.delete(listener);
+    },
+    close: async () => {
+      await environment.cleanup();
+    },
+  };
+}
+
+/**
+ * Перевод событий цикла агента в дельты. Событий у Pi больше, чем дельт: сюда попадает только то,
+ * что видно человеку в ленте (docs/agent-runtime-contract.md).
+ */
+function translate(
+  event: AgentHarnessEvent,
+  current: { turnId: string; messages: number } | undefined,
+  publish: (delta: SessionDelta) => void,
+): void {
+  if (current === undefined) {
+    return;
+  }
+
+  if (event.type === "message_start") {
+    const role = event.message.role;
+
+    if (role !== "user" && role !== "assistant") {
+      return;
+    }
+
+    current.messages += 1;
+
+    const messageId = `${current.turnId}:${String(current.messages)}`;
+
+    publish({ kind: "message-start", messageId, role: role === "user" ? "user" : "agent" });
+
+    // Сообщение человека не стримится: оно приезжает целиком. Дельта у него одна, чтобы вью не
+    // заводило второй путь отрисовки на ту же ленту.
+    if (role === "user") {
+      publish({
+        kind: "message-delta",
+        messageId,
+        channel: "text",
+        text: textOf(event.message.content),
+      });
+    }
+
+    return;
+  }
+
+  if (event.type === "message_update") {
+    const delta = event.assistantMessageEvent;
+    const messageId = `${current.turnId}:${String(current.messages)}`;
+
+    if (delta.type === "text_delta") {
+      publish({ kind: "message-delta", messageId, channel: "text", text: delta.delta });
+    }
+
+    if (delta.type === "thinking_delta") {
+      publish({ kind: "message-delta", messageId, channel: "reasoning", text: delta.delta });
+    }
+
+    return;
+  }
+
+  if (event.type === "message_end") {
+    const role = event.message.role;
+
+    if (role === "user" || role === "assistant") {
+      publish({ kind: "message-end", messageId: `${current.turnId}:${String(current.messages)}` });
+    }
+
+    return;
+  }
+
+  if (event.type === "tool_execution_start") {
+    publish({
+      kind: "tool-start",
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      input: event.args,
+    });
+
+    return;
+  }
+
+  if (event.type === "tool_execution_end") {
+    publish({ kind: "tool-end", toolCallId: event.toolCallId, failed: event.isError });
+  }
+}
+
+/**
+ * Перевод записи дерева. Незнакомая запись приезжает как `other` со своим типом рантайма: молчаливая
+ * потеря записи сделала бы ленту неполной без всякого следа.
+ */
+function describeEntry(entry: SessionTreeEntry): SessionEntry[] {
+  const common = {
+    id: entry.id,
+    ...(entry.parentId === null ? {} : { parentId: entry.parentId }),
+    time: entry.timestamp,
+  };
+
+  if (entry.type === "model_change") {
+    return [
+      { ...common, kind: "model-change", model: modelReference(entry.provider, entry.modelId) },
+    ];
+  }
+
+  if (entry.type === "thinking_level_change") {
+    return isThinkingLevel(entry.thinkingLevel)
+      ? [{ ...common, kind: "thinking-level-change", thinkingLevel: entry.thinkingLevel }]
+      : [{ ...common, kind: "other", type: entry.type }];
+  }
+
+  if (entry.type === "active_tools_change") {
+    return [{ ...common, kind: "tools-change", toolNames: [...entry.activeToolNames] }];
+  }
+
+  if (entry.type !== "message") {
+    return [{ ...common, kind: "other", type: entry.type }];
+  }
+
+  const message = entry.message;
+
+  if (message.role === "user") {
+    return [
+      {
+        ...common,
+        kind: "message",
+        role: "user",
+        content: [{ kind: "text", text: textOf(message.content) }],
+      },
+    ];
+  }
+
+  if (message.role === "assistant") {
+    return [{ ...common, kind: "message", role: "agent", content: blocksOf(message.content) }];
+  }
+
+  if (message.role === "toolResult") {
+    return [
+      {
+        ...common,
+        kind: "tool-result",
+        toolCallId: message.toolCallId,
+        toolName: message.toolName,
+        text: textOf(message.content),
+        failed: message.isError,
+      },
+    ];
+  }
+
+  // Сообщение вида, которого этот срез не переводит: исполнение bash, суммаризация, своё сообщение
+  // плагина. Роль уезжает как тип — по ней видно, чего именно недостаёт.
+  return [{ ...common, kind: "other", type: message.role }];
+}
+
+function blocksOf(content: readonly unknown[]): SessionContentBlock[] {
+  const blocks: SessionContentBlock[] = [];
+
+  for (const piece of content) {
+    const part = piece as { type?: string; text?: string; thinking?: string };
+
+    if (part.type === "text" && typeof part.text === "string") {
+      blocks.push({ kind: "text", text: part.text });
+    }
+
+    if (part.type === "thinking") {
+      blocks.push({ kind: "reasoning", text: String(part.thinking ?? "") });
+    }
+
+    if (part.type === "toolCall") {
+      const call = piece as { id: string; name: string; arguments: unknown };
+
+      blocks.push({
+        kind: "tool-call",
+        toolCallId: call.id,
+        toolName: call.name,
+        input: call.arguments,
+      });
+    }
+  }
+
+  return blocks;
+}
+
+function textOf(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((piece) => {
+      const part = piece as { type?: string; text?: string };
+
+      return part.type === "text" ? (part.text ?? "") : "";
+    })
+    .join("");
+}
+
+function resolveModel(models: MutableModels, reference: string) {
+  const parsed = parseModelReference(reference);
+
+  return parsed === undefined ? undefined : models.getModel(parsed.providerId, parsed.modelId);
+}
+
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function describe(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}

@@ -3,6 +3,7 @@
  * `@earendil-works/*` (docs/architecture.md); наружу отдаются только типы `@sovereign/protocol`.
  */
 
+export * from "./agent-session.ts";
 export * from "./catalogue.ts";
 export * from "./credentials.ts";
 export * from "./custom-provider.ts";

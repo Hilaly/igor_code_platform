@@ -120,8 +120,15 @@ export type TurnInterrupted = {
   interrupted: boolean;
 };
 
+/**
+ * Кусок сообщения. Вызов инструмента — блок внутри сообщения, а не отдельная запись: модель
+ * выдаёт его тем же ответом, что и текст, и разорви мы их — лента потеряла бы порядок, в котором
+ * агент рассуждал и действовал.
+ */
 export type SessionContentBlock =
-  { kind: "text"; text: string } | { kind: "reasoning"; text: string };
+  | { kind: "text"; text: string }
+  | { kind: "reasoning"; text: string }
+  | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown };
 
 /**
  * Запись дерева сессии в терминах контракта. Дерево ведёт рантайм, поэтому запись, которую этот срез
@@ -134,13 +141,36 @@ export type SessionEntry = {
   time: string;
 } & (
   | { kind: "message"; role: "user" | "agent"; content: SessionContentBlock[] }
-  | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown }
   | { kind: "tool-result"; toolCallId: string; toolName: string; text: string; failed: boolean }
   | { kind: "model-change"; model: string }
   | { kind: "thinking-level-change"; thinkingLevel: ThinkingLevel }
   | { kind: "tools-change"; toolNames: string[] }
   | { kind: "other"; type: string }
 );
+
+/**
+ * Ссылка на модель на проводе: `<провайдер>/<модель>`. Идентификатор модели сам вправе содержать
+ * `/` (так устроены каталоги вроде OpenRouter), поэтому режется по **первому** разделителю —
+ * в идентификаторе провайдера `/` не бывает.
+ */
+export function modelReference(providerId: string, modelId: string): string {
+  return `${providerId}/${modelId}`;
+}
+
+export function parseModelReference(
+  reference: string,
+): { providerId: string; modelId: string } | undefined {
+  const boundary = reference.indexOf("/");
+
+  if (boundary <= 0 || boundary === reference.length - 1) {
+    return undefined;
+  }
+
+  return {
+    providerId: reference.slice(0, boundary),
+    modelId: reference.slice(boundary + 1),
+  };
+}
 
 export type SessionEntriesPage = {
   sessionId: string;

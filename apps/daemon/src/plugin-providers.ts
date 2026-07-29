@@ -139,7 +139,7 @@ export type CreatePluginProvidersOptions = {
   catalogue: Pick<
     ProviderCatalogue,
     | "snapshot"
-    | "models"
+    | "modelsOf"
     | "status"
     | "refresh"
     | "logout"
@@ -303,7 +303,7 @@ export function createPluginProviders(options: CreatePluginProvidersOptions): Pl
           return { kind: "list", providers: snapshot.providers.map(providerForPlugin) };
         }
         case "models": {
-          const models = catalogue.models(request.providerId);
+          const models = catalogue.modelsOf(request.providerId);
 
           return {
             kind: "models",
