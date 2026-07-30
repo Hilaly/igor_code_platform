@@ -18,6 +18,7 @@ import {
   createReadTool,
   createWriteTool,
   JsonlSessionRepo,
+  SessionError,
   type AgentHarnessEvent,
   type AgentHarnessTool,
   type ExecutionToolContext,
@@ -33,7 +34,10 @@ import {
   type SessionContentBlock,
   type SessionDelta,
   type SessionEntry,
+  type SessionMessageMode,
   type SessionPhase,
+  type SessionQueues,
+  type SessionStats,
   type ThinkingLevel,
 } from "@sovereign/protocol";
 
@@ -43,7 +47,7 @@ export type AgentTool = {
   tool: unknown;
 };
 
-/** Что известно о сессии, не открывая её. Читается из заголовка файла. */
+/** Что известно о сессии, не поднимая harness. */
 export type AgentSessionSummary = {
   id: string;
   projectId: string;
@@ -53,6 +57,8 @@ export type AgentSessionSummary = {
   folderKey: string;
   model: string;
   thinkingLevel: ThinkingLevel;
+  /** Имя, данное человеком. Безымянная сессия — норма. */
+  name?: string;
   createdAt: string;
 };
 
@@ -75,6 +81,13 @@ export type AgentSession = {
   setModel: (reference: string) => Promise<ModelOutcome>;
   setThinkingLevel: (level: ThinkingLevel) => Promise<void>;
   setTools: (tools: AgentTool[], activeToolNames: string[]) => Promise<void>;
+  /**
+   * Сообщение, которое не запускает турн. Куда оно встанет, решает режим; отказ приезжает исходом,
+   * а не исключением, потому что у режимов разные требования к занятости сессии.
+   */
+  message: (text: string, mode: SessionMessageMode) => Promise<MessageOutcome>;
+  /** Что сейчас ждёт в очередях. Снимок для клиента, который подключился посреди турна. */
+  queues: () => SessionQueues;
   /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
   entries: (after?: number) => Promise<{ entries: SessionEntry[]; seen: number }>;
   subscribe: (listener: (delta: SessionDelta) => void) => () => void;
@@ -92,6 +105,13 @@ export type PersistedAgentSession = {
    * отдаёт тот же harness: второй писал бы в тот же файл от своего представления о листе дерева.
    */
   activate: (agent: AgentDefinition) => AgentSession | { kind: "unknown-model" };
+  /**
+   * Назвать сессию. Живёт на записи, а не на harness: переименовать надо уметь и ту сессию, чью
+   * модель или чей плагин с агентом убрали, — иначе имя нельзя дать ровно там, где оно нужнее.
+   */
+  setName: (name: string) => Promise<void>;
+  /** Счёт токенов и денег по всему файлу, включая брошенные ветки. */
+  stats: () => Promise<AgentSessionStats>;
   /** Остановить поднятый harness, если он был. Сама запись остаётся на диске. */
   close: () => Promise<void>;
 };
@@ -99,6 +119,20 @@ export type PersistedAgentSession = {
 export type TurnOutcome = { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
 
 export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
+
+/**
+ * Исход постановки сообщения в очередь. `idle` и `busy` — не сбой, а несовпадение с требованием
+ * режима: стиринг и догоняющее требуют идущего турна, дозапись — простоя.
+ */
+export type MessageOutcome = { kind: "queued" } | { kind: "idle" } | { kind: "busy" };
+
+export type AgentSessionStats = Omit<SessionStats, "sessionId">;
+
+/** Что вышло из форка. Отказ рантайма приезжает исходом: указать не ту запись — обычная ошибка. */
+export type ForkOutcome =
+  | { kind: "forked"; session: PersistedAgentSession }
+  | { kind: "unknown-session" }
+  | { kind: "refused"; reason: string };
 
 export type CreateAgentSessionInput = {
   projectId: string;
@@ -119,10 +153,27 @@ export type AgentSessionStore = {
    */
   open: (id: string) => Promise<PersistedAgentSession | undefined>;
   list: () => Promise<AgentSessionSummary[]>;
+  /**
+   * Новая сессия из куска старой. Остаётся в том же проекте и в той же папке: `metadata` источника
+   * наследуется целиком, и форк «в другой проект» означал бы подменить её вручную.
+   */
+  fork: (sourceId: string, options?: ForkRequest) => Promise<ForkOutcome>;
+  /** Стереть файл сессии. `false` — стирать было нечего. */
+  remove: (id: string) => Promise<boolean>;
   /** Файлы, которые прочитать не вышло. Одна битая сессия не отменяет остальные. */
   problems: () => string[];
   /** Выгрузить сессию из памяти: harness останавливается, следующий `open` читает файл заново. */
   close: (id: string) => Promise<void>;
+};
+
+/**
+ * Где резать при форке. `before` оставляет всё до записи и работает **только по сообщению
+ * человека**: единственный смысл, в котором отрезать ответ модели вместе с вопросом осмысленно, —
+ * «переспросить иначе». `at` берёт путь до любой записи включительно.
+ */
+export type ForkRequest = {
+  entryId?: string;
+  position?: "before" | "at";
 };
 
 export type CreateAgentSessionStoreOptions = {
@@ -175,6 +226,15 @@ export function createAgentSessionStore(
     }
   };
 
+  const metadataOf = async (id: string): Promise<JsonlSessionMetadata | undefined> => {
+    const scanProblems: string[] = [];
+    const found = (await listMetadata(scanProblems)).find((candidate) => candidate.id === id);
+
+    problems = scanProblems;
+
+    return found;
+  };
+
   const own = (session: PiSession, summary: AgentSessionSummary): PersistedAgentSession => {
     const known = owned.get(summary.id);
 
@@ -220,10 +280,7 @@ export function createAgentSessionStore(
         return known;
       }
 
-      const scanProblems: string[] = [];
-      const metadata = (await listMetadata(scanProblems)).find((candidate) => candidate.id === id);
-
-      problems = scanProblems;
+      const metadata = await metadataOf(id);
 
       if (metadata === undefined) {
         return undefined;
@@ -251,6 +308,44 @@ export function createAgentSessionStore(
 
       return summaries.filter((summary): summary is AgentSessionSummary => summary !== undefined);
     },
+    fork: async (sourceId, request = {}) => {
+      const metadata = await metadataOf(sourceId);
+
+      if (metadata === undefined) {
+        return { kind: "unknown-session" };
+      }
+
+      let forked: PiSession;
+
+      try {
+        forked = await repo.fork(metadata, { cwd: metadata.cwd, ...request });
+      } catch (cause) {
+        // Не та запись — обычная ошибка вызывающего, а не сбой хранилища: она приезжает исходом.
+        // Всё прочее (не пишется файл, не читается дерево) уезжает наверх исключением.
+        if (cause instanceof SessionError && cause.code === "invalid_fork_target") {
+          return { kind: "refused", reason: cause.message };
+        }
+
+        throw cause;
+      }
+
+      return { kind: "forked", session: own(forked, await summaryOf(forked)) };
+    },
+    remove: async (id) => {
+      const metadata = await metadataOf(id);
+
+      if (metadata === undefined) {
+        return false;
+      }
+
+      const known = owned.get(id);
+
+      owned.delete(id);
+      await known?.close();
+      await repo.delete(metadata);
+
+      return true;
+    },
     problems: () => [...problems],
     close: async (id) => {
       const known = owned.get(id);
@@ -275,8 +370,8 @@ async function summaryOfMetadata(
 }
 
 /**
- * Текущие модель и уровень ризонинга выводятся из записей дерева, а не хранятся в заголовке: их
- * меняют на живой сессии, а заголовок дописанного файла не переписывается.
+ * Текущие модель, уровень ризонинга и имя выводятся из записей дерева, а не хранятся в заголовке:
+ * их меняют на живой сессии, а заголовок дописанного файла не переписывается.
  */
 async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
   const metadata = await session.getMetadata();
@@ -296,6 +391,8 @@ async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
     }
   }
 
+  const name = await session.getSessionName();
+
   return {
     id: metadata.id,
     projectId: asText(fields["projectId"]),
@@ -304,6 +401,7 @@ async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
     folderKey: asText(fields["folderKey"]),
     model,
     thinkingLevel,
+    ...(name === undefined ? {} : { name }),
     createdAt: metadata.createdAt,
   };
 }
@@ -351,13 +449,63 @@ function liveSession(
     publish({ kind: "phase", phase: next });
   };
 
+  /**
+   * Очереди рантайм наружу не отдаёт — только сообщает о смене событием, поэтому последнее
+   * состояние приходится помнить: клиент, подключившийся посреди турна, спросит снимок.
+   */
+  let queues: SessionQueues = { steer: [], followUp: [], nextTurn: [] };
+
   harness.subscribe((event) => {
+    if (event.type === "queue_update") {
+      queues = {
+        steer: event.steer.map(queuedText),
+        followUp: event.followUp.map(queuedText),
+        nextTurn: event.nextTurn.map(queuedText),
+      };
+      publish({ kind: "queues", queues });
+
+      return;
+    }
+
     translate(event, current, publish);
   });
 
   return {
     summary: () => ({ ...summary }),
     phase: () => phase,
+    queues: () => ({
+      steer: [...queues.steer],
+      followUp: [...queues.followUp],
+      nextTurn: [...queues.nextTurn],
+    }),
+    message: async (text, mode) => {
+      // Требования к занятости у режимов разные, и проверяются они здесь, а не в рантайме: у
+      // рантайма это исключение `invalid_state`, а у нас — обычный исход, который маршрут переводит
+      // в `409` с внятной причиной.
+      if ((mode === "steer" || mode === "follow-up") && phase === "idle") {
+        return { kind: "idle" };
+      }
+
+      if (mode === "append" && phase !== "idle") {
+        return { kind: "busy" };
+      }
+
+      if (mode === "steer") {
+        await harness.steer(text);
+      } else if (mode === "follow-up") {
+        await harness.followUp(text);
+      } else if (mode === "next-turn") {
+        await harness.nextTurn(text);
+      } else {
+        await harness.appendMessage({
+          role: "user",
+          content: [{ type: "text", text }],
+          timestamp: Date.now(),
+        });
+      }
+
+      return { kind: "queued" };
+    },
     prompt: async (text, turnId) => {
       if (phase !== "idle") {
         return { kind: "busy" };
@@ -466,6 +614,18 @@ function persistedSession(
       }
 
       return started;
+    },
+    setName: async (name) => {
+      await session.appendSessionName(name);
+
+      // Сводка общая с живой сессией по ссылке, поэтому переименование видно и через harness.
+      summary.name = await session.getSessionName();
+    },
+    stats: async () => {
+      const { messageCount, cachedTokens, uncachedTokens, totalTokens, costTotal } =
+        await session.getSessionStats();
+
+      return { messageCount, cachedTokens, uncachedTokens, totalTokens, costTotal };
     },
     close: async () => {
       await live?.close();
@@ -656,6 +816,14 @@ function blocksOf(content: readonly unknown[]): SessionContentBlock[] {
   }
 
   return blocks;
+}
+
+/**
+ * Текст сообщения, ждущего в очереди. В очередях лежат сообщения человека, но тип рантайма шире —
+ * в нём есть и сообщения без содержимого вовсе, и пустая строка для них честнее выдумки.
+ */
+function queuedText(message: object): string {
+  return "content" in message ? textOf(message.content) : "";
 }
 
 function textOf(content: unknown): string {

@@ -163,6 +163,12 @@ export type ScriptedModelProviderOptions = {
    * молчаливый лишний поход к модели значил бы, что цикл агента не останавливается.
    */
   turns: ScriptedTurn[];
+  /**
+   * Что сделать перед тем, как двойник ответит на обращение с этим номером. Единственный способ
+   * вмешаться в турн изнутри: цикл агента к этому моменту точно идёт, а на живой системе так себя
+   * и ведёт человек, дописывающий указание посреди ответа.
+   */
+  beforeAnswer?: (index: number) => void;
 };
 
 export type ScriptedModelProvider = {
@@ -203,6 +209,7 @@ export function scriptedModelProvider(
     const events = createAssistantMessageEventStream();
 
     requests.push(context);
+    options.beforeAnswer?.(requests.length - 1);
     playTurn(events, streamed, options.turns[requests.length - 1]);
 
     return events;
