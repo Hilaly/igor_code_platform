@@ -87,8 +87,13 @@ export type PersistedAgentSession = {
   summary: () => AgentSessionSummary;
   /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
   entries: (after?: number) => Promise<{ entries: SessionEntry[]; seen: number }>;
-  /** Поднять harness с текущими зависимостями. Запись остаётся читаемой при отказе. */
+  /**
+   * Поднять harness с текущими зависимостями. Запись остаётся читаемой при отказе. Повторный вызов
+   * отдаёт тот же harness: второй писал бы в тот же файл от своего представления о листе дерева.
+   */
   activate: (agent: AgentDefinition) => AgentSession | { kind: "unknown-model" };
+  /** Остановить поднятый harness, если он был. Сама запись остаётся на диске. */
+  close: () => Promise<void>;
 };
 
 export type TurnOutcome = { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
@@ -107,11 +112,17 @@ export type CreateAgentSessionInput = {
 
 export type AgentSessionStore = {
   create: (input: CreateAgentSessionInput) => Promise<AgentSession | { kind: "unknown-model" }>;
-  /** `undefined` — такой сессии нет. Открытие читает JSONL, но не поднимает harness. */
+  /**
+   * `undefined` — такой сессии нет. Открытие читает JSONL, но не поднимает harness.
+   *
+   * Повторный вызов отдаёт тот же экземпляр: у файла сессии один владелец на процесс.
+   */
   open: (id: string) => Promise<PersistedAgentSession | undefined>;
   list: () => Promise<AgentSessionSummary[]>;
   /** Файлы, которые прочитать не вышло. Одна битая сессия не отменяет остальные. */
   problems: () => string[];
+  /** Выгрузить сессию из памяти: harness останавливается, следующий `open` читает файл заново. */
+  close: (id: string) => Promise<void>;
 };
 
 export type CreateAgentSessionStoreOptions = {
@@ -145,6 +156,12 @@ export function createAgentSessionStore(
 ): AgentSessionStore {
   const storage = new NodeExecutionEnv({ cwd: options.directory });
   const repo = new JsonlSessionRepo({ fs: storage, sessionsRoot: options.directory });
+  /**
+   * Один владелец на файл сессии. Экземпляр `Session` держит своё дерево записей и свой лист в
+   * памяти, а дозапись идёт от этого листа: два экземпляра на один файл разошлись бы ветками при
+   * первой же записи мимо второго — и разошлись бы молча, испортив цепочку `parentId`.
+   */
+  const owned = new Map<string, PersistedAgentSession>();
   let problems: string[] = [];
 
   const listMetadata = async (scanProblems: string[]): Promise<JsonlSessionMetadata[]> => {
@@ -156,6 +173,20 @@ export function createAgentSessionStore(
 
       return [];
     }
+  };
+
+  const own = (session: PiSession, summary: AgentSessionSummary): PersistedAgentSession => {
+    const known = owned.get(summary.id);
+
+    if (known !== undefined) {
+      return known;
+    }
+
+    const persisted = persistedSession(session, options.models, summary);
+
+    owned.set(summary.id, persisted);
+
+    return persisted;
   };
 
   return {
@@ -180,11 +211,15 @@ export function createAgentSessionStore(
       await session.appendModelChange(model.provider, model.id);
       await session.appendThinkingLevelChange(input.thinkingLevel);
 
-      return persistedSession(session, options.models, await summaryOf(session)).activate(
-        input.agent,
-      );
+      return own(session, await summaryOf(session)).activate(input.agent);
     },
     open: async (id) => {
+      const known = owned.get(id);
+
+      if (known !== undefined) {
+        return known;
+      }
+
       const scanProblems: string[] = [];
       const metadata = (await listMetadata(scanProblems)).find((candidate) => candidate.id === id);
 
@@ -196,7 +231,7 @@ export function createAgentSessionStore(
 
       const session = await repo.open(metadata);
 
-      return persistedSession(session, options.models, await summaryOf(session));
+      return own(session, await summaryOf(session));
     },
     list: async () => {
       const scanProblems: string[] = [];
@@ -217,6 +252,16 @@ export function createAgentSessionStore(
       return summaries.filter((summary): summary is AgentSessionSummary => summary !== undefined);
     },
     problems: () => [...problems],
+    close: async (id) => {
+      const known = owned.get(id);
+
+      if (known === undefined) {
+        return;
+      }
+
+      owned.delete(id);
+      await known.close();
+    },
   };
 }
 
@@ -268,6 +313,7 @@ function liveSession(
   models: MutableModels,
   agent: AgentDefinition,
   summary: AgentSessionSummary,
+  onClosed: () => void,
 ): AgentSession | { kind: "unknown-model" } {
   const model = resolveModel(models, summary.model);
 
@@ -390,6 +436,7 @@ function liveSession(
       return () => listeners.delete(listener);
     },
     close: async () => {
+      onClosed();
       await environment.cleanup();
     },
   };
@@ -400,10 +447,29 @@ function persistedSession(
   models: MutableModels,
   summary: AgentSessionSummary,
 ): PersistedAgentSession {
+  let live: AgentSession | undefined;
+
   return {
     summary: () => ({ ...summary }),
     entries: (after = 0) => entriesOf(session, after),
-    activate: (agent) => liveSession(session, models, agent, summary),
+    activate: (agent) => {
+      if (live !== undefined) {
+        return live;
+      }
+
+      const started = liveSession(session, models, agent, summary, () => {
+        live = undefined;
+      });
+
+      if (!("kind" in started)) {
+        live = started;
+      }
+
+      return started;
+    },
+    close: async () => {
+      await live?.close();
+    },
   };
 }
 

@@ -89,7 +89,7 @@ export type SessionService = {
   /** `false` — прерывать было нечего. */
   abort: (sessionId: string) => Promise<boolean>;
   routes: () => Route[];
-  /** Сколько сессий в папке проекта: считается по заголовкам файлов, без чтения записей. */
+  /** Сколько сессий в папке проекта: считается по снимку списка, без похода на диск. */
   countByFolderKey: (folderKey: string) => number;
   /** Перечитать список с диска. Зовётся при старте и после создания сессии. */
   refresh: () => Promise<void>;
@@ -555,8 +555,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       closing = true;
       await Promise.allSettled(opening.values());
 
-      for (const session of live.values()) {
-        await session.close();
+      for (const sessionId of live.keys()) {
+        // Через стор, а не через саму сессию: владельца файла держит он, и забыть её должен он же.
+        await options.store.close(sessionId);
       }
 
       opening.clear();

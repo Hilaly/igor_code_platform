@@ -213,6 +213,48 @@ describe("an agent session over pi", () => {
     assert.deepEqual(persisted.activate(agent), { kind: "unknown-model" });
   });
 
+  it("keeps one owner per session file", async () => {
+    const { open, store, directory } = await withStore([
+      { text: "первый" },
+      { text: "второй" },
+      { text: "третий" },
+    ]);
+    const session = await open();
+    const sessionId = session.summary().id;
+
+    await session.prompt("первый", "t1");
+
+    // Второе открытие посреди жизни сессии — обычное дело: так демон читает ленту, пока harness
+    // держит ту же сессию. Оно обязано отдать того же владельца, а не второй экземпляр.
+    const persisted = await store.open(sessionId);
+
+    assert.ok(persisted !== undefined);
+    assert.equal(persisted.activate(agent), session);
+
+    // Запись после второго открытия для второго экземпляра прошла бы незамеченной: он остался бы
+    // с устаревшим листом, и его собственная запись встала бы веткой от него.
+    await session.prompt("второй", "t2");
+
+    const second = persisted.activate(agent);
+
+    assert.ok(!("kind" in second));
+    await second.prompt("третий", "t3");
+    await session.close();
+
+    // Правда о дереве — на диске, поэтому читается она свежим стором, а не тем же экземпляром.
+    const reread = await (await freshStore(directory)).open(sessionId);
+
+    assert.ok(reread !== undefined);
+
+    const chain = (await reread.entries()).entries;
+    const identifiers = chain.map((entry) => entry.id);
+
+    assert.deepEqual(
+      chain.map((entry) => entry.parentId),
+      [undefined, ...identifiers.slice(0, -1)],
+    );
+  });
+
   it("refuses to create a session on a model nobody has", async () => {
     const { store, folder } = await withStore([]);
 
