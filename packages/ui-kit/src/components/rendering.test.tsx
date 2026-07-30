@@ -17,6 +17,7 @@ import { Field } from "./field.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
+import { Message, MessageFeed } from "./message-feed.tsx";
 import { Progress } from "./progress.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
@@ -317,5 +318,40 @@ describe("text that is still arriving", () => {
     const markup = renderToStaticMarkup(<StreamingText text={"первая\nвторая"} streaming />);
 
     expect(markup).toContain("первая\nвторая");
+  });
+});
+
+describe("feed of messages", () => {
+  it("is a live log with a name of its own", () => {
+    const markup = renderToStaticMarkup(
+      <MessageFeed label="Переписка" busy>
+        <Message role="human">вопрос</Message>
+      </MessageFeed>,
+    );
+
+    expect(markup).not.toContain("undefined");
+    expect(markup).toContain('role="log"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-label="Переписка"');
+    expect(markup).toContain('aria-busy="true"');
+  });
+
+  it("marks who is speaking with data, not with a class name", () => {
+    // Роль читается стилями и тестами вью; имя класса CSS Modules хешируется и цепляться за него нечем.
+    const markup = renderToStaticMarkup(
+      <MessageFeed label="Переписка">
+        <Message role="human">вопрос</Message>
+        <Message role="agent" header={<span>10:12</span>}>
+          ответ
+        </Message>
+        <Message role="service">модель сменилась</Message>
+      </MessageFeed>,
+    );
+
+    expect(markup).not.toContain("undefined");
+    expect(markup).toContain('data-role="human"');
+    expect(markup).toContain('data-role="agent"');
+    expect(markup).toContain('data-role="service"');
+    expect(markup).toContain("10:12");
   });
 });

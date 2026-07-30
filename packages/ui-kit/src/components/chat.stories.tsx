@@ -8,6 +8,7 @@
  */
 
 import { Markdown } from "./markdown.tsx";
+import { Message, MessageFeed } from "./message-feed.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 
 const column = {
@@ -47,5 +48,22 @@ export const Arriving = () => (
   <div style={column}>
     <StreamingText text={"Смотрю очередь.\nПохоже, фаза берётся из"} streaming label="Ответ" />
     <StreamingText text="Готово: правка легла в sessions.ts." streaming={false} />
+  </div>
+);
+
+export const Feed = () => (
+  <div style={{ ...column, height: "28rem", border: "1px solid var(--sovereign-border)" }}>
+    <MessageFeed label="Переписка" busy>
+      <Message role="human" header="10:11">
+        Почему фаза сессии в очереди — `queued`, а не `turn`?
+      </Message>
+      <Message role="agent" header="10:11">
+        <Markdown text="Очередь отвечает первой: для рантайма такая сессия **ещё простаивает**." />
+      </Message>
+      <Message role="service">Модель сменилась на anthropic/claude-opus-4-5</Message>
+      <Message role="agent" header="10:12">
+        <StreamingText text="Проверяю по коду очереди" streaming />
+      </Message>
+    </MessageFeed>
   </div>
 );

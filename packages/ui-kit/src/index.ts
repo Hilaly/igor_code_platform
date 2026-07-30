@@ -29,6 +29,7 @@ export * from "./components/link.tsx";
 export * from "./components/list.tsx";
 export * from "./components/markdown.tsx";
 export * from "./components/menu.tsx";
+export * from "./components/message-feed.tsx";
 export * from "./components/multi-select.tsx";
 export * from "./components/notice.tsx";
 export * from "./components/panel.tsx";

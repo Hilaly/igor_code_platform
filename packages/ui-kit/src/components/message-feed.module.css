@@ -1,0 +1,74 @@
+/*
+ * Лента переписки. Реплика человека отличается от ответа агента заливкой и выравниванием, служебная
+ * строка — кеглем и цветом; аватаров нет.
+ */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-4);
+  padding: var(--sovereign-space-4);
+  overflow-y: auto;
+  /*
+   * Лента забирает всю высоту, которую ей дали, и прокручивается внутри себя. `min-height: 0`
+   * обязателен: без него flex-элемент не сжимается ниже содержимого, и прокрутка уезжает на страницу.
+   */
+  flex: 1;
+  min-height: 0;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  /* Реплика не тянется на всю ширину: строка длиной в экран не читается. */
+  max-width: 52rem;
+}
+
+.header {
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.body {
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-sm);
+  line-height: var(--sovereign-line-height-normal);
+}
+
+/* Реплика человека — единственное, что в ленте прижато к концу строки: так видно, кто говорит. */
+.message[data-role="human"] {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message[data-role="human"] .body {
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-accent-border);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-accent-surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message[data-role="agent"] {
+  align-self: stretch;
+}
+
+/*
+ * Служебная строка — смена модели или уровня размышлений. Это не реплика, и выглядеть как реплика
+ * она не должна: узкая полоса по центру, второстепенным цветом.
+ */
+.message[data-role="service"] {
+  align-self: center;
+  align-items: center;
+  max-width: 100%;
+}
+
+.message[data-role="service"] .body {
+  padding: var(--sovereign-space-1) var(--sovereign-space-3);
+  border-radius: var(--sovereign-radius-full);
+  background: var(--sovereign-fill-surface);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+}
