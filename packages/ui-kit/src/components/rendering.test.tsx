@@ -18,6 +18,7 @@ import { Input, Textarea } from "./input.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
 import { Progress } from "./progress.tsx";
+import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
@@ -293,5 +294,28 @@ describe("markdown from the agent", () => {
 
     expect(markup).toContain('target="_blank"');
     expect(markup).toContain('rel="noreferrer"');
+  });
+});
+
+describe("text that is still arriving", () => {
+  it("says it is busy and shows a caret only while the answer is coming", () => {
+    const arriving = renderToStaticMarkup(<StreamingText text="прив" streaming label="Ответ" />);
+    expect(arriving).not.toContain("undefined");
+    expect(arriving).toContain('aria-busy="true"');
+    expect(arriving).toContain('aria-label="Ответ"');
+    // Каретка — украшение и озвучиваться не должна: скринридер читает текст, а не курсор.
+    expect(arriving).toContain('aria-hidden="true"');
+
+    const finished = renderToStaticMarkup(<StreamingText text="привет" streaming={false} />);
+    expect(finished).not.toContain("undefined");
+    expect(finished).toContain('aria-busy="false"');
+    expect(finished).not.toContain("aria-hidden");
+  });
+
+  it("keeps the line breaks the model sent", () => {
+    // Разметки здесь нет вовсе, и переводы строк — единственное, чем текст структурирован.
+    const markup = renderToStaticMarkup(<StreamingText text={"первая\nвторая"} streaming />);
+
+    expect(markup).toContain("первая\nвторая");
   });
 });

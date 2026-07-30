@@ -8,6 +8,7 @@
  */
 
 import { Markdown } from "./markdown.tsx";
+import { StreamingText } from "./streaming-text.tsx";
 
 const column = {
   display: "flex",
@@ -39,5 +40,12 @@ const phase = queue.stateOf(id) === "queued" ? "queued" : runtime.phase();
 export const AgentMarkdown = () => (
   <div style={column}>
     <Markdown text={answer} />
+  </div>
+);
+
+export const Arriving = () => (
+  <div style={column}>
+    <StreamingText text={"Смотрю очередь.\nПохоже, фаза берётся из"} streaming label="Ответ" />
+    <StreamingText text="Готово: правка легла в sessions.ts." streaming={false} />
   </div>
 );
