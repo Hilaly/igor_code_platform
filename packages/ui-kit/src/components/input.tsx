@@ -4,7 +4,7 @@
  * поля и у обвязки одновременно, и связь с ошибкой зависела бы от того, кто из них её объявил.
  */
 
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useRef, type CSSProperties } from "react";
 
 import styles from "./input.module.css";
 
@@ -115,18 +115,59 @@ export type TextareaProps = {
   describedBy?: string;
   /** Высота в строках. Растягивать поле дальше вызывающий может сам — вертикальный `resize` разрешён. */
   rows?: number;
+  "aria-label"?: string;
+  /**
+   * Поле тянется под содержимое. Без этого ввод сообщения в чат — это либо одна строка на длинный
+   * запрос, либо пустая простыня на короткий.
+   */
+  autoGrow?: boolean;
+  /** Предел роста в строках. Дальше поле прокручивается внутри себя, а не выдавливает ленту. */
+  maxRows?: number;
+  /**
+   * Отправка с клавиатуры: `Enter` без модификаторов. `Shift+Enter` переводит строку — так устроен
+   * каждый чат, и переучивать здесь нечему. Пустое сообщение не отправляется: демон принял бы его и
+   * потратил обращение к модели.
+   */
+  onSubmit?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 };
 
-export function Textarea({
-  value,
-  onChange,
-  placeholder,
-  invalid = false,
-  disabled = false,
-  id,
-  describedBy,
-  rows,
-}: TextareaProps) {
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  {
+    value,
+    onChange,
+    placeholder,
+    invalid = false,
+    disabled = false,
+    id,
+    describedBy,
+    rows,
+    "aria-label": ariaLabel,
+    autoGrow = false,
+    maxRows,
+    onSubmit,
+    onKeyDown,
+  },
+  ref,
+) {
+  const own = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Высоту знает только браузер: `scrollHeight` измеряется после того, как высота сброшена, иначе
+   * поле умеет расти и никогда не уменьшается. Предел ставит CSS через `--textarea-max-rows` —
+   * считать его в пикселях значило бы повторять здесь межстрочный интервал из стилей.
+   */
+  useEffect(() => {
+    const element = own.current;
+
+    if (element === null || !autoGrow) {
+      return;
+    }
+
+    element.style.height = "auto";
+    element.style.height = `${String(element.scrollHeight)}px`;
+  }, [autoGrow, value]);
+
   return (
     <textarea
       className={`${styles.control} ${styles.textarea}`}
@@ -137,7 +178,42 @@ export function Textarea({
       rows={rows}
       aria-invalid={invalid}
       aria-describedby={describedBy}
+      aria-label={ariaLabel}
+      style={
+        maxRows === undefined
+          ? undefined
+          : ({ "--textarea-max-rows": String(maxRows) } as CSSProperties)
+      }
       onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+
+        // Метод ввода ещё собирает символ: `Enter` подтверждает вариант, а не отправляет сообщение.
+        if (
+          onSubmit === undefined ||
+          event.key !== "Enter" ||
+          event.shiftKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.altKey ||
+          event.nativeEvent.isComposing ||
+          value.trim() === ""
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        onSubmit();
+      }}
+      ref={(element) => {
+        own.current = element;
+
+        if (typeof ref === "function") {
+          ref(element);
+        } else if (ref !== null) {
+          ref.current = element;
+        }
+      }}
     />
   );
-}
+});

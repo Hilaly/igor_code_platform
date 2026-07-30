@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Combobox } from "./combobox.tsx";
+import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
@@ -366,5 +367,72 @@ describe("tool call", () => {
 
     expect(container.querySelectorAll("pre")).toHaveLength(2);
     expect(screen.getByText("Вывод")).not.toBeNull();
+  });
+});
+
+describe("chat composer", () => {
+  it("sends on Enter and breaks the line on Shift+Enter", () => {
+    const onSubmit = vi.fn();
+    render(
+      <Textarea value="привет" onChange={() => {}} onSubmit={onSubmit} aria-label="Сообщение" />,
+    );
+
+    const field = screen.getByRole("textbox", { name: "Сообщение" });
+
+    const send = fireEvent.keyDown(field, { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    // Отменённое событие означает, что перевод строки в поле не попал.
+    expect(send).toBe(false);
+
+    const newline = fireEvent.keyDown(field, { key: "Enter", shiftKey: true });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(newline).toBe(true);
+  });
+
+  it("keeps quiet while the input method is still composing a character", () => {
+    // Enter в середине набора иероглифа подтверждает вариант, а не отправляет сообщение.
+    const onSubmit = vi.fn();
+    render(
+      <Textarea value="привет" onChange={() => {}} onSubmit={onSubmit} aria-label="Сообщение" />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение" }), {
+      key: "Enter",
+      isComposing: true,
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("does not send an empty message", () => {
+    // Пустой турн демон примет и потратит на него обращение к модели; отсекается здесь.
+    const onSubmit = vi.fn();
+    render(<Textarea value="   " onChange={() => {}} onSubmit={onSubmit} aria-label="Сообщение" />);
+
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение" }), { key: "Enter" });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("grows with the text and stops at the row limit", () => {
+    const { rerender } = render(
+      <Textarea value="одна" onChange={() => {}} autoGrow maxRows={8} aria-label="Сообщение" />,
+    );
+
+    const field = screen.getByRole("textbox", { name: "Сообщение" });
+    // Высоту считает браузер по `scrollHeight`; в jsdom раскладки нет, проверяется сам факт замера.
+    expect(field.style.height).not.toBe("");
+    expect(field.style.getPropertyValue("--textarea-max-rows")).toBe("8");
+
+    rerender(
+      <Textarea
+        value={"одна\nдве\nтри"}
+        onChange={() => {}}
+        autoGrow
+        maxRows={8}
+        aria-label="Сообщение"
+      />,
+    );
+    expect(field.style.height).not.toBe("");
   });
 });
