@@ -229,7 +229,7 @@ describe("a turn that was only submitted", () => {
     expect(state.open?.pending).toEqual({ "turn-1": "привет" });
   });
 
-  it("drops it on the first delta of that turn, so the line is not doubled", () => {
+  it("drops it when the turn starts, so the line is not doubled", () => {
     const submitted = applyPendingTurn(opened(), "0199", "turn-1", "привет");
     const started = applySessionDelta(submitted, "0199", "turn-1", {
       kind: "phase",
@@ -237,6 +237,30 @@ describe("a turn that was only submitted", () => {
     }).state;
 
     expect(started.open?.pending).toEqual({});
+  });
+
+  it("keeps it when the daemon only confirms that the turn is still queued", () => {
+    // Постановка в очередь сама даёт `phase: queued`; это ещё не начало турна, и записи реплики
+    // в дереве пока нет. Снять pending здесь — оставить очередь без текста.
+    const submitted = applyPendingTurn(opened(), "0199", "turn-1", "привет");
+    const queued = applySessionDelta(submitted, "0199", "turn-1", {
+      kind: "phase",
+      phase: "queued",
+    }).state;
+
+    expect(queued.open?.pending).toEqual({ "turn-1": "привет" });
+  });
+
+  it("drops it when a fresh snapshot says the queued turn was cancelled", () => {
+    // Снятый с очереди турн не даёт финальной дельты; его единственный исход — снимок `idle`.
+    const submitted = applySummary(
+      applyPendingTurn(opened(), "0199", "turn-1", "привет"),
+      "0199",
+      session({ phase: "queued" }),
+    );
+    const cancelled = applySummary(submitted, "0199", session({ phase: "idle" }));
+
+    expect(cancelled.open?.pending).toEqual({});
   });
 
   it("keeps a turn that is still waiting while another one runs", () => {

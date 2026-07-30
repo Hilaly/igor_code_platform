@@ -128,9 +128,14 @@ export function applySummary(
     return state;
   }
 
+  // Снятый с очереди турн не даёт финальной дельты. Его исход подтверждает только следующий
+  // снимок: как только прежний `queued` сменился другой фазой, локальный текст больше не ждёт.
+  const pending =
+    open.summary?.phase === "queued" && summary?.phase !== "queued" ? {} : open.pending;
+
   return {
     ...state,
-    open: { ...open, summary, ...(summary === undefined ? { loading: false } : {}) },
+    open: { ...open, summary, pending, ...(summary === undefined ? { loading: false } : {}) },
   };
 }
 
@@ -280,8 +285,12 @@ export function applySessionDelta(
     return { state, reread: false };
   }
 
-  // Первая дельта турна снимает его текст из ожидающих: дальше реплику показывают записи и буфер.
-  const pending = removePending(open.pending, turnId);
+  // `phase: queued` подтверждает только ожидание: записи реплики и живого буфера ещё нет. Любая
+  // следующая дельта означает, что турн начался или закончился, и текст уже показывает другой слой.
+  const pending =
+    delta.kind === "phase" && delta.phase === "queued"
+      ? open.pending
+      : removePending(open.pending, turnId);
 
   if (delta.kind === "turn-end" || delta.kind === "turn-aborted" || delta.kind === "turn-failed") {
     return {

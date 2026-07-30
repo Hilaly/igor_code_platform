@@ -206,10 +206,21 @@ describe("useSessions", () => {
   it("leaves no waiting behind when a queued turn is cancelled without a single delta", async () => {
     // Прерванный в очереди турн отзывается только событием шины. Ожидание, повешенное на дельты,
     // зависло бы навсегда — чинит его снимок.
-    sessions = [session({ phase: "queued" })];
+    refusals[`POST ${sessionTurnsPath("0199")}`] = {
+      status: 202,
+      body: { sessionId: "0199", turnId: "turn-7", phase: "queued" },
+    };
     const view = connect({ sessionId: "0199" });
 
-    await waitFor(() => expect(view.result.current.state.open?.summary?.phase).toBe("queued"));
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    act(() => {
+      view.result.current.submitTurn("привет");
+    });
+
+    await waitFor(() =>
+      expect(view.result.current.state.open?.pending).toEqual({ "turn-7": "привет" }),
+    );
 
     sessions = [session({ phase: "idle" })];
     act(() => {
@@ -222,6 +233,7 @@ describe("useSessions", () => {
     });
 
     await waitFor(() => expect(view.result.current.state.open?.summary?.phase).toBe("idle"));
+    expect(view.result.current.state.open?.pending).toEqual({});
   });
 
   it("shows the text of a submitted turn before the queue got to it", async () => {
