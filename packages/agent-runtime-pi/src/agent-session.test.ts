@@ -200,7 +200,9 @@ describe("an agent session over pi", () => {
     assert.match(listed[0]?.model ?? "", /^scripted-model\//);
 
     // Активация поднимает harness заново и видит записанное: сессия переживает перезапуск демона.
-    const persisted = await (await freshStore(directory, archivedDirectory)).open(listed[0]?.id ?? "");
+    const persisted = await (
+      await freshStore(directory, archivedDirectory)
+    ).open(listed[0]?.id ?? "");
 
     assert.ok(persisted !== undefined);
     const reopened = persisted.activate(agent);
@@ -320,7 +322,10 @@ describe("messages that do not start a turn", () => {
     const { open, requests } = await withStore(
       // Первый ответ — вызов инструмента: цикл агента пойдёт на второй круг, и стиринг, положенный
       // в очередь во время первого, обязан доехать до второго обращения.
-      [{ toolCalls: [{ id: "c1", name: "read", arguments: { path: "/dev/null" } }] }, { text: "ок" }],
+      [
+        { toolCalls: [{ id: "c1", name: "read", arguments: { path: "/dev/null" } }] },
+        { text: "ок" },
+      ],
       undefined,
       (index) => {
         if (index === 0) {
@@ -338,10 +343,9 @@ describe("messages that do not start a turn", () => {
     await session.prompt("сделай", "t1");
 
     assert.match(saidToModel(requests, 1), /возьми левее/);
-    assert.deepEqual(
-      deltas.filter((delta) => delta.kind === "queues").at(0)?.queues.steer,
-      ["возьми левее"],
-    );
+    assert.deepEqual(deltas.filter((delta) => delta.kind === "queues").at(0)?.queues.steer, [
+      "возьми левее",
+    ]);
     // Очередь опустела к концу турна: сообщение ушло в разговор, а не осталось висеть.
     assert.deepEqual(session.queues(), { steer: [], followUp: [], nextTurn: [] });
     await session.close();
@@ -611,7 +615,10 @@ async function onlySessionFile(directory: string): Promise<string> {
 }
 
 /** Второй стор на тех же корнях: так проверяется переживание перезапуска демона. */
-async function freshStore(directory: string, archivedDirectory: string): Promise<AgentSessionStore> {
+async function freshStore(
+  directory: string,
+  archivedDirectory: string,
+): Promise<AgentSessionStore> {
   const scripted = scriptedModelProvider({ turns: [] });
   const models = createModels();
 

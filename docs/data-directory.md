@@ -18,7 +18,7 @@
 | `credentials.json`    | платформа | креды LLM-провайдеров ([models-and-providers.md](models-and-providers.md))            |
 | `model-catalogs.json` | платформа | кэш динамических списков моделей ([models-and-providers.md](models-and-providers.md)) |
 | `sessions/`           | платформа | записи сессий агента ([sessions-and-projects.md](sessions-and-projects.md))           |
-| `sessions-archived/`  | платформа | те же записи, убранные с глаз; раскладка внутри та же                                  |
+| `sessions-archived/`  | платформа | те же записи, убранные с глаз; раскладка внутри та же                                 |
 | `plugins/`            | человек   | папка на плагин; сюда кладут внешние плагины ([plugins.md](plugins.md))               |
 | `work/`               | человек   | папка эфемерного проекта; в неё пишет пользователь и агент                            |
 

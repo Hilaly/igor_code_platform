@@ -13,9 +13,13 @@ import {
   agentsPath,
   coreEventTypes,
   projectPath,
+  projectsPath,
   sessionEntriesPath,
+  sessionForkPath,
+  sessionMessagesPath,
   sessionPath,
   sessionsPath,
+  sessionStatsPath,
   sessionTurnsPath,
   type AgentContributionRegistration,
   type AgentsSnapshot,
@@ -23,6 +27,7 @@ import {
   type ContributionRegistration,
   type SessionEntriesPage,
   type SessionsSnapshot,
+  type SessionStats,
 } from "@sovereign/protocol";
 
 import { coreToolSource } from "./core-tools.ts";
@@ -107,6 +112,7 @@ async function serve(
     restoreModel,
   } = scriptedSessionStore({
     directory: join(directory, "sessions"),
+    archivedDirectory: join(directory, "sessions-archived"),
     turns: options.turns ?? [{ text: "готово" }],
   });
   const coldSession =
@@ -857,6 +863,18 @@ describe("project and session lifecycle", () => {
   });
 });
 
+/** Счётчик сессий проекта. Отдельного маршрута на один проект нет — счёт живёт в списке. */
+async function sessionCountOf(
+  call: (method: string, path: string) => Promise<Answer>,
+  projectId: string,
+): Promise<number | undefined> {
+  const body = (await call("GET", projectsPath)).body as unknown as {
+    projects?: { id: string; sessionCount: number }[];
+  };
+
+  return body.projects?.find((project) => project.id === projectId)?.sessionCount;
+}
+
 function projectsStillContain(answer: Answer, projectId: string): boolean {
   const body = answer.body as {
     projects?: { id: string }[];
@@ -889,3 +907,211 @@ function findSessionFile(root: string, sessionId: string): string | undefined {
 
   return undefined;
 }
+
+describe("the session lifecycle over http", () => {
+  it("names a session and shows the name in the list", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    const written = await call("PUT", sessionPath(sessionId), {
+      title: "разбор бага",
+      archived: false,
+    });
+
+    assert.equal(written.status, 200);
+    assert.equal(written.body["title"], "разбор бага");
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      "разбор бага",
+    );
+  });
+
+  it("archives a session out of the list and reads it by its own address", async () => {
+    const { call, start, directory } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: true })).status, 200);
+
+    // Из списка сессия пропала, но по прямому адресу читается — она убрана с глаз, а не потеряна.
+    assert.deepEqual(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions,
+      [],
+    );
+    assert.equal((await call("GET", sessionPath(sessionId))).body["archived"], true);
+    assert.equal((await call("GET", sessionEntriesPath(sessionId))).status, 200);
+    assert.equal(
+      ((await call("GET", `${sessionsPath}?archived=true`)).body as unknown as SessionsSnapshot)
+        .sessions[0]?.id,
+      sessionId,
+    );
+
+    // Файл переехал в соседний корень, а не получил запись внутри себя.
+    assert.equal(findSessionFile(join(directory, "sessions"), sessionId), undefined);
+    assert.ok(findSessionFile(join(directory, "sessions-archived"), sessionId));
+
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: false })).status, 200);
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.id,
+      sessionId,
+    );
+  });
+
+  it("refuses a turn in an archived session", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    await call("PUT", sessionPath(sessionId), { archived: true });
+
+    const started = await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+
+    assert.equal(started.status, 409);
+    assert.match(String(started.body["error"]), /archived/);
+  });
+
+  it("refuses to archive or delete a busy session, and lets it through once it idles", async () => {
+    // Предел в ноль держит турн в очереди сколько угодно: занятость здесь наблюдаемая и без гонки.
+    const { call, start } = await serve({ limit: 0 });
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal((await call("POST", sessionTurnsPath(sessionId), { text: "скажи" })).status, 200);
+    assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "queued");
+
+    // Двигать и стирать файл, в который вот-вот пойдёт дозапись, — гонка, и отказ здесь один и тот
+    // же по обеим операциям.
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: true })).status, 409);
+    assert.equal((await call("DELETE", sessionPath(sessionId))).status, 409);
+
+    // Переименование простоя не требует: это обычная запись в дерево, а не перенос файла.
+    assert.equal(
+      (await call("PUT", sessionPath(sessionId), { title: "имя на ходу", archived: false })).status,
+      200,
+    );
+
+    assert.equal((await call("DELETE", sessionTurnsPath(sessionId))).body["interrupted"], true);
+    await untilIdle(call, sessionId);
+
+    assert.equal((await call("DELETE", sessionPath(sessionId))).status, 200);
+  });
+
+  it("deletes a session and stops counting it for the project", async () => {
+    const { call, start, projectId, directory } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(await sessionCountOf(call, projectId), 1);
+
+    const deleted = await call("DELETE", sessionPath(sessionId));
+
+    assert.equal(deleted.status, 200);
+    assert.equal(deleted.body["id"], sessionId);
+    assert.equal(findSessionFile(join(directory, "sessions"), sessionId), undefined);
+    assert.equal((await call("GET", sessionPath(sessionId))).status, 404);
+    assert.equal(await sessionCountOf(call, projectId), 0);
+    assert.equal((await call("DELETE", sessionPath(sessionId))).status, 404);
+  });
+
+  it("forks a session from an entry into a second one in the same project", async () => {
+    const { call, start, projectId } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal((await call("POST", sessionTurnsPath(sessionId), { text: "скажи" })).status, 200);
+    await untilIdle(call, sessionId);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const question = page.entries.find(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+
+    assert.ok(question);
+
+    const forked = await call("POST", sessionForkPath(sessionId), { entryId: question.id });
+
+    assert.equal(forked.status, 200);
+    assert.equal(forked.body["projectId"], projectId);
+    assert.notEqual(forked.body["id"], sessionId);
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions.length,
+      2,
+    );
+
+    // Форк отрезал вопрос вместе с ответом: у него осталась только преамбула сессии.
+    const forkedPage = (await call("GET", sessionEntriesPath(String(forked.body["id"]))))
+      .body as unknown as SessionEntriesPage;
+
+    assert.deepEqual(
+      forkedPage.entries.map((entry) => entry.kind),
+      ["model-change", "thinking-level-change", "tools-change"],
+    );
+  });
+
+  it("refuses a fork that cuts before an answer instead of a question", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const answer = page.entries.at(-1);
+
+    assert.ok(answer);
+    assert.equal(
+      (await call("POST", sessionForkPath(sessionId), { entryId: answer.id })).status,
+      409,
+    );
+    assert.equal((await call("POST", sessionForkPath("00000000"), {})).status, 404);
+  });
+
+  it("refuses steering when nothing is running and takes a message for the next turn", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    const steered = await call("POST", sessionMessagesPath(sessionId), {
+      text: "левее",
+      mode: "steer",
+    });
+
+    assert.equal(steered.status, 409);
+    assert.match(String(steered.body["error"]), /idle/);
+
+    const queued = await call("POST", sessionMessagesPath(sessionId), {
+      text: "не забудь про тесты",
+      mode: "next-turn",
+    });
+
+    assert.equal(queued.status, 200);
+    assert.equal(queued.body["mode"], "next-turn");
+
+    // Сообщение к следующему турну ждёт, а не запускает работу: сессия осталась в простое.
+    assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "idle");
+  });
+
+  it("counts what the session cost", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const counted = await call("GET", sessionStatsPath(sessionId));
+    const stats = counted.body as unknown as SessionStats;
+
+    assert.equal(counted.status, 200);
+    assert.equal(stats.sessionId, sessionId);
+    assert.equal(stats.messageCount, 2);
+    assert.equal((await call("GET", sessionStatsPath("00000000"))).status, 404);
+  });
+
+  it("refuses a body the contract does not know", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal((await call("PUT", sessionPath(sessionId), { title: "имя" })).status, 400);
+    assert.equal((await call("POST", sessionMessagesPath(sessionId), { text: "и" })).status, 400);
+    assert.equal(
+      (await call("POST", sessionForkPath(sessionId), { position: "before" })).status,
+      400,
+    );
+  });
+});
