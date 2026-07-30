@@ -13,6 +13,7 @@ import {
   type AuthenticationState,
   type Health,
   type LoginStepFrame,
+  type SessionDeltaFrame,
 } from "@sovereign/protocol";
 import {
   Button,
@@ -47,6 +48,7 @@ import { ProjectsView } from "./projects/projects-view.tsx";
 import { useProjects } from "./projects/use-projects.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
+import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearancePanel } from "./shell/appearance-panel.tsx";
@@ -161,6 +163,10 @@ export function App() {
   // `reload`: пересоздавать поток из-за смены обработчика незачем.
   const loginStep = useRef<(frame: LoginStepFrame) => void>(() => {});
 
+  // Дельта турна — тоже не событие шины: их сотни на один ответ модели, и на шину они не выходят
+  // (docs/sessions-and-projects.md). Связь та же ссылка, по той же причине.
+  const sessionDelta = useRef<(frame: SessionDeltaFrame) => void>(() => {});
+
   // У `EventSource` нет кода ответа, поэтому закрытая сессия выглядит из потока так же, как лежащий
   // демон: различает их только отдельный запрос (docs/authentication.md).
   const recheck = useRef(() => {
@@ -188,6 +194,7 @@ export function App() {
       onStatus: setStream,
       onDiagnostic: diagnostics.record,
       onLoginStep: (frame) => loginStep.current(frame),
+      onSessionDelta: (frame) => sessionDelta.current(frame),
       onGaveUp: () => recheck.current(),
     });
 
@@ -246,12 +253,24 @@ export function App() {
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
   const providers = useProviders({ bus, stream, onDiagnostic: diagnostics.record });
+  const sessions = useSessions({
+    bus,
+    stream,
+    onDiagnostic: diagnostics.record,
+    ...(page.kind === "sessions" && page.sessionId !== undefined
+      ? { sessionId: page.sessionId }
+      : {}),
+  });
 
   // Обработчик кадра берётся у вью провайдеров, а соединение живёт своей жизнью: связывает их
   // ссылка, и переустановка её не трогает поток.
   useEffect(() => {
     loginStep.current = providers.receiveLoginStep;
   }, [providers.receiveLoginStep]);
+
+  useEffect(() => {
+    sessionDelta.current = sessions.receiveSessionDelta;
+  }, [sessions.receiveSessionDelta]);
 
   const translator = useMemo(
     () =>

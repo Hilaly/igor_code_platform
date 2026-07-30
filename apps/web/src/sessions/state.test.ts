@@ -7,6 +7,7 @@ import {
   applySessionDelta,
   applySessions,
   applyStreamEvent,
+  applySummary,
   closeSession,
   initialSessionsState,
   isBusy,
@@ -54,17 +55,32 @@ describe("the list of sessions", () => {
     expect(state.problems).toEqual(["0199: not valid json"]);
   });
 
-  it("refreshes the phase of the open session from the same snapshot", () => {
-    // Отдельного запроса за фазой нет: она приезжает списком, и списку верят.
-    const state = applySessions(opened(), { sessions: [session({ phase: "turn" })] });
+  it("leaves the open session alone: absent from the list is not absent at all", () => {
+    // Сессия архивного проекта из списка пропадает, но по своему адресу читается по-прежнему.
+    const state = applySessions(opened(), { sessions: [] });
+
+    expect(state.open?.summary?.id).toBe("0199");
+  });
+});
+
+describe("the snapshot of the open session", () => {
+  it("carries the phase, and the phase is what the view believes", () => {
+    const state = applySummary(opened(), "0199", session({ phase: "turn" }));
 
     expect(state.open?.summary?.phase).toBe("turn");
   });
 
-  it("forgets the summary when the open session is gone from the snapshot", () => {
-    const state = applySessions(opened(), { sessions: [] });
+  it("takes a session that is gone for an answer, and stops waiting", () => {
+    const state = applySummary(opened(), "0199", undefined);
 
     expect(state.open?.summary).toBeUndefined();
+    expect(state.open?.loading).toBe(false);
+  });
+
+  it("ignores an answer about a session nobody is looking at", () => {
+    const state = opened();
+
+    expect(applySummary(state, "0200", session({ id: "0200" }))).toBe(state);
   });
 });
 

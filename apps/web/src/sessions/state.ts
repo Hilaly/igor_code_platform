@@ -85,18 +85,35 @@ export type SessionsState = {
 
 export const initialSessionsState: SessionsState = { problems: [] };
 
+/**
+ * Список сессий. Снимок открытой сессии он не трогает: сессия архивного проекта из списка пропадает,
+ * оставаясь читаемой по своему адресу (docs/web-api.md), и «нет в списке» не значит «нет вовсе».
+ * За открытую отвечает `applySummary`.
+ */
 export function applySessions(state: SessionsState, snapshot: SessionsSnapshot): SessionsState {
-  const open = state.open;
-
   return {
     ...state,
     sessions: snapshot.sessions,
     problems: snapshot.problems ?? [],
     failure: undefined,
-    // Фаза открытой сессии приезжает тем же снимком: отдельного запроса за ней не нужно.
-    ...(open === undefined
-      ? {}
-      : { open: { ...open, summary: snapshot.sessions.find(({ id }) => id === open.id) } }),
+  };
+}
+
+/** Снимок открытой сессии: источник истины по фазе. `undefined` — сессии больше нет. */
+export function applySummary(
+  state: SessionsState,
+  sessionId: string,
+  summary: Session | undefined,
+): SessionsState {
+  const open = state.open;
+
+  if (open?.id !== sessionId) {
+    return state;
+  }
+
+  return {
+    ...state,
+    open: { ...open, summary, ...(summary === undefined ? { loading: false } : {}) },
   };
 }
 
@@ -148,17 +165,6 @@ export function applyEntries(
     ...state,
     open: { ...open, entries: [...open.entries, ...entries], seen, loading: false },
   };
-}
-
-/** Сессия пропала, пока её читали: адрес мог остаться в закладках, а проект уйти в архив. */
-export function applyMissingSession(state: SessionsState, sessionId: string): SessionsState {
-  const open = state.open;
-
-  if (open?.id !== sessionId) {
-    return state;
-  }
-
-  return { ...state, open: { ...open, summary: undefined, loading: false } };
 }
 
 /**
