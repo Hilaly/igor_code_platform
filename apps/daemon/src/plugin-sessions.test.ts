@@ -20,11 +20,29 @@ const session: Session = {
 
 const page: SessionEntriesPage = { sessionId: "0199", entries: [], seen: 0 };
 
+const counters = {
+  messageCount: 2,
+  cachedTokens: 0,
+  uncachedTokens: 7,
+  totalTokens: 7,
+  costTotal: 0.01,
+};
+
 function bridge(overrides: Partial<SessionService> = {}) {
   const calls: unknown[] = [];
   const service: Pick<
     SessionService,
-    "agents" | "list" | "create" | "entries" | "prompt" | "abort"
+    | "agents"
+    | "list"
+    | "create"
+    | "entries"
+    | "prompt"
+    | "abort"
+    | "fork"
+    | "update"
+    | "remove"
+    | "message"
+    | "stats"
   > = {
     agents: () => [],
     list: (projectId) => {
@@ -44,6 +62,27 @@ function bridge(overrides: Partial<SessionService> = {}) {
         turn: { sessionId: "0199", turnId: "t1", phase: "turn" },
       }),
     abort: () => Promise.resolve(true),
+    fork: (sessionId, request) => {
+      calls.push({ fork: sessionId, request });
+
+      return Promise.resolve({ kind: "done", session });
+    },
+    update: (sessionId, update) => {
+      calls.push({ update: sessionId, wanted: update });
+
+      return Promise.resolve({ kind: "done", session });
+    },
+    remove: (sessionId) => {
+      calls.push({ remove: sessionId });
+
+      return Promise.resolve({ kind: "removed" });
+    },
+    message: (sessionId, message) => {
+      calls.push({ message: sessionId, wanted: message });
+
+      return Promise.resolve({ kind: "accepted", accepted: { sessionId, mode: message.mode } });
+    },
+    stats: (sessionId) => Promise.resolve({ sessionId, ...counters }),
     ...overrides,
   };
 
@@ -123,5 +162,70 @@ describe("createPluginSessions", () => {
       kind: "session-abort",
       interrupted: false,
     });
+  });
+});
+
+describe("the lifecycle over the plugin bridge", () => {
+  it("calls the very same service functions the routes call", async () => {
+    const { sessions, calls } = bridge();
+
+    assert.deepEqual(
+      await sessions.answer({ kind: "session-fork", sessionId: "0199", request: {} }),
+      {
+        kind: "session-fork",
+        session,
+      },
+    );
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-update",
+        sessionId: "0199",
+        update: { title: "имя", archived: false },
+      }),
+      { kind: "session-update", session },
+    );
+    assert.deepEqual(await sessions.answer({ kind: "session-remove", sessionId: "0199" }), {
+      kind: "session-remove",
+    });
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-message",
+        sessionId: "0199",
+        message: { text: "левее", mode: "steer" },
+      }),
+      { kind: "session-message", accepted: { sessionId: "0199", mode: "steer" } },
+    );
+    assert.deepEqual(await sessions.answer({ kind: "session-stats", sessionId: "0199" }), {
+      kind: "session-stats",
+      stats: { sessionId: "0199", ...counters },
+    });
+
+    assert.deepEqual(calls, [
+      { fork: "0199", request: {} },
+      { update: "0199", wanted: { title: "имя", archived: false } },
+      { remove: "0199" },
+      { message: "0199", wanted: { text: "левее", mode: "steer" } },
+    ]);
+  });
+
+  it("turns a refusal into a failure with the reason, and a miss into a named session", async () => {
+    const busy = bridge({
+      update: () => Promise.resolve({ kind: "refused", reason: "the session is busy" }),
+      remove: () => Promise.resolve({ kind: "unknown" }),
+    });
+
+    assert.deepEqual(
+      await busy.sessions.answer({
+        kind: "session-update",
+        sessionId: "0199",
+        update: { archived: true },
+      }),
+      { kind: "failed", reason: "the session is busy" },
+    );
+
+    const missing = await busy.sessions.answer({ kind: "session-remove", sessionId: "невидимка" });
+
+    assert.equal(missing.kind, "failed");
+    assert.match(missing.kind === "failed" ? missing.reason : "", /невидимка/);
   });
 });

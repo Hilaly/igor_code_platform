@@ -90,13 +90,59 @@ export type TurnAccepted = {
   phase: SessionPhase;
 };
 
+/** Тело изменения: переименование, архивация и восстановление — одна запись целой записи. */
+export type SessionUpdate = {
+  title?: string;
+  archived: boolean;
+};
+
+/**
+ * Где резать при форке. `before` — умолчание — оставляет всё до записи и работает только по
+ * сообщению человека; `at` берёт путь до любой записи включительно.
+ */
+export type SessionForkRequest = {
+  entryId?: string;
+  position?: "before" | "at";
+};
+
+/**
+ * Куда встаёт сообщение, отправленное не турном: вклинить в идущий турн, продолжить им же после
+ * текущего, лечь в начало следующего или просто дописать в дерево.
+ */
+export type SessionMessageMode = "steer" | "follow-up" | "next-turn" | "append";
+
+export type SessionMessage = {
+  text: string;
+  mode: SessionMessageMode;
+};
+
+export type SessionMessageAccepted = {
+  sessionId: string;
+  mode: SessionMessageMode;
+};
+
+/** Счёт по всему файлу сессии, включая брошенные ветки. */
+export type SessionStats = {
+  sessionId: string;
+  messageCount: number;
+  cachedTokens: number;
+  uncachedTokens: number;
+  totalTokens: number;
+  costTotal: number;
+};
+
 export type SessionRequest =
   | { kind: "agent-list" }
   | { kind: "session-list"; projectId?: string }
   | { kind: "session-create"; draft: SessionDraft }
   | { kind: "session-entries"; sessionId: string; after?: number }
   | { kind: "session-prompt"; turn: TurnRequest }
-  | { kind: "session-abort"; sessionId: string };
+  | { kind: "session-abort"; sessionId: string }
+  | { kind: "session-fork"; sessionId: string; request: SessionForkRequest }
+  | { kind: "session-update"; sessionId: string; update: SessionUpdate }
+  | { kind: "session-remove"; sessionId: string }
+  | { kind: "session-message"; sessionId: string; message: SessionMessage }
+  | { kind: "session-stats"; sessionId: string };
 
 export type SessionResponse =
   | { kind: "agent-list"; agents: AgentSummary[] }
@@ -105,6 +151,11 @@ export type SessionResponse =
   | { kind: "session-entries"; page: SessionEntriesPage }
   | { kind: "session-prompt"; accepted: TurnAccepted }
   | { kind: "session-abort"; interrupted: boolean }
+  | { kind: "session-fork"; session: Session }
+  | { kind: "session-update"; session: Session }
+  | { kind: "session-remove" }
+  | { kind: "session-message"; accepted: SessionMessageAccepted }
+  | { kind: "session-stats"; stats: SessionStats }
   /** Отказ платформы: проект архивный, агента нет, модель недоступна, сессия занята. */
   | { kind: "failed"; reason: string };
 
@@ -130,7 +181,7 @@ export const sessions = {
   agents: async (): Promise<AgentSummary[]> =>
     (await ask({ kind: "agent-list" }, "agent-list")).agents,
 
-  /** Сессии, при желании — только одного проекта. */
+  /** Сессии, при желании — только одного проекта. Архивные в список не попадают. */
   list: async (projectId?: string): Promise<Session[]> =>
     (
       await ask(
@@ -167,4 +218,31 @@ export const sessions = {
         "session-entries",
       )
     ).page,
+
+  /**
+   * Новая сессия из куска этой. Без `entryId` форк берёт сессию целиком; форк остаётся в том же
+   * проекте и рождается действующим, даже если источник архивный.
+   */
+  fork: async (sessionId: string, request: SessionForkRequest = {}): Promise<Session> =>
+    (await ask({ kind: "session-fork", sessionId, request }, "session-fork")).session,
+
+  /**
+   * Переименовать, заархивировать или восстановить. Тело заменяет запись целиком: `archived`
+   * обязателен, а тело без `title` снимает имя. Архивация требует простоя, переименование — нет.
+   */
+  update: async (sessionId: string, update: SessionUpdate): Promise<Session> =>
+    (await ask({ kind: "session-update", sessionId, update }, "session-update")).session,
+
+  /** Удалить сессию безвозвратно. Требует простоя; форки этой сессии остаются жить. */
+  remove: async (sessionId: string): Promise<void> => {
+    await ask({ kind: "session-remove", sessionId }, "session-remove");
+  },
+
+  /** Сообщение, которое не запускает турн: стиринг, догоняющее, к следующему турну, дозапись. */
+  message: async (sessionId: string, message: SessionMessage): Promise<SessionMessageAccepted> =>
+    (await ask({ kind: "session-message", sessionId, message }, "session-message")).accepted,
+
+  /** Токены и стоимость по всему файлу сессии. */
+  stats: async (sessionId: string): Promise<SessionStats> =>
+    (await ask({ kind: "session-stats", sessionId }, "session-stats")).stats,
 };
