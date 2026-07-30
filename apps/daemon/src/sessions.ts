@@ -304,6 +304,29 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
    */
   const places = new Map<string, { turnId: string; cancel: () => boolean; validating: boolean }>();
 
+  /**
+   * Активный набор инструментов на прошлом турне каждой сессии. Нужен потому, что «инструмент
+   * исчез» — это разница между двумя моментами, и нигде, кроме памяти, она не лежит: сборка знает
+   * только то, что есть сейчас.
+   */
+  const activeTools = new Map<string, string[]>();
+
+  /**
+   * Сказать, что сессия лишилась опоры и доигрывает без неё. След остаётся в двух местах: в дереве
+   * сессии — для человека, который потом будет разбираться, почему агент повёл себя иначе; на шине —
+   * для всех, кто смотрит за сессией сейчас, включая плагины (docs/sessions-and-projects.md).
+   */
+  const noteDegradation = async (
+    sessionId: string,
+    kind: "tool" | "model",
+    name: string,
+  ): Promise<void> => {
+    const persisted = await options.store.open(sessionId);
+
+    await persisted?.noteDegradation(kind, name);
+    options.bus.publish(coreEventTypes.sessionDegraded, { sessionId, kind, name });
+  };
+
   /** Набор инструментов пересобирается перед каждым турном: сессия доигрывает с тем, что осталось. */
   const applyTools = async (
     session: AgentSession,
@@ -317,11 +340,20 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     }
 
     const names = collected.tools.map((tool) => tool.name);
+    const active = selectToolNames(names, agent.tools);
+    const sessionId = session.summary().id;
+    const before = activeTools.get(sessionId) ?? [];
 
     await session.setTools(
       collected.tools.map((tool) => ({ name: tool.name, tool: tool.tool })),
-      selectToolNames(names, agent.tools),
+      active,
     );
+    activeTools.set(sessionId, active);
+
+    // Первый турн сравнивать не с чем: до него у сессии не было набора, а не «был и опустел».
+    for (const lost of before.filter((name) => !active.includes(name))) {
+      await noteDegradation(sessionId, "tool", lost);
+    }
   };
 
   /** Операции. Маршруты и мост плагинов зовут их одни и те же: набор обязан быть один. */
@@ -362,6 +394,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   const forget = (sessionId: string): void => {
     live.delete(sessionId);
     places.delete(sessionId);
+    activeTools.delete(sessionId);
   };
 
   const create = (draft: SessionDraft): Promise<CreateSessionOutcome> =>
@@ -641,6 +674,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       if (session.validateModel().kind === "unknown-model") {
         place.release();
         places.delete(sessionId);
+
+        // Модель сессии пропала из каталога, пока сессия жила: отказ турна — половина ответа,
+        // вторая половина в том, что об этом видно и постфактум (docs/sessions-and-projects.md).
+        await noteDegradation(sessionId, "model", summary.model);
+
         return {
           kind: "refused",
           reason: `the model ${summary.model} is not available right now`,

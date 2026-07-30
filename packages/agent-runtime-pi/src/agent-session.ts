@@ -117,6 +117,14 @@ export type PersistedAgentSession = {
   setName: (name: string) => Promise<void>;
   /** Счёт токенов и денег по всему файлу, включая брошенные ветки. */
   stats: () => Promise<AgentSessionStats>;
+  /**
+   * Записать в дерево, что сессия лишилась инструмента или модели и доигрывает без них.
+   *
+   * Запись вида `custom`, а не сообщение: про исчезнувший инструмент рантайм уже сказал модели
+   * текстом результата вызова, и второе сообщение в контексте её запутает; про недоступную модель
+   * говорить модели бессмысленно — турна нет. Это след для человека, а не для агента.
+   */
+  noteDegradation: (kind: "tool" | "model", name: string) => Promise<void>;
   /** Остановить поднятый harness, если он был. Сама запись остаётся на диске. */
   close: () => Promise<void>;
 };
@@ -132,6 +140,12 @@ export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
 export type MessageOutcome = { kind: "queued" } | { kind: "idle" } | { kind: "busy" };
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
+
+/**
+ * Тип записи об утрате опоры. С неймспейсом платформы, потому что `custom` — общая точка, куда
+ * кладут своё и приложение, и плагины: без неймспейса две записи столкнулись бы именами.
+ */
+export const degradationEntryType = "sovereign.degraded";
 
 /** Исход переноса между корнями. Сессия уже там, куда её просят, — успех, а не отказ. */
 export type ArchiveOutcome = { kind: "moved" } | { kind: "unknown-session" };
@@ -714,6 +728,9 @@ function persistedSession(
         await session.getSessionStats();
 
       return { messageCount, cachedTokens, uncachedTokens, totalTokens, costTotal };
+    },
+    noteDegradation: async (kind, name) => {
+      await session.appendCustomEntry(degradationEntryType, { kind, name });
     },
     close: async () => {
       await live?.close();

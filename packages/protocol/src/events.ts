@@ -43,6 +43,14 @@ export const coreEventTypes = {
    */
   sessionsChanged: "core.sessions.changed",
   /**
+   * Сессия лишилась опоры и доигрывает без неё: инструмент исчез вместе с выключенным плагином или
+   * модель пропала из каталога (docs/sessions-and-projects.md). Отдельное событие, а не
+   * `core.sessions.changed`: тот значит «перечитай список», а здесь произошёл факт, о котором надо
+   * рассказать. Дельтой это ехать не может — дельты идут мимо шины и плагину не отдаются вовсе, а
+   * подписчиком здесь должен быть в том числе плагин автоматизации.
+   */
+  sessionDegraded: "core.sessions.degraded",
+  /**
    * Каталог провайдеров изменился: обновился динамический список моделей либо появился или исчез
    * кастомный провайдер плагина (docs/models-and-providers.md). Вход и выход это событие **не**
    * публикуют — у них свои, иначе вью перезапрашивало бы список дважды на одно действие.
@@ -89,6 +97,18 @@ export type SessionsChanged = Record<string, never>;
 export type ProvidersChanged = Record<string, never>;
 
 /**
+ * Нагрузка есть, в отличие от «изменилось»: это факт о случившемся, и перечитать его неоткуда —
+ * состояния «инструмент был и пропал» нигде не лежит, есть только момент, когда это заметили.
+ */
+export type SessionDegraded = {
+  sessionId: string;
+  /** Чего лишилась сессия: инструмента или модели. */
+  kind: "tool" | "model";
+  /** Имя исчезнувшего: имя инструмента или ссылка на модель. */
+  name: string;
+};
+
+/**
  * У входа и выхода нагрузка есть, в отличие от остальных событий ядра: это факт о случившемся, а не
  * «состояние изменилось, перечитай». Подписчику важно, в кого именно вошли, — перечитывать ради
  * этого весь список провайдеров он не обязан.
@@ -108,6 +128,7 @@ export type CoreEventPayloads = {
   "core.preferences.changed": PreferencesChanged;
   "core.projects.changed": ProjectsChanged;
   "core.sessions.changed": SessionsChanged;
+  "core.sessions.degraded": SessionDegraded;
   "core.providers.changed": ProvidersChanged;
   "core.provider.login": ProviderLogin;
   "core.provider.logout": ProviderLogout;

@@ -550,7 +550,14 @@ describe("running a turn over http", () => {
 
     assert.equal(refused.status, 409);
     assert.match(String(refused.body["error"]), new RegExp(model.replace("/", "\\/")));
-    assert.deepEqual(afterRefusal.entries, before.entries);
+
+    // Отказанный турн не пишет в дерево реплику человека — писать её было бы враньём: модель её
+    // не видела. След об исчезнувшей модели при этом остаётся, и это другая запись.
+    assert.deepEqual(
+      afterRefusal.entries.filter((entry) => entry.kind === "message"),
+      before.entries.filter((entry) => entry.kind === "message"),
+    );
+    assert.equal(afterRefusal.entries.length, before.entries.length + 1);
 
     restoreModel();
 
@@ -1113,5 +1120,67 @@ describe("the session lifecycle over http", () => {
       (await call("POST", sessionForkPath(sessionId), { position: "before" })).status,
       400,
     );
+  });
+});
+
+describe("a session that lost a tool or a model", () => {
+  it("leaves a trace in the tree and an event on the bus, once per loss", async () => {
+    let contributions: ContributionRegistration[] = [baseAgent];
+    const { call, start, events } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }, { text: "третий" }],
+      contributions: () => contributions,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый" });
+    await untilIdle(call, sessionId);
+
+    // Агенту оставили один инструмент из четырёх: остальные для сессии исчезли на ходу.
+    contributions = [{ ...baseAgent, tools: { include: ["read"], exclude: [] } }];
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "второй" });
+    await untilIdle(call, sessionId);
+
+    const lost = events
+      .filter((event) => event.type === coreEventTypes.sessionDegraded)
+      .map((event) => (event.payload as { kind: string; name: string }).name)
+      .sort();
+
+    assert.deepEqual(lost, ["bash", "edit", "write"]);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(page.entries.filter((entry) => entry.kind === "other").length, 3);
+
+    // Повторный турн на том же наборе ничего не теряет — и ничего не повторяет.
+    await call("POST", sessionTurnsPath(sessionId), { text: "третий" });
+    await untilIdle(call, sessionId);
+
+    assert.equal(events.filter((event) => event.type === coreEventTypes.sessionDegraded).length, 3);
+  });
+
+  it("says the model went away instead of only refusing the turn", async () => {
+    const { call, start, model, removeModel, events } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый" });
+    await untilIdle(call, sessionId);
+
+    removeModel();
+
+    assert.equal((await call("POST", sessionTurnsPath(sessionId), { text: "второй" })).status, 409);
+
+    const degraded = events.filter((event) => event.type === coreEventTypes.sessionDegraded);
+
+    assert.deepEqual(
+      degraded.map((event) => event.payload),
+      [{ sessionId, kind: "model", name: model }],
+    );
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(page.entries.at(-1)?.kind, "other");
   });
 });
