@@ -27,6 +27,7 @@ export * from "./components/icon.tsx";
 export * from "./components/input.tsx";
 export * from "./components/link.tsx";
 export * from "./components/list.tsx";
+export * from "./components/markdown.tsx";
 export * from "./components/menu.tsx";
 export * from "./components/multi-select.tsx";
 export * from "./components/notice.tsx";

@@ -15,6 +15,7 @@ import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { Input, Textarea } from "./input.tsx";
+import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
 import { Progress } from "./progress.tsx";
 import { Skeleton } from "./skeleton.tsx";
@@ -216,5 +217,81 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain("undefined");
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain("width:2rem");
+  });
+});
+
+/**
+ * Разметка от модели — единственное место, где в интерфейс попадает чужой текст, и проверять её
+ * надо на два разных вопроса: что размётка вообще доходит до разметки и что вредное до неё не
+ * доходит. Второе важнее: модель повторяет то, что прочитала в файлах проекта, а там может лежать
+ * что угодно.
+ */
+describe("markdown from the agent", () => {
+  it("renders headings, lists and emphasis", () => {
+    const markup = renderToStaticMarkup(
+      <Markdown text={"# Заголовок\n\nТекст с **жирным**.\n\n- первый\n- второй\n"} />,
+    );
+
+    expect(markup).not.toContain("undefined");
+    expect(markup).toContain("Заголовок");
+    expect(markup).toContain("<strong>жирным</strong>");
+    expect(markup).toContain("<li>первый</li>");
+  });
+
+  it("shifts the top heading down, so a message cannot own the page heading", () => {
+    // Заголовок страницы у оболочки один, и реплика агента не вправе стать вторым `h1`.
+    const markup = renderToStaticMarkup(<Markdown text="# Заголовок" />);
+
+    expect(markup).not.toContain("<h1");
+    expect(markup).toMatch(/<h2[^>]*>Заголовок<\/h2>/);
+  });
+
+  it("renders a GFM table, which the default schema of the sanitiser is able to drop", () => {
+    const markup = renderToStaticMarkup(
+      <Markdown text={"| ключ | значение |\n| --- | --- |\n| a | 1 |\n"} />,
+    );
+
+    expect(markup).toContain("<table");
+    expect(markup).toContain("<th");
+    expect(markup).toContain("<td");
+  });
+
+  it("dresses code in the kit primitives", () => {
+    const inline = renderToStaticMarkup(<Markdown text="строчный `код` внутри" />);
+    expect(inline).toContain("<code");
+    expect(inline).toContain("код");
+
+    // Ограждённый блок отдаётся `CodeBlock` целиком, вместе с переводами строк внутри.
+    const block = renderToStaticMarkup(<Markdown text={"```ts\nпервая\nвторая\n```\n"} />);
+    expect(block).toContain("<pre");
+    expect(block).toContain("первая\nвторая");
+  });
+
+  it("ignores raw HTML instead of rendering it", () => {
+    const markup = renderToStaticMarkup(
+      <Markdown text={"<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n"} />,
+    );
+
+    expect(markup).not.toContain("<script");
+    expect(markup).not.toContain("onerror");
+    expect(markup).not.toContain("<img");
+  });
+
+  it("drops a link whose scheme is not one a browser may follow safely", () => {
+    const markup = renderToStaticMarkup(
+      <Markdown text="[ссылка](javascript:alert(1)) и [обычная](https://example.org)" />,
+    );
+
+    expect(markup).not.toContain("javascript:");
+    expect(markup).toContain('href="https://example.org"');
+    // Текст ссылки остаётся: вырезана схема, а не реплика агента.
+    expect(markup).toContain("ссылка");
+  });
+
+  it("opens every link in a new tab: the chat page must stay where it is", () => {
+    const markup = renderToStaticMarkup(<Markdown text="[обычная](https://example.org)" />);
+
+    expect(markup).toContain('target="_blank"');
+    expect(markup).toContain('rel="noreferrer"');
   });
 });

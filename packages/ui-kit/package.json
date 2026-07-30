@@ -16,7 +16,10 @@
     "@fontsource-variable/ibm-plex-sans": "^5.2.5",
     "@fontsource-variable/jetbrains-mono": "^5.2.5",
     "@fontsource-variable/unbounded": "^5.2.5",
-    "@sovereign/protocol": "workspace:*"
+    "@sovereign/protocol": "workspace:*",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "peerDependencies": {
     "react": "^19.0.0",

@@ -1,0 +1,87 @@
+/*
+ * Оформление размётки от агента. Тонкое намеренно: заголовки, ссылки и код одеты своими примитивами,
+ * здесь остаётся то, у чего примитива нет, — ритм между блоками, список, таблица, цитата.
+ *
+ * Селекторы потомков, а не классы: узлы рождает `react-markdown`, и повесить на них класс негде.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-sm);
+  line-height: var(--sovereign-line-height-normal);
+  /* Реплика модели приносит и длинные пути, и ссылки без пробелов: ломаем их, а не раскладку. */
+  overflow-wrap: anywhere;
+}
+
+/* Первый и последний блок не добавляют отступа: внешние поля задаёт лента сообщений. */
+.root > :first-child {
+  margin-block-start: 0;
+}
+
+.root > :last-child {
+  margin-block-end: 0;
+}
+
+.root p {
+  margin: 0;
+}
+
+.root ul,
+.root ol {
+  margin: 0;
+  padding-inline-start: var(--sovereign-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+}
+
+.root li::marker {
+  color: var(--sovereign-text-muted);
+}
+
+.root blockquote {
+  margin: 0;
+  padding-inline-start: var(--sovereign-space-3);
+  border-inline-start: var(--sovereign-stroke-emphasis) solid var(--sovereign-border);
+  color: var(--sovereign-text-muted);
+}
+
+.root hr {
+  width: 100%;
+  height: var(--sovereign-stroke-thin);
+  margin: 0;
+  border: none;
+  background: var(--sovereign-border-subtle);
+}
+
+/*
+ * Таблица прокручивается внутри себя: колонок в ответе модели бывает больше, чем влезает в панель
+ * чата, а растянуть страницу таблица не вправе — то же правило, что у блока кода.
+ */
+.root table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.root th,
+.root td {
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  text-align: start;
+}
+
+.root th {
+  color: var(--sovereign-text-muted);
+  font-weight: var(--sovereign-font-weight-medium);
+}
+
+.root img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--sovereign-radius-xs);
+}
