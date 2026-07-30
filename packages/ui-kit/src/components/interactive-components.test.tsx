@@ -22,7 +22,16 @@ afterEach(cleanup);
 describe("interactive components", () => {
   it("opens Combobox with an enabled active option and selects it from the keyboard", () => {
     const onChange = vi.fn();
-    render(<Combobox options={options} value="missing" onChange={onChange} label="Выбор" />);
+    render(
+      <Combobox
+        options={options}
+        value="missing"
+        onChange={onChange}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
+    );
 
     const input = screen.getByRole("combobox", { name: "Выбор" });
     fireEvent.click(input);
@@ -37,7 +46,16 @@ describe("interactive components", () => {
 
   it("uses Home and End to navigate Combobox options without landing on disabled items", () => {
     const onChange = vi.fn();
-    render(<Combobox options={options} value="second" onChange={onChange} label="Выбор" />);
+    render(
+      <Combobox
+        options={options}
+        value="second"
+        onChange={onChange}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
+    );
 
     const input = screen.getByRole("combobox", { name: "Выбор" });
     fireEvent.click(input);
@@ -49,7 +67,16 @@ describe("interactive components", () => {
 
   it("resets Combobox active descendant to the enabled filtered option", () => {
     const onChange = vi.fn();
-    render(<Combobox options={options} value="third" onChange={onChange} label="Выбор" />);
+    render(
+      <Combobox
+        options={options}
+        value="third"
+        onChange={onChange}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
+    );
 
     const input = screen.getByRole("combobox", { name: "Выбор" });
     fireEvent.click(input);
@@ -63,7 +90,16 @@ describe("interactive components", () => {
   });
 
   it("does not expose a disabled Combobox value as selected", () => {
-    render(<Combobox options={options} value="disabled" onChange={() => {}} label="Выбор" />);
+    render(
+      <Combobox
+        options={options}
+        value="disabled"
+        onChange={() => {}}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
+    );
 
     const input = screen.getByRole("combobox", { name: "Выбор" }) as HTMLInputElement;
     expect(input.value).toBe("");
@@ -75,7 +111,15 @@ describe("interactive components", () => {
 
   it("opens MultiSelect from its combobox trigger and toggles the enabled active option", () => {
     const onChange = vi.fn();
-    render(<MultiSelect options={options} value={[]} onChange={onChange} label="Метки" />);
+    render(
+      <MultiSelect
+        options={options}
+        value={[]}
+        onChange={onChange}
+        label="Метки"
+        placeholder="Выберите..."
+      />,
+    );
 
     const trigger = screen.getByRole("combobox", { name: "Метки" });
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
@@ -91,7 +135,15 @@ describe("interactive components", () => {
   });
 
   it("gives each selected MultiSelect tag an accessible removal name", () => {
-    render(<MultiSelect options={options} value={["second"]} onChange={() => {}} label="Метки" />);
+    render(
+      <MultiSelect
+        options={options}
+        value={["second"]}
+        onChange={() => {}}
+        label="Метки"
+        placeholder="Выберите..."
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "Удалить Второй" })).not.toBeNull();
   });
@@ -103,6 +155,7 @@ describe("interactive components", () => {
         value={["disabled", "second"]}
         onChange={() => {}}
         label="Метки"
+        placeholder="Выберите..."
       />,
     );
 
@@ -121,6 +174,7 @@ describe("interactive components", () => {
         onChange={() => {}}
         label="Метки"
         disabled
+        placeholder="Выберите..."
       />,
     );
     expect(screen.getByRole("combobox", { name: "Метки" }).getAttribute("aria-disabled")).toBe(
@@ -175,7 +229,15 @@ describe("interactive components", () => {
 
   it("uses End to select the last enabled custom Select option", () => {
     const onChange = vi.fn();
-    render(<Select options={options} value="second" onChange={onChange} label="Схема" />);
+    render(
+      <Select
+        options={options}
+        value="second"
+        onChange={onChange}
+        label="Схема"
+        placeholder="Выберите..."
+      />,
+    );
 
     const trigger = screen.getByRole("combobox", { name: "Схема" });
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
@@ -187,7 +249,13 @@ describe("interactive components", () => {
 
   it("does not expose a disabled Select value as selected and marks a disabled trigger", () => {
     const { rerender } = render(
-      <Select options={options} value="disabled" onChange={() => {}} label="Схема" />,
+      <Select
+        options={options}
+        value="disabled"
+        onChange={() => {}}
+        label="Схема"
+        placeholder="Выберите..."
+      />,
     );
 
     const trigger = screen.getByRole("combobox", { name: "Схема" });
@@ -198,7 +266,14 @@ describe("interactive components", () => {
     );
 
     rerender(
-      <Select options={options} value="disabled" onChange={() => {}} label="Схема" disabled />,
+      <Select
+        options={options}
+        value="disabled"
+        onChange={() => {}}
+        label="Схема"
+        disabled
+        placeholder="Выберите..."
+      />,
     );
     expect(trigger.getAttribute("aria-disabled")).toBe("true");
   });
@@ -247,7 +322,13 @@ describe("interactive components", () => {
     const onChange = vi.fn();
 
     const { unmount } = render(
-      <Select options={unusual} value={unusual[0]!.value} onChange={onChange} label="Схема" />,
+      <Select
+        options={unusual}
+        value={unusual[0]!.value}
+        onChange={onChange}
+        label="Схема"
+        placeholder="Выберите..."
+      />,
     );
     const selectTrigger = screen.getByRole("combobox", { name: "Схема" });
     fireEvent.click(selectTrigger);
@@ -259,7 +340,14 @@ describe("interactive components", () => {
     unmount();
 
     render(
-      <Combobox options={unusual} value={unusual[0]!.value} onChange={onChange} label="Выбор" />,
+      <Combobox
+        options={unusual}
+        value={unusual[0]!.value}
+        onChange={onChange}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
     );
     const comboboxInput = screen.getByRole("combobox", { name: "Выбор" });
     fireEvent.click(comboboxInput);
@@ -270,7 +358,15 @@ describe("interactive components", () => {
     );
     unmount();
 
-    render(<MultiSelect options={unusual} value={[]} onChange={onChange} label="Метки" />);
+    render(
+      <MultiSelect
+        options={unusual}
+        value={[]}
+        onChange={onChange}
+        label="Метки"
+        placeholder="Выберите..."
+      />,
+    );
     const multiTrigger = screen.getByRole("combobox", { name: "Метки" });
     fireEvent.click(multiTrigger);
     const multiOption = screen.getAllByRole("option").at(-1)!;
@@ -281,7 +377,16 @@ describe("interactive components", () => {
   });
 
   it("does not prevent Home or End in a closed Combobox", () => {
-    render(<Combobox options={options} value="second" onChange={() => {}} label="Выбор" />);
+    render(
+      <Combobox
+        options={options}
+        value="second"
+        onChange={() => {}}
+        label="Выбор"
+        placeholder="Выберите..."
+        emptyText="Ничего не найдено"
+      />,
+    );
 
     const input = screen.getByRole("combobox", { name: "Выбор" });
     const home = new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true });

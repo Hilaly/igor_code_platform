@@ -132,6 +132,7 @@ export function NewSessionDialog(props: NewSessionDialogProps) {
             value: project.id,
             label: `${project.name} — ${project.folder}`,
           }))}
+          placeholder={t("common.choose")}
         />
 
         <Select
@@ -142,6 +143,7 @@ export function NewSessionDialog(props: NewSessionDialogProps) {
             value: agent.id,
             label: agent.title ?? agent.id,
           }))}
+          placeholder={t("common.choose")}
         />
 
         <Select
@@ -152,6 +154,7 @@ export function NewSessionDialog(props: NewSessionDialogProps) {
             value: provider.id,
             label: provider.name,
           }))}
+          placeholder={t("common.choose")}
         />
 
         {entry?.kind === "failed" ? (
@@ -168,6 +171,7 @@ export function NewSessionDialog(props: NewSessionDialogProps) {
             disabled={entry?.kind !== "ready"}
             emptyText={t("state.empty")}
             options={known.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
+            placeholder={t("common.choose")}
           />
         </div>
 
@@ -180,6 +184,7 @@ export function NewSessionDialog(props: NewSessionDialogProps) {
             value: level,
             label: t(`thinking.${level}`),
           }))}
+          placeholder={t("common.choose")}
         />
       </div>
     </Dialog>

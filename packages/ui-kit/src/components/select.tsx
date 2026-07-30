@@ -18,10 +18,22 @@ export type SelectProps = {
   options: SelectOption[];
   onChange: (value: string) => void;
   label: string;
+  /**
+   * Что стоит в триггере, пока ничего не выбрано. Обязателен и без значения по умолчанию: строка,
+   * зашитая в кит, приезжает на чужом языке — переводить её обязан вызывающий (docs/ui-kit.md).
+   */
+  placeholder: string;
   disabled?: boolean;
 };
 
-export function Select({ value, options, onChange, label, disabled = false }: SelectProps) {
+export function Select({
+  value,
+  options,
+  onChange,
+  label,
+  placeholder,
+  disabled = false,
+}: SelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -135,7 +147,7 @@ export function Select({ value, options, onChange, label, disabled = false }: Se
         }}
         onKeyDown={handleKeyDown}
       >
-        <span className={styles.valueText}>{selectedOption?.label || "Выберите..."}</span>
+        <span className={styles.valueText}>{selectedOption?.label || placeholder}</span>
         <span className={`${styles.arrow}${open ? ` ${styles.open}` : ""}`}>▼</span>
       </div>
       {open ? (

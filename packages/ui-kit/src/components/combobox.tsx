@@ -15,22 +15,24 @@ export type ComboboxProps<T extends string> = {
   options: ComboboxOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  placeholder?: string;
+  /** Обязателен и без значения по умолчанию: строка, зашитая в кит, приезжает на чужом языке. */
+  placeholder: string;
   disabled?: boolean;
   invalid?: boolean;
   label?: string;
-  emptyText?: string;
+  /** То же правило: «ничего не найдено» переводит вызывающий. */
+  emptyText: string;
 };
 
 export function Combobox<T extends string>({
   options,
   value,
   onChange,
-  placeholder = "Выберите...",
+  placeholder,
   disabled = false,
   invalid = false,
   label,
-  emptyText = "Ничего не найдено",
+  emptyText,
 }: ComboboxProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

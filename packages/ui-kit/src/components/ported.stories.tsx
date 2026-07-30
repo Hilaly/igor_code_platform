@@ -215,6 +215,7 @@ export const Selectors = () => {
         value={searchableScheme}
         onChange={setSearchableScheme}
         placeholder="Найдите схему"
+        emptyText="Ничего не найдено"
       />
       <MultiSelect
         label="Видимые столбцы"

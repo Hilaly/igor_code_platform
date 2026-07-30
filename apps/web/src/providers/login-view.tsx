@@ -241,6 +241,7 @@ function LoginPromptForm({ prompt, onAnswer, translator }: LoginPromptFormProps)
           }))}
           onChange={setValue}
           label={prompt.message}
+          placeholder={t("common.choose")}
         />
       ) : (
         <Field label={prompt.message} hint={hint}>

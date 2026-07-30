@@ -246,7 +246,11 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
   `dismissible`, `footer`, `children`. Рисуется порталом в `body`, фокус держит внутренний
   `useFocusTrap`. **`ConfirmDialog`** поверх него.
 - **`Select`** — управляемый кастомный одиночный выбор: `value`, `options`, `onChange(value)`,
-  `label`, `disabled`. Триггер — `role="combobox"`, открытый набор — `role="listbox"`; активный
+  `label`, `placeholder`, `disabled`. `placeholder` обязателен и значения по умолчанию не имеет —
+  как и `placeholder` с `emptyText` у `Combobox` и `placeholder` у `MultiSelect`: строка,
+  зашитая в кит, приезжает на чужом языке, и первым же местом, где это стало видно, оказался
+  английский интерфейс с русским «Выберите...» в трёх полях подряд. Обязательный проп делает
+  забывчивость отказом сборки, а не находкой на скриншоте. Триггер — `role="combobox"`, открытый набор — `role="listbox"`; активный
   пункт связан через `aria-activedescendant`, выбранный — через `aria-selected`. Щелчок, `ArrowDown`,
   `Enter` или пробел открывают список; в открытом списке стрелки, `Home` и `End` двигают активный
   пункт, `Enter` или пробел выбирают его, `Escape` закрывает. Недоступные пункты остаются видимыми с

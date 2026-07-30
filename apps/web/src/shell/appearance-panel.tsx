@@ -50,6 +50,7 @@ export function AppearancePanel({
         onChange={(colorScheme) =>
           onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
         }
+        placeholder={t("common.choose")}
       />
       <div className="shell-appearance-choice">
         <Text tone="muted">{t("appearance.variant")}</Text>
@@ -90,6 +91,7 @@ export function AppearancePanel({
         value={preferences.locale}
         options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
         onChange={(locale) => onChange({ ...preferences, locale })}
+        placeholder={t("common.choose")}
       />
     </div>
   );

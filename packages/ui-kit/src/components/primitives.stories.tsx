@@ -104,6 +104,7 @@ export const Controls = () => {
           { value: "imperium", label: "Империум" },
           { value: "nord", label: "Норд" },
         ]}
+        placeholder="Выберите..."
       />
     </div>
   );

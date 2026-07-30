@@ -14,7 +14,8 @@ export type MultiSelectProps<T extends string> = {
   options: MultiSelectOption<T>[];
   value: T[];
   onChange: (value: T[]) => void;
-  placeholder?: string;
+  /** Обязателен и без значения по умолчанию: строка, зашитая в кит, приезжает на чужом языке. */
+  placeholder: string;
   disabled?: boolean;
   invalid?: boolean;
   label?: string;
@@ -24,7 +25,7 @@ export function MultiSelect<T extends string>({
   options,
   value,
   onChange,
-  placeholder = "Выберите...",
+  placeholder,
   disabled = false,
   invalid = false,
   label,

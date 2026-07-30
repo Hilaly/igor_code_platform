@@ -88,6 +88,7 @@ export const coreEnglish: CatalogRegistration = {
     "page.providers.title": "Providers",
     "page.sessions.title": "Sessions",
     "common.cancel": "Cancel",
+    "common.choose": "Pick one…",
     "providers.access.title": "Getting into {name}",
     "providers.auth.api_key": "API key",
     "providers.auth.oauth": "Subscription",

@@ -86,6 +86,7 @@ export const coreRussian: CatalogRegistration = {
     "page.providers.title": "Провайдеры",
     "page.sessions.title": "Сессии",
     "common.cancel": "Отмена",
+    "common.choose": "Выберите…",
     "providers.access.title": "Вход в {name}",
     "providers.auth.api_key": "Ключ API",
     "providers.auth.oauth": "Подписка",
