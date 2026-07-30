@@ -46,6 +46,7 @@ export * from "./components/tabs.tsx";
 export * from "./components/text.tsx";
 export * from "./components/toast.tsx";
 export * from "./components/toggle.tsx";
+export * from "./components/tool-call.tsx";
 export * from "./components/tooltip.tsx";
 export * from "./components/tree.tsx";
 export * from "./i18n/catalog.ts";

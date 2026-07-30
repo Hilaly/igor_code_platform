@@ -10,6 +10,7 @@
 import { Markdown } from "./markdown.tsx";
 import { Message, MessageFeed } from "./message-feed.tsx";
 import { StreamingText } from "./streaming-text.tsx";
+import { ToolCall } from "./tool-call.tsx";
 
 const column = {
   display: "flex",
@@ -59,6 +60,24 @@ export const Feed = () => (
       </Message>
       <Message role="agent" header="10:11">
         <Markdown text="Очередь отвечает первой: для рантайма такая сессия **ещё простаивает**." />
+      </Message>
+      <Message role="agent">
+        <ToolCall
+          toolName="write_file"
+          status="done"
+          statusLabel="Готово"
+          argumentsText={'{\n  "path": "hello.txt",\n  "text": "привет"\n}'}
+          output="Записано 6 байт."
+          outputLabel="Вывод"
+        />
+      </Message>
+      <Message role="agent">
+        <ToolCall
+          toolName="read_file"
+          status="failed"
+          statusLabel="Не удалось"
+          argumentsText={'{\n  "path": "нет-такого.txt"\n}'}
+        />
       </Message>
       <Message role="service">Модель сменилась на anthropic/claude-opus-4-5</Message>
       <Message role="agent" header="10:12">

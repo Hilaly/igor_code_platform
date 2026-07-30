@@ -1,0 +1,27 @@
+/*
+ * Вызов инструмента внутри ленты. Рамка нужна: в потоке ответа он стоит между абзацами текста, и без
+ * границы читается как ещё один абзац.
+ */
+
+.root {
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-panel-surface);
+}
+
+/* Провалившийся вызов виден по краю, а не только по значку: цвет один, но опор для глаза две. */
+.root[data-status="failed"] {
+  border-color: var(--sovereign-danger-border);
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+}
+
+.outputLabel {
+  margin-block-start: var(--sovereign-space-2);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+}

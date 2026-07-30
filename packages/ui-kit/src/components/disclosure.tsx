@@ -9,8 +9,12 @@ import type { ReactNode } from "react";
 import styles from "./disclosure.module.css";
 
 export type DisclosureProps = {
-  /** Подпись закрытого состояния: она объясняет, что развернётся. */
-  summary: string;
+  /**
+   * Подпись закрытого состояния: она объясняет, что развернётся. Не только строка — в подписи
+   * вызова инструмента стоит ещё и значок его состояния, и узнавать исход разворачиванием было бы
+   * неправильно.
+   */
+  summary: ReactNode;
   children: ReactNode;
 };
 

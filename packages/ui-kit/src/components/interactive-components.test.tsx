@@ -7,6 +7,7 @@ import { Combobox } from "./combobox.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
+import { ToolCall } from "./tool-call.tsx";
 import { Tree } from "./tree.tsx";
 
 const options = [
@@ -306,5 +307,64 @@ describe("interactive components", () => {
     const first = screen.getByRole("treeitem", { name: "Первый" });
     expect(first.getAttribute("tabindex")).toBe("0");
     expect(screen.queryByRole("treeitem", { name: "Второй" })).toBeNull();
+  });
+});
+
+describe("tool call", () => {
+  it("keeps the arguments folded until they are asked for", () => {
+    render(
+      <ToolCall
+        toolName="write_file"
+        status="running"
+        statusLabel="Идёт"
+        argumentsText={'{\n  "path": "hello.txt"\n}'}
+      />,
+    );
+
+    const details = screen.getByText("write_file").closest("details");
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
+
+    fireEvent.click(screen.getByText("write_file"));
+    expect(details?.open).toBe(true);
+    expect(screen.getByText(/hello\.txt/)).not.toBeNull();
+  });
+
+  it("shows the outcome without unfolding anything", () => {
+    // Провалившийся вызов обязан быть виден в свёрнутом состоянии: иначе про отказ узнают щелчком.
+    const { container } = render(
+      <ToolCall
+        toolName="write_file"
+        status="failed"
+        statusLabel="Не удалось"
+        argumentsText="{}"
+      />,
+    );
+
+    expect(screen.getByText("Не удалось")).not.toBeNull();
+    expect(container.querySelector('[data-status="failed"]')).not.toBeNull();
+  });
+
+  it("has no output block until the entries were read again", () => {
+    // В потоке вывода инструмента нет вовсе: `tool-end` несёт только идентификатор и признак отказа.
+    const { rerender, container } = render(
+      <ToolCall toolName="read_file" status="done" statusLabel="Готово" argumentsText="{}" />,
+    );
+
+    expect(container.querySelectorAll("pre")).toHaveLength(1);
+
+    rerender(
+      <ToolCall
+        toolName="read_file"
+        status="done"
+        statusLabel="Готово"
+        argumentsText="{}"
+        output="привет"
+        outputLabel="Вывод"
+      />,
+    );
+
+    expect(container.querySelectorAll("pre")).toHaveLength(2);
+    expect(screen.getByText("Вывод")).not.toBeNull();
   });
 });
