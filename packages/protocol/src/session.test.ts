@@ -4,9 +4,15 @@ import { describe, it } from "node:test";
 import {
   isSessionId,
   parseSessionDraft,
+  parseSessionForkRequest,
+  parseSessionMessage,
+  parseSessionUpdate,
   parseTurnRequest,
   sessionEntriesPath,
+  sessionForkPath,
+  sessionMessagesPath,
   sessionPath,
+  sessionStatsPath,
   sessionTurnsPath,
 } from "./session.ts";
 
@@ -95,10 +101,90 @@ describe("isSessionId", () => {
   });
 });
 
+describe("parseSessionUpdate", () => {
+  it("reads a rename together with the archive flag", () => {
+    const result = parseSessionUpdate({ title: "  разбор бага  ", archived: false });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      title: "разбор бага",
+      archived: false,
+    });
+  });
+
+  it("takes a body without a title as a session with no name", () => {
+    const result = parseSessionUpdate({ archived: true });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, { archived: true });
+  });
+
+  it("refuses a body without the archive flag", () => {
+    // Тело заменяет запись целиком: молчаливое умолчание разархивировало бы сессию при переименовании.
+    assert.equal(parseSessionUpdate({ title: "имя" }).kind, "rejected");
+    assert.equal(parseSessionUpdate({ title: "имя", archived: "да" }).kind, "rejected");
+  });
+
+  it("refuses a title made of spaces instead of silently clearing it", () => {
+    assert.equal(parseSessionUpdate({ title: "   ", archived: false }).kind, "rejected");
+  });
+});
+
+describe("parseSessionForkRequest", () => {
+  it("takes an empty body as a fork of the whole session", () => {
+    for (const body of [{}, undefined, null]) {
+      const result = parseSessionForkRequest(body);
+
+      assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {}, String(body));
+    }
+  });
+
+  it("reads the entry to cut at and where to cut", () => {
+    const result = parseSessionForkRequest({ entryId: "e7", position: "at" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      entryId: "e7",
+      position: "at",
+    });
+  });
+
+  it("refuses a position with nothing to cut at", () => {
+    assert.equal(parseSessionForkRequest({ position: "before" }).kind, "rejected");
+  });
+
+  it("refuses a position the runtime does not know", () => {
+    assert.equal(parseSessionForkRequest({ entryId: "e7", position: "after" }).kind, "rejected");
+  });
+});
+
+describe("parseSessionMessage", () => {
+  it("reads the text and the mode", () => {
+    const result = parseSessionMessage({ text: "  левее  ", mode: "steer" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      text: "левее",
+      mode: "steer",
+    });
+  });
+
+  it("refuses a message without a mode", () => {
+    // Умолчания нет намеренно: у четырёх режимов разные предусловия по занятости сессии.
+    assert.equal(parseSessionMessage({ text: "левее" }).kind, "rejected");
+    assert.equal(parseSessionMessage({ text: "левее", mode: "steering" }).kind, "rejected");
+  });
+
+  it("refuses a message without text", () => {
+    for (const body of [{ mode: "steer" }, { text: "  ", mode: "steer" }]) {
+      assert.equal(parseSessionMessage(body).kind, "rejected", JSON.stringify(body));
+    }
+  });
+});
+
 describe("session paths", () => {
   it("builds the paths of one session", () => {
     assert.equal(sessionPath("abc"), "/api/sessions/abc");
     assert.equal(sessionEntriesPath("abc"), "/api/sessions/abc/entries");
     assert.equal(sessionTurnsPath("abc"), "/api/sessions/abc/turns");
+    assert.equal(sessionForkPath("abc"), "/api/sessions/abc/fork");
+    assert.equal(sessionMessagesPath("abc"), "/api/sessions/abc/messages");
+    assert.equal(sessionStatsPath("abc"), "/api/sessions/abc/stats");
   });
 });

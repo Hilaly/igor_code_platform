@@ -50,6 +50,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",
   phase: "idle",
+  archived: false,
   createdAt: "2026-07-29T00:00:00.000Z",
   ...overrides,
 });

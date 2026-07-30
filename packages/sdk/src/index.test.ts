@@ -80,6 +80,7 @@ describe("the session surface", () => {
       model: "scripted/one",
       thinkingLevel: "off" as const,
       phase: "idle" as const,
+      archived: false,
       createdAt: "2026-07-29T09:00:00.000Z",
     };
 

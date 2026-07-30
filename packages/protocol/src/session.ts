@@ -18,9 +18,19 @@ export const agentsPath = "/api/agents";
 export const sessionPathPattern = `${sessionsPath}/:sessionId`;
 export const sessionEntriesPathPattern = `${sessionsPath}/:sessionId/entries`;
 export const sessionTurnsPathPattern = `${sessionsPath}/:sessionId/turns`;
+export const sessionForkPathPattern = `${sessionsPath}/:sessionId/fork`;
+export const sessionMessagesPathPattern = `${sessionsPath}/:sessionId/messages`;
+export const sessionStatsPathPattern = `${sessionsPath}/:sessionId/stats`;
 
 /** Параметр фильтра списка: сессии одного проекта. */
 export const sessionProjectParameter = "projectId";
+
+/**
+ * Параметр фильтра списка: архивные вместо действующих. Фильтр, а не второй список рядом с
+ * действующими, как у проектов: сессий на проект бывают десятки, и оба списка в одном ответе
+ * заставили бы клиента возить архив, которого он не показывает.
+ */
+export const sessionArchivedParameter = "archived";
 
 /** Курсор чтения записей: сколько записей клиент уже видел. */
 export const sessionEntriesAfterParameter = "after";
@@ -35,6 +45,18 @@ export function sessionEntriesPath(sessionId: string): string {
 
 export function sessionTurnsPath(sessionId: string): string {
   return `${sessionPath(sessionId)}/turns`;
+}
+
+export function sessionForkPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/fork`;
+}
+
+export function sessionMessagesPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/messages`;
+}
+
+export function sessionStatsPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/stats`;
 }
 
 /**
@@ -78,7 +100,13 @@ export type Session = {
   model: string;
   thinkingLevel: ThinkingLevel;
   phase: SessionPhase;
+  /** Имя, данное человеком. Его может не быть: сессия называется не при создании, а когда захочется. */
   title?: string;
+  /**
+   * Архивная сессия убрана с глаз, но цела и читается по прямому адресу. Архивация требует простоя
+   * (docs/sessions-and-projects.md).
+   */
+  archived: boolean;
   createdAt: string;
 };
 
@@ -118,6 +146,86 @@ export type TurnAccepted = {
 export type TurnInterrupted = {
   sessionId: string;
   interrupted: boolean;
+};
+
+/**
+ * Тело изменения сессии: переименование, архивация и восстановление — одна запись целой записи, как
+ * у проекта. `title` при этом необязателен, потому что безымянная сессия — норма: тело без него
+ * снимает имя, а не отказывает.
+ */
+export type SessionUpdate = {
+  title?: string;
+  archived: boolean;
+};
+
+/** Ответ безвозвратного удаления. */
+export type SessionDeleted = {
+  id: string;
+};
+
+/**
+ * Тело форка. Без `entryId` форк берёт сессию целиком.
+ *
+ * `position` — где резать: `before` оставляет всё **до** записи, `at` — включая её. Умолчание
+ * `before` работает только по сообщению человека: «переспросить иначе» — единственный смысл, в
+ * котором отрезать ответ модели вместе с вопросом осмысленно (docs/agent-runtime-contract.md).
+ */
+export type SessionForkRequest = {
+  entryId?: string;
+  position?: "before" | "at";
+};
+
+/**
+ * Куда встаёт сообщение, отправленное не турном.
+ *
+ * - `steer` — вклинить в идущий турн, модель увидит его следующим шагом;
+ * - `follow-up` — дождаться конца текущего турна и продолжить им же;
+ * - `next-turn` — лечь в начало следующего турна; переживает прерывание;
+ * - `append` — просто дописать в дерево, никого не будя.
+ *
+ * Один маршрут с полем вместо четырёх: расширять `POST .../turns` нельзя — он значит «запусти турн»
+ * и требует простоя, а `steer` требует ровно обратного (docs/web-api.md).
+ */
+export const sessionMessageModes = ["steer", "follow-up", "next-turn", "append"] as const;
+
+export type SessionMessageMode = (typeof sessionMessageModes)[number];
+
+export function isSessionMessageMode(value: unknown): value is SessionMessageMode {
+  return sessionMessageModes.includes(value as SessionMessageMode);
+}
+
+export type SessionMessage = {
+  text: string;
+  mode: SessionMessageMode;
+};
+
+/** Ответ приёма сообщения. Фазы здесь нет: турна оно не запускает. */
+export type SessionMessageAccepted = {
+  sessionId: string;
+  mode: SessionMessageMode;
+};
+
+/**
+ * Очереди сообщений, ждущих своего момента. Отдаются наружу, потому что написавший стиринг обязан
+ * видеть, что тот принят и ждёт, а не пропал.
+ */
+export type SessionQueues = {
+  steer: string[];
+  followUp: string[];
+  nextTurn: string[];
+};
+
+/**
+ * Счёт токенов и денег. Считается по **всему файлу сессии**, включая брошенные ветки: вопрос, на
+ * который она отвечает, — «сколько я за эту сессию заплатил», а заплачено и за брошенное тоже.
+ */
+export type SessionStats = {
+  sessionId: string;
+  messageCount: number;
+  cachedTokens: number;
+  uncachedTokens: number;
+  totalTokens: number;
+  costTotal: number;
 };
 
 /**
@@ -195,7 +303,8 @@ export type SessionDelta =
   | { kind: "tool-end"; toolCallId: string; failed: boolean }
   | { kind: "turn-end" }
   | { kind: "turn-aborted" }
-  | { kind: "turn-failed"; reason: string };
+  | { kind: "turn-failed"; reason: string }
+  | { kind: "queues"; queues: SessionQueues };
 
 /** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
 export type AgentSummary = {
@@ -225,6 +334,9 @@ export function isSessionId(value: unknown): value is string {
 
 const draftKeys = ["projectId", "agentId", "model", "thinkingLevel"];
 const turnKeys = ["text", "model", "thinkingLevel"];
+const updateKeys = ["title", "archived"];
+const forkKeys = ["entryId", "position"];
+const messageKeys = ["text", "mode"];
 
 export function parseSessionDraft(
   raw: unknown,
@@ -285,6 +397,126 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
   }
 
   return { kind: "parsed", value: { text, ...overrides }, diagnostics };
+}
+
+export function parseSessionUpdate(
+  raw: unknown,
+  label = "session",
+): SettingsParseResult<SessionUpdate> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, updateKeys);
+  const archived = fields["archived"];
+
+  // `archived` обязателен: запись заменяет запись целиком, и тело без него разархивировало бы
+  // сессию человеку, который менял только имя. `title` необязателен — безымянная сессия законна.
+  if (typeof archived !== "boolean") {
+    diagnostics.push(`${label}.archived must be a boolean, got ${JSON.stringify(archived)}`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const rawTitle = fields["title"];
+
+  if (rawTitle !== undefined && trimmedText(rawTitle) === undefined) {
+    diagnostics.push(`${label}.title must be a non-empty name, or absent to clear it`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: {
+      ...(rawTitle === undefined ? {} : { title: trimmedText(rawTitle) as string }),
+      archived,
+    },
+    diagnostics,
+  };
+}
+
+export function parseSessionForkRequest(
+  raw: unknown,
+  label = "fork",
+): SettingsParseResult<SessionForkRequest> {
+  // Пустое тело — законный форк сессии целиком, поэтому отсутствующее тело равно пустому объекту.
+  const fields = raw === undefined || raw === null ? {} : asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, forkKeys);
+  const rawEntryId = fields["entryId"];
+  const entryId = rawEntryId === undefined ? undefined : trimmedText(rawEntryId);
+
+  if (rawEntryId !== undefined && entryId === undefined) {
+    diagnostics.push(`${label}.entryId must be a non-empty entry identifier`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const position = fields["position"];
+
+  if (position !== undefined && position !== "before" && position !== "at") {
+    diagnostics.push(
+      `${label}.position must be one of before, at, got ${JSON.stringify(position)}`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  if (position !== undefined && entryId === undefined) {
+    diagnostics.push(`${label}.position needs ${label}.entryId: there is nothing to cut at`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: {
+      ...(entryId === undefined ? {} : { entryId }),
+      ...(position === undefined ? {} : { position }),
+    },
+    diagnostics,
+  };
+}
+
+export function parseSessionMessage(
+  raw: unknown,
+  label = "message",
+): SettingsParseResult<SessionMessage> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, messageKeys);
+  const text = trimmedText(fields["text"]);
+
+  if (text === undefined) {
+    diagnostics.push(`${label}.text must be a non-empty message`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const mode = fields["mode"];
+
+  // Умолчания у режима нет намеренно: у четырёх режимов разные предусловия по занятости сессии, и
+  // угаданный за отправителя режим отличался бы от задуманного молча.
+  if (!isSessionMessageMode(mode)) {
+    diagnostics.push(
+      `${label}.mode must be one of ${sessionMessageModes.join(", ")}, got ${JSON.stringify(mode)}`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: { text, mode }, diagnostics };
 }
 
 /** Модель и уровень ризонинга разбираются одинаково и в теле создания, и в теле турна. */

@@ -14,6 +14,7 @@ const session: Session = {
   model: "scripted/one",
   thinkingLevel: "off",
   phase: "idle",
+  archived: false,
   createdAt: "2026-07-29T09:00:00.000Z",
 };
 

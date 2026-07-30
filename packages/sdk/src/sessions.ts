@@ -26,7 +26,10 @@ export type Session = {
   model: string;
   thinkingLevel: ThinkingLevel;
   phase: SessionPhase;
+  /** Имя, данное человеком. Его может не быть: сессия называется не при создании, а когда захочется. */
   title?: string;
+  /** Архивная сессия убрана с глаз, но цела и читается по прямому адресу. */
+  archived: boolean;
   createdAt: string;
 };
 
