@@ -31,6 +31,26 @@ describe("matchPage", () => {
     });
   });
 
+  it("keeps a single session on an address of its own", () => {
+    expect(matchPage("/sessions")).toEqual({ kind: "sessions" });
+    expect(matchPage("/sessions/0199abcd-ef01")).toEqual({
+      kind: "sessions",
+      sessionId: "0199abcd-ef01",
+    });
+  });
+
+  it("takes a malformed session identifier for an unknown address", () => {
+    // Мусор в адресе не должен превращаться в запрос, который вернёт 404: проверка та же, что у демона.
+    expect(matchPage("/sessions/со слэшем/ещё")).toEqual({
+      kind: "unknown",
+      path: "/sessions/со слэшем/ещё",
+    });
+    expect(matchPage("/sessions/русскими буквами")).toEqual({
+      kind: "unknown",
+      path: "/sessions/русскими буквами",
+    });
+  });
+
   it("reads the plugin page namespace", () => {
     expect(matchPage("/p/tracker/board")).toEqual({
       kind: "plugin",
@@ -63,6 +83,8 @@ describe("pathOf", () => {
       "/plugins",
       "/projects",
       "/providers",
+      "/sessions",
+      "/sessions/0199abcd-ef01",
       "/p/tracker/board",
       "/p/tracker/board/15/edit",
       "/settings",

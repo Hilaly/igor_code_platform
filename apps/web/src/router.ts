@@ -5,18 +5,23 @@
  * маршрутами; до тех пор она была бы зависимостью ради `history.pushState`.
  */
 
+import { isSessionId } from "@sovereign/protocol";
+
 export const pluginPagePrefix = "p";
 
 /** Вью базовой поставки живут в ядре и своего адреса не теряют (docs/architecture.md). */
 export const pluginsPagePath = "/plugins";
 export const projectsPagePath = "/projects";
 export const providersPagePath = "/providers";
+export const sessionsPagePath = "/sessions";
 
 export type Page =
   | { kind: "home" }
   | { kind: "plugins" }
   | { kind: "projects" }
   | { kind: "providers" }
+  /** Мастер-деталь: список сессий, а с идентификатором — ещё и открытый чат. */
+  | { kind: "sessions"; sessionId?: string }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -38,6 +43,17 @@ export function matchPage(path: string): Page {
 
   if (segments.length === 1 && `/${segments[0]}` === providersPagePath) {
     return { kind: "providers" };
+  }
+
+  if (`/${segments[0]}` === sessionsPagePath && segments.length <= 2) {
+    const sessionId = segments[1];
+
+    if (sessionId === undefined) {
+      return { kind: "sessions" };
+    }
+
+    // Мусор в адресе не превращается в запрос, который вернёт 404: проверка та же, что у демона.
+    return isSessionId(sessionId) ? { kind: "sessions", sessionId } : { kind: "unknown", path };
   }
 
   if (segments[0] === pluginPagePrefix) {
@@ -64,6 +80,10 @@ export function pathOf(page: Page): string {
       return projectsPagePath;
     case "providers":
       return providersPagePath;
+    case "sessions":
+      return page.sessionId === undefined
+        ? sessionsPagePath
+        : `${sessionsPagePath}/${page.sessionId}`;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":
