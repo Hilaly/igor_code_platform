@@ -10,6 +10,9 @@
  * атомарной перезаписи файла, ради которой существует `writeFileAtomically` в демоне.
  */
 
+import { mkdir, rename } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
+
 import {
   AgentHarness,
   AgentHarnessError,
@@ -59,6 +62,8 @@ export type AgentSessionSummary = {
   thinkingLevel: ThinkingLevel;
   /** Имя, данное человеком. Безымянная сессия — норма. */
   name?: string;
+  /** Признак архива — корень, в котором лежит файл, а не запись внутри него. */
+  archived: boolean;
   createdAt: string;
 };
 
@@ -128,6 +133,9 @@ export type MessageOutcome = { kind: "queued" } | { kind: "idle" } | { kind: "bu
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
 
+/** Исход переноса между корнями. Сессия уже там, куда её просят, — успех, а не отказ. */
+export type ArchiveOutcome = { kind: "moved" } | { kind: "unknown-session" };
+
 /** Что вышло из форка. Отказ рантайма приезжает исходом: указать не ту запись — обычная ошибка. */
 export type ForkOutcome =
   | { kind: "forked"; session: PersistedAgentSession }
@@ -160,6 +168,13 @@ export type AgentSessionStore = {
   fork: (sourceId: string, options?: ForkRequest) => Promise<ForkOutcome>;
   /** Стереть файл сессии. `false` — стирать было нечего. */
   remove: (id: string) => Promise<boolean>;
+  /**
+   * Убрать сессию с глаз, не теряя её: файл переезжает в архивный корень. Требует, чтобы файл
+   * никто не дописывал, поэтому harness сессии останавливается — простой обеспечивает вызывающий.
+   */
+  archive: (id: string) => Promise<ArchiveOutcome>;
+  /** Вернуть сессию из архива тем же переносом в обратную сторону. */
+  restore: (id: string) => Promise<ArchiveOutcome>;
   /** Файлы, которые прочитать не вышло. Одна битая сессия не отменяет остальные. */
   problems: () => string[];
   /** Выгрузить сессию из памяти: harness останавливается, следующий `open` читает файл заново. */
@@ -184,6 +199,11 @@ export type CreateAgentSessionStoreOptions = {
   models: MutableModels;
   /** Корень записей сессий внутри директории данных (docs/data-directory.md). */
   directory: string;
+  /**
+   * Корень архивных записей — сосед первого, а не папка внутри него: архивация переносит файл
+   * между корнями, а вложенная папка притворилась бы папкой рабочей директории при обходе.
+   */
+  archivedDirectory: string;
 };
 
 /**
@@ -206,7 +226,13 @@ export function createAgentSessionStore(
   options: CreateAgentSessionStoreOptions,
 ): AgentSessionStore {
   const storage = new NodeExecutionEnv({ cwd: options.directory });
+  // Два корня — два репозитория рантайма со своими `list`, `open` и `delete`. Действующий корень
+  // про архивный не знает вовсе, поэтому архивная сессия не может случайно попасть в его список.
   const repo = new JsonlSessionRepo({ fs: storage, sessionsRoot: options.directory });
+  const archivedRepo = new JsonlSessionRepo({
+    fs: storage,
+    sessionsRoot: options.archivedDirectory,
+  });
   /**
    * Один владелец на файл сессии. Экземпляр `Session` держит своё дерево записей и свой лист в
    * памяти, а дозапись идёт от этого листа: два экземпляра на один файл разошлись бы ветками при
@@ -215,24 +241,83 @@ export function createAgentSessionStore(
   const owned = new Map<string, PersistedAgentSession>();
   let problems: string[] = [];
 
-  const listMetadata = async (scanProblems: string[]): Promise<JsonlSessionMetadata[]> => {
-    try {
-      return await repo.list();
-    } catch (cause) {
-      // Нечитаемый корень — не отказ поверхности: сессий просто не видно, и об этом надо сказать.
-      scanProblems.push(`the sessions could not be listed: ${describe(cause)}`);
+  /** Запись файла сессии вместе с тем, в каком корне она лежит. Корень и есть признак архива. */
+  type Located = { metadata: JsonlSessionMetadata; archived: boolean };
 
-      return [];
+  const listMetadata = async (scanProblems: string[]): Promise<Located[]> => {
+    const roots: [JsonlSessionRepo, boolean][] = [
+      [repo, false],
+      [archivedRepo, true],
+    ];
+    const found: Located[] = [];
+
+    for (const [root, archived] of roots) {
+      try {
+        for (const metadata of await root.list()) {
+          found.push({ metadata, archived });
+        }
+      } catch (cause) {
+        // Нечитаемый корень — не отказ поверхности: сессий просто не видно, и об этом надо сказать.
+        const which = archived ? "archived sessions" : "sessions";
+
+        scanProblems.push(`the ${which} could not be listed: ${describe(cause)}`);
+      }
     }
+
+    return found;
   };
 
-  const metadataOf = async (id: string): Promise<JsonlSessionMetadata | undefined> => {
+  const locate = async (id: string): Promise<Located | undefined> => {
     const scanProblems: string[] = [];
-    const found = (await listMetadata(scanProblems)).find((candidate) => candidate.id === id);
+    const found = (await listMetadata(scanProblems)).find(
+      (candidate) => candidate.metadata.id === id,
+    );
 
     problems = scanProblems;
 
     return found;
+  };
+
+  const repoOf = (located: Located): JsonlSessionRepo => (located.archived ? archivedRepo : repo);
+
+  /** Забыть сессию и остановить её harness. После этого файл можно двигать и стирать. */
+  const release = async (id: string): Promise<void> => {
+    const known = owned.get(id);
+
+    owned.delete(id);
+    await known?.close();
+  };
+
+  /**
+   * Архивация и разархив — перенос файла между корнями. Папка рабочей директории воссоздаётся с тем
+   * же именем: как рантайм кодирует путь в имя папки — его дело, и переизобретать эту кодировку
+   * незачем, достаточно перенести имя дословно.
+   */
+  const move = async (id: string, archived: boolean): Promise<ArchiveOutcome> => {
+    const located = await locate(id);
+
+    if (located === undefined) {
+      return { kind: "unknown-session" };
+    }
+
+    if (located.archived === archived) {
+      return { kind: "moved" };
+    }
+
+    const source = located.metadata.path;
+    const target = join(
+      archived ? options.archivedDirectory : options.directory,
+      basename(dirname(source)),
+      basename(source),
+    );
+
+    // Сначала отпустить файл, потом двигать: у открытой сессии в памяти лежит старый путь, и
+    // следующая дозапись ушла бы по нему — то есть мимо перенесённого файла.
+    await release(id);
+    await mkdir(dirname(target), { recursive: true });
+    await rename(source, target);
+
+    return { kind: "moved" };
   };
 
   const own = (session: PiSession, summary: AgentSessionSummary): PersistedAgentSession => {
@@ -271,7 +356,7 @@ export function createAgentSessionStore(
       await session.appendModelChange(model.provider, model.id);
       await session.appendThinkingLevelChange(input.thinkingLevel);
 
-      return own(session, await summaryOf(session)).activate(input.agent);
+      return own(session, await summaryOf(session, false)).activate(input.agent);
     },
     open: async (id) => {
       const known = owned.get(id);
@@ -280,24 +365,26 @@ export function createAgentSessionStore(
         return known;
       }
 
-      const metadata = await metadataOf(id);
+      const located = await locate(id);
 
-      if (metadata === undefined) {
+      if (located === undefined) {
         return undefined;
       }
 
-      const session = await repo.open(metadata);
+      const session = await repoOf(located).open(located.metadata);
 
-      return own(session, await summaryOf(session));
+      return own(session, await summaryOf(session, located.archived));
     },
     list: async () => {
       const scanProblems: string[] = [];
       const summaries = await Promise.all(
-        (await listMetadata(scanProblems)).map(async (metadata) => {
+        (await listMetadata(scanProblems)).map(async (located) => {
           try {
-            return await summaryOfMetadata(repo, metadata);
+            return await summaryOfMetadata(repoOf(located), located);
           } catch (cause) {
-            scanProblems.push(`the session ${metadata.id} could not be read: ${describe(cause)}`);
+            scanProblems.push(
+              `the session ${located.metadata.id} could not be read: ${describe(cause)}`,
+            );
 
             return undefined;
           }
@@ -309,16 +396,17 @@ export function createAgentSessionStore(
       return summaries.filter((summary): summary is AgentSessionSummary => summary !== undefined);
     },
     fork: async (sourceId, request = {}) => {
-      const metadata = await metadataOf(sourceId);
+      const located = await locate(sourceId);
 
-      if (metadata === undefined) {
+      if (located === undefined) {
         return { kind: "unknown-session" };
       }
 
       let forked: PiSession;
 
       try {
-        forked = await repo.fork(metadata, { cwd: metadata.cwd, ...request });
+        // Форк всегда рождается действующим: продолжать работу в архиве бессмысленно.
+        forked = await repo.fork(located.metadata, { cwd: located.metadata.cwd, ...request });
       } catch (cause) {
         // Не та запись — обычная ошибка вызывающего, а не сбой хранилища: она приезжает исходом.
         // Всё прочее (не пишется файл, не читается дерево) уезжает наверх исключением.
@@ -329,23 +417,22 @@ export function createAgentSessionStore(
         throw cause;
       }
 
-      return { kind: "forked", session: own(forked, await summaryOf(forked)) };
+      return { kind: "forked", session: own(forked, await summaryOf(forked, false)) };
     },
     remove: async (id) => {
-      const metadata = await metadataOf(id);
+      const located = await locate(id);
 
-      if (metadata === undefined) {
+      if (located === undefined) {
         return false;
       }
 
-      const known = owned.get(id);
-
-      owned.delete(id);
-      await known?.close();
-      await repo.delete(metadata);
+      await release(id);
+      await repoOf(located).delete(located.metadata);
 
       return true;
     },
+    archive: (id) => move(id, true),
+    restore: (id) => move(id, false),
     problems: () => [...problems],
     close: async (id) => {
       const known = owned.get(id);
@@ -364,16 +451,16 @@ type PiSession = Awaited<ReturnType<JsonlSessionRepo["create"]>>;
 
 async function summaryOfMetadata(
   repo: JsonlSessionRepo,
-  metadata: JsonlSessionMetadata,
+  located: { metadata: JsonlSessionMetadata; archived: boolean },
 ): Promise<AgentSessionSummary> {
-  return summaryOf(await repo.open(metadata));
+  return summaryOf(await repo.open(located.metadata), located.archived);
 }
 
 /**
  * Текущие модель, уровень ризонинга и имя выводятся из записей дерева, а не хранятся в заголовке:
  * их меняют на живой сессии, а заголовок дописанного файла не переписывается.
  */
-async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
+async function summaryOf(session: PiSession, archived: boolean): Promise<AgentSessionSummary> {
   const metadata = await session.getMetadata();
   const fields = (metadata.metadata ?? {}) as Record<string, unknown>;
   const entries = await session.getEntries();
@@ -402,6 +489,7 @@ async function summaryOf(session: PiSession): Promise<AgentSessionSummary> {
     model,
     thinkingLevel,
     ...(name === undefined ? {} : { name }),
+    archived,
     createdAt: metadata.createdAt,
   };
 }

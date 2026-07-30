@@ -33,6 +33,13 @@ export const workDirectoryName = "work";
  */
 export const sessionsDirectoryName = "sessions";
 
+/**
+ * Корень архивных сессий — **сосед** `sessions/`, а не папка внутри неё. Архивация переносит файл
+ * между корнями, и вложенная папка сломала бы обход рантайма: он берёт папки первого уровня корня
+ * за папки рабочих директорий (docs/sessions-and-projects.md).
+ */
+export const archivedSessionsDirectoryName = "sessions-archived";
+
 export function ensureDataDirectory(path: string): string {
   const directory = resolveDataDirectory(path);
   const existing = statSync(directory, { throwIfNoEntry: false });
@@ -44,6 +51,7 @@ export function ensureDataDirectory(path: string): string {
   mkdirSync(join(directory, pluginsDirectoryName), { recursive: true });
   mkdirSync(join(directory, workDirectoryName), { recursive: true });
   mkdirSync(join(directory, sessionsDirectoryName), { recursive: true });
+  mkdirSync(join(directory, archivedSessionsDirectoryName), { recursive: true });
 
   return directory;
 }

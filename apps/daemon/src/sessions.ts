@@ -150,8 +150,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     // Очередь знает про ожидание и работу, рантайм — про всё остальное. Спрашиваем сначала очередь:
     // сессия в очереди для рантайма ещё простаивает (docs/architecture.md).
     phase: phaseOf(summary.id),
-    // Архива у сессий пока нет: корень записей один, и заархивировать сессию нечем.
-    archived: false,
+    ...(summary.name === undefined ? {} : { title: summary.name }),
+    archived: summary.archived,
     createdAt: summary.createdAt,
   });
 

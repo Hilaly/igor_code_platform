@@ -326,7 +326,12 @@ function emptyUsage(): Usage {
  * Хранилище сессий на двойнике модели. Живёт здесь, а не в тестах демона, по той же причине, что и
  * остальные двойники: собрано оно из типов Pi, а демону они недоступны (docs/architecture.md).
  */
-export function scriptedSessionStore(options: { directory: string; turns?: ScriptedTurn[] }): {
+export function scriptedSessionStore(options: {
+  directory: string;
+  /** Корень архива. Не назван — берётся сосед `<directory>-archived`, чтобы тест не заводил второй. */
+  archivedDirectory?: string;
+  turns?: ScriptedTurn[];
+}): {
   store: AgentSessionStore;
   model: string;
   removeModel: () => void;
@@ -338,7 +343,11 @@ export function scriptedSessionStore(options: { directory: string; turns?: Scrip
   models.setProvider(scripted.provider);
 
   return {
-    store: createAgentSessionStore({ models, directory: options.directory }),
+    store: createAgentSessionStore({
+      models,
+      directory: options.directory,
+      archivedDirectory: options.archivedDirectory ?? `${options.directory}-archived`,
+    }),
     model: `${scripted.model.provider}/${scripted.model.id}`,
     removeModel: () => models.deleteProvider(scripted.provider.id),
     restoreModel: () => models.setProvider(scripted.provider),

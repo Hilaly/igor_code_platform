@@ -6,7 +6,11 @@ import { parseArguments } from "./arguments.ts";
 import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createCredentialStore } from "./credential-store.ts";
-import { ensureDataDirectory, sessionsDirectoryName } from "./data-directory.ts";
+import {
+  archivedSessionsDirectoryName,
+  ensureDataDirectory,
+  sessionsDirectoryName,
+} from "./data-directory.ts";
 import { createEventBus } from "./event-bus.ts";
 import {
   createAgentSessionStore,
@@ -248,6 +252,7 @@ const sessions = createSessionService({
   store: createAgentSessionStore({
     models: providers.models,
     directory: join(directory, sessionsDirectoryName),
+    archivedDirectory: join(directory, archivedSessionsDirectoryName),
   }),
   projects,
   contributions: () => contributions.resolved(),

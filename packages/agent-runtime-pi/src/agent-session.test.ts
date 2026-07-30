@@ -48,8 +48,9 @@ async function withStore(
   models.setProvider(scripted.provider);
 
   const directory = await freshFolder("sessions");
+  const archivedDirectory = await freshFolder("sessions-archived");
   const folder = projectFolder ?? (await freshFolder("project"));
-  const store = createAgentSessionStore({ models, directory });
+  const store = createAgentSessionStore({ models, directory, archivedDirectory });
 
   const open = async (): Promise<AgentSession> => {
     const created = await store.create({
@@ -68,7 +69,7 @@ async function withStore(
     return created;
   };
 
-  return { store, open, folder, directory, requests: scripted.requests };
+  return { store, open, folder, directory, archivedDirectory, requests: scripted.requests };
 }
 
 /** Что уехало модели в обращении с этим номером: по нему видно, доехал ли стиринг до разговора. */
@@ -182,7 +183,9 @@ describe("an agent session over pi", () => {
   });
 
   it("keeps a session across a restart of the store", async () => {
-    const { open, store, directory, folder } = await withStore([{ text: "привет" }]);
+    const { open, store, directory, archivedDirectory, folder } = await withStore([
+      { text: "привет" },
+    ]);
     const session = await open();
 
     await session.prompt("скажи", "t1");
@@ -197,7 +200,7 @@ describe("an agent session over pi", () => {
     assert.match(listed[0]?.model ?? "", /^scripted-model\//);
 
     // Активация поднимает harness заново и видит записанное: сессия переживает перезапуск демона.
-    const persisted = await (await freshStore(directory)).open(listed[0]?.id ?? "");
+    const persisted = await (await freshStore(directory, archivedDirectory)).open(listed[0]?.id ?? "");
 
     assert.ok(persisted !== undefined);
     const reopened = persisted.activate(agent);
@@ -208,7 +211,7 @@ describe("an agent session over pi", () => {
   });
 
   it("reads a persisted session after its model disappears", async () => {
-    const { open, directory } = await withStore([{ text: "привет" }]);
+    const { open, directory, archivedDirectory } = await withStore([{ text: "привет" }]);
     const session = await open();
 
     await session.prompt("скажи", "t1");
@@ -216,7 +219,7 @@ describe("an agent session over pi", () => {
     await session.close();
 
     const models = createModels();
-    const restarted = createAgentSessionStore({ models, directory });
+    const restarted = createAgentSessionStore({ models, directory, archivedDirectory });
     const listed = await restarted.list();
     const persisted = await restarted.open(sessionId);
 
@@ -227,7 +230,7 @@ describe("an agent session over pi", () => {
   });
 
   it("keeps one owner per session file", async () => {
-    const { open, store, directory } = await withStore([
+    const { open, store, directory, archivedDirectory } = await withStore([
       { text: "первый" },
       { text: "второй" },
       { text: "третий" },
@@ -255,7 +258,7 @@ describe("an agent session over pi", () => {
     await session.close();
 
     // Правда о дереве — на диске, поэтому читается она свежим стором, а не тем же экземпляром.
-    const reread = await (await freshStore(directory)).open(sessionId);
+    const reread = await (await freshStore(directory, archivedDirectory)).open(sessionId);
 
     assert.ok(reread !== undefined);
 
@@ -470,7 +473,7 @@ describe("forking a session", () => {
 
 describe("naming, counting and removing a session", () => {
   it("keeps the name across a restart of the store", async () => {
-    const { open, store, directory } = await withStore([]);
+    const { open, store, directory, archivedDirectory } = await withStore([]);
     const session = await open();
     const sessionId = session.summary().id;
     const persisted = await store.open(sessionId);
@@ -482,7 +485,7 @@ describe("naming, counting and removing a session", () => {
     assert.equal(session.summary().name, "разбор бага");
     await session.close();
 
-    const restarted = await freshStore(directory);
+    const restarted = await freshStore(directory, archivedDirectory);
 
     assert.deepEqual(
       (await restarted.list()).map((summary) => summary.name),
@@ -520,6 +523,81 @@ describe("naming, counting and removing a session", () => {
   });
 });
 
+describe("archiving a session", () => {
+  it("moves the file to the archived root and back", async () => {
+    const { open, store, directory, archivedDirectory } = await withStore([{ text: "привет" }]);
+    const session = await open();
+    const sessionId = session.summary().id;
+
+    await session.prompt("скажи", "t1");
+    await session.close();
+
+    assert.deepEqual(await store.archive(sessionId), { kind: "moved" });
+
+    // Переезжает файл, а не папка: опустевшая папка рабочей директории остаётся в действующем
+    // корне и никому не мешает — сессий в ней рантайм больше не видит.
+    assert.deepEqual(await sessionFiles(directory), []);
+    assert.equal((await store.list()).filter((summary) => summary.archived).length, 1);
+    assert.match(await onlySessionFile(archivedDirectory), /\.jsonl$/);
+
+    // Архивная сессия цела: по прямому адресу она читается со всеми записями.
+    const persisted = await store.open(sessionId);
+
+    assert.ok(persisted !== undefined);
+    assert.equal(persisted.summary().archived, true);
+    assert.equal((await persisted.entries()).entries.length, 5);
+
+    assert.deepEqual(await store.restore(sessionId), { kind: "moved" });
+    assert.deepEqual(await sessionFiles(archivedDirectory), []);
+    assert.deepEqual(
+      (await store.list()).map((summary) => summary.archived),
+      [false],
+    );
+  });
+
+  it("takes a session already where it is asked to be as done", async () => {
+    const { open, store } = await withStore([]);
+    const session = await open();
+
+    await session.close();
+
+    assert.deepEqual(await store.restore(session.summary().id), { kind: "moved" });
+    assert.deepEqual(await store.archive("00000000"), { kind: "unknown-session" });
+  });
+
+  it("keeps writing to the archived file after it moved", async () => {
+    const { open, store, archivedDirectory } = await withStore([]);
+    const session = await open();
+    const sessionId = session.summary().id;
+
+    await session.close();
+    await store.archive(sessionId);
+
+    const persisted = await store.open(sessionId);
+
+    assert.ok(persisted !== undefined);
+    await persisted.setName("убрано с глаз");
+
+    // Имя ушло в перенесённый файл, а не в старый путь, оставшийся в памяти прежнего владельца.
+    const contents = await readFile(await onlySessionFile(archivedDirectory), "utf8");
+
+    assert.match(contents, /убрано с глаз/);
+  });
+});
+
+/** Файлы сессий в корне, по всем папкам рабочих директорий. Пустая папка сессией не считается. */
+async function sessionFiles(root: string): Promise<string[]> {
+  const found: string[] = [];
+
+  for (const folder of await readdir(root)) {
+    for (const file of await readdir(join(root, folder))) {
+      found.push(file);
+    }
+  }
+
+  return found;
+}
+
 async function onlySessionFile(directory: string): Promise<string> {
   const [sessionDirectory] = await readdir(directory);
 
@@ -532,12 +610,12 @@ async function onlySessionFile(directory: string): Promise<string> {
   return join(directory, sessionDirectory, sessionFile);
 }
 
-/** Второй стор на той же директории: так проверяется переживание перезапуска демона. */
-async function freshStore(directory: string): Promise<AgentSessionStore> {
+/** Второй стор на тех же корнях: так проверяется переживание перезапуска демона. */
+async function freshStore(directory: string, archivedDirectory: string): Promise<AgentSessionStore> {
   const scripted = scriptedModelProvider({ turns: [] });
   const models = createModels();
 
   models.setProvider(scripted.provider);
 
-  return createAgentSessionStore({ models, directory });
+  return createAgentSessionStore({ models, directory, archivedDirectory });
 }
