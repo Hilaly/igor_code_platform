@@ -483,6 +483,19 @@ export function App() {
           <SessionsView
             state={sessions.state}
             onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
+            onPrepareDraft={sessions.prepareDraft}
+            onPickProvider={sessions.loadModels}
+            onCreate={async (draft) => {
+              const outcome = await sessions.createSession(draft);
+
+              if (outcome.kind === "refused") {
+                return outcome.reason;
+              }
+
+              navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
+
+              return undefined;
+            }}
             onSubmit={sessions.submitTurn}
             onInterrupt={sessions.interrupt}
             translator={translator}

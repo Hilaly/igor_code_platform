@@ -92,3 +92,20 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Форма создания сессии: контролы в колонку, каждый со своей подписью. */
+.sessions-form,
+.sessions-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
+.sessions-form-field {
+  gap: var(--sovereign-space-1);
+}
+
+.sessions-form-label {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-sm);
+}

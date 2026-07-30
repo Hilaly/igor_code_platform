@@ -5,9 +5,10 @@
  * Своих запросов здесь нет: всё приходит пропами, а действия уходят наверх.
  */
 
-import type { Session } from "@sovereign/protocol";
+import type { Session, SessionDraft } from "@sovereign/protocol";
 import {
   Badge,
+  Button,
   Code,
   EmptyState,
   Heading,
@@ -19,13 +20,20 @@ import {
   type BadgeTone,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
+import { useState } from "react";
 
 import { ChatPlaceholder, ChatView } from "./chat-view.tsx";
+import { NewSessionDialog } from "./new-session-dialog.tsx";
 import type { SessionsState } from "./state.ts";
 
 export type SessionsViewProps = {
   state: SessionsState;
   onOpen: (sessionId: string) => void;
+  /** Диалог создания спрашивает проекты и провайдеров по своему открытию, а не заранее. */
+  onPrepareDraft: () => void;
+  onPickProvider: (providerId: string) => void;
+  /** Возвращает причину отказа, если демон отказал: диалог при этом остаётся открытым. */
+  onCreate: (draft: SessionDraft) => Promise<string | undefined>;
   onSubmit: (text: string) => void;
   onInterrupt: () => void;
   translator: ScopedTranslator;
@@ -38,12 +46,41 @@ export function SessionsView(props: SessionsViewProps) {
   const { state, translator } = props;
   const { t } = translator;
   const sessions = state.sessions;
+  const [creating, setCreating] = useState(false);
+
+  const startCreating = (): void => {
+    setCreating(true);
+    props.onPrepareDraft();
+  };
 
   return (
     <div className="sessions">
       <div className="sessions-head">
         <Heading level={1}>{t("page.sessions.title")}</Heading>
+        <Button tone="accent" onClick={startCreating}>
+          {t("sessions.new")}
+        </Button>
       </div>
+
+      <NewSessionDialog
+        open={creating}
+        {...(state.projects === undefined ? {} : { projects: state.projects })}
+        {...(state.agents === undefined ? {} : { agents: state.agents })}
+        {...(state.providers === undefined ? {} : { providers: state.providers })}
+        models={state.models}
+        onPickProvider={props.onPickProvider}
+        onCreate={async (draft) => {
+          const reason = await props.onCreate(draft);
+
+          if (reason === undefined) {
+            setCreating(false);
+          }
+
+          return reason;
+        }}
+        onClose={() => setCreating(false)}
+        translator={translator}
+      />
 
       {state.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.failed", { reason: state.failure })} />

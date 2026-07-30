@@ -13,6 +13,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FrontendBus } from "../events/bus.ts";
 import type { StreamStatus } from "../events/stream.ts";
+import { fetchProjectsSnapshot } from "../projects/api.ts";
+import { fetchProviderModels, fetchProvidersSnapshot } from "../providers/api.ts";
 import {
   createSession as createSessionRequest,
   fetchAgents,
@@ -27,8 +29,12 @@ import {
   applyAgents,
   applyEntries,
   applyFailure,
+  applyModels,
+  applyModelsFailure,
   applyPendingTurn,
   applySessionDelta,
+  applyProjects,
+  applyProviders,
   applySessions,
   applyStreamEvent,
   applySummary,
@@ -37,6 +43,7 @@ import {
   initialSessionsState,
   openSession,
   reconnected,
+  startModels,
   type SessionsState,
 } from "./state.ts";
 
@@ -51,6 +58,10 @@ export type UseSessionsOptions = {
 export type SessionsController = {
   state: SessionsState;
   createSession: (draft: SessionDraft) => Promise<CreateSessionOutcome>;
+  /** Подготовить диалог создания: проекты и настроенные провайдеры. Зовётся по его открытию. */
+  prepareDraft: () => void;
+  /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
+  loadModels: (providerId: string) => void;
   submitTurn: (text: string) => void;
   interrupt: () => void;
   /** Кадр дельты из потока. Не событие шины (docs/sessions-and-projects.md). */
@@ -200,6 +211,43 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [],
   );
 
+  const prepareDraft = useCallback(() => {
+    void fetchProjectsSnapshot()
+      .then((snapshot) => apply((current) => applyProjects(current, snapshot.projects)))
+      .catch((cause: unknown) =>
+        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`),
+      );
+
+    void fetchProvidersSnapshot()
+      .then((snapshot) => apply((current) => applyProviders(current, snapshot.providers)))
+      .catch((cause: unknown) =>
+        onDiagnostic(`the providers could not be read: ${reasonOf(cause)}`),
+      );
+  }, [apply, onDiagnostic]);
+
+  const loadModels = useCallback(
+    (providerId: string) => {
+      // Прочитанное не перечитывается: каталог моделей лежит в пакете рантайма и сам не меняется.
+      const known = latest.current.models[providerId];
+
+      if (known?.kind === "ready" || known?.kind === "loading") {
+        return;
+      }
+
+      apply((current) => startModels(current, providerId));
+
+      void fetchProviderModels(providerId)
+        .then((answer) => apply((current) => applyModels(current, providerId, answer.models)))
+        .catch((cause: unknown) => {
+          const reason = reasonOf(cause);
+
+          onDiagnostic(`the models of ${providerId} could not be read: ${reason}`);
+          apply((current) => applyModelsFailure(current, providerId, reason));
+        });
+    },
+    [apply, onDiagnostic],
+  );
+
   const createSession = useCallback(
     async (draft: SessionDraft): Promise<CreateSessionOutcome> => {
       const outcome = await createSessionRequest(draft).catch(
@@ -286,5 +334,13 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [apply, reloadOpen],
   );
 
-  return { state, createSession, submitTurn, interrupt, receiveSessionDelta };
+  return {
+    state,
+    createSession,
+    prepareDraft,
+    loadModels,
+    submitTurn,
+    interrupt,
+    receiveSessionDelta,
+  };
 }

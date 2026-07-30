@@ -71,6 +71,9 @@ const show = (state: SessionsState) =>
     <SessionsView
       state={state}
       onOpen={vi.fn()}
+      onPrepareDraft={vi.fn()}
+      onPickProvider={vi.fn()}
+      onCreate={vi.fn()}
       onSubmit={vi.fn()}
       onInterrupt={vi.fn()}
       translator={translator}
@@ -279,6 +282,9 @@ describe("the chat", () => {
       <SessionsView
         state={withOpen()}
         onOpen={vi.fn()}
+        onPrepareDraft={vi.fn()}
+        onPickProvider={vi.fn()}
+        onCreate={vi.fn()}
         onSubmit={onSubmit}
         onInterrupt={vi.fn()}
         translator={translator}
@@ -299,6 +305,9 @@ describe("the chat", () => {
       <SessionsView
         state={withOpen([], { phase: "turn" })}
         onOpen={vi.fn()}
+        onPrepareDraft={vi.fn()}
+        onPickProvider={vi.fn()}
+        onCreate={vi.fn()}
         onSubmit={vi.fn()}
         onInterrupt={onInterrupt}
         translator={translator}

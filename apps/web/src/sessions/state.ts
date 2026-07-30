@@ -20,6 +20,9 @@ import {
   streamGapType,
   type AgentSummary,
   type BusStreamEvent,
+  type ModelSummary,
+  type Project,
+  type ProviderSummary,
   type Session,
   type SessionDelta,
   type SessionEntry,
@@ -73,17 +76,30 @@ export type OpenSession = {
   loading: boolean;
 };
 
+/**
+ * Модели одного провайдера. Спрашиваются по выбору провайдера в диалоге создания, а не все сразу:
+ * на все провайдеры их больше тысячи (docs/web-api.md).
+ */
+export type ModelsEntry =
+  | { kind: "loading" }
+  | { kind: "ready"; models: ModelSummary[] }
+  | { kind: "failed"; reason: string };
+
 export type SessionsState = {
   /** `undefined` — снимка ещё нет. Это не пустой список, и показывать надо ожидание, а не «пусто». */
   sessions?: Session[];
   /** Сессии, чей файл прочитать не вышло. Одна битая не отменяет остальные. */
   problems: string[];
   agents?: AgentSummary[];
+  /** Всё, что нужно диалогу создания. Спрашивается по его открытию, а не на каждом подъёме потока. */
+  projects?: Project[];
+  providers?: ProviderSummary[];
+  models: Record<string, ModelsEntry>;
   open?: OpenSession;
   failure?: string;
 };
 
-export const initialSessionsState: SessionsState = { problems: [] };
+export const initialSessionsState: SessionsState = { problems: [], models: {} };
 
 /**
  * Список сессий. Снимок открытой сессии он не трогает: сессия архивного проекта из списка пропадает,
@@ -119,6 +135,44 @@ export function applySummary(
 
 export function applyAgents(state: SessionsState, agents: AgentSummary[]): SessionsState {
   return { ...state, agents };
+}
+
+/** Проекты для диалога: архивные и пропавшие отсеиваются здесь — создать сессию в них нельзя. */
+export function applyProjects(state: SessionsState, projects: Project[]): SessionsState {
+  return {
+    ...state,
+    projects: projects.filter(
+      (project) => !project.archived && project.availability === "available",
+    ),
+  };
+}
+
+/** Провайдеры для диалога: без креда модель всё равно не поедет, и выбирать там нечего. */
+export function applyProviders(state: SessionsState, providers: ProviderSummary[]): SessionsState {
+  return {
+    ...state,
+    providers: providers.filter((provider) => provider.auth.kind === "configured"),
+  };
+}
+
+export function startModels(state: SessionsState, providerId: string): SessionsState {
+  return { ...state, models: { ...state.models, [providerId]: { kind: "loading" } } };
+}
+
+export function applyModels(
+  state: SessionsState,
+  providerId: string,
+  models: ModelSummary[],
+): SessionsState {
+  return { ...state, models: { ...state.models, [providerId]: { kind: "ready", models } } };
+}
+
+export function applyModelsFailure(
+  state: SessionsState,
+  providerId: string,
+  reason: string,
+): SessionsState {
+  return { ...state, models: { ...state.models, [providerId]: { kind: "failed", reason } } };
 }
 
 export function applyFailure(state: SessionsState, reason: string): SessionsState {
