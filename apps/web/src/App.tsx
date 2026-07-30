@@ -48,6 +48,7 @@ import { ProjectsView } from "./projects/projects-view.tsx";
 import { useProjects } from "./projects/use-projects.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
+import { SessionsView } from "./sessions/sessions-view.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
@@ -393,6 +394,12 @@ export function App() {
               <Text>{translator.t("nav.providers")}</Text>
             </ListRow>
             <ListRow
+              selected={page.kind === "sessions"}
+              onSelect={() => navigation.navigate({ kind: "sessions" })}
+            >
+              <Text>{translator.t("nav.sessions")}</Text>
+            </ListRow>
+            <ListRow
               selected={page.kind === "plugins"}
               onSelect={() => navigation.navigate({ kind: "plugins" })}
             >
@@ -469,6 +476,15 @@ export function App() {
             onCancelLogin={providers.cancelLogin}
             onCloseLogin={providers.closeLogin}
             onLogOut={providers.logOut}
+            translator={translator}
+          />
+        }
+        sessions={
+          <SessionsView
+            state={sessions.state}
+            onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
+            onSubmit={sessions.submitTurn}
+            onInterrupt={sessions.interrupt}
             translator={translator}
           />
         }

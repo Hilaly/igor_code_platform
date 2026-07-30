@@ -1,0 +1,94 @@
+/*
+ * Раскладка вью сессий. Цвета — только переменные ролей, размеры — только шкалы кита: значения
+ * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
+ *
+ * Своим файлом, а не строками в `shell.css`: мастер-деталь чата ничего общего с раскладкой панелей
+ * оболочки вокруг него не имеет.
+ */
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  /* Вью забирает высоту хоста целиком: лента прокручивается внутри себя, а не вместе со страницей. */
+  min-height: 0;
+  flex: 1;
+}
+
+.sessions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  flex-wrap: wrap;
+}
+
+/*
+ * Мастер-деталь. Список фиксированной доли, чат — всё остальное; на узком экране они встают в
+ * колонку: требование вижна, а не среза.
+ */
+.sessions-split {
+  display: grid;
+  grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
+  gap: var(--sovereign-space-3);
+  min-height: 0;
+  flex: 1;
+}
+
+@media (width < 60rem) {
+  .sessions-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sessions-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sessions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  width: 100%;
+  /* Длинный путь режется, а не растягивает строку: папка бывает глубокой. */
+  min-width: 0;
+}
+
+.sessions-row-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  align-items: flex-start;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.sessions-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-height: 0;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-panel-surface);
+}
+
+/*
+ * Ввод прижат к низу панели и не уезжает вместе с лентой: он остаётся на месте, пока история
+ * прокручивается над ним.
+ */
+.sessions-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sovereign-space-2);
+  padding: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.sessions-composer > :first-child {
+  flex: 1;
+  min-width: 0;
+}

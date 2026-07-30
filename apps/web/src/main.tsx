@@ -3,6 +3,7 @@ import "./shell/shell.css";
 import "./login/login.css";
 import "./projects/projects.css";
 import "./providers/providers.css";
+import "./sessions/sessions.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

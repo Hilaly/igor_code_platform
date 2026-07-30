@@ -1,5 +1,5 @@
 /**
- * Центральная страница: разводит адреса по вью. Свои вью есть у проектов, у провайдеров и у
+ * Центральная страница: разводит адреса по вью. Свои вью есть у сессий, у проектов, у провайдеров и у
  * управления плагинами, страницы плагинов появятся вместе с браузерным кодом, который собирает демон
  * (docs/ui-extension-model.md).
  */
@@ -15,10 +15,18 @@ export type PageViewProps = {
   plugins: ReactNode;
   projects: ReactNode;
   providers: ReactNode;
+  sessions: ReactNode;
   translator: ScopedTranslator;
 };
 
-export function PageView({ page, plugins, projects, providers, translator }: PageViewProps) {
+export function PageView({
+  page,
+  plugins,
+  projects,
+  providers,
+  sessions,
+  translator,
+}: PageViewProps) {
   const { t } = translator;
 
   if (page.kind === "plugins") {
@@ -31,6 +39,10 @@ export function PageView({ page, plugins, projects, providers, translator }: Pag
 
   if (page.kind === "providers") {
     return providers;
+  }
+
+  if (page.kind === "sessions") {
+    return sessions;
   }
 
   if (page.kind === "plugin") {
