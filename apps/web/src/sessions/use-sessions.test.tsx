@@ -243,6 +243,24 @@ describe("useSessions", () => {
     expect(view.result.current.state.open?.summary?.phase).toBe("queued");
   });
 
+  it("does not double the line of a turn that started at once", async () => {
+    // Начатый турн уже пишет запись реплики: вторая копия висела бы в ленте до конца работы.
+    refusals[`POST ${sessionTurnsPath("0199")}`] = {
+      status: 202,
+      body: { sessionId: "0199", turnId: "turn-8", phase: "turn" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    act(() => {
+      view.result.current.submitTurn("привет");
+    });
+
+    await waitFor(() => expect(view.result.current.state.open?.summary?.phase).toBe("turn"));
+    expect(view.result.current.state.open?.pending).toEqual({});
+  });
+
   it("keeps the reason of a refused turn and says it in the diagnostics too", async () => {
     refusals[`POST ${sessionTurnsPath("0199")}`] = {
       status: 409,

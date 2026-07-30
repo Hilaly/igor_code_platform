@@ -282,8 +282,12 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
             return;
           }
 
-          // Текст показывается сразу: турн, вставший в очередь, не даёт ни одной дельты.
-          apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, text));
+          // Текст показывается сразу — но только у турна, вставшего в очередь: он не даёт ни одной
+          // дельты, и без этого реплика ждала бы конца чужого турна. У начатого турна запись уже
+          // пишется, и вторая копия реплики висела бы в ленте до самого конца работы.
+          if (outcome.accepted.phase === "queued") {
+            apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, text));
+          }
           apply((current) =>
             applySummary(
               current,
