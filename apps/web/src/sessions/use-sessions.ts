@@ -8,7 +8,13 @@
  * вызовом `receiveSessionDelta`, как шаг входа во вью провайдеров.
  */
 
-import type { SessionDeltaFrame, SessionDraft } from "@sovereign/protocol";
+import type {
+  SessionDeltaFrame,
+  SessionDraft,
+  SessionForkRequest,
+  SessionMessage,
+  SessionUpdate,
+} from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FrontendBus } from "../events/bus.ts";
@@ -21,14 +27,22 @@ import {
   fetchEntries,
   fetchSession,
   fetchSessions,
+  fetchStats,
+  forkSession as forkSessionRequest,
   interruptTurn,
+  removeSession as removeSessionRequest,
+  sendMessage as sendMessageRequest,
   submitTurn as submitTurnRequest,
+  updateSession as updateSessionRequest,
   type CreateSessionOutcome,
+  type RemoveSessionOutcome,
+  type SessionOutcome,
 } from "./api.ts";
 import {
   applyAgents,
   applyEntries,
   applyFailure,
+  applyStats,
   applyModels,
   applyModelsFailure,
   applyPendingTurn,
@@ -43,6 +57,7 @@ import {
   initialSessionsState,
   openSession,
   reconnected,
+  showArchived as showArchivedIn,
   startModels,
   type SessionsState,
 } from "./state.ts";
@@ -63,7 +78,16 @@ export type SessionsController = {
   /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
   loadModels: (providerId: string) => void;
   submitTurn: (text: string) => void;
+  /** Сообщение, которое не запускает турн. Отказ приезжает причиной, а не исключением. */
+  sendMessage: (message: SessionMessage) => Promise<string | undefined>;
   interrupt: () => void;
+  /** Переименование, архивация и восстановление. Возвращает причину отказа, если демон отказал. */
+  updateSession: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
+  removeSession: (sessionId: string) => Promise<string | undefined>;
+  /** Форк открытой сессии от записи. Новая сессия открывается сразу: смотреть на неё и есть смысл. */
+  forkSession: (request: SessionForkRequest) => Promise<string | undefined>;
+  /** Переключить список между действующими и архивными. */
+  setShowArchived: (archived: boolean) => void;
   /** Кадр дельты из потока. Не событие шины (docs/sessions-and-projects.md). */
   receiveSessionDelta: (frame: SessionDeltaFrame) => void;
 };
@@ -93,7 +117,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     const controller = new AbortController();
     pendingSessions.current = controller;
 
-    void fetchSessions(undefined, controller.signal)
+    void fetchSessions(undefined, latest.current.showArchived, controller.signal)
       .then((snapshot) => apply((current) => applySessions(current, snapshot)))
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
@@ -147,9 +171,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     void Promise.all([
       fetchSession(id, controller.signal),
       fetchEntries(id, seen, controller.signal),
+      fetchStats(id, controller.signal),
     ])
-      .then(([summary, page]) => {
+      .then(([summary, page, stats]) => {
         apply((current) => applySummary(current, id, summary));
+        apply((current) => applyStats(current, id, stats));
 
         if (page !== undefined) {
           apply((current) => applyEntries(current, id, page.entries, page.seen));
@@ -338,13 +364,113 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [apply, reloadOpen],
   );
 
+  const sendMessage = useCallback(
+    async (message: SessionMessage): Promise<string | undefined> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return undefined;
+      }
+
+      const outcome = await sendMessageRequest(id, message).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the message was refused: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      return undefined;
+    },
+    [onDiagnostic],
+  );
+
+  /** Запись, отдающая сессию. Список после неё перечитывается: изменилась не только открытая. */
+  const written = useCallback(
+    async (
+      what: string,
+      run: () => Promise<SessionOutcome | RemoveSessionOutcome>,
+    ): Promise<string | undefined> => {
+      const outcome = await run().catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`${what}: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      reloadSessions();
+      reloadOpen();
+
+      return undefined;
+    },
+    [onDiagnostic, reloadOpen, reloadSessions],
+  );
+
+  const updateSession = useCallback(
+    (id: string, update: SessionUpdate) =>
+      written(`the session ${id} could not be written`, () => updateSessionRequest(id, update)),
+    [written],
+  );
+
+  const removeSession = useCallback(
+    (id: string) =>
+      written(`the session ${id} could not be removed`, () => removeSessionRequest(id)),
+    [written],
+  );
+
+  const forkSession = useCallback(
+    async (request: SessionForkRequest): Promise<string | undefined> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return undefined;
+      }
+
+      const outcome = await forkSessionRequest(id, request).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the session ${id} could not be forked: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      reloadSessions();
+
+      return undefined;
+    },
+    [onDiagnostic, reloadSessions],
+  );
+
+  const setShowArchived = useCallback(
+    (archived: boolean) => {
+      apply((current) => showArchivedIn(current, archived));
+      reloadSessions();
+    },
+    [apply, reloadSessions],
+  );
+
   return {
     state,
     createSession,
     prepareDraft,
     loadModels,
     submitTurn,
+    sendMessage,
     interrupt,
+    updateSession,
+    removeSession,
+    forkSession,
+    setShowArchived,
     receiveSessionDelta,
   };
 }

@@ -9,17 +9,25 @@
 
 import {
   agentsPath,
+  sessionArchivedParameter,
   sessionEntriesAfterParameter,
   sessionEntriesPath,
+  sessionForkPath,
+  sessionMessagesPath,
   sessionPath,
   sessionProjectParameter,
+  sessionStatsPath,
   sessionTurnsPath,
   sessionsPath,
   type AgentsSnapshot,
   type Session,
   type SessionDraft,
   type SessionEntriesPage,
+  type SessionForkRequest,
+  type SessionMessage,
   type SessionsSnapshot,
+  type SessionStats,
+  type SessionUpdate,
   type TurnAccepted,
   type TurnInterrupted,
   type TurnRequest,
@@ -37,12 +45,20 @@ export async function fetchAgents(signal?: AbortSignal): Promise<AgentsSnapshot>
 
 export async function fetchSessions(
   projectId?: string,
+  archived = false,
   signal?: AbortSignal,
 ): Promise<SessionsSnapshot> {
-  const path =
-    projectId === undefined
-      ? sessionsPath
-      : `${sessionsPath}?${sessionProjectParameter}=${encodeURIComponent(projectId)}`;
+  const query = new URLSearchParams();
+
+  if (projectId !== undefined) {
+    query.set(sessionProjectParameter, projectId);
+  }
+
+  if (archived) {
+    query.set(sessionArchivedParameter, "true");
+  }
+
+  const path = query.size === 0 ? sessionsPath : `${sessionsPath}?${query.toString()}`;
   const response = await fetch(path, signal === undefined ? {} : { signal });
 
   if (!response.ok) {
@@ -153,6 +169,89 @@ export async function interruptTurn(sessionId: string): Promise<TurnInterrupted 
   }
 
   return (await response.json()) as TurnInterrupted;
+}
+
+/**
+ * Статистика открытой сессии. Отдельным запросом, а не полем списка: цифры нужны на той сессии, что
+ * открыта, и снимок списка из полусотни строк от них не тяжелеет (docs/web-api.md).
+ */
+export async function fetchStats(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<SessionStats | undefined> {
+  const response = await fetch(sessionStatsPath(sessionId), signal === undefined ? {} : { signal });
+
+  if (response.status === 404) {
+    return undefined;
+  }
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as SessionStats;
+}
+
+/** Исход изменяющей операции над сессией. Отказ `409` — то, что показывают, а не то, на чём падают. */
+export type SessionOutcome =
+  { kind: "done"; session: Session } | { kind: "refused"; reason: string };
+
+/** Переименование, архивация и восстановление — одна запись целой записи (docs/web-api.md). */
+export async function updateSession(
+  sessionId: string,
+  update: SessionUpdate,
+): Promise<SessionOutcome> {
+  return writing(sessionPath(sessionId), "PUT", update);
+}
+
+/** Форк. Пустое тело — форк сессии целиком. */
+export async function forkSession(
+  sessionId: string,
+  request: SessionForkRequest = {},
+): Promise<SessionOutcome> {
+  return writing(sessionForkPath(sessionId), "POST", request);
+}
+
+export type RemoveSessionOutcome = { kind: "removed" } | { kind: "refused"; reason: string };
+
+export async function removeSession(sessionId: string): Promise<RemoveSessionOutcome> {
+  const response = await fetch(sessionPath(sessionId), {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+  });
+
+  return response.ok ? { kind: "removed" } : { kind: "refused", reason: await reasonOf(response) };
+}
+
+export type SendMessageOutcome = { kind: "accepted" } | { kind: "refused"; reason: string };
+
+/** Сообщение, которое не запускает турн: стиринг, догоняющее, к следующему турну, дозапись. */
+export async function sendMessage(
+  sessionId: string,
+  message: SessionMessage,
+): Promise<SendMessageOutcome> {
+  const response = await fetch(sessionMessagesPath(sessionId), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(message),
+  });
+
+  return response.ok ? { kind: "accepted" } : { kind: "refused", reason: await reasonOf(response) };
+}
+
+/** Запись, отдающая сессию в ответ. Форма запроса у форка и изменения одна, различается только тело. */
+async function writing(path: string, method: string, body: unknown): Promise<SessionOutcome> {
+  const response = await fetch(path, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (response.ok) {
+    return { kind: "done", session: (await response.json()) as Session };
+  }
+
+  return { kind: "refused", reason: await reasonOf(response) };
 }
 
 /** Демон отвечает `{"error"}` на любой отказ (docs/web-api.md), но код без тела тоже возможен. */

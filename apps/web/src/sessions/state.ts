@@ -26,7 +26,9 @@ import {
   type Session,
   type SessionDelta,
   type SessionEntry,
+  type SessionQueues,
   type SessionsSnapshot,
+  type SessionStats,
 } from "@sovereign/protocol";
 
 /** Сообщение, которое ещё едет. Каналы разделены: размышления показываются свёрнутыми отдельно. */
@@ -74,6 +76,19 @@ export type OpenSession = {
   pending: Record<string, string>;
   /** Причина `turn-failed` или отказа демона. Английская фраза уходит ещё и в диагностику. */
   failure?: string;
+  /**
+   * Что ждёт в очередях. Приезжает дельтой `queues`: написавший стиринг обязан видеть, что тот
+   * принят и ждёт, а не пропал (docs/web-api.md).
+   */
+  queues?: SessionQueues;
+  /** Токены и деньги. Спрашиваются отдельным запросом по открытию сессии и по концу турна. */
+  stats?: SessionStats;
+  /**
+   * Чего сессия лишилась на ходу: инструмент исчез вместе с плагином или модель пропала из
+   * каталога. Копится списком, потому что за одну пересборку набора пропасть может несколько
+   * инструментов (docs/sessions-and-projects.md).
+   */
+  degradations: { kind: "tool" | "model"; name: string }[];
   loading: boolean;
 };
 
@@ -98,9 +113,20 @@ export type SessionsState = {
   models: Record<string, ModelsEntry>;
   open?: OpenSession;
   failure?: string;
+  /** Список показывает архив вместо действующих сессий. Фильтр, а не второй список рядом. */
+  showArchived: boolean;
 };
 
-export const initialSessionsState: SessionsState = { problems: [], models: {} };
+export const initialSessionsState: SessionsState = {
+  problems: [],
+  models: {},
+  showArchived: false,
+};
+
+/** Переключить список между действующими и архивными. Список после этого перезапрашивается. */
+export function showArchived(state: SessionsState, archived: boolean): SessionsState {
+  return { ...state, showArchived: archived, sessions: undefined };
+}
 
 /**
  * Список сессий. Снимок открытой сессии он не трогает: сессия архивного проекта из списка пропадает,
@@ -199,6 +225,7 @@ export function openSession(state: SessionsState, sessionId: string): SessionsSt
       entries: [],
       seen: 0,
       pending: {},
+      degradations: [],
       loading: true,
     },
   };
@@ -249,6 +276,45 @@ export function applyPendingTurn(
   };
 }
 
+/** Очереди приезжают целиком, а не приращением: у дельты в них лежит всё, что ждёт прямо сейчас. */
+export function applyQueues(
+  state: SessionsState,
+  sessionId: string,
+  queues: SessionQueues,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, queues } } : state;
+}
+
+export function applyStats(
+  state: SessionsState,
+  sessionId: string,
+  stats: SessionStats | undefined,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, stats } } : state;
+}
+
+/**
+ * Сессия лишилась опоры. Копится списком, а не заменяется: за одну пересборку набора пропасть может
+ * несколько инструментов, и последнее сообщение стёрло бы остальные.
+ */
+export function applyDegradation(
+  state: SessionsState,
+  sessionId: string,
+  degradation: { kind: "tool" | "model"; name: string },
+): SessionsState {
+  const open = state.open;
+
+  if (open?.id !== sessionId) {
+    return state;
+  }
+
+  return { ...state, open: { ...open, degradations: [...open.degradations, degradation] } };
+}
+
 export function applyTurnFailure(
   state: SessionsState,
   sessionId: string,
@@ -283,6 +349,12 @@ export function applySessionDelta(
 
   if (open?.id !== sessionId) {
     return { state, reread: false };
+  }
+
+  // Очереди про турн ничего не говорят: сообщение к следующему турну кладут и в простое, и
+  // выбрасывать по нему буфер или снимать ожидающий текст было бы неверно.
+  if (delta.kind === "queues") {
+    return { state: applyQueues(state, sessionId, delta.queues), reread: false };
   }
 
   // `phase: queued` подтверждает только ожидание: записи реплики и живого буфера ещё нет. Любая
@@ -428,6 +500,20 @@ export function applyStreamEvent(state: SessionsState, event: BusStreamEvent): S
     return { state, sessions: true };
   }
 
+  // Утрата опоры — единственное событие сессий с нагрузкой: перечитать её неоткуда, состояния
+  // «инструмент был и пропал» нигде не лежит (docs/event-bus.md).
+  if (event.type === coreEventTypes.sessionDegraded) {
+    const payload = event.payload as { sessionId: string; kind: "tool" | "model"; name: string };
+
+    return {
+      state: applyDegradation(state, payload.sessionId, {
+        kind: payload.kind,
+        name: payload.name,
+      }),
+      sessions: false,
+    };
+  }
+
   return { state, sessions: event.type === coreEventTypes.sessionsChanged };
 }
 
@@ -445,7 +531,17 @@ export function reconnected(state: SessionsState): SessionsState {
 
   return {
     ...state,
-    open: { ...open, entries: [], seen: 0, live: undefined, pending: {}, loading: true },
+    open: {
+      ...open,
+      entries: [],
+      seen: 0,
+      live: undefined,
+      pending: {},
+      // Очереди обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за время
+      // разрыва потеряны. Верное значение приедет со следующим `queue_update`.
+      queues: undefined,
+      loading: true,
+    },
   };
 }
 

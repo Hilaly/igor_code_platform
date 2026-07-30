@@ -5,18 +5,30 @@
  * Своих запросов здесь нет: всё приходит пропами, а действия уходят наверх.
  */
 
-import type { Session, SessionDraft } from "@sovereign/protocol";
+import type {
+  Session,
+  SessionDraft,
+  SessionForkRequest,
+  SessionMessage,
+  SessionUpdate,
+} from "@sovereign/protocol";
 import {
   Badge,
   Button,
   Code,
+  ConfirmDialog,
+  Dialog,
   EmptyState,
+  Field,
   Heading,
+  Input,
   List,
   ListRow,
+  Menu,
   Notice,
   Spinner,
   Text,
+  Toggle,
   type BadgeTone,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
@@ -35,7 +47,12 @@ export type SessionsViewProps = {
   /** Возвращает причину отказа, если демон отказал: диалог при этом остаётся открытым. */
   onCreate: (draft: SessionDraft) => Promise<string | undefined>;
   onSubmit: (text: string) => void;
+  onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
+  onUpdate: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
+  onRemove: (sessionId: string) => Promise<string | undefined>;
+  onFork: (request: SessionForkRequest) => Promise<string | undefined>;
+  onShowArchived: (archived: boolean) => void;
   translator: ScopedTranslator;
 };
 
@@ -47,19 +64,72 @@ export function SessionsView(props: SessionsViewProps) {
   const { t } = translator;
   const sessions = state.sessions;
   const [creating, setCreating] = useState(false);
+  /** Сессия, чьё имя правят прямо сейчас, и черновик этого имени. */
+  const [renaming, setRenaming] = useState<{ session: Session; title: string } | undefined>(
+    undefined,
+  );
+  const [removing, setRemoving] = useState<Session | undefined>(undefined);
 
   const startCreating = (): void => {
     setCreating(true);
     props.onPrepareDraft();
   };
 
+  /**
+   * Пункты меню строки. Архивация и удаление у занятой сессии выключены здесь же, а не только
+   * отказом демона: показать невозможное действие и объяснить отказ постфактум — худший из двух
+   * способов сказать одно и то же (docs/sessions-and-projects.md).
+   */
+  const rowActions = (session: Session) => {
+    const busy = session.phase !== "idle";
+
+    return [
+      {
+        id: "rename",
+        label: t("sessions.action.rename"),
+        onSelect: () => setRenaming({ session, title: session.title ?? "" }),
+      },
+      session.archived
+        ? {
+            id: "restore",
+            label: t("sessions.action.restore"),
+            disabled: busy,
+            onSelect: () => {
+              void props.onUpdate(session.id, { archived: false, ...titleOf(session) });
+            },
+          }
+        : {
+            id: "archive",
+            label: t("sessions.action.archive"),
+            disabled: busy,
+            onSelect: () => {
+              void props.onUpdate(session.id, { archived: true, ...titleOf(session) });
+            },
+          },
+      {
+        id: "remove",
+        label: t("sessions.action.remove"),
+        tone: "danger" as const,
+        disabled: busy,
+        onSelect: () => setRemoving(session),
+      },
+    ];
+  };
+
   return (
     <div className="sessions">
       <div className="sessions-head">
         <Heading level={1}>{t("page.sessions.title")}</Heading>
-        <Button tone="accent" onClick={startCreating}>
-          {t("sessions.new")}
-        </Button>
+        <span className="sessions-head-actions">
+          <Toggle
+            checked={state.showArchived}
+            onChange={props.onShowArchived}
+            label={t("sessions.archived.show")}
+          />
+          <Button tone="accent" onClick={startCreating}>
+            {t("sessions.new")}
+          </Button>
+        </span>
       </div>
 
       <NewSessionDialog
@@ -116,6 +186,12 @@ export function SessionsView(props: SessionsViewProps) {
                     <Badge tone={phaseTone(session.phase)}>
                       {t(`sessions.phase.${session.phase}`)}
                     </Badge>
+                    <Menu
+                      label={t("sessions.actions", { name: session.title ?? session.id })}
+                      trigger="…"
+                      triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
+                      items={rowActions(session)}
+                    />
                   </span>
                 </ListRow>
               ))}
@@ -134,11 +210,76 @@ export function SessionsView(props: SessionsViewProps) {
           <ChatView
             open={state.open}
             onSubmit={props.onSubmit}
+            onSendMessage={props.onSendMessage}
             onInterrupt={props.onInterrupt}
+            onFork={props.onFork}
             translator={translator}
           />
         )}
       </div>
+
+      <Dialog
+        open={renaming !== undefined}
+        onClose={() => setRenaming(undefined)}
+        title={t("sessions.rename.title")}
+        footer={
+          <>
+            <Button onClick={() => setRenaming(undefined)}>{t("common.cancel")}</Button>
+            <Button
+              tone="accent"
+              onClick={() => {
+                if (renaming === undefined) {
+                  return;
+                }
+
+                const title = renaming.title.trim();
+
+                void props.onUpdate(renaming.session.id, {
+                  archived: renaming.session.archived,
+                  ...(title === "" ? {} : { title }),
+                });
+                setRenaming(undefined);
+              }}
+            >
+              {t("sessions.rename.confirm")}
+            </Button>
+          </>
+        }
+      >
+        <Field label={t("sessions.rename.field")} hint={t("sessions.rename.hint")}>
+          {(control) => (
+            <Input
+              {...control}
+              value={renaming?.title ?? ""}
+              onChange={(title) =>
+                setRenaming((current) => (current === undefined ? current : { ...current, title }))
+              }
+            />
+          )}
+        </Field>
+      </Dialog>
+
+      <ConfirmDialog
+        open={removing !== undefined}
+        onClose={() => setRemoving(undefined)}
+        title={t("sessions.remove.title", { name: removing?.title ?? removing?.id ?? "" })}
+        description={t("sessions.remove.hint")}
+        confirmLabel={t("sessions.remove.confirm")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        onConfirm={() => {
+          if (removing !== undefined) {
+            void props.onRemove(removing.id);
+          }
+
+          setRemoving(undefined);
+        }}
+      />
     </div>
   );
+}
+
+/** Имя в теле записи: тело заменяет запись целиком, и без имени оно бы его снимало. */
+function titleOf(session: Session): { title?: string } {
+  return session.title === undefined ? {} : { title: session.title };
 }

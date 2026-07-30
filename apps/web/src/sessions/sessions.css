@@ -109,3 +109,24 @@
   color: var(--sovereign-text-muted);
   font-size: var(--sovereign-font-size-sm);
 }
+
+/*
+ * Строка цифр, очереди и выбор момента доставки — три полоски между лентой и вводом. Они не внутри
+ * `.sessions-composer` намеренно: там первый ребёнок растягивается на всю ширину, и это поле ввода.
+ */
+.sessions-stats,
+.sessions-queues,
+.sessions-modes {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  padding-inline: var(--sovereign-space-3);
+  padding-block-start: var(--sovereign-space-2);
+  flex-wrap: wrap;
+}
+
+.sessions-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+}

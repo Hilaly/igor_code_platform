@@ -497,7 +497,22 @@ export function App() {
               return undefined;
             }}
             onSubmit={sessions.submitTurn}
+            onSendMessage={sessions.sendMessage}
             onInterrupt={sessions.interrupt}
+            onUpdate={sessions.updateSession}
+            onRemove={async (sessionId) => {
+              const reason = await sessions.removeSession(sessionId);
+
+              // Удалённая сессия остаётся в адресе, и вью показало бы «сессия пропала». Уводим на
+              // список сам, а не ждём, пока человек догадается уйти.
+              if (reason === undefined && sessions.state.open?.id === sessionId) {
+                navigation.navigate({ kind: "sessions" });
+              }
+
+              return reason;
+            }}
+            onFork={sessions.forkSession}
+            onShowArchived={sessions.setShowArchived}
             translator={translator}
           />
         }

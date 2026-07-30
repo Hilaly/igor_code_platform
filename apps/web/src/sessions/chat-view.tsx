@@ -9,8 +9,15 @@
  * потому что буфер живёт ровно до конца турна, после чего то же самое приезжает записями.
  */
 
-import type { SessionContentBlock, SessionEntry } from "@sovereign/protocol";
+import type {
+  SessionContentBlock,
+  SessionEntry,
+  SessionForkRequest,
+  SessionMessage,
+  SessionMessageMode,
+} from "@sovereign/protocol";
 import {
+  Badge,
   Button,
   Disclosure,
   EmptyState,
@@ -18,6 +25,7 @@ import {
   Message,
   MessageFeed,
   Notice,
+  SegmentedControl,
   Spinner,
   StreamingText,
   Text,
@@ -32,9 +40,18 @@ import { isBusy, type OpenSession, type StreamedItem } from "./state.ts";
 export type ChatViewProps = {
   open: OpenSession;
   onSubmit: (text: string) => void;
+  onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
+  onFork: (request: SessionForkRequest) => Promise<string | undefined>;
   translator: ScopedTranslator;
 };
+
+/**
+ * Что делает кнопка отправки у занятой сессии. Турна она запустить не может — сессия занята, — и
+ * выбор между тремя очередями заменяет его собой (docs/web-api.md). `append` сюда не входит: он,
+ * наоборот, требует простоя, и в простое кнопка запускает турн.
+ */
+const busyModes: SessionMessageMode[] = ["steer", "follow-up", "next-turn"];
 
 /** Исход вызова инструмента из записей: результат приезжает отдельной записью, а не внутри вызова. */
 type ToolOutcome = { text: string; failed: boolean };
@@ -46,18 +63,33 @@ const outcomesOf = (entries: SessionEntry[]): Map<string, ToolOutcome> =>
       .map((entry) => [entry.toolCallId, { text: entry.text, failed: entry.failed }]),
   );
 
-export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewProps) {
+export function ChatView(props: ChatViewProps) {
+  const { open, onSubmit, onSendMessage, onInterrupt, onFork, translator } = props;
   const { t } = translator;
   const [draft, setDraft] = useState("");
+  const [mode, setMode] = useState<SessionMessageMode>("steer");
   const busy = isBusy(open.summary);
   const outcomes = outcomesOf(open.entries);
+  const queues = open.queues;
+  const waiting = [
+    ...(queues?.steer ?? []),
+    ...(queues?.followUp ?? []),
+    ...(queues?.nextTurn ?? []),
+  ];
 
   const send = (): void => {
     if (draft.trim() === "") {
       return;
     }
 
-    onSubmit(draft);
+    if (busy) {
+      // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
+      // человек выбирает сам, потому что момент доставки у них разный.
+      void onSendMessage({ text: draft, mode });
+    } else {
+      onSubmit(draft);
+    }
+
     setDraft("");
   };
 
@@ -75,6 +107,14 @@ export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewPr
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
       )}
 
+      {open.degradations.map((lost, index) => (
+        <Notice
+          key={`${lost.kind}:${lost.name}:${String(index)}`}
+          tone="warning"
+          title={t(`chat.degraded.${lost.kind}`, { name: lost.name })}
+        />
+      ))}
+
       {open.loading && empty ? (
         <Spinner label={t("state.loading")} />
       ) : (
@@ -88,6 +128,11 @@ export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewPr
               key={entry.id}
               entry={entry}
               outcomes={outcomes}
+              // Форк идёт от реплики человека: рантайм иначе и не режет — «переспросить иначе»
+              // единственный смысл, в котором отрезать ответ вместе с вопросом осмысленно.
+              {...(entry.kind === "message" && entry.role === "user" && !busy
+                ? { onFork: () => void onFork({ entryId: entry.id }) }
+                : {})}
               translator={translator}
             />
           ))}
@@ -108,6 +153,41 @@ export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewPr
         </MessageFeed>
       )}
 
+      {open.stats === undefined ? undefined : (
+        <div className="sessions-stats">
+          <Text tone="muted">
+            {t("chat.stats.tokens", { total: String(open.stats.totalTokens) })}
+          </Text>
+          <Text tone="muted">
+            {t("chat.stats.cost", { cost: open.stats.costTotal.toFixed(4) })}
+          </Text>
+        </div>
+      )}
+
+      {waiting.length === 0 ? undefined : (
+        <div className="sessions-queues">
+          {waiting.map((text, index) => (
+            <Badge key={`${String(index)}:${text}`} tone="accent">
+              {text}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {busy ? (
+        <div className="sessions-modes">
+          <SegmentedControl
+            options={busyModes.map((option) => ({
+              value: option,
+              label: t(`chat.mode.${option}`),
+            }))}
+            value={mode}
+            onChange={setMode}
+            label={t("chat.mode.label")}
+          />
+        </div>
+      ) : undefined}
+
       <div className="sessions-composer">
         <Textarea
           value={draft}
@@ -119,15 +199,14 @@ export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewPr
           rows={2}
           maxRows={12}
         />
+        <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
+          {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
+        </Button>
         {busy ? (
           <Button tone="danger" onClick={onInterrupt}>
             {t("chat.stop")}
           </Button>
-        ) : (
-          <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
-            {t("chat.send")}
-          </Button>
-        )}
+        ) : undefined}
       </div>
     </div>
   );
@@ -136,9 +215,10 @@ export function ChatView({ open, onSubmit, onInterrupt, translator }: ChatViewPr
 function EntryMessage(props: {
   entry: SessionEntry;
   outcomes: Map<string, ToolOutcome>;
+  onFork?: () => void;
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, translator } = props;
+  const { entry, outcomes, onFork, translator } = props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -165,6 +245,7 @@ function EntryMessage(props: {
           translator={translator}
         />
       ))}
+      {onFork === undefined ? undefined : <Button onClick={onFork}>{t("chat.fork")}</Button>}
     </Message>
   );
 }

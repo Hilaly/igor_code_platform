@@ -2,6 +2,7 @@ import { coreEventTypes, type Session, type SessionEntry } from "@sovereign/prot
 import { describe, expect, it } from "vitest";
 
 import {
+  applyDegradation,
   applyEntries,
   applyPendingTurn,
   applySessionDelta,
@@ -13,6 +14,7 @@ import {
   isBusy,
   openSession,
   reconnected,
+  showArchived,
   type SessionsState,
 } from "./state.ts";
 
@@ -347,5 +349,83 @@ describe("isBusy", () => {
     expect(isBusy(session({ phase: "queued" }))).toBe(true);
     expect(isBusy(session({ phase: "turn" }))).toBe(true);
     expect(isBusy(undefined)).toBe(false);
+  });
+});
+
+describe("the queues, the counters and what the session lost", () => {
+  const opened = (): SessionsState =>
+    openSession(
+      applySessions(initialSessionsState, {
+        sessions: [session()],
+      }),
+      "0199",
+    );
+
+  it("shows what waits in the queues, replacing it wholesale", () => {
+    const first = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "queues",
+      queues: { steer: ["левее"], followUp: [], nextTurn: [] },
+    });
+
+    expect(first.state.open?.queues?.steer).toEqual(["левее"]);
+    // Дельта несёт всё, что ждёт прямо сейчас: опустевшая очередь опустошает и показанное.
+    expect(first.reread).toBe(false);
+
+    const drained = applySessionDelta(first.state, "0199", "turn-1", {
+      kind: "queues",
+      queues: { steer: [], followUp: [], nextTurn: ["потом"] },
+    });
+
+    expect(drained.state.open?.queues).toEqual({ steer: [], followUp: [], nextTurn: ["потом"] });
+  });
+
+  it("forgets the queues when the stream comes back, because their deltas are gone", () => {
+    const queued = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "queues",
+      queues: { steer: ["левее"], followUp: [], nextTurn: [] },
+    }).state;
+
+    expect(reconnected(queued).open?.queues).toBeUndefined();
+  });
+
+  it("keeps every loss, not only the last one", () => {
+    const lost = applyDegradation(
+      applyDegradation(opened(), "0199", { kind: "tool", name: "bash" }),
+      "0199",
+      { kind: "tool", name: "write" },
+    );
+
+    // За одну пересборку набора пропасть может несколько инструментов, и замена стёрла бы остальные.
+    expect(lost.open?.degradations).toEqual([
+      { kind: "tool", name: "bash" },
+      { kind: "tool", name: "write" },
+    ]);
+  });
+
+  it("takes a loss in another session as none of its business", () => {
+    expect(
+      applyDegradation(opened(), "чужая", { kind: "model", name: "m" }).open?.degradations,
+    ).toEqual([]);
+  });
+
+  it("reads a loss off the bus without asking for the list again", () => {
+    const outcome = applyStreamEvent(opened(), {
+      index: 1,
+      time: "2026-07-29T00:00:00.000Z",
+      type: coreEventTypes.sessionDegraded,
+      payload: { sessionId: "0199", kind: "tool", name: "bash" },
+    } as never);
+
+    expect(outcome.state.open?.degradations).toEqual([{ kind: "tool", name: "bash" }]);
+    // Список от этого не меняется: пропала опора сессии, а не сама сессия.
+    expect(outcome.sessions).toBe(false);
+  });
+
+  it("drops the list when the archive filter flips, so nothing stale is shown", () => {
+    const listed = applySessions(initialSessionsState, { sessions: [session()] });
+    const flipped = showArchived(listed, true);
+
+    expect(flipped.showArchived).toBe(true);
+    expect(flipped.sessions).toBeUndefined();
   });
 });
