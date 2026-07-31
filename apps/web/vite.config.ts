@@ -3,6 +3,26 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // The UI kit and React are shared by every route. Keeping them in stable vendor chunks
+        // prevents the entry from growing past the browser's useful single-request size as views
+        // are added, while preserving the same eager loading behaviour for the first screen.
+        manualChunks(id) {
+          if (id.includes("/packages/ui-kit/") || id.includes("/node_modules/@sovereign/ui-kit/")) {
+            return "ui-kit";
+          }
+
+          if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/")) {
+            return "react-vendor";
+          }
+
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     // Порт свой, а не дефолтный 5173: он занят чуть ли не в каждом втором проекте.
     // strictPort — чтобы при занятом порте dev падал с внятной ошибкой, а не уезжал
