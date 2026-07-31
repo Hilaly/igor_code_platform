@@ -106,4 +106,14 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-split\s*>\s*\*\s*\{[^}]*min-width:\s*0;/s);
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });
+
+  it("stacks the session split by its available width rather than the viewport", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(/\.sessions\s*\{[^}]*container-type:\s*inline-size;/s);
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<\s*60rem\)\s*\{[^}]*\.sessions-split\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
+    expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
+  });
 });
