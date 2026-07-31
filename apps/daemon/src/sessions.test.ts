@@ -1280,7 +1280,7 @@ describe("compacting a session over http", () => {
     const seenBefore = events.length;
     const accepted = await call("POST", sessionCompactPath(sessionId), { instructions: "короче" });
 
-    assert.equal(accepted.status, 200);
+    assert.equal(accepted.status, 202);
     assert.equal(accepted.body["sessionId"], sessionId);
     // Как у турна: возврат значит «принята», и фаза говорит, начата ли она уже.
     assert.ok(["compaction", "queued"].includes(String(accepted.body["phase"])));

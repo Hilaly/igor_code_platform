@@ -1508,7 +1508,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             return;
           }
 
-          respondWithJson(response, 200, accepted.accepted);
+          respondWithJson(response, 202, accepted.accepted);
         },
       },
       {
