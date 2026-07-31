@@ -244,6 +244,103 @@ export const Selectors = () => {
   );
 };
 
+/**
+ * Дерево: выбор и раскрытие — разные жесты, и проверять здесь надо именно это. Щелчок по строке
+ * выбирает узел и не сворачивает его, щелчок по раскрывашке сворачивает и не меняет выбор; с
+ * клавиатуры выбирают `Enter` и пробел, раскрывают `ArrowRight` и `ArrowLeft` — то же самое.
+ * Раскрытие здесь дерево помнит само: пропа `expandedIds` нет.
+ */
+function TreeSelection() {
+  const [selectedId, setSelectedId] = useState("ui-kit");
+
+  return (
+    <div style={column}>
+      <Tree
+        label="Файлы демонстрации"
+        selectedId={selectedId}
+        onSelect={(node) => setSelectedId(node.id)}
+        toggleLabel={(node, expanded) =>
+          expanded ? `Свернуть ${node.label}` : `Развернуть ${node.label}`
+        }
+        nodes={[
+          {
+            id: "packages",
+            label: "packages",
+            badge: { tone: "neutral", text: "2" },
+            children: [
+              { id: "ui-kit", label: "ui-kit", badge: { tone: "accent", text: "изменён" } },
+              { id: "protocol", label: "protocol" },
+            ],
+          },
+          { id: "docs", label: "docs", badge: { tone: "warning", text: "разошлась" } },
+        ]}
+      />
+      <Text tone="muted">{`Выбрано: ${selectedId}`}</Text>
+    </div>
+  );
+}
+
+/** Ветка, в которой разговор идёт сейчас: путь до текущего листа знает вью, а не кит. */
+const currentBranchPath = ["fork", "branch-b"];
+
+/**
+ * Управляемое раскрытие: набор принадлежит вызывающему, и своего дерево не применяет вовсе. Так
+ * живёт панель дерева записей сессии — она обязана открыться на работающей ветке, а не свёрнутой.
+ * Проверять здесь надо, что кнопки снаружи двигают раскрытие так же, как раскрывашки внутри.
+ */
+function TreeCurrentBranch() {
+  const [expandedIds, setExpandedIds] = useState<string[]>(currentBranchPath);
+  const [selectedId, setSelectedId] = useState("reply-later");
+
+  return (
+    <div style={column}>
+      <Tree
+        label="Записи сессии"
+        selectedId={selectedId}
+        onSelect={(node) => setSelectedId(node.id)}
+        expandedIds={expandedIds}
+        onExpandedChange={setExpandedIds}
+        toggleLabel={(node, expanded) =>
+          expanded ? `Свернуть ${node.label}` : `Развернуть ${node.label}`
+        }
+        nodes={[
+          { id: "prompt", label: "Вопрос человека" },
+          { id: "reply-first", label: "Ответ агента" },
+          {
+            id: "fork",
+            label: "Переспросили иначе",
+            badge: { tone: "neutral", text: "2 ветки" },
+            children: [
+              {
+                id: "branch-a",
+                label: "Брошенная ветка",
+                children: [{ id: "reply-abandoned", label: "Ответ агента" }],
+              },
+              {
+                id: "branch-b",
+                label: "Рабочая ветка",
+                badge: { tone: "success", text: "текущая" },
+                children: [
+                  { id: "tool-call", label: "Вызов инструмента" },
+                  {
+                    id: "reply-later",
+                    label: "Ответ агента",
+                    badge: { tone: "accent", text: "лист" },
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+      />
+      <div style={row}>
+        <Button onClick={() => setExpandedIds(currentBranchPath)}>Показать текущую ветку</Button>
+        <Button onClick={() => setExpandedIds([])}>Свернуть всё</Button>
+      </div>
+    </div>
+  );
+}
+
 export const NavigationAndLayers = () => {
   const [opacity, setOpacity] = useState(72);
 
@@ -283,20 +380,8 @@ export const NavigationAndLayers = () => {
           },
         ]}
       />
-      <Tree
-        label="Файлы демонстрации"
-        nodes={[
-          {
-            id: "packages",
-            label: "packages",
-            children: [
-              { id: "ui-kit", label: "ui-kit" },
-              { id: "protocol", label: "protocol" },
-            ],
-          },
-          { id: "docs", label: "docs" },
-        ]}
-      />
+      <TreeSelection />
+      <TreeCurrentBranch />
     </div>
   );
 };

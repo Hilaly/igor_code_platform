@@ -9,13 +9,17 @@ import { MultiSelect } from "./multi-select.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
 import { ToolCall } from "./tool-call.tsx";
-import { Tree } from "./tree.tsx";
+import { Tree, type TreeNode } from "./tree.tsx";
 
 const options = [
   { value: "disabled", label: "Недоступно", disabled: true },
   { value: "second", label: "Второй" },
   { value: "third", label: "Третий" },
 ];
+
+/** Имя кнопки раскрытия дерева приходит от вызывающего — умолчания у него нет. */
+const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
+  `${expanded ? "Свернуть" : "Развернуть"} ${node.label}`;
 
 afterEach(cleanup);
 
@@ -187,6 +191,7 @@ describe("interactive components", () => {
     render(
       <Tree
         label="Файлы"
+        toggleLabel={treeToggleLabel}
         onSelect={onSelect}
         nodes={[
           { id: "parent", label: "Родитель", children: [{ id: "child", label: "Ребёнок" }] },
@@ -195,7 +200,11 @@ describe("interactive components", () => {
       />,
     );
 
-    const parent = screen.getByRole("treeitem", { name: /Родитель/ });
+    // Имя дерева и имя кнопки раскрытия целиком принадлежат вызывающему: своих строк у кита нет.
+    expect(screen.getByRole("tree").getAttribute("aria-label")).toBe("Файлы");
+    expect(screen.getByRole("button", { name: "Развернуть Родитель" })).toBeTruthy();
+
+    const parent = screen.getByRole("treeitem", { name: "Родитель" });
     parent.focus();
     fireEvent.keyDown(parent, { key: "ArrowDown" });
 
@@ -209,22 +218,179 @@ describe("interactive components", () => {
   it("expands a Tree item then moves real focus to its first child", async () => {
     render(
       <Tree
+        label="Файлы"
+        toggleLabel={treeToggleLabel}
         nodes={[{ id: "parent", label: "Родитель", children: [{ id: "child", label: "Ребёнок" }] }]}
       />,
     );
 
-    const parent = screen.getByRole("treeitem", { name: /Родитель/ });
+    const parent = screen.getByRole("treeitem", { name: "Родитель" });
     parent.focus();
     fireEvent.keyDown(parent, { key: "ArrowRight" });
 
     await waitFor(() => {
-      expect(screen.getByRole("treeitem", { name: /Родитель/ }).getAttribute("aria-expanded")).toBe(
+      expect(screen.getByRole("treeitem", { name: "Родитель" }).getAttribute("aria-expanded")).toBe(
         "true",
       );
     });
-    fireEvent.keyDown(screen.getByRole("treeitem", { name: /Родитель/ }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("treeitem", { name: "Родитель" }), { key: "ArrowRight" });
 
     expect(document.activeElement).toBe(screen.getByRole("treeitem", { name: "Ребёнок" }));
+  });
+
+  it("keeps a Tree click on the row a selection and never a collapse", () => {
+    const onSelect = vi.fn();
+    render(
+      <Tree
+        label="Записи"
+        toggleLabel={treeToggleLabel}
+        onSelect={onSelect}
+        nodes={[
+          {
+            id: "turn",
+            label: "Турн",
+            badge: { tone: "accent", text: "черновик" },
+            children: [{ id: "reply", label: "Ответ" }],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Развернуть Турн" }));
+
+    const expandedTurn = screen.getByRole("treeitem", { name: "Турн черновик" });
+    expect(expandedTurn.getAttribute("aria-expanded")).toBe("true");
+    // Раскрывашка меняет только раскрытие: выбирать за человека она не имеет права.
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(expandedTurn);
+
+    // А щелчок по строке — только выбор: раскрытую папку выбирают, не сворачивая её.
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "turn" }));
+    expect(
+      screen.getByRole("treeitem", { name: "Турн черновик" }).getAttribute("aria-expanded"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть Турн" }));
+    expect(
+      screen.getByRole("treeitem", { name: "Турн черновик" }).getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("remembers Tree expansion itself while nobody claimed it, naming every new set", () => {
+    const onExpandedChange = vi.fn();
+    render(
+      <Tree
+        label="Записи"
+        toggleLabel={treeToggleLabel}
+        onExpandedChange={onExpandedChange}
+        nodes={[
+          {
+            id: "turn",
+            label: "Турн",
+            children: [{ id: "reply", label: "Ответ", children: [{ id: "tool", label: "Вызов" }] }],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Развернуть Турн" }));
+
+    // Набора никто не забрал, поэтому дерево применило его само — и всё равно назвало вслух.
+    expect(onExpandedChange).toHaveBeenLastCalledWith(["turn"]);
+    expect(screen.getByRole("treeitem", { name: "Турн" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Развернуть Ответ" }));
+    expect(onExpandedChange).toHaveBeenLastCalledWith(["turn", "reply"]);
+    expect(screen.getByRole("treeitem", { name: "Вызов" })).toBeTruthy();
+  });
+
+  it("leaves Tree expansion untouched until the caller changes expandedIds", () => {
+    const onExpandedChange = vi.fn();
+    const nodes: TreeNode[] = [
+      {
+        id: "turn",
+        label: "Турн",
+        children: [{ id: "reply", label: "Ответ" }],
+      },
+    ];
+    const { rerender } = render(
+      <Tree
+        label="Записи"
+        toggleLabel={treeToggleLabel}
+        expandedIds={[]}
+        onExpandedChange={onExpandedChange}
+        nodes={nodes}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Развернуть Турн" }));
+
+    // Раскрытием владеет вызывающий: сама по себе кнопка только просит о нём.
+    expect(onExpandedChange).toHaveBeenCalledWith(["turn"]);
+    expect(screen.getByRole("treeitem", { name: "Турн" }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    expect(screen.queryByRole("treeitem", { name: "Ответ" })).toBeNull();
+
+    // Клавиатура в управляемом режиме означает ровно то же самое, что и мышь.
+    fireEvent.keyDown(screen.getByRole("treeitem", { name: "Турн" }), { key: "ArrowRight" });
+    expect(onExpandedChange).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("treeitem", { name: "Турн" }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+
+    rerender(
+      <Tree
+        label="Записи"
+        toggleLabel={treeToggleLabel}
+        expandedIds={["turn"]}
+        onExpandedChange={onExpandedChange}
+        nodes={nodes}
+      />,
+    );
+
+    expect(screen.getByRole("treeitem", { name: "Турн" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("treeitem", { name: "Ответ" })).toBeTruthy();
+
+    // Набор вызывающего побеждает и в обратную сторону: своего раскрытия дерево не накопило.
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть Турн" }));
+    expect(onExpandedChange).toHaveBeenLastCalledWith([]);
+    expect(screen.getByRole("treeitem", { name: "Турн" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("does not pull focus into a Tree that received its nodes while somebody was typing", () => {
+    const composerLabel = "Сообщение";
+    const nodes: TreeNode[] = [
+      { id: "first", label: "Первый" },
+      { id: "second", label: "Второй" },
+    ];
+    const { rerender } = render(
+      <>
+        <input aria-label={composerLabel} />
+        <Tree label="Записи" toggleLabel={treeToggleLabel} nodes={[]} />
+      </>,
+    );
+
+    const composer = screen.getByRole("textbox", { name: composerLabel });
+    composer.focus();
+    // Дерево записей стоит рядом с живой лентой: узлы приезжают дельтой, а не действием человека.
+    rerender(
+      <>
+        <input aria-label={composerLabel} />
+        <Tree label="Записи" toggleLabel={treeToggleLabel} nodes={nodes} />
+      </>,
+    );
+
+    expect(screen.getByRole("treeitem", { name: "Первый" }).getAttribute("tabindex")).toBe("0");
+    expect(document.activeElement).toBe(composer);
   });
 
   it("uses End to select the last enabled custom Select option", () => {
@@ -395,24 +561,45 @@ describe("interactive components", () => {
     expect(input.dispatchEvent(end)).toBe(true);
   });
 
-  it("normalizes Tree roving focus when the focused node is removed", () => {
+  it("normalizes Tree roving focus without stealing it when the focused node is removed", () => {
+    const composerLabel = "Сообщение";
     const { rerender } = render(
-      <Tree
-        label="Файлы"
-        nodes={[
-          { id: "first", label: "Первый" },
-          { id: "second", label: "Второй" },
-        ]}
-      />,
+      <>
+        <input aria-label={composerLabel} />
+        <Tree
+          label="Файлы"
+          toggleLabel={treeToggleLabel}
+          nodes={[
+            { id: "first", label: "Первый" },
+            { id: "second", label: "Второй" },
+          ]}
+        />
+      </>,
     );
 
     const second = screen.getByRole("treeitem", { name: "Второй" });
-    second.focus();
-    rerender(<Tree label="Файлы" nodes={[{ id: "first", label: "Первый" }]} />);
+    fireEvent.click(second);
+    expect(document.activeElement).toBe(second);
 
+    const composer = screen.getByRole("textbox", { name: composerLabel });
+    composer.focus();
+    rerender(
+      <>
+        <input aria-label={composerLabel} />
+        <Tree
+          label="Файлы"
+          toggleLabel={treeToggleLabel}
+          nodes={[{ id: "first", label: "Первый" }]}
+        />
+      </>,
+    );
+
+    // Право на `Tab` переезжает на оставшийся узел, а сам фокус остаётся там, куда его поставил
+    // человек: узел исчез не по его команде.
     const first = screen.getByRole("treeitem", { name: "Первый" });
     expect(first.getAttribute("tabindex")).toBe("0");
     expect(screen.queryByRole("treeitem", { name: "Второй" })).toBeNull();
+    expect(document.activeElement).toBe(composer);
   });
 });
 

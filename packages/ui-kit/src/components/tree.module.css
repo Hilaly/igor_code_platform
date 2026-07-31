@@ -27,8 +27,11 @@
   transition: background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
-.item:focus-visible > .row,
-.item.focused > .row {
+/*
+ * Кольцо показывает настоящий фокус, а не право на `Tab`: узел, помнящий, куда вернётся `Tab`, есть
+ * всегда, и подсвеченным он выглядел бы фокусом в дереве, из которого человек давно ушёл.
+ */
+.item:focus-visible > .row {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
   outline-offset: -1px;
 }
@@ -43,19 +46,39 @@
   font-weight: var(--sovereign-font-weight-medium);
 }
 
-.toggle {
+.toggle,
+.togglePlaceholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
   width: 1rem;
   height: 1rem;
+}
+
+.toggle {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
   font-size: 0.7rem;
+  line-height: 1;
   color: var(--sovereign-text-muted);
+  cursor: pointer;
   transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .toggle.expanded {
   transform: rotate(90deg);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.label {
+  min-width: 0;
 }
 
 .children {
