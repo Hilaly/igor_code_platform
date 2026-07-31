@@ -6,13 +6,14 @@ import { after, describe, it } from "node:test";
 
 import { createModels } from "@earendil-works/pi-ai";
 import type { Context } from "@earendil-works/pi-ai";
-import type { SessionDelta } from "@sovereign/protocol";
+import { foldEntryLabels, type SessionDelta } from "@sovereign/protocol";
 
 import {
   createAgentSessionStore,
   createCoreTools,
   type AgentSession,
   type AgentSessionStore,
+  type CompactionTuning,
 } from "./agent-session.ts";
 import { scriptedModelProvider, type ScriptedTurn } from "./testing.ts";
 
@@ -34,10 +35,17 @@ async function freshFolder(name: string): Promise<string> {
 
 const agent = { id: "base-agent.agent", instructions: "ты двойник" };
 
+/**
+ * Параметры компакции в тестах те же, что зашиты в Pi: своя компакция заведена ради управляемости,
+ * а не ради других чисел. Функция, а не значение, — как на живой системе.
+ */
+const compactionSettings = () => ({ reserveTokens: 16384, keepRecentTokens: 20000 });
+
 async function withStore(
   turns: ScriptedTurn[],
   projectFolder?: string,
   beforeAnswer?: (index: number) => void,
+  tuning: () => CompactionTuning = compactionSettings,
 ) {
   const scripted = scriptedModelProvider({
     turns,
@@ -50,7 +58,12 @@ async function withStore(
   const directory = await freshFolder("sessions");
   const archivedDirectory = await freshFolder("sessions-archived");
   const folder = projectFolder ?? (await freshFolder("project"));
-  const store = createAgentSessionStore({ models, directory, archivedDirectory });
+  const store = createAgentSessionStore({
+    models,
+    directory,
+    archivedDirectory,
+    compactionSettings: tuning,
+  });
 
   const open = async (): Promise<AgentSession> => {
     const created = await store.create({
@@ -225,7 +238,12 @@ describe("an agent session over pi", () => {
     await session.close();
 
     const models = createModels();
-    const restarted = createAgentSessionStore({ models, directory, archivedDirectory });
+    const restarted = createAgentSessionStore({
+      models,
+      directory,
+      archivedDirectory,
+      compactionSettings,
+    });
     const listed = await restarted.list();
     const persisted = await restarted.open(sessionId);
 
@@ -613,6 +631,403 @@ describe("archiving a session", () => {
   });
 });
 
+describe("reading the branch, the labels and the context", () => {
+  it("reads the branch from the leaf and from a named entry", async () => {
+    const { open, store } = await withStore([{ text: "первый" }, { text: "второй" }]);
+    const session = await open();
+    const persisted = await recordOf(store, session);
+
+    await session.prompt("первый вопрос", "t1");
+    await session.prompt("второй вопрос", "t2");
+
+    const whole = await persisted.branch();
+
+    assert.equal(whole.kind, "branch");
+
+    if (whole.kind !== "branch") {
+      return;
+    }
+
+    assert.deepEqual(
+      whole.entries.map((entry) => entry.kind),
+      [
+        "model-change",
+        "thinking-level-change",
+        "tools-change",
+        "message",
+        "message",
+        "message",
+        "message",
+      ],
+    );
+    assert.equal(whole.leafId, whole.entries.at(-1)?.id);
+
+    // Ветка от записи — путь до неё, а не до листа: лист при этом остаётся листом сессии.
+    const middle = whole.entries[3];
+
+    assert.ok(middle !== undefined);
+
+    const partial = await persisted.branch(middle.id);
+
+    assert.equal(partial.kind === "branch" ? partial.entries.length : 0, 4);
+    assert.equal(partial.kind === "branch" ? partial.leafId : "", whole.leafId);
+    assert.deepEqual(await persisted.branch("никакой"), { kind: "unknown-entry" });
+    await session.close();
+  });
+
+  it("labels an entry, clears the label and folds the records", async () => {
+    const { open, store } = await withStore([{ text: "готово" }]);
+    const session = await open();
+    const persisted = await recordOf(store, session);
+
+    await session.prompt("вопрос", "t1");
+
+    const answer = (await session.entries()).entries.at(-1);
+
+    assert.ok(answer !== undefined);
+    assert.deepEqual(await persisted.label(answer.id, "важное"), { kind: "labelled" });
+    assert.deepEqual(await persisted.label(answer.id, "важное решение"), { kind: "labelled" });
+    assert.deepEqual(
+      foldEntryLabels((await session.entries()).entries),
+      new Map([[answer.id, "важное решение"]]),
+    );
+
+    // Снятие — такая же запись, только без значения, и свёртка обязана видеть именно снятие.
+    assert.deepEqual(await persisted.label(answer.id, null), { kind: "labelled" });
+    assert.deepEqual(foldEntryLabels((await session.entries()).entries), new Map());
+
+    assert.deepEqual(await persisted.label("никакой", "метка"), { kind: "unknown-entry" });
+    await session.close();
+  });
+
+  it("counts the context of the branch and names the window of the model", async () => {
+    const { open, store } = await withStore([{ text: "готово" }]);
+    const session = await open();
+    const persisted = await recordOf(store, session);
+
+    const empty = await persisted.contextUsage();
+
+    assert.equal(empty.tokens, 0);
+    assert.equal(empty.contextWindow, 128_000);
+
+    await session.prompt("вопрос подлиннее, чтобы токенов стало больше нуля", "t1");
+
+    assert.ok((await persisted.contextUsage()).tokens > 0);
+    await session.close();
+  });
+
+  it("leaves the window out when the model of the session is gone", async () => {
+    const { open, directory, archivedDirectory } = await withStore([{ text: "готово" }]);
+    const session = await open();
+    const sessionId = session.summary().id;
+
+    await session.prompt("вопрос", "t1");
+    await session.close();
+
+    // Пустой каталог моделей: доли контекста не существует, и проценты показывать не из чего.
+    const models = createModels();
+    const restarted = createAgentSessionStore({
+      models,
+      directory,
+      archivedDirectory,
+      compactionSettings,
+    });
+    const persisted = await restarted.open(sessionId);
+
+    assert.ok(persisted !== undefined);
+
+    const usage = await persisted.contextUsage();
+
+    assert.ok(usage.tokens > 0);
+    assert.equal(usage.contextWindow, undefined);
+  });
+});
+
+describe("translating every kind of tree entry", () => {
+  it("names all eleven kinds the runtime writes and keeps the unknown one visible", async () => {
+    const { open, directory, archivedDirectory } = await withStore([]);
+    const session = await open();
+    const sessionId = session.summary().id;
+
+    await session.close();
+
+    // Часть записей рантайм пишет только изнутри компакции и навигации, а `custom_message` наша
+    // поверхность не создаёт вовсе. Проверяется здесь перевод, а не путь их появления, поэтому
+    // строки дописываются в файл сессии дословно — ровно в том виде, в каком их пишет Pi.
+    const path = await onlySessionFile(directory);
+    const written = [
+      { type: "compaction", summary: "свёрнуто", tokensBefore: 4096, firstKeptEntryId: "e-9" },
+      { type: "compaction", summary: "своё", tokensBefore: 1, fromHook: true },
+      { type: "branch_summary", fromId: "e-1", summary: "пересказ ветки" },
+      { type: "label", targetId: "e-1", label: "важное" },
+      { type: "label", targetId: "e-1" },
+      { type: "session_info", name: "разбор бага" },
+      { type: "session_info" },
+      { type: "leaf", targetId: "e-1" },
+      { type: "leaf", targetId: null },
+      { type: "custom", customType: "sovereign.degraded", data: { kind: "tool" } },
+      {
+        type: "custom_message",
+        customType: "sovereign.note",
+        content: [
+          { type: "text", text: "первая часть " },
+          { type: "text", text: "и вторая" },
+        ],
+        display: true,
+      },
+      { type: "из будущей версии pi" },
+    ];
+
+    await appendFile(
+      path,
+      written
+        .map((entry, index) =>
+          JSON.stringify({
+            ...entry,
+            id: `raw-${String(index)}`,
+            parentId: null,
+            timestamp: "2026-07-31T00:00:00.000Z",
+          }),
+        )
+        .join("\n") + "\n",
+    );
+
+    const reread = await (await freshStore(directory, archivedDirectory)).open(sessionId);
+
+    assert.ok(reread !== undefined);
+
+    const entries = (await reread.entries()).entries.slice(-written.length);
+
+    assert.deepEqual(
+      entries.map((entry) => entry.kind),
+      [
+        "compaction",
+        "compaction",
+        "branch-summary",
+        "label",
+        "label",
+        "session-name",
+        "session-name",
+        "leaf",
+        "leaf",
+        "custom",
+        "custom-message",
+        "other",
+      ],
+    );
+    assert.deepEqual(entries[0], {
+      id: "raw-0",
+      time: "2026-07-31T00:00:00.000Z",
+      kind: "compaction",
+      summary: "свёрнуто",
+      tokensBefore: 4096,
+      firstKeptEntryId: "e-9",
+      // Поля у Pi нет — значит компакцию считал сам harness, а не подсунул хук.
+      fromHook: false,
+    });
+    assert.equal(entries[1]?.kind === "compaction" ? entries[1].fromHook : undefined, true);
+    assert.equal(
+      entries[1]?.kind === "compaction" ? entries[1].firstKeptEntryId : "нет",
+      undefined,
+    );
+    assert.deepEqual(entries[3], {
+      id: "raw-3",
+      time: "2026-07-31T00:00:00.000Z",
+      kind: "label",
+      targetId: "e-1",
+      label: "важное",
+    });
+    // Снятая метка — запись без значения, а не с пустым.
+    assert.equal(entries[4]?.kind === "label" ? entries[4].label : "нет", undefined);
+    assert.equal(entries[6]?.kind === "session-name" ? entries[6].name : "нет", undefined);
+    // Лист, вернувший дерево в пустое состояние, приезжает без цели.
+    assert.equal(entries[8]?.kind === "leaf" ? entries[8].targetId : "нет", undefined);
+    assert.deepEqual(entries[9], {
+      id: "raw-9",
+      time: "2026-07-31T00:00:00.000Z",
+      kind: "custom",
+      type: "sovereign.degraded",
+      data: { kind: "tool" },
+    });
+    // Содержимое своего сообщения бывает массивом блоков: текстовые склеиваются по порядку.
+    assert.deepEqual(entries[10], {
+      id: "raw-10",
+      time: "2026-07-31T00:00:00.000Z",
+      kind: "custom-message",
+      type: "sovereign.note",
+      text: "первая часть и вторая",
+      display: true,
+    });
+    assert.deepEqual(entries[11], {
+      id: "raw-11",
+      time: "2026-07-31T00:00:00.000Z",
+      kind: "other",
+      type: "из будущей версии pi",
+    });
+  });
+});
+
+describe("compacting the context", () => {
+  it("writes a compaction the platform built itself, honouring our keepRecentTokens", async () => {
+    // Четыре ответа: два турна и два пересказа. Пересказов два, потому что срез по хвосту в один
+    // токен разрезает турн пополам, а разрезанный турн Pi пересказывает вторым запросом.
+    const { open, requests, store } = await withStore(
+      [
+        { text: "первый ответ" },
+        { text: "второй ответ" },
+        { text: "вот пересказ" },
+        { text: "и хвост турна" },
+      ],
+      undefined,
+      undefined,
+      () => ({ reserveTokens: 4096, keepRecentTokens: 1 }),
+    );
+    const session = await open();
+    const persisted = await recordOf(store, session);
+
+    await session.prompt("первый вопрос", "t1");
+    await session.prompt("второй вопрос", "t2");
+
+    assert.deepEqual(await session.compact(), { kind: "done" });
+
+    const entries = (await session.entries()).entries;
+    const written = entries.at(-1);
+
+    assert.ok(written?.kind === "compaction");
+    assert.match(written.summary, /вот пересказ/);
+    // Компакцию собрала платформа, а не рантайм: иначе наши `reserveTokens` и `keepRecentTokens`
+    // применить было бы негде (docs/agent-runtime-contract.md).
+    assert.equal(written.fromHook, true);
+    assert.ok(written.tokensBefore > 0);
+
+    // `keepRecentTokens: 1` обрезает разговор почти целиком, поэтому пересказывать уехал первый
+    // вопрос: по этому и видно, что наши настройки доехали до подготовки, а не остались словами.
+    assert.match(JSON.stringify(requests.slice(2)), /первый вопрос/);
+
+    // Свёрнутая ветка кончается компакцией, и второй раз сворачивать нечего.
+    const branch = await persisted.branch();
+
+    assert.equal(branch.kind === "branch" ? branch.entries.at(-1)?.kind : "нет", "compaction");
+    await session.close();
+  });
+
+  it("keeps the whole conversation out of the summary when the tail budget is large", async () => {
+    const { open, requests } = await withStore([
+      { text: "первый ответ" },
+      { text: "вот пересказ" },
+    ]);
+    const session = await open();
+
+    await session.prompt("первый вопрос", "t1");
+
+    assert.deepEqual(await session.compact(), { kind: "done" });
+
+    // Хвост в двадцать тысяч токенов покрывает весь разговор: пересказывать оказалось нечего, и в
+    // запрос уехала пустая история. Это та же настройка, только с другим значением.
+    assert.doesNotMatch(JSON.stringify(requests.at(-1)?.messages ?? []), /первый вопрос/);
+    await session.close();
+  });
+
+  it("answers busy instead of throwing while a turn runs", async () => {
+    const { open } = await withStore([{ text: "первый" }, { text: "пересказ" }]);
+    const session = await open();
+
+    const running = session.prompt("первый", "t1");
+    const refused = await session.compact();
+
+    assert.deepEqual(refused, { kind: "busy" });
+    await running;
+    await session.close();
+  });
+});
+
+describe("navigating the tree", () => {
+  it("moves the leaf back to a question and hands its text to the editor", async () => {
+    const { open } = await withStore([{ text: "первый ответ" }, { text: "второй ответ" }]);
+    const session = await open();
+
+    await session.prompt("первый вопрос", "t1");
+    await session.prompt("второй вопрос", "t2");
+
+    const questions = (await session.entries()).entries.filter(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+    const second = questions[1];
+
+    assert.ok(second !== undefined);
+
+    const moved = await session.navigate({ entryId: second.id });
+
+    assert.equal(moved.kind, "navigated");
+
+    if (moved.kind !== "navigated") {
+      return;
+    }
+
+    // Целью была реплика человека, поэтому листом стал её родитель, а текст уехал в ответ: иначе
+    // переспросить иначе было бы нечем (docs/sessions-and-projects.md).
+    assert.equal(moved.editorText, "второй вопрос");
+    assert.equal(moved.leafId, second.parentId);
+    assert.equal(moved.summarized, false);
+    assert.equal(moved.cancelled, false);
+    await session.close();
+  });
+
+  it("summarizes the branch it leaves when asked to", async () => {
+    const { open, requests } = await withStore([
+      { text: "первый ответ" },
+      { text: "второй ответ" },
+      { text: "пересказ покинутой ветки" },
+    ]);
+    const session = await open();
+
+    await session.prompt("первый вопрос", "t1");
+    await session.prompt("второй вопрос", "t2");
+
+    const questions = (await session.entries()).entries.filter(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+    const second = questions[1];
+
+    assert.ok(second !== undefined);
+
+    const moved = await session.navigate({
+      entryId: second.id,
+      summarize: true,
+      instructions: "коротко",
+    });
+
+    assert.equal(moved.kind === "navigated" ? moved.summarized : false, true);
+    assert.match(JSON.stringify(requests.at(-1)?.messages ?? []), /коротко/);
+
+    const summary = (await session.entries()).entries.at(-1);
+
+    assert.equal(summary?.kind, "branch-summary");
+    assert.match(
+      summary?.kind === "branch-summary" ? summary.summary : "",
+      /пересказ покинутой ветки/,
+    );
+    await session.close();
+  });
+
+  it("says the entry is unknown instead of throwing", async () => {
+    const { open } = await withStore([]);
+    const session = await open();
+
+    assert.deepEqual(await session.navigate({ entryId: "никакой" }), { kind: "unknown-entry" });
+    await session.close();
+  });
+});
+
+/** Запись той же сессии: у файла один владелец, поэтому это тот же экземпляр, а не второй. */
+async function recordOf(store: AgentSessionStore, session: AgentSession) {
+  const persisted = await store.open(session.summary().id);
+
+  assert.ok(persisted !== undefined);
+
+  return persisted;
+}
+
 /** Файлы сессий в корне, по всем папкам рабочих директорий. Пустая папка сессией не считается. */
 async function sessionFiles(root: string): Promise<string[]> {
   const found: string[] = [];
@@ -648,5 +1063,5 @@ async function freshStore(
 
   models.setProvider(scripted.provider);
 
-  return createAgentSessionStore({ models, directory, archivedDirectory });
+  return createAgentSessionStore({ models, directory, archivedDirectory, compactionSettings });
 }

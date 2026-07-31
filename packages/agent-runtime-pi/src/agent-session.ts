@@ -16,11 +16,14 @@ import { basename, dirname, join } from "node:path";
 import {
   AgentHarness,
   AgentHarnessError,
+  compact as generateCompaction,
   createBashTool,
   createEditTool,
   createReadTool,
   createWriteTool,
+  estimateContextTokens,
   JsonlSessionRepo,
+  prepareCompaction,
   SessionError,
   type AgentHarnessEvent,
   type AgentHarnessTool,
@@ -95,6 +98,17 @@ export type AgentSession = {
   queues: () => SessionQueues;
   /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
   entries: (after?: number) => Promise<{ entries: SessionEntry[]; seen: number }>;
+  /**
+   * Свернуть контекст в пересказ. Это поход к модели: он стоит денег и занимает слот в очереди —
+   * ставит его туда вызывающий, как и турн (docs/architecture.md).
+   */
+  compact: (instructions?: string) => Promise<CompactOutcome>;
+  /**
+   * Перейти к записи дерева, при желании пересказав покидаемую ветку. Возвращает результат целиком,
+   * а не только новый лист: `editorText` — текст реплики, которую человек собрался переспросить
+   * иначе, и доставить его вне ответа нечем (docs/sessions-and-projects.md).
+   */
+  navigate: (request: NavigateRequest) => Promise<NavigateOutcome>;
   subscribe: (listener: (delta: SessionDelta) => void) => () => void;
   /** Освободить среду исполнения. Зовётся, когда сессию выгружают из памяти. */
   close: () => Promise<void>;
@@ -115,6 +129,22 @@ export type PersistedAgentSession = {
    * модель или чей плагин с агентом убрали, — иначе имя нельзя дать ровно там, где оно нужнее.
    */
   setName: (name: string) => Promise<void>;
+  /**
+   * Ветка дерева: путь от записи вверх до корня либо до последней компакции. Живёт на записи, а не
+   * на harness: ветка читается и у сессии, чью модель или чей плагин с агентом убрали.
+   */
+  branch: (fromId?: string) => Promise<BranchOutcome>;
+  /**
+   * Поставить или снять метку записи. Тоже мимо harness: это дозапись в дерево, а не поход к
+   * модели, — ровно как имя сессии.
+   */
+  label: (entryId: string, label: string | null) => Promise<LabelOutcome>;
+  /**
+   * Насколько заполнен контекст действующей ветки. Harness для этого не нужен: контекст собирается
+   * из записей, а окно берётся у модели каталога — её может не оказаться, и тогда доли не
+   * существует.
+   */
+  contextUsage: () => Promise<ContextUsage>;
   /** Счёт токенов и денег по всему файлу, включая брошенные ветки. */
   stats: () => Promise<AgentSessionStats>;
   /**
@@ -140,6 +170,59 @@ export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
 export type MessageOutcome = { kind: "queued" } | { kind: "idle" } | { kind: "busy" };
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
+
+/**
+ * Исход компакции. `busy` — не сбой, а состояние: `compact()` у рантайма требует простоя ровно так
+ * же, как `prompt`.
+ */
+export type CompactOutcome =
+  { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
+
+/** Тело перехода к записи дерева. Повторяет `SessionNavigateRequest` протокола до поля. */
+export type NavigateRequest = {
+  entryId: string;
+  summarize?: boolean;
+  instructions?: string;
+  replaceInstructions?: boolean;
+};
+
+/**
+ * Исход перехода. `leafId` берётся у сессии после перехода, а не из ответа рантайма: `navigateTree`
+ * новый лист не возвращает вовсе, а по цели его не вычислить — у реплики человека листом становится
+ * её родитель.
+ */
+export type NavigateOutcome =
+  | {
+      kind: "navigated";
+      leafId?: string;
+      editorText?: string;
+      summarized: boolean;
+      cancelled: boolean;
+    }
+  | { kind: "busy" }
+  | { kind: "unknown-entry" }
+  | { kind: "failed"; reason: string };
+
+/** Ветка дерева. Записи уже переведены в контракт, `leafId` — лист **сессии**, а не конец ветки. */
+export type BranchOutcome =
+  { kind: "branch"; entries: SessionEntry[]; leafId?: string } | { kind: "unknown-entry" };
+
+/** Исход простановки метки. Указать не ту запись — обычная ошибка вызывающего, а не сбой. */
+export type LabelOutcome = { kind: "labelled" } | { kind: "unknown-entry" };
+
+/** Заполненность контекста. Окна может не быть: модель сессии могла пропасть из каталога. */
+export type ContextUsage = { tokens: number; contextWindow?: number };
+
+/**
+ * Параметры компакции, которые Pi зашивает константой. `compact()` их не принимает, поэтому
+ * платформа собирает компакцию сама и подсовывает её хуком (docs/sessions-and-projects.md).
+ */
+export type CompactionTuning = {
+  /** Сколько токенов окна оставить под промпт пересказа и его ответ. */
+  reserveTokens: number;
+  /** Сколько хвоста разговора оставить как есть. */
+  keepRecentTokens: number;
+};
 
 /**
  * Тип записи об утрате опоры. С неймспейсом платформы, потому что `custom` — общая точка, куда
@@ -218,6 +301,12 @@ export type CreateAgentSessionStoreOptions = {
    * между корнями, а вложенная папка притворилась бы папкой рабочей директории при обходе.
    */
   archivedDirectory: string;
+  /**
+   * Параметры компакции спрашиваются функцией, а не берутся значением при создании стора: то же
+   * правило, что у предела одновременных турнов — `config.json` перечитывается на живом процессе, и
+   * снимок, взятый однажды, устарел бы молча (docs/architecture.md).
+   */
+  compactionSettings: () => CompactionTuning;
 };
 
 /**
@@ -341,7 +430,12 @@ export function createAgentSessionStore(
       return known;
     }
 
-    const persisted = persistedSession(session, options.models, summary);
+    const persisted = persistedSession(
+      session,
+      options.models,
+      summary,
+      options.compactionSettings,
+    );
 
     owned.set(summary.id, persisted);
 
@@ -513,6 +607,7 @@ function liveSession(
   models: MutableModels,
   agent: AgentDefinition,
   summary: AgentSessionSummary,
+  compactionSettings: () => CompactionTuning,
   onClosed: () => void,
 ): AgentSession | { kind: "unknown-model" } {
   const model = resolveModel(models, summary.model);
@@ -570,6 +665,49 @@ function liveSession(
     }
 
     translate(event, current, publish);
+  });
+
+  /**
+   * Своя компакция вместо рантаймовой.
+   *
+   * Причина — не другие числа, а управляемость: `reserveTokens` и `keepRecentTokens` Pi берёт из
+   * своей константы, а параметрами `compact()` их не принимает. Этот хук — единственная точка, где
+   * их можно подставить: рантайм отдаёт сюда уже собранную подготовку и записи ветки, а вернувший
+   * свою компакцию заменяет её целиком (docs/agent-runtime-contract.md).
+   *
+   * Настройки спрашиваются в момент компакции, а не при подъёме harness: `config.json`
+   * перечитывается на живом процессе, и сессия, открытая до правки, обязана увидеть новое значение.
+   */
+  harness.on("session_before_compact", async (event) => {
+    const prepared = prepareCompaction(event.branchEntries, {
+      enabled: true,
+      ...compactionSettings(),
+    });
+
+    if (!prepared.ok) {
+      throw prepared.error;
+    }
+
+    // Сворачивать нечего: ветка пуста либо уже кончается компакцией. Отмена честнее пустого
+    // пересказа — она хотя бы не портит дерево записью ни о чём.
+    if (prepared.value === undefined) {
+      return { cancel: true };
+    }
+
+    const produced = await generateCompaction(
+      prepared.value,
+      harness.models,
+      harness.getModel(),
+      event.customInstructions,
+      event.signal,
+      harness.getThinkingLevel(),
+    );
+
+    if (!produced.ok) {
+      throw produced.error;
+    }
+
+    return { compaction: produced.value };
   });
 
   return {
@@ -680,6 +818,74 @@ function liveSession(
     entries: async (after = 0) => {
       return entriesOf(session, after);
     },
+    compact: async (instructions) => {
+      // Проверка и смена состояния идут до первого `await`, поэтому вторая компакция, пришедшая в
+      // том же такте, отказ получает здесь, а не исключением `busy` из рантайма.
+      if (phase !== "idle") {
+        return { kind: "busy" };
+      }
+
+      setPhase("compaction");
+
+      try {
+        await harness.compact(instructions);
+
+        return { kind: "done" };
+      } catch (cause) {
+        if (cause instanceof AgentHarnessError && cause.code === "busy") {
+          return { kind: "busy" };
+        }
+
+        return { kind: "failed", reason: describe(cause) };
+      } finally {
+        setPhase("idle");
+      }
+    },
+    navigate: async (request) => {
+      if (phase !== "idle") {
+        return { kind: "busy" };
+      }
+
+      // Фаза одна на переход с пересказом и без него: рантайм различает их только тем, ходит ли он
+      // к модели, а состояние `branch_summary` присваивает в обоих случаях.
+      setPhase("branch-summary");
+
+      try {
+        const moved = await harness.navigateTree(request.entryId, {
+          ...(request.summarize === undefined ? {} : { summarize: request.summarize }),
+          ...(request.instructions === undefined
+            ? {}
+            : { customInstructions: request.instructions }),
+          ...(request.replaceInstructions === undefined
+            ? {}
+            : { replaceInstructions: request.replaceInstructions }),
+        });
+        // Лист спрашивается у сессии: в ответе рантайма его нет, а по цели он не выводится — у
+        // реплики человека листом становится её родитель, чтобы вопрос можно было задать иначе.
+        const leafId = await session.getLeafId();
+
+        return {
+          kind: "navigated",
+          ...(leafId === null ? {} : { leafId }),
+          ...(moved.editorText === undefined ? {} : { editorText: moved.editorText }),
+          summarized: moved.summaryEntry !== undefined,
+          cancelled: moved.cancelled,
+        };
+      } catch (cause) {
+        if (cause instanceof AgentHarnessError && cause.code === "busy") {
+          return { kind: "busy" };
+        }
+
+        // Не та запись — обычная ошибка вызывающего, и она приезжает исходом, как у форка.
+        if (cause instanceof AgentHarnessError && cause.code === "invalid_argument") {
+          return { kind: "unknown-entry" };
+        }
+
+        return { kind: "failed", reason: describe(cause) };
+      } finally {
+        setPhase("idle");
+      }
+    },
     subscribe: (listener) => {
       listeners.add(listener);
 
@@ -696,18 +902,64 @@ function persistedSession(
   session: PiSession,
   models: MutableModels,
   summary: AgentSessionSummary,
+  compactionSettings: () => CompactionTuning,
 ): PersistedAgentSession {
   let live: AgentSession | undefined;
 
   return {
     summary: () => ({ ...summary }),
     entries: (after = 0) => entriesOf(session, after),
+    branch: async (fromId) => {
+      let found: SessionTreeEntry[];
+
+      try {
+        found = await session.getBranch(fromId);
+      } catch (cause) {
+        if (cause instanceof SessionError && cause.code === "not_found") {
+          return { kind: "unknown-entry" };
+        }
+
+        throw cause;
+      }
+
+      const leafId = await session.getLeafId();
+
+      return {
+        kind: "branch",
+        entries: found.flatMap(describeEntry),
+        ...(leafId === null ? {} : { leafId }),
+      };
+    },
+    label: async (entryId, label) => {
+      try {
+        // Снятие метки — такая же запись, только без значения: действующее значение это свёртка
+        // всех записей `label` по цели, а не последнее непустое.
+        await session.appendLabel(entryId, label ?? undefined);
+      } catch (cause) {
+        if (cause instanceof SessionError && cause.code === "not_found") {
+          return { kind: "unknown-entry" };
+        }
+
+        throw cause;
+      }
+
+      return { kind: "labelled" };
+    },
+    contextUsage: async () => {
+      const context = await session.buildContext();
+      const model = resolveModel(models, summary.model);
+
+      return {
+        tokens: estimateContextTokens(context.messages).tokens,
+        ...(model === undefined ? {} : { contextWindow: model.contextWindow }),
+      };
+    },
     activate: (agent) => {
       if (live !== undefined) {
         return live;
       }
 
-      const started = liveSession(session, models, agent, summary, () => {
+      const started = liveSession(session, models, agent, summary, compactionSettings, () => {
         live = undefined;
       });
 
@@ -829,10 +1081,14 @@ function translate(
 }
 
 /**
- * Перевод записи дерева. Незнакомая запись приезжает как `other` со своим типом рантайма: молчаливая
- * потеря записи сделала бы ленту неполной без всякого следа.
+ * Перевод записи дерева. Разобраны все одиннадцать типов записей рантайма; `other` остаётся под то,
+ * чего рантайм ещё не умеет: обновление Pi, принёсшее новый тип записи, обязано доехать до клиента
+ * хоть чем-то. Молчаливая потеря записи сделала бы ленту неполной без всякого следа.
  */
 function describeEntry(entry: SessionTreeEntry): SessionEntry[] {
+  // Тип читается до разбора: когда разобраны все известные виды, для компилятора `entry` становится
+  // `never`, и незнакомой записи неоткуда взять своё имя.
+  const type: string = entry.type;
   const common = {
     id: entry.id,
     ...(entry.parentId === null ? {} : { parentId: entry.parentId }),
@@ -848,15 +1104,101 @@ function describeEntry(entry: SessionTreeEntry): SessionEntry[] {
   if (entry.type === "thinking_level_change") {
     return isThinkingLevel(entry.thinkingLevel)
       ? [{ ...common, kind: "thinking-level-change", thinkingLevel: entry.thinkingLevel }]
-      : [{ ...common, kind: "other", type: entry.type }];
+      : [{ ...common, kind: "other", type }];
   }
 
   if (entry.type === "active_tools_change") {
     return [{ ...common, kind: "tools-change", toolNames: [...entry.activeToolNames] }];
   }
 
+  if (entry.type === "compaction") {
+    // `fromHook` у рантайма необязателен, у нас — обязателен: отсутствие значит «считал сам
+    // harness», и превращать эту разницу в третье состояние незачем.
+    return [
+      {
+        ...common,
+        kind: "compaction",
+        summary: entry.summary,
+        tokensBefore: entry.tokensBefore,
+        ...(entry.firstKeptEntryId === undefined
+          ? {}
+          : { firstKeptEntryId: entry.firstKeptEntryId }),
+        fromHook: entry.fromHook ?? false,
+      },
+    ];
+  }
+
+  if (entry.type === "branch_summary") {
+    return [
+      {
+        ...common,
+        kind: "branch-summary",
+        fromId: entry.fromId,
+        summary: entry.summary,
+        fromHook: entry.fromHook ?? false,
+      },
+    ];
+  }
+
+  if (entry.type === "label") {
+    // Метки без значения не бывает — бывает снятая: рантайм пишет снятие такой же записью, только
+    // без текста, и отсутствие поля здесь значит именно это.
+    return [
+      {
+        ...common,
+        kind: "label",
+        targetId: entry.targetId,
+        ...(entry.label === undefined ? {} : { label: entry.label }),
+      },
+    ];
+  }
+
+  if (entry.type === "session_info") {
+    return [
+      {
+        ...common,
+        kind: "session-name",
+        ...(entry.name === undefined ? {} : { name: entry.name }),
+      },
+    ];
+  }
+
+  if (entry.type === "leaf") {
+    // `null` у рантайма — «дерево вернули в пустое состояние»; наружу это отсутствие поля.
+    return [
+      {
+        ...common,
+        kind: "leaf",
+        ...(entry.targetId === null ? {} : { targetId: entry.targetId }),
+      },
+    ];
+  }
+
+  if (entry.type === "custom") {
+    return [
+      {
+        ...common,
+        kind: "custom",
+        type: entry.customType,
+        ...(entry.data === undefined ? {} : { data: entry.data }),
+      },
+    ];
+  }
+
+  if (entry.type === "custom_message") {
+    return [
+      {
+        ...common,
+        kind: "custom-message",
+        type: entry.customType,
+        text: textOf(entry.content),
+        display: entry.display,
+      },
+    ];
+  }
+
   if (entry.type !== "message") {
-    return [{ ...common, kind: "other", type: entry.type }];
+    return [{ ...common, kind: "other", type }];
   }
 
   const message = entry.message;

@@ -12,11 +12,17 @@ import type { AgentSession, AgentSessionStore } from "@sovereign/agent-runtime-p
 import {
   agentsPath,
   coreEventTypes,
+  foldEntryLabels,
   projectPath,
   projectsPath,
+  sessionBranchPath,
+  sessionCompactPath,
+  sessionContextPath,
   sessionEntriesPath,
+  sessionEntryLabelPath,
   sessionForkPath,
   sessionMessagesPath,
+  sessionNavigatePath,
   sessionPath,
   sessionsPath,
   sessionStatsPath,
@@ -25,7 +31,11 @@ import {
   type AgentsSnapshot,
   type BusEvent,
   type ContributionRegistration,
+  type SessionBranch,
+  type SessionContextUsage,
   type SessionEntriesPage,
+  type SessionEntry,
+  type SessionNavigated,
   type SessionsSnapshot,
   type SessionStats,
 } from "@sovereign/protocol";
@@ -94,6 +104,7 @@ async function serve(
     openGate?: ReturnType<typeof gate>;
     createGate?: ReturnType<typeof gate>;
     coldSession?: boolean;
+    compactionThreshold?: number;
   } = {},
 ) {
   const directory = ensureDataDirectory(mkdtempSync(join(workspace, "case-")));
@@ -108,6 +119,7 @@ async function serve(
   const {
     store: sessionStore,
     model,
+    contextWindow,
     removeModel,
     restoreModel,
   } = scriptedSessionStore({
@@ -207,6 +219,7 @@ async function serve(
     logger,
     availability: () => "available",
     projectLifecycle,
+    compactionThreshold: () => options.compactionThreshold ?? 0,
   });
 
   await service.refresh();
@@ -267,6 +280,7 @@ async function serve(
     folder,
     projectId,
     model,
+    contextWindow,
     removeModel,
     restoreModel,
     coldSessionId,
@@ -1147,6 +1161,351 @@ describe("the session lifecycle over http", () => {
   });
 });
 
+/** Дождаться записи компакции: автопорог срабатывает после турна, а не в ответе на его запуск. */
+async function untilCompacted(
+  call: (method: string, path: string) => Promise<Answer>,
+  sessionId: string,
+): Promise<SessionEntry[]> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    if (page.entries.some((entry) => entry.kind === "compaction")) {
+      return page.entries;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error("компакция так и не записалась");
+}
+
+describe("reading the branch and the context over http", () => {
+  it("answers with the branch from the leaf and from a named entry", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const answer = await call("GET", sessionBranchPath(sessionId));
+    const whole = answer.body as unknown as SessionBranch;
+
+    assert.equal(answer.status, 200);
+    assert.equal(whole.sessionId, sessionId);
+    assert.deepEqual(
+      whole.entries.map((entry) => entry.kind),
+      ["model-change", "thinking-level-change", "tools-change", "message", "message"],
+    );
+    assert.equal(whole.leafId, whole.entries.at(-1)?.id);
+
+    const question = whole.entries.find(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+
+    assert.ok(question);
+
+    const partial = (await call("GET", sessionBranchPath(sessionId, question.id)))
+      .body as unknown as SessionBranch;
+
+    assert.equal(partial.entries.at(-1)?.id, question.id);
+    // Лист остаётся листом сессии: по нему клиент отличает рабочую ветку от осмотренной чужой.
+    assert.equal(partial.leafId, whole.leafId);
+
+    assert.equal((await call("GET", sessionBranchPath(sessionId, "никакой"))).status, 404);
+    assert.equal((await call("GET", sessionBranchPath("00000000"))).status, 404);
+  });
+
+  it("counts the context and names the live threshold", async () => {
+    const { call, start, contextWindow } = await serve({
+      turns: [{ text: "готово" }],
+      compactionThreshold: 0.9,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const answer = await call("GET", sessionContextPath(sessionId));
+    const usage = answer.body as unknown as SessionContextUsage;
+
+    assert.equal(answer.status, 200);
+    assert.equal(usage.sessionId, sessionId);
+    assert.ok(usage.tokens > 0);
+    assert.equal(usage.contextWindow, contextWindow);
+    assert.equal(usage.threshold, 0.9);
+    assert.equal((await call("GET", sessionContextPath("00000000"))).status, 404);
+  });
+
+  it("keeps reading an archived session and refuses to work in it", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const branch = (await call("GET", sessionBranchPath(sessionId)))
+      .body as unknown as SessionBranch;
+    const answerEntry = branch.entries.at(-1);
+
+    assert.ok(answerEntry);
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: true })).status, 200);
+
+    // Читается: архивная сессия убрана с глаз, а не из системы (docs/sessions-and-projects.md).
+    assert.equal((await call("GET", sessionBranchPath(sessionId))).status, 200);
+    assert.equal((await call("GET", sessionContextPath(sessionId))).status, 200);
+
+    // И не работает: три записи ниже стоят денег или меняют дерево.
+    for (const refused of [
+      await call("POST", sessionCompactPath(sessionId), {}),
+      await call("POST", sessionNavigatePath(sessionId), { entryId: answerEntry.id }),
+      await call("PUT", sessionEntryLabelPath(sessionId, answerEntry.id), { label: "важное" }),
+    ]) {
+      assert.equal(refused.status, 409);
+      assert.match(String(refused.body["error"]), /archived/);
+    }
+  });
+});
+
+describe("compacting a session over http", () => {
+  it("takes the compaction like a turn and writes it into the tree", async () => {
+    const { call, start, events } = await serve({
+      turns: [{ text: "готово" }, { text: "вот пересказ" }],
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const seenBefore = events.length;
+    const accepted = await call("POST", sessionCompactPath(sessionId), { instructions: "короче" });
+
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body["sessionId"], sessionId);
+    // Как у турна: возврат значит «принята», и фаза говорит, начата ли она уже.
+    assert.ok(["compaction", "queued"].includes(String(accepted.body["phase"])));
+
+    const entries = await untilCompacted(call, sessionId);
+    const written = entries.find((entry) => entry.kind === "compaction");
+
+    assert.ok(written?.kind === "compaction");
+    assert.match(written.summary, /вот пересказ/);
+    // Компакцию собрала платформа, а не рантайм: только так применяются наши настройки.
+    assert.equal(written.fromHook, true);
+    assert.ok(
+      events.slice(seenBefore).some((event) => event.type === coreEventTypes.sessionsChanged),
+      "компакция обязана быть видна тому, кто её не запускал",
+    );
+
+    await untilIdle(call, sessionId);
+  });
+
+  it("refuses a busy session, an unknown one and a body the contract does not know", async () => {
+    const { call, start } = await serve({ limit: 0 });
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(
+      (await call("POST", sessionCompactPath(sessionId), { instructions: "   " })).status,
+      400,
+    );
+    assert.equal((await call("POST", sessionCompactPath("00000000"), {})).status, 404);
+    assert.equal((await call("POST", sessionTurnsPath(sessionId), { text: "скажи" })).status, 200);
+
+    const refused = await call("POST", sessionCompactPath(sessionId), {});
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /busy/);
+    assert.equal((await call("DELETE", sessionTurnsPath(sessionId))).body["interrupted"], true);
+  });
+});
+
+describe("navigating the tree over http", () => {
+  it("answers with the new leaf and the text to ask again", async () => {
+    const { call, start } = await serve({ turns: [{ text: "первый" }, { text: "второй" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый вопрос" });
+    await untilIdle(call, sessionId);
+    await call("POST", sessionTurnsPath(sessionId), { text: "второй вопрос" });
+    await untilIdle(call, sessionId);
+
+    const branch = (await call("GET", sessionBranchPath(sessionId)))
+      .body as unknown as SessionBranch;
+    const second = branch.entries.filter(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    )[1];
+
+    assert.ok(second);
+
+    const moved = await call("POST", sessionNavigatePath(sessionId), { entryId: second.id });
+    const navigated = moved.body as unknown as SessionNavigated;
+
+    assert.equal(moved.status, 200);
+    // Переход синхронный именно ради этого поля: доставить его вне ответа нечем.
+    assert.equal(navigated.editorText, "второй вопрос");
+    assert.equal(navigated.leafId, second.parentId);
+    assert.equal(navigated.summarized, false);
+
+    // Лист переставлен, и ветка теперь кончается там, куда перешли.
+    const after = (await call("GET", sessionBranchPath(sessionId)))
+      .body as unknown as SessionBranch;
+
+    assert.equal(after.leafId, second.parentId);
+  });
+
+  it("summarizes the branch it leaves when asked, and refuses a body without a target", async () => {
+    const { call, start } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }, { text: "пересказ ветки" }],
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый вопрос" });
+    await untilIdle(call, sessionId);
+    await call("POST", sessionTurnsPath(sessionId), { text: "второй вопрос" });
+    await untilIdle(call, sessionId);
+
+    const branch = (await call("GET", sessionBranchPath(sessionId)))
+      .body as unknown as SessionBranch;
+    const second = branch.entries.filter(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    )[1];
+
+    assert.ok(second);
+
+    const moved = await call("POST", sessionNavigatePath(sessionId), {
+      entryId: second.id,
+      summarize: true,
+    });
+
+    assert.equal(moved.status, 200);
+    assert.equal((moved.body as unknown as SessionNavigated).summarized, true);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const summary = page.entries.at(-1);
+
+    assert.equal(summary?.kind, "branch-summary");
+    assert.match(summary?.kind === "branch-summary" ? summary.summary : "", /пересказ ветки/);
+
+    assert.equal((await call("POST", sessionNavigatePath(sessionId), {})).status, 400);
+    assert.equal(
+      (await call("POST", sessionNavigatePath(sessionId), { entryId: "никакой" })).status,
+      404,
+    );
+    assert.equal(
+      (await call("POST", sessionNavigatePath("00000000"), { entryId: "e-1" })).status,
+      404,
+    );
+  });
+});
+
+describe("labelling an entry over http", () => {
+  it("sets a label, clears it and folds the records into the live value", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    const branch = (await call("GET", sessionBranchPath(sessionId)))
+      .body as unknown as SessionBranch;
+    const answerEntry = branch.entries.at(-1);
+
+    assert.ok(answerEntry);
+
+    const written = await call("PUT", sessionEntryLabelPath(sessionId, answerEntry.id), {
+      label: "  важное  ",
+    });
+
+    assert.equal(written.status, 200);
+    assert.deepEqual(written.body, {
+      sessionId,
+      entryId: answerEntry.id,
+      label: "важное",
+    });
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.deepEqual(foldEntryLabels(page.entries), new Map([[answerEntry.id, "важное"]]));
+
+    const cleared = await call("PUT", sessionEntryLabelPath(sessionId, answerEntry.id), {
+      label: null,
+    });
+
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body["label"], undefined);
+    assert.deepEqual(
+      foldEntryLabels(
+        ((await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage)
+          .entries,
+      ),
+      new Map(),
+    );
+
+    // Тело без ключа — не «не трогать»: запись заменяет запись целиком, и снятие пишется явно.
+    assert.equal(
+      (await call("PUT", sessionEntryLabelPath(sessionId, answerEntry.id), {})).status,
+      400,
+    );
+    assert.equal(
+      (await call("PUT", sessionEntryLabelPath(sessionId, "никакой"), { label: "и" })).status,
+      404,
+    );
+    assert.equal(
+      (await call("PUT", sessionEntryLabelPath("00000000", "e-1"), { label: "и" })).status,
+      404,
+    );
+  });
+});
+
+describe("the automatic compaction threshold", () => {
+  it("stays out of the way when the threshold is zero", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await untilIdle(call, sessionId);
+
+    // Порог `0` — выключено, и это умолчание: компакция стоит денег и необратимо меняет разговор.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(page.entries.filter((entry) => entry.kind === "compaction").length, 0);
+  });
+
+  it("compacts by itself once past the threshold, and does not loop on it", async () => {
+    const { call, start } = await serve({
+      // Три ответа: турн, пересказ автокомпакции и запас на тот случай, если она пойдёт по кругу.
+      turns: [{ text: "готово" }, { text: "вот пересказ" }, { text: "лишний" }],
+      // Доля, которую перерастает любой непустой разговор: порог здесь проверяется, а не подбирается.
+      compactionThreshold: 0.000_01,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+
+    const entries = await untilCompacted(call, sessionId);
+    const written = entries.find((entry) => entry.kind === "compaction");
+
+    assert.ok(written?.kind === "compaction");
+    assert.equal(written.fromHook, true);
+
+    await untilIdle(call, sessionId);
+
+    // Контекст свёрнутой сессии всё ещё выше порога, но второй раз подряд компакция не идёт:
+    // иначе сессия ходила бы к модели по кругу за деньги владельца.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const after = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(after.entries.filter((entry) => entry.kind === "compaction").length, 1);
+  });
+});
+
 describe("a session that lost a tool or a model", () => {
   it("leaves a trace in the tree and an event on the bus, once per loss", async () => {
     let contributions: ContributionRegistration[] = [baseAgent];
@@ -1175,7 +1534,14 @@ describe("a session that lost a tool or a model", () => {
     const page = (await call("GET", sessionEntriesPath(sessionId)))
       .body as unknown as SessionEntriesPage;
 
-    assert.equal(page.entries.filter((entry) => entry.kind === "other").length, 3);
+    // След об утрате — запись вида `custom` со своим типом, а не безымянное «что-то ещё»: разбор
+    // записей рантайма полный, и `other` остался только под то, чего Pi пока не умеет.
+    assert.deepEqual(
+      page.entries
+        .filter((entry) => entry.kind === "custom")
+        .map((entry) => (entry.kind === "custom" ? entry.type : "")),
+      ["sovereign.degraded", "sovereign.degraded", "sovereign.degraded"],
+    );
 
     // Повторный турн на том же наборе ничего не теряет — и ничего не повторяет.
     await call("POST", sessionTurnsPath(sessionId), { text: "третий" });
@@ -1205,6 +1571,12 @@ describe("a session that lost a tool or a model", () => {
     const page = (await call("GET", sessionEntriesPath(sessionId)))
       .body as unknown as SessionEntriesPage;
 
-    assert.equal(page.entries.at(-1)?.kind, "other");
+    const last = page.entries.at(-1);
+
+    assert.equal(last?.kind, "custom");
+    assert.deepEqual(last?.kind === "custom" ? last.data : undefined, {
+      kind: "model",
+      name: model,
+    });
   });
 });

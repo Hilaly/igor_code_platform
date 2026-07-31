@@ -38,7 +38,10 @@ export type SessionContentBlock =
   | { kind: "reasoning"; text: string }
   | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown };
 
-/** Запись, которую платформа не переводит, приезжает как `other` со своим типом рантайма. */
+/**
+ * Запись дерева сессии. Разобраны все одиннадцать типов записей рантайма; `other` остаётся под то,
+ * чего рантайм ещё не умеет — новый тип записи обязан доехать до плагина хоть чем-то.
+ */
 export type SessionEntry = {
   id: string;
   parentId?: string;
@@ -49,8 +52,53 @@ export type SessionEntry = {
   | { kind: "model-change"; model: string }
   | { kind: "thinking-level-change"; thinkingLevel: ThinkingLevel }
   | { kind: "tools-change"; toolNames: string[] }
+  /**
+   * Контекст свёрнут в пересказ. `firstKeptEntryId` — с какой записи хвост оставлен как есть;
+   * `fromHook` различает пересказ рантайма и подсунутый платформой, а она подсовывает свой всегда.
+   */
+  | {
+      kind: "compaction";
+      summary: string;
+      tokensBefore: number;
+      firstKeptEntryId?: string;
+      fromHook: boolean;
+    }
+  /** Пересказ покинутой ветки, записанный при переходе к другой записи дерева. */
+  | { kind: "branch-summary"; fromId: string; summary: string; fromHook: boolean }
+  /** Метка на записи. Отсутствие `label` — снятая метка: действующее значение это свёртка записей. */
+  | { kind: "label"; targetId: string; label?: string }
+  /** Сессию назвали. Отсутствие `name` — имя сняли. */
+  | { kind: "session-name"; name?: string }
+  /** Лист дерева переставлен. Отсутствие `targetId` — дерево вернули в пустое состояние. */
+  | { kind: "leaf"; targetId?: string }
+  /** Запись приложения, модели не показанная. */
+  | { kind: "custom"; type: string; data?: unknown }
+  /** Запись приложения, которая **является** сообщением в разговоре. */
+  | { kind: "custom-message"; type: string; text: string; display: boolean }
   | { kind: "other"; type: string }
 );
+
+/**
+ * Действующие метки ветки: свёртка записей `label` по цели. Считается здесь, чтобы каждый плагин не
+ * повторял свёртку и не расходился с соседом в том, что значит метка, снятая и поставленная заново.
+ */
+export function foldEntryLabels(entries: readonly SessionEntry[]): Map<string, string> {
+  const labels = new Map<string, string>();
+
+  for (const entry of entries) {
+    if (entry.kind !== "label") {
+      continue;
+    }
+
+    if (entry.label === undefined) {
+      labels.delete(entry.targetId);
+    } else {
+      labels.set(entry.targetId, entry.label);
+    }
+  }
+
+  return labels;
+}
 
 export type SessionEntriesPage = {
   sessionId: string;
@@ -131,6 +179,74 @@ export type SessionStats = {
   costTotal: number;
 };
 
+/**
+ * Ветка дерева: путь от записи вверх до корня, в хронологическом порядке. `leafId` — лист
+ * **сессии**, а не конец возвращённой ветки: по нему видно, в какой ветке сессия сейчас работает.
+ */
+export type SessionBranch = {
+  sessionId: string;
+  entries: SessionEntry[];
+  leafId?: string;
+};
+
+/**
+ * Насколько заполнен контекст. Считается по действующей ветке, а не по файлу целиком: `SessionStats`
+ * отвечает «сколько заплачено», эта — «сколько ещё влезет». Окна может не быть, если модель
+ * недоступна, — тогда доли не существует.
+ */
+export type SessionContextUsage = {
+  sessionId: string;
+  tokens: number;
+  contextWindow?: number;
+  /** Доля окна, после которой компакция запускается сама. `0` — автопорог выключен. */
+  threshold: number;
+};
+
+/** Тело компакции. Инструкции необязательны: без них рантайм пересказывает по своему промпту. */
+export type SessionCompactRequest = {
+  instructions?: string;
+};
+
+/** Ответ на запуск компакции. Фаза здесь та же, что у турна: компакция ждёт своей очереди. */
+export type SessionCompactAccepted = {
+  sessionId: string;
+  phase: SessionPhase;
+};
+
+/**
+ * Тело перехода к записи дерева. `summarize` заказывает пересказ покидаемой ветки — это запрос к
+ * модели. `replaceInstructions` заменяет промпт пересказа целиком, а не дописывает к нему.
+ */
+export type SessionNavigateRequest = {
+  entryId: string;
+  summarize?: boolean;
+  instructions?: string;
+  replaceInstructions?: boolean;
+};
+
+/**
+ * Ответ перехода. `editorText` появляется, когда целью была реплика человека: листом в этом случае
+ * становится её родитель, а текст возвращается, чтобы вопрос можно было задать иначе.
+ */
+export type SessionNavigated = {
+  sessionId: string;
+  leafId?: string;
+  editorText?: string;
+  summarized: boolean;
+};
+
+/** Тело простановки метки. `null` снимает метку. */
+export type SessionLabelUpdate = {
+  label: string | null;
+};
+
+/** Ответ простановки метки. Без `label` — метка снята. */
+export type SessionEntryLabelled = {
+  sessionId: string;
+  entryId: string;
+  label?: string;
+};
+
 export type SessionRequest =
   | { kind: "agent-list" }
   | { kind: "session-list"; projectId?: string; archived?: boolean }
@@ -142,7 +258,12 @@ export type SessionRequest =
   | { kind: "session-update"; sessionId: string; update: SessionUpdate }
   | { kind: "session-remove"; sessionId: string }
   | { kind: "session-message"; sessionId: string; message: SessionMessage }
-  | { kind: "session-stats"; sessionId: string };
+  | { kind: "session-stats"; sessionId: string }
+  | { kind: "session-branch"; sessionId: string; from?: string }
+  | { kind: "session-context"; sessionId: string }
+  | { kind: "session-compact"; sessionId: string; request: SessionCompactRequest }
+  | { kind: "session-navigate"; sessionId: string; request: SessionNavigateRequest }
+  | { kind: "session-label"; sessionId: string; entryId: string; update: SessionLabelUpdate };
 
 export type SessionResponse =
   | { kind: "agent-list"; agents: AgentSummary[] }
@@ -156,6 +277,11 @@ export type SessionResponse =
   | { kind: "session-remove" }
   | { kind: "session-message"; accepted: SessionMessageAccepted }
   | { kind: "session-stats"; stats: SessionStats }
+  | { kind: "session-branch"; branch: SessionBranch }
+  | { kind: "session-context"; usage: SessionContextUsage }
+  | { kind: "session-compact"; accepted: SessionCompactAccepted }
+  | { kind: "session-navigate"; navigated: SessionNavigated }
+  | { kind: "session-label"; labelled: SessionEntryLabelled }
   /** Отказ платформы: проект архивный, агента нет, модель недоступна, сессия занята. */
   | { kind: "failed"; reason: string };
 
@@ -249,4 +375,47 @@ export const sessions = {
   /** Токены и стоимость по всему файлу сессии. */
   stats: async (sessionId: string): Promise<SessionStats> =>
     (await ask({ kind: "session-stats", sessionId }, "session-stats")).stats,
+
+  /**
+   * Ветка дерева: путь от записи вверх до корня или до последней компакции. Без `from` — ветка от
+   * текущего листа, то есть тот разговор, который увидит модель на следующем турне.
+   */
+  branch: async (sessionId: string, from?: string): Promise<SessionBranch> =>
+    (
+      await ask(
+        from === undefined
+          ? { kind: "session-branch", sessionId }
+          : { kind: "session-branch", sessionId, from },
+        "session-branch",
+      )
+    ).branch,
+
+  /** Насколько заполнен контекст и с какой доли окна компакция запускается сама. */
+  context: async (sessionId: string): Promise<SessionContextUsage> =>
+    (await ask({ kind: "session-context", sessionId }, "session-context")).usage,
+
+  /**
+   * Свернуть контекст в пересказ. Возврат значит «принята», а не «свёрнута»: компакция ходит к
+   * модели и ждёт своей очереди наравне с турном.
+   */
+  compact: async (
+    sessionId: string,
+    request: SessionCompactRequest = {},
+  ): Promise<SessionCompactAccepted> =>
+    (await ask({ kind: "session-compact", sessionId, request }, "session-compact")).accepted,
+
+  /**
+   * Перейти к записи дерева, при желании пересказав покидаемую ветку. В отличие от компакции ждёт
+   * результата: `editorText` доставить вне ответа нечем.
+   */
+  navigate: async (sessionId: string, request: SessionNavigateRequest): Promise<SessionNavigated> =>
+    (await ask({ kind: "session-navigate", sessionId, request }, "session-navigate")).navigated,
+
+  /** Поставить или снять метку записи. `null` снимает: «не трогать» здесь не операция. */
+  label: async (
+    sessionId: string,
+    entryId: string,
+    update: SessionLabelUpdate,
+  ): Promise<SessionEntryLabelled> =>
+    (await ask({ kind: "session-label", sessionId, entryId, update }, "session-label")).labelled,
 };

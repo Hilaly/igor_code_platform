@@ -253,6 +253,12 @@ const sessions = createSessionService({
     models: providers.models,
     directory: join(directory, sessionsDirectoryName),
     archivedDirectory: join(directory, archivedSessionsDirectoryName),
+    // Читаются живьём по той же причине, что и предел турнов: правка `config.json` применяется без
+    // перезапуска демона, а снимок настроек устарел бы молча.
+    compactionSettings: () => ({
+      reserveTokens: settings.current().config.compactionReserveTokens,
+      keepRecentTokens: settings.current().config.compactionKeepRecentTokens,
+    }),
   }),
   projects,
   contributions: () => contributions.resolved(),
@@ -268,6 +274,8 @@ const sessions = createSessionService({
   logger,
   projectLifecycle,
   availability: (project) => projectAvailability.of(project.id),
+  // Автопорог тоже живой: `0` выключает его, и это умолчание (docs/sessions-and-projects.md).
+  compactionThreshold: () => settings.current().config.compactionThreshold,
 });
 
 await Promise.all([initialPluginApplication, sessions.refresh()]);

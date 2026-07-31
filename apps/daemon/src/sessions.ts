@@ -10,17 +10,26 @@ import {
   agentsPath,
   coreEventTypes,
   isSessionId,
+  parseSessionCompactRequest,
   parseSessionDraft,
   parseSessionForkRequest,
+  parseSessionLabelUpdate,
   parseSessionMessage,
+  parseSessionNavigateRequest,
   parseSessionUpdate,
   parseTurnRequest,
   selectToolNames,
   sessionArchivedParameter,
+  sessionBranchFromParameter,
+  sessionBranchPathPattern,
+  sessionCompactPathPattern,
+  sessionContextPathPattern,
   sessionEntriesAfterParameter,
   sessionEntriesPathPattern,
+  sessionEntryLabelPathPattern,
   sessionForkPathPattern,
   sessionMessagesPathPattern,
+  sessionNavigatePathPattern,
   sessionPathPattern,
   sessionProjectParameter,
   sessionsPath,
@@ -31,12 +40,20 @@ import {
   type AgentSummary,
   type ContributionRegistration,
   type Session,
+  type SessionBranch,
+  type SessionCompactAccepted,
+  type SessionCompactRequest,
+  type SessionContextUsage,
   type SessionDeleted,
   type SessionDraft,
   type SessionEntriesPage,
+  type SessionEntryLabelled,
   type SessionForkRequest,
+  type SessionLabelUpdate,
   type SessionMessage,
   type SessionMessageAccepted,
+  type SessionNavigated,
+  type SessionNavigateRequest,
   type SessionsSnapshot,
   type SessionStats,
   type SessionUpdate,
@@ -76,6 +93,12 @@ export type SessionServiceOptions = {
   logger: Logger;
   availability?: (project: StoredProject) => "available" | "missing";
   projectLifecycle?: ProjectLifecycle;
+  /**
+   * Доля контекстного окна, после которой компакция запускается сама. Спрашивается функцией по той
+   * же причине, что и предел турнов: `config.json` применяется живьём. Отсутствие равно `0` —
+   * автопорогу, которого нет, а не молча включённому (docs/sessions-and-projects.md).
+   */
+  compactionThreshold?: () => number;
 };
 
 /** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
@@ -103,6 +126,32 @@ export type SessionMessageOutcome =
   | { kind: "unknown" }
   | { kind: "refused"; reason: string };
 
+/**
+ * Исход запуска компакции. Как у турна: возврат значит «принята», а не «свёрнут контекст» —
+ * компакция ходит к модели и ждёт своей очереди наравне с турном (docs/architecture.md).
+ */
+export type SessionCompactOutcome =
+  | { kind: "accepted"; accepted: SessionCompactAccepted }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
+
+/**
+ * Исход перехода по дереву. В отличие от компакции — дожидается результата: `editorText` доставить
+ * вне ответа нечем, а лист без него бессмыслен (docs/sessions-and-projects.md).
+ *
+ * `unknown` покрывает и отсутствующую сессию, и отсутствующую запись: снаружи это один и тот же
+ * «такого нет».
+ */
+export type SessionNavigateOutcome =
+  | { kind: "done"; navigated: SessionNavigated }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
+
+export type SessionLabelOutcome =
+  | { kind: "done"; labelled: SessionEntryLabelled }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
+
 export type SessionService = {
   /** Включённые агенты. Пустой список — законный ответ. */
   agents: () => AgentSummary[];
@@ -123,6 +172,23 @@ export type SessionService = {
   message: (sessionId: string, message: SessionMessage) => Promise<SessionMessageOutcome>;
   /** `undefined` — такой сессии нет. */
   stats: (sessionId: string) => Promise<SessionStats | undefined>;
+  /**
+   * Ветка дерева от записи или от листа. `undefined` — нет ни такой сессии, ни такой записи.
+   * Архивная сессия читается: убрана она с глаз, а не из системы.
+   */
+  branch: (sessionId: string, from?: string) => Promise<SessionBranch | undefined>;
+  /** Заполненность контекста действующей ветки вместе с действующим автопорогом. */
+  contextUsage: (sessionId: string) => Promise<SessionContextUsage | undefined>;
+  /** Свернуть контекст. Асинхронна, как турн: занимает слот в очереди походов к модели. */
+  compact: (sessionId: string, request: SessionCompactRequest) => Promise<SessionCompactOutcome>;
+  /** Перейти к записи дерева. Синхронна: результат нужен вызывающему целиком. */
+  navigate: (sessionId: string, request: SessionNavigateRequest) => Promise<SessionNavigateOutcome>;
+  /** Поставить или снять метку записи. Простоя не требует: это запись в дерево, а не перенос файла. */
+  labelEntry: (
+    sessionId: string,
+    entryId: string,
+    update: SessionLabelUpdate,
+  ) => Promise<SessionLabelOutcome>;
   routes: () => Route[];
   /** Сколько сессий в папке проекта: считается по снимку списка, без похода на диск. */
   countByFolderKey: (folderKey: string) => number;
@@ -130,6 +196,10 @@ export type SessionService = {
   refresh: () => Promise<void>;
   close: () => Promise<void>;
 };
+
+function describeCause(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
 
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const availabilityOf =
@@ -479,6 +549,353 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return persisted === undefined ? undefined : { sessionId, ...(await persisted.stats()) };
   };
 
+  /** Запись сессии на диске. Отдельно от `openSession`: чтение harness не поднимает. */
+  const record = async (sessionId: string) => {
+    if (find(sessionId) === undefined) {
+      return undefined;
+    }
+
+    return options.store.open(sessionId);
+  };
+
+  const branch = async (sessionId: string, from?: string): Promise<SessionBranch | undefined> => {
+    const persisted = await record(sessionId);
+
+    if (persisted === undefined) {
+      return undefined;
+    }
+
+    const found = await persisted.branch(from);
+
+    // Нет такой записи — то же «не найдено», что и нет такой сессии: клиенту различать их не по
+    // чему, он просил одну ветку и не получил её.
+    if (found.kind === "unknown-entry") {
+      return undefined;
+    }
+
+    return {
+      sessionId,
+      entries: found.entries,
+      ...(found.leafId === undefined ? {} : { leafId: found.leafId }),
+    };
+  };
+
+  const thresholdOf = (): number => options.compactionThreshold?.() ?? 0;
+
+  const contextUsage = async (sessionId: string): Promise<SessionContextUsage | undefined> => {
+    const persisted = await record(sessionId);
+
+    if (persisted === undefined) {
+      return undefined;
+    }
+
+    const counted = await persisted.contextUsage();
+
+    return {
+      sessionId,
+      tokens: counted.tokens,
+      ...(counted.contextWindow === undefined ? {} : { contextWindow: counted.contextWindow }),
+      threshold: thresholdOf(),
+    };
+  };
+
+  const labelEntry = async (
+    sessionId: string,
+    entryId: string,
+    update: SessionLabelUpdate,
+  ): Promise<SessionLabelOutcome> => {
+    const summary = find(sessionId);
+
+    if (summary === undefined) {
+      return { kind: "unknown" };
+    }
+
+    // Архивная сессия читается, но не пишется: та же граница, что у турна и компакции. Простоя
+    // метка при этом не требует — это запись в дерево, а не перенос файла.
+    if (summary.archived) {
+      return { kind: "refused", reason: "the session is archived" };
+    }
+
+    const persisted = await options.store.open(sessionId);
+
+    if (persisted === undefined) {
+      return { kind: "unknown" };
+    }
+
+    const written = await persisted.label(entryId, update.label);
+
+    if (written.kind === "unknown-entry") {
+      return { kind: "unknown" };
+    }
+
+    return {
+      kind: "done",
+      labelled: {
+        sessionId,
+        entryId,
+        ...(update.label === null ? {} : { label: update.label }),
+      },
+    };
+  };
+
+  /**
+   * Живая сессия, готовая к походу к модели. Общее начало компакции и навигации: обе требуют
+   * поднятого harness, действующего агента и незанятой сессии — ровно как турн.
+   */
+  const readyForModel = async (
+    sessionId: string,
+  ): Promise<
+    | { kind: "ready"; session: AgentSession }
+    | { kind: "unknown" }
+    | { kind: "refused"; reason: string }
+  > => {
+    const summary = find(sessionId);
+
+    if (summary === undefined) {
+      return { kind: "unknown" };
+    }
+
+    if (summary.archived) {
+      return { kind: "refused", reason: "the session is archived" };
+    }
+
+    const opened = await openSession(sessionId);
+
+    if (opened.kind === "unknown") {
+      return { kind: "unknown" };
+    }
+
+    if (opened.kind === "unavailable") {
+      return { kind: "refused", reason: opened.reason };
+    }
+
+    if (phaseOf(sessionId) !== "idle") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    return { kind: "ready", session: opened.session };
+  };
+
+  /**
+   * Запустить компакцию. `automatic` различает просьбу человека и решение автопорога: только у
+   * второй по окончании стоит перепроверить контекст — и только один раз, иначе сессия, которая не
+   * влезает в окно даже свёрнутой, ходила бы к модели бесконечно.
+   */
+  const startCompaction = async (
+    sessionId: string,
+    request: SessionCompactRequest,
+    automatic: boolean,
+  ): Promise<SessionCompactOutcome> => {
+    const ready = await readyForModel(sessionId);
+
+    if (ready.kind !== "ready") {
+      return ready;
+    }
+
+    const place = options.queue.reserve(sessionId);
+
+    if (place.kind === "busy") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    const tracked = { turnId: place.turnId, cancel: place.cancel, validating: false };
+
+    places.set(sessionId, tracked);
+
+    const started = place.start({
+      kind: "compaction",
+      run: async () => {
+        try {
+          const outcome = await ready.session.compact(request.instructions);
+
+          if (outcome.kind !== "done") {
+            options.logger.warn("a compaction did not go through", {
+              session: sessionId,
+              reason: outcome.kind === "busy" ? "the session is busy" : outcome.reason,
+            });
+          }
+        } finally {
+          places.delete(sessionId);
+
+          if (automatic) {
+            scheduleThresholdCheck(sessionId, true);
+          }
+        }
+      },
+    });
+
+    if (started === undefined) {
+      places.delete(sessionId);
+
+      return { kind: "refused", reason: "the compaction was cancelled" };
+    }
+
+    if (started.state === "queued") {
+      options.emitDelta({
+        sessionId,
+        turnId: started.turnId,
+        delta: { kind: "phase", phase: "queued" },
+      });
+    }
+
+    announce();
+
+    return { kind: "accepted", accepted: { sessionId, phase: phaseOf(sessionId) } };
+  };
+
+  const compact = (
+    sessionId: string,
+    request: SessionCompactRequest,
+  ): Promise<SessionCompactOutcome> => startCompaction(sessionId, request, false);
+
+  const navigate = async (
+    sessionId: string,
+    request: SessionNavigateRequest,
+  ): Promise<SessionNavigateOutcome> => {
+    const ready = await readyForModel(sessionId);
+
+    if (ready.kind !== "ready") {
+      return ready;
+    }
+
+    const session = ready.session;
+
+    // Переход без пересказа к модели не ходит, поэтому слот очереди ему не нужен: очередь считает
+    // походы к модели, а не любые операции над сессией (docs/architecture.md).
+    if (request.summarize !== true) {
+      return describeNavigation(sessionId, await session.navigate(request));
+    }
+
+    const place = options.queue.reserve(sessionId);
+
+    if (place.kind === "busy") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    places.set(sessionId, { turnId: place.turnId, cancel: place.cancel, validating: false });
+
+    let settle: (outcome: Awaited<ReturnType<AgentSession["navigate"]>>) => void = () => undefined;
+    const finished = new Promise<Awaited<ReturnType<AgentSession["navigate"]>>>((resolve) => {
+      settle = resolve;
+    });
+
+    const started = place.start({
+      kind: "branch-summary",
+      run: async () => {
+        try {
+          settle(await session.navigate(request));
+        } catch (cause) {
+          // Ждущий обязан получить ответ даже на сбое: иначе запрос повис бы навсегда.
+          settle({ kind: "failed", reason: describeCause(cause) });
+
+          throw cause;
+        } finally {
+          places.delete(sessionId);
+        }
+      },
+    });
+
+    if (started === undefined) {
+      places.delete(sessionId);
+
+      return { kind: "refused", reason: "the navigation was cancelled" };
+    }
+
+    if (started.state === "queued") {
+      options.emitDelta({
+        sessionId,
+        turnId: started.turnId,
+        delta: { kind: "phase", phase: "queued" },
+      });
+    }
+
+    announce();
+
+    return describeNavigation(sessionId, await finished);
+  };
+
+  const describeNavigation = (
+    sessionId: string,
+    moved: Awaited<ReturnType<AgentSession["navigate"]>>,
+  ): SessionNavigateOutcome => {
+    if (moved.kind === "unknown-entry") {
+      return { kind: "unknown" };
+    }
+
+    if (moved.kind === "busy") {
+      return { kind: "refused", reason: "the session is busy" };
+    }
+
+    if (moved.kind === "failed") {
+      options.logger.warn("a navigation failed", { session: sessionId, reason: moved.reason });
+
+      return { kind: "refused", reason: moved.reason };
+    }
+
+    announce();
+
+    return {
+      kind: "done",
+      navigated: {
+        sessionId,
+        ...(moved.leafId === undefined ? {} : { leafId: moved.leafId }),
+        ...(moved.editorText === undefined ? {} : { editorText: moved.editorText }),
+        summarized: moved.summarized,
+      },
+    };
+  };
+
+  /**
+   * Проверить автопорог после того, как сессия вернулась в простой. Именно после: слот очереди
+   * освобождается на выходе из работы, а изнутри работы места в очереди не получить.
+   */
+  const scheduleThresholdCheck = (sessionId: string, afterCompaction = false): void => {
+    setImmediate(() => {
+      void considerCompaction(sessionId, afterCompaction);
+    });
+  };
+
+  const considerCompaction = async (sessionId: string, afterCompaction: boolean): Promise<void> => {
+    const threshold = thresholdOf();
+
+    if (closing || threshold <= 0) {
+      return;
+    }
+
+    const counted = await contextUsage(sessionId);
+
+    // Без окна доли не существует: модель сессии пропала из каталога, и сравнивать не с чем.
+    if (counted?.contextWindow === undefined) {
+      return;
+    }
+
+    if (counted.tokens <= counted.contextWindow * threshold) {
+      return;
+    }
+
+    if (afterCompaction) {
+      // Второй раз подряд не запускаем: контекст, не влезающий в порог даже свёрнутым, иначе гонял
+      // бы компакцию по кругу за деньги владельца.
+      options.logger.warn("the context stayed above the compaction threshold after compacting", {
+        session: sessionId,
+        tokens: counted.tokens,
+        contextWindow: counted.contextWindow,
+        threshold,
+      });
+
+      return;
+    }
+
+    const started = await startCompaction(sessionId, {}, true);
+
+    if (started.kind !== "accepted") {
+      options.logger.warn("the automatic compaction did not start", {
+        session: sessionId,
+        reason: started.kind === "unknown" ? "the session is gone" : started.reason,
+      });
+    }
+  };
+
   const fork = async (sessionId: string, request: SessionForkRequest): Promise<SessionOutcome> => {
     if (find(sessionId) === undefined) {
       return { kind: "unknown" };
@@ -729,6 +1146,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
         } finally {
           places.delete(sessionId);
+          scheduleThresholdCheck(sessionId);
         }
       },
     });
@@ -794,6 +1212,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     remove,
     message,
     stats,
+    branch,
+    contextUsage,
+    compact,
+    navigate,
+    labelEntry,
     countByFolderKey: (folderKey) =>
       summaries.filter((summary) => summary.folderKey === folderKey).length,
     refresh,
@@ -1026,6 +1449,128 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
 
           respondWithJson(response, 200, page);
+        },
+      },
+      {
+        method: "GET",
+        path: sessionBranchPathPattern,
+        handle: async ({ response, parameters, url }) => {
+          const from = url.searchParams.get(sessionBranchFromParameter);
+          const found = await branch(parameters["sessionId"] ?? "", from ?? undefined);
+
+          if (found === undefined) {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          respondWithJson(response, 200, found);
+        },
+      },
+      {
+        method: "GET",
+        path: sessionContextPathPattern,
+        handle: async ({ response, parameters }) => {
+          const counted = await contextUsage(parameters["sessionId"] ?? "");
+
+          if (counted === undefined) {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          respondWithJson(response, 200, counted);
+        },
+      },
+      {
+        method: "POST",
+        path: sessionCompactPathPattern,
+        handle: async ({ response, parameters, body }) => {
+          const parsed = parseSessionCompactRequest(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          const accepted = await compact(parameters["sessionId"] ?? "", parsed.value);
+
+          if (accepted.kind === "unknown") {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          if (accepted.kind === "refused") {
+            respondWithError(response, 409, accepted.reason);
+
+            return;
+          }
+
+          respondWithJson(response, 200, accepted.accepted);
+        },
+      },
+      {
+        method: "POST",
+        path: sessionNavigatePathPattern,
+        handle: async ({ response, parameters, body }) => {
+          const parsed = parseSessionNavigateRequest(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          const moved = await navigate(parameters["sessionId"] ?? "", parsed.value);
+
+          if (moved.kind === "unknown") {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          if (moved.kind === "refused") {
+            respondWithError(response, 409, moved.reason);
+
+            return;
+          }
+
+          respondWithJson(response, 200, moved.navigated);
+        },
+      },
+      {
+        method: "PUT",
+        path: sessionEntryLabelPathPattern,
+        handle: async ({ response, parameters, body }) => {
+          const parsed = parseSessionLabelUpdate(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          const written = await labelEntry(
+            parameters["sessionId"] ?? "",
+            parameters["entryId"] ?? "",
+            parsed.value,
+          );
+
+          if (written.kind === "unknown") {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          if (written.kind === "refused") {
+            respondWithError(response, 409, written.reason);
+
+            return;
+          }
+
+          respondWithJson(response, 200, written.labelled);
         },
       },
       {

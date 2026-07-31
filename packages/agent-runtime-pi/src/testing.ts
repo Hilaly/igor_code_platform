@@ -24,7 +24,11 @@ import type {
   Usage,
 } from "@earendil-works/pi-ai";
 
-import { createAgentSessionStore, type AgentSessionStore } from "./agent-session.ts";
+import {
+  createAgentSessionStore,
+  type AgentSessionStore,
+  type CompactionTuning,
+} from "./agent-session.ts";
 import type { CredentialVault } from "./credentials.ts";
 import type { Environment } from "./environment.ts";
 
@@ -331,9 +335,13 @@ export function scriptedSessionStore(options: {
   /** Корень архива. Не назван — берётся сосед `<directory>-archived`, чтобы тест не заводил второй. */
   archivedDirectory?: string;
   turns?: ScriptedTurn[];
+  /** Параметры компакции. Не названы — те же, что зашиты в Pi (docs/data-directory.md). */
+  compactionSettings?: () => CompactionTuning;
 }): {
   store: AgentSessionStore;
   model: string;
+  /** Окно контекста двойника: по нему тест считает, где проходит доля автопорога. */
+  contextWindow: number;
   removeModel: () => void;
   restoreModel: () => void;
 } {
@@ -347,8 +355,11 @@ export function scriptedSessionStore(options: {
       models,
       directory: options.directory,
       archivedDirectory: options.archivedDirectory ?? `${options.directory}-archived`,
+      compactionSettings:
+        options.compactionSettings ?? (() => ({ reserveTokens: 16384, keepRecentTokens: 20000 })),
     }),
     model: `${scripted.model.provider}/${scripted.model.id}`,
+    contextWindow: scripted.model.contextWindow,
     removeModel: () => models.deleteProvider(scripted.provider.id),
     restoreModel: () => models.setProvider(scripted.provider),
   };

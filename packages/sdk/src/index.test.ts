@@ -3,7 +3,17 @@ import { afterEach, describe, it } from "node:test";
 
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
-import { contribute, defineEvent, events, identity, log, providers, sessions, z } from "./index.ts";
+import {
+  contribute,
+  defineEvent,
+  events,
+  foldEntryLabels,
+  identity,
+  log,
+  providers,
+  sessions,
+  z,
+} from "./index.ts";
 import type { CustomProviderDefinition, ProviderSummary } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
@@ -110,6 +120,68 @@ describe("the session surface", () => {
       turnId: "t1",
       phase: "turn",
     });
+  });
+
+  it("reads the branch and the context, compacts, navigates and labels", async () => {
+    const host = installTestHost({ id: "tracker" });
+    const entries = [
+      { id: "e-1", time: "2026-07-31T09:00:00.000Z", kind: "label" as const, targetId: "e-0" },
+      {
+        id: "e-2",
+        parentId: "e-1",
+        time: "2026-07-31T09:00:01.000Z",
+        kind: "label" as const,
+        targetId: "e-0",
+        label: "важное",
+      },
+    ];
+
+    host.answerSessions((request) => {
+      switch (request.kind) {
+        case "session-branch":
+          return { kind: "session-branch", branch: { sessionId: "0199", entries, leafId: "e-2" } };
+        case "session-context":
+          return {
+            kind: "session-context",
+            usage: { sessionId: "0199", tokens: 90, contextWindow: 1000, threshold: 0.8 },
+          };
+        case "session-compact":
+          return {
+            kind: "session-compact",
+            accepted: { sessionId: "0199", phase: "compaction" },
+          };
+        case "session-navigate":
+          return {
+            kind: "session-navigate",
+            navigated: { sessionId: "0199", leafId: "e-1", editorText: "иначе", summarized: true },
+          };
+        default:
+          return {
+            kind: "session-label",
+            labelled: { sessionId: "0199", entryId: "e-0", label: "важное" },
+          };
+      }
+    });
+
+    assert.deepEqual(await sessions.branch("0199", "e-2"), {
+      sessionId: "0199",
+      entries,
+      leafId: "e-2",
+    });
+    // Свёртка меток живёт в SDK, чтобы каждый плагин не повторял её и не расходился с соседом.
+    assert.deepEqual(foldEntryLabels(entries), new Map([["e-0", "важное"]]));
+    assert.equal((await sessions.context("0199")).threshold, 0.8);
+    assert.equal((await sessions.compact("0199")).phase, "compaction");
+    assert.equal((await sessions.navigate("0199", { entryId: "e-1" })).editorText, "иначе");
+    assert.equal((await sessions.label("0199", "e-0", { label: "важное" })).label, "важное");
+
+    assert.deepEqual(host.sessionRequests, [
+      { kind: "session-branch", sessionId: "0199", from: "e-2" },
+      { kind: "session-context", sessionId: "0199" },
+      { kind: "session-compact", sessionId: "0199", request: {} },
+      { kind: "session-navigate", sessionId: "0199", request: { entryId: "e-1" } },
+      { kind: "session-label", sessionId: "0199", entryId: "e-0", update: { label: "важное" } },
+    ]);
   });
 
   it("turns a refusal of the platform into an error with its reason", async () => {

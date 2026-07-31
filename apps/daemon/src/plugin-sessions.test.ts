@@ -43,6 +43,11 @@ function bridge(overrides: Partial<SessionService> = {}) {
     | "remove"
     | "message"
     | "stats"
+    | "branch"
+    | "contextUsage"
+    | "compact"
+    | "navigate"
+    | "labelEntry"
   > = {
     agents: () => [],
     list: (projectId, archived) => {
@@ -83,6 +88,41 @@ function bridge(overrides: Partial<SessionService> = {}) {
       return Promise.resolve({ kind: "accepted", accepted: { sessionId, mode: message.mode } });
     },
     stats: (sessionId) => Promise.resolve({ sessionId, ...counters }),
+    branch: (sessionId, from) => {
+      calls.push({ branch: sessionId, from });
+
+      return Promise.resolve({ sessionId, entries: [], leafId: "e-3" });
+    },
+    contextUsage: (sessionId) =>
+      Promise.resolve({ sessionId, tokens: 120, contextWindow: 1000, threshold: 0.8 }),
+    compact: (sessionId, request) => {
+      calls.push({ compact: sessionId, request });
+
+      return Promise.resolve({
+        kind: "accepted",
+        accepted: { sessionId, phase: "compaction" },
+      });
+    },
+    navigate: (sessionId, request) => {
+      calls.push({ navigate: sessionId, request });
+
+      return Promise.resolve({
+        kind: "done",
+        navigated: { sessionId, leafId: "e-2", editorText: "второй вопрос", summarized: false },
+      });
+    },
+    labelEntry: (sessionId, entryId, update) => {
+      calls.push({ label: sessionId, entryId, update });
+
+      return Promise.resolve({
+        kind: "done",
+        labelled: {
+          sessionId,
+          entryId,
+          ...(update.label === null ? {} : { label: update.label }),
+        },
+      });
+    },
     ...overrides,
   };
 
@@ -208,6 +248,59 @@ describe("the lifecycle over the plugin bridge", () => {
       { update: "0199", wanted: { title: "имя", archived: false } },
       { remove: "0199" },
       { message: "0199", wanted: { text: "левее", mode: "steer" } },
+    ]);
+  });
+
+  it("gives the plugin the same context surface the routes have", async () => {
+    const { sessions, calls } = bridge();
+
+    assert.deepEqual(
+      await sessions.answer({ kind: "session-branch", sessionId: "0199", from: "e-1" }),
+      { kind: "session-branch", branch: { sessionId: "0199", entries: [], leafId: "e-3" } },
+    );
+    assert.deepEqual(await sessions.answer({ kind: "session-context", sessionId: "0199" }), {
+      kind: "session-context",
+      usage: { sessionId: "0199", tokens: 120, contextWindow: 1000, threshold: 0.8 },
+    });
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-compact",
+        sessionId: "0199",
+        request: { instructions: "короче" },
+      }),
+      { kind: "session-compact", accepted: { sessionId: "0199", phase: "compaction" } },
+    );
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-navigate",
+        sessionId: "0199",
+        request: { entryId: "e-2" },
+      }),
+      {
+        kind: "session-navigate",
+        navigated: {
+          sessionId: "0199",
+          leafId: "e-2",
+          editorText: "второй вопрос",
+          summarized: false,
+        },
+      },
+    );
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-label",
+        sessionId: "0199",
+        entryId: "e-2",
+        update: { label: null },
+      }),
+      { kind: "session-label", labelled: { sessionId: "0199", entryId: "e-2" } },
+    );
+
+    assert.deepEqual(calls, [
+      { branch: "0199", from: "e-1" },
+      { compact: "0199", request: { instructions: "короче" } },
+      { navigate: "0199", request: { entryId: "e-2" } },
+      { label: "0199", entryId: "e-2", update: { label: null } },
     ]);
   });
 

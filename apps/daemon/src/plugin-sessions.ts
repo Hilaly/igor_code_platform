@@ -12,8 +12,16 @@
 import type {
   AgentSummary as PluginAgentSummary,
   Session as PluginSession,
+  SessionBranch as PluginSessionBranch,
+  SessionCompactAccepted as PluginSessionCompactAccepted,
+  SessionCompactRequest as PluginSessionCompactRequest,
+  SessionContextUsage as PluginSessionContextUsage,
   SessionEntriesPage as PluginSessionEntriesPage,
+  SessionEntryLabelled as PluginSessionEntryLabelled,
+  SessionLabelUpdate as PluginSessionLabelUpdate,
   SessionMessage as PluginSessionMessage,
+  SessionNavigated as PluginSessionNavigated,
+  SessionNavigateRequest as PluginSessionNavigateRequest,
   SessionRequest,
   SessionResponse,
   SessionStats as PluginSessionStats,
@@ -22,8 +30,16 @@ import type {
 import type {
   AgentSummary,
   Session,
+  SessionBranch,
+  SessionCompactAccepted,
+  SessionCompactRequest,
+  SessionContextUsage,
   SessionEntriesPage,
+  SessionEntryLabelled,
+  SessionLabelUpdate,
   SessionMessage,
+  SessionNavigated,
+  SessionNavigateRequest,
   SessionStats,
   SessionUpdate,
 } from "@sovereign/protocol";
@@ -57,6 +73,33 @@ const statsForPlugin = sameShape<SessionStats, PluginSessionStats>({
   backward: (stats) => stats,
 });
 
+// Тождество по ветке заодно сверяет и `SessionEntry`: он едет внутри неё, и разъехавшийся союз
+// записей перестаёт присваиваться в обе стороны.
+const branchForPlugin = sameShape<SessionBranch, PluginSessionBranch>({
+  forward: (branch) => branch,
+  backward: (branch) => branch,
+});
+
+const contextForPlugin = sameShape<SessionContextUsage, PluginSessionContextUsage>({
+  forward: (usage) => usage,
+  backward: (usage) => usage,
+});
+
+const compactionForPlugin = sameShape<SessionCompactAccepted, PluginSessionCompactAccepted>({
+  forward: (accepted) => accepted,
+  backward: (accepted) => accepted,
+});
+
+const navigationForPlugin = sameShape<SessionNavigated, PluginSessionNavigated>({
+  forward: (navigated) => navigated,
+  backward: (navigated) => navigated,
+});
+
+const labelForPlugin = sameShape<SessionEntryLabelled, PluginSessionEntryLabelled>({
+  forward: (labelled) => labelled,
+  backward: (labelled) => labelled,
+});
+
 // Тела едут в обратную сторону — от плагина к платформе, — поэтому и тождество здесь обратное.
 const updateFromPlugin = sameShape<PluginSessionUpdate, SessionUpdate>({
   forward: (update) => update,
@@ -66,6 +109,21 @@ const updateFromPlugin = sameShape<PluginSessionUpdate, SessionUpdate>({
 const messageFromPlugin = sameShape<PluginSessionMessage, SessionMessage>({
   forward: (message) => message,
   backward: (message) => message,
+});
+
+const compactionFromPlugin = sameShape<PluginSessionCompactRequest, SessionCompactRequest>({
+  forward: (request) => request,
+  backward: (request) => request,
+});
+
+const navigationFromPlugin = sameShape<PluginSessionNavigateRequest, SessionNavigateRequest>({
+  forward: (request) => request,
+  backward: (request) => request,
+});
+
+const labelFromPlugin = sameShape<PluginSessionLabelUpdate, SessionLabelUpdate>({
+  forward: (update) => update,
+  backward: (update) => update,
 });
 
 const agentForPlugin = sameShape<AgentSummary, PluginAgentSummary>({
@@ -95,6 +153,11 @@ export type PluginSessionsOptions = {
     | "remove"
     | "message"
     | "stats"
+    | "branch"
+    | "contextUsage"
+    | "compact"
+    | "navigate"
+    | "labelEntry"
   >;
 };
 
@@ -202,6 +265,51 @@ export function createPluginSessions(options: PluginSessionsOptions): PluginSess
           return counted === undefined
             ? { kind: "failed", reason: `no session ${request.sessionId}` }
             : { kind: "session-stats", stats: statsForPlugin(counted) };
+        }
+        case "session-branch": {
+          const found = await sessions.branch(request.sessionId, request.from);
+
+          return found === undefined
+            ? { kind: "failed", reason: `no session ${request.sessionId}` }
+            : { kind: "session-branch", branch: branchForPlugin(found) };
+        }
+        case "session-context": {
+          const counted = await sessions.contextUsage(request.sessionId);
+
+          return counted === undefined
+            ? { kind: "failed", reason: `no session ${request.sessionId}` }
+            : { kind: "session-context", usage: contextForPlugin(counted) };
+        }
+        case "session-compact": {
+          const accepted = await sessions.compact(
+            request.sessionId,
+            compactionFromPlugin(request.request),
+          );
+
+          return accepted.kind === "accepted"
+            ? { kind: "session-compact", accepted: compactionForPlugin(accepted.accepted) }
+            : { kind: "failed", reason: refusal(accepted, request.sessionId) };
+        }
+        case "session-navigate": {
+          const moved = await sessions.navigate(
+            request.sessionId,
+            navigationFromPlugin(request.request),
+          );
+
+          return moved.kind === "done"
+            ? { kind: "session-navigate", navigated: navigationForPlugin(moved.navigated) }
+            : { kind: "failed", reason: refusal(moved, request.sessionId) };
+        }
+        case "session-label": {
+          const written = await sessions.labelEntry(
+            request.sessionId,
+            request.entryId,
+            labelFromPlugin(request.update),
+          );
+
+          return written.kind === "done"
+            ? { kind: "session-label", labelled: labelForPlugin(written.labelled) }
+            : { kind: "failed", reason: refusal(written, request.sessionId) };
         }
       }
     },

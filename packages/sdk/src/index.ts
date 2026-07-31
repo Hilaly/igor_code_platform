@@ -36,19 +36,27 @@ export type {
 export { providers } from "./providers.ts";
 
 /** Сессии агента: тот же набор, что у веб-API (docs/sessions-and-projects.md). */
-export { sessions } from "./sessions.ts";
+export { foldEntryLabels, sessions } from "./sessions.ts";
 
 export type {
   AgentSummary,
   Session,
+  SessionBranch,
+  SessionCompactAccepted,
+  SessionCompactRequest,
   SessionContentBlock,
+  SessionContextUsage,
   SessionDraft,
   SessionEntriesPage,
   SessionEntry,
+  SessionEntryLabelled,
   SessionForkRequest,
+  SessionLabelUpdate,
   SessionMessage,
   SessionMessageAccepted,
   SessionMessageMode,
+  SessionNavigated,
+  SessionNavigateRequest,
   SessionPhase,
   SessionRequest,
   SessionResponse,
