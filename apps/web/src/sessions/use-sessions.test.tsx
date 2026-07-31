@@ -70,7 +70,7 @@ const entry = (id: string): SessionEntry => ({
   content: [{ kind: "text", text: id }],
 });
 
-type Call = { url: string; method: string; body?: string };
+type Call = { url: string; method: string; body?: string; signal?: AbortSignal | null };
 
 let calls: Call[] = [];
 let sessions: Session[] = [session()];
@@ -78,6 +78,7 @@ let page: SessionEntriesPage = { sessionId: "0199", entries: [], seen: 0 };
 let context: SessionContextUsage = { sessionId: "0199", tokens: 0, threshold: 0 };
 let delayedBranch: Promise<Response> | undefined;
 let delayedBranches: Promise<Response>[] | undefined;
+let delayedEntries: Promise<Response> | undefined;
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -96,11 +97,17 @@ beforeEach(() => {
   refusals = {};
   delayedBranch = undefined;
   delayedBranches = undefined;
+  delayedEntries = undefined;
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
 
-    calls.push({ url, method, ...(typeof init?.body === "string" ? { body: init.body } : {}) });
+    calls.push({
+      url,
+      method,
+      ...(typeof init?.body === "string" ? { body: init.body } : {}),
+      ...(init?.signal === undefined ? {} : { signal: init.signal }),
+    });
 
     const refusal = refusals[`${method} ${url}`];
 
@@ -141,6 +148,10 @@ beforeEach(() => {
     }
 
     if (url.startsWith(sessionEntriesPath("0199"))) {
+      if (delayedEntries !== undefined) {
+        return delayedEntries;
+      }
+
       return answer(page);
     }
 
@@ -197,6 +208,40 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.seen).toBe(4));
     expect(asked(`${sessionEntriesPath("0199")}?after=0`)).toHaveLength(1);
+  });
+
+  it("starts the active branch only after the core snapshot applies", async () => {
+    let resolveEntries!: (response: Response) => void;
+    delayedEntries = new Promise((resolve) => {
+      resolveEntries = resolve;
+    });
+
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(asked(`${sessionEntriesPath("0199")}?after=0`)).toHaveLength(1));
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(0);
+
+    resolveEntries(await answer({ sessionId: "0199", entries: [entry("active")], seen: 1 }));
+    await waitFor(() => expect(asked(sessionBranchPath("0199"))).toHaveLength(1));
+    await waitFor(() => expect(view.result.current.state.open?.seen).toBe(1));
+  });
+
+  it("cancels the open session reload when its route closes", async () => {
+    let resolveEntries!: (response: Response) => void;
+    delayedEntries = new Promise((resolve) => {
+      resolveEntries = resolve;
+    });
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(asked(`${sessionEntriesPath("0199")}?after=0`)).toHaveLength(1));
+    const request = asked(`${sessionEntriesPath("0199")}?after=0`)[0];
+
+    view.rerender({ stream: "open" });
+    expect(request?.signal?.aborted).toBe(true);
+
+    resolveEntries(await answer({ error: "late failure" }, 503));
+    await waitFor(() => expect(view.result.current.state.open).toBeUndefined());
+    expect(view.diagnostics).toEqual([]);
   });
 
   it("takes a session that is gone for an empty panel, not for a failure", async () => {

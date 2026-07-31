@@ -177,6 +177,9 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     const open = latest.current.open;
 
     if (open === undefined) {
+      pendingOpen.current?.abort();
+      pendingOpen.current = undefined;
+
       return;
     }
 
@@ -205,6 +208,22 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         if (page !== undefined) {
           apply((current) => applyEntries(current, id, page.entries, page.seen));
         }
+
+        void fetchBranch(id, undefined, controller.signal)
+          .then((branch) => {
+            if (controller.signal.aborted) {
+              return;
+            }
+
+            apply((current) => applyBranch(current, id, branch));
+          })
+          .catch((cause: unknown) => {
+            if (controller.signal.aborted) {
+              return;
+            }
+
+            onDiagnostic(`the branch of ${id} could not be read: ${reasonOf(cause)}`);
+          });
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
@@ -215,24 +234,6 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
 
         onDiagnostic(`the session ${id} could not be read: ${reason}`);
         apply((current) => applyTurnFailure(current, id, reason));
-      });
-
-    void fetchBranch(id, undefined, controller.signal)
-      .then((branch) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        apply((current) => applyBranch(current, id, branch));
-      })
-      .catch((cause: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        const reason = reasonOf(cause);
-
-        onDiagnostic(`the branch of ${id} could not be read: ${reason}`);
       });
   }, [apply, onDiagnostic]);
 
