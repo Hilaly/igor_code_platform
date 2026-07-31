@@ -54,6 +54,7 @@ import {
   applyStats,
   applyModels,
   applyModelsFailure,
+  applyOpenFailure,
   applyPendingTurn,
   applySessionDelta,
   applyProjects,
@@ -233,7 +234,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         const reason = reasonOf(cause);
 
         onDiagnostic(`the session ${id} could not be read: ${reason}`);
-        apply((current) => applyTurnFailure(current, id, reason));
+        apply((current) => applyOpenFailure(current, id, reason));
       });
   }, [apply, onDiagnostic]);
 
@@ -243,7 +244,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       pendingOpen.current?.abort();
       pendingOpen.current = undefined;
     };
-  }, [sessionId]);
+  }, [sessionId, stream]);
 
   useEffect(() => {
     apply((current) =>

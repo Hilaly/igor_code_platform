@@ -244,6 +244,34 @@ describe("useSessions", () => {
     expect(view.diagnostics).toEqual([]);
   });
 
+  it("stops loading when the core snapshot fails", async () => {
+    refusals[`GET ${sessionEntriesPath("0199")}?after=0`] = {
+      status: 503,
+      body: { error: "entries unavailable" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    expect(view.result.current.state.open?.failure).toBe("entries unavailable");
+    expect(view.diagnostics).toContain("the session 0199 could not be read: entries unavailable");
+  });
+
+  it("cancels a same-session reload when the stream tears down", async () => {
+    let resolveEntries!: (response: Response) => void;
+    delayedEntries = new Promise((resolve) => {
+      resolveEntries = resolve;
+    });
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(asked(`${sessionEntriesPath("0199")}?after=0`)).toHaveLength(1));
+    const request = asked(`${sessionEntriesPath("0199")}?after=0`)[0];
+    view.rerender({ stream: "reconnecting", sessionId: "0199" });
+    expect(request?.signal?.aborted).toBe(true);
+
+    resolveEntries(await answer({ error: "late failure" }, 503));
+    await waitFor(() => expect(view.result.current.state.open?.failure).toBeUndefined());
+  });
+
   it("takes a session that is gone for an empty panel, not for a failure", async () => {
     // Ссылку могли открыть после того, как сессию удалили: адрес остался в закладках.
     sessions = [];

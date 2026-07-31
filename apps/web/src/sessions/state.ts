@@ -544,6 +544,19 @@ export function applyTurnFailure(
   return { ...state, open: { ...open, failure: reason } };
 }
 
+/** Ошибка снимка прекращает ожидание загрузки, не меняя семантику отказа отдельного турна. */
+export function applyOpenFailure(
+  state: SessionsState,
+  sessionId: string,
+  reason: string,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId
+    ? { ...state, open: { ...open, failure: reason, loading: false } }
+    : state;
+}
+
 export type DeltaOutcome = {
   state: SessionsState;
   /** Турн кончился: буфер выброшен, записи надо дочитать с курсора. */
