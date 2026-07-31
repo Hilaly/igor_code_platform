@@ -450,6 +450,24 @@ describe("useSessions", () => {
     expect(view.result.current.state.open?.entries).toEqual([]);
   });
 
+  it("keeps the core snapshot usable when the active branch cannot be read", async () => {
+    refusals[`GET ${sessionBranchPath("0199")}`] = {
+      status: 503,
+      body: { error: "branch service unavailable" },
+    };
+    page = { sessionId: "0199", entries: [entry("inactive")], seen: 1 };
+
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.summary?.id).toBe("0199"));
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    expect(view.result.current.state.open?.branchEntryIds).toEqual(new Set());
+    expect(view.result.current.state.open?.entries).toEqual([entry("inactive")]);
+    expect(view.diagnostics[0]).toBe(
+      "the branch of 0199 could not be read: branch service unavailable",
+    );
+  });
+
   it("reads the feed and the branch again after a move, because the leaf is elsewhere now", async () => {
     refusals[`POST ${sessionNavigatePath("0199")}`] = {
       status: 200,

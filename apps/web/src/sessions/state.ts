@@ -488,6 +488,15 @@ export function applyBranch(
     : state;
 }
 
+/** Ошибка чтения ветки не отменяет снимок: пустой набор удерживает ленту от показа чужих веток. */
+export function applyBranchFailure(state: SessionsState, sessionId: string): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId && open.branchEntryIds === undefined
+    ? { ...state, open: { ...open, branchEntryIds: new Set() } }
+    : state;
+}
+
 /**
  * Заполнение контекста. Приходит вместе со снимком: меняется оно тогда же, когда фаза, — турн
  * дописал ветку или компакция её свернула. Пропавшая сессия отвечает `undefined`, и показывать
