@@ -67,6 +67,7 @@ import {
   initialSessionsState,
   openSession,
   reconnected,
+  resetBranch,
   showArchived as showArchivedIn,
   startModels,
   type SessionsState,
@@ -185,6 +186,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     const controller = new AbortController();
     pendingOpen.current = controller;
     const { id, seen } = open;
+    apply((current) => resetBranch(current, id));
 
     void Promise.all([
       fetchSession(id, controller.signal),

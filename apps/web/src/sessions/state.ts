@@ -497,6 +497,15 @@ export function applyBranchFailure(state: SessionsState, sessionId: string): Ses
     : state;
 }
 
+/** Начало нового чтения ветки: старый путь нельзя показывать поверх нового снимка. */
+export function resetBranch(state: SessionsState, sessionId: string): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId
+    ? { ...state, open: { ...open, leafId: undefined, branchEntryIds: new Set() } }
+    : state;
+}
+
 /**
  * Заполнение контекста. Приходит вместе со снимком: меняется оно тогда же, когда фаза, — турн
  * дописал ветку или компакция её свернула. Пропавшая сессия отвечает `undefined`, и показывать
