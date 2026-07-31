@@ -54,6 +54,7 @@
 /* Фоновая заливка страницы — единственное место, где второй акцент работает на всю площадь. */
 .shell-page {
   flex: 1 1 auto;
+  min-width: 0;
   padding: var(--sovereign-space-5);
   background: var(--sovereign-gradient-backdrop);
   overflow: auto;

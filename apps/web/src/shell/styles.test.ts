@@ -97,4 +97,13 @@ describe("the style sheets of the application", () => {
     // такой селектор здесь был (docs/ui-extension-model.md).
     expect(styles).not.toMatch(/\.sv-/);
   });
+
+  it("allows the shell page and session tracks to shrink below their content width", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
+    expect(sessions).toMatch(/\.sessions-split\s*>\s*\*\s*\{[^}]*min-width:\s*0;/s);
+    expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
+  });
 });

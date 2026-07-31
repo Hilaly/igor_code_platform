@@ -12,6 +12,7 @@
   gap: var(--sovereign-space-3);
   /* Вью забирает высоту хоста целиком: лента прокручивается внутри себя, а не вместе со страницей. */
   min-height: 0;
+  min-width: 0;
   flex: 1;
 }
 
@@ -32,7 +33,12 @@
   grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
   gap: var(--sovereign-space-3);
   min-height: 0;
+  min-width: 0;
   flex: 1;
+}
+
+.sessions-split > * {
+  min-width: 0;
 }
 
 @media (width < 60rem) {
@@ -72,6 +78,7 @@
   flex-direction: column;
   gap: var(--sovereign-space-3);
   min-height: 0;
+  min-width: 0;
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   border-radius: var(--sovereign-radius-md);
   background: var(--sovereign-panel-surface);
@@ -85,6 +92,8 @@
   display: flex;
   align-items: flex-end;
   gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
   padding: var(--sovereign-space-3);
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
