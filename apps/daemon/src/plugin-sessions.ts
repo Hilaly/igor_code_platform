@@ -121,7 +121,7 @@ export function createPluginSessions(options: PluginSessionsOptions): PluginSess
         case "session-list":
           return {
             kind: "session-list",
-            sessions: sessions.list(request.projectId).map(sessionForPlugin),
+            sessions: sessions.list(request.projectId, request.archived).map(sessionForPlugin),
           };
         case "session-create": {
           const created = await sessions.create(request.draft);

@@ -125,6 +125,8 @@ const [agent] = await sessions.agents();
 const session = await sessions.create({ projectId, agentId: agent.id, model: "anthropic/claude" });
 
 await sessions.prompt({ sessionId: session.id, text: "создай hello.txt" });
+
+const archived = await sessions.list(projectId, true);
 ```
 
 Один и тот же набор проверяется тем, что маршруты и мост плагинов зовут **одни и те же функции**

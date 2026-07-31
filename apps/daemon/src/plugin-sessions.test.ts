@@ -45,8 +45,8 @@ function bridge(overrides: Partial<SessionService> = {}) {
     | "stats"
   > = {
     agents: () => [],
-    list: (projectId) => {
-      calls.push({ list: projectId });
+    list: (projectId, archived) => {
+      calls.push({ list: projectId, archived });
 
       return [session];
     },
@@ -102,11 +102,14 @@ describe("createPluginSessions", () => {
   it("hands the list over as the service gave it", async () => {
     const { sessions, calls } = bridge();
 
-    assert.deepEqual(await sessions.answer({ kind: "session-list", projectId: "p1" }), {
-      kind: "session-list",
-      sessions: [session],
-    });
-    assert.deepEqual(calls, [{ list: "p1" }]);
+    assert.deepEqual(
+      await sessions.answer({ kind: "session-list", projectId: "p1", archived: true }),
+      {
+        kind: "session-list",
+        sessions: [session],
+      },
+    );
+    assert.deepEqual(calls, [{ list: "p1", archived: true }]);
   });
 
   it("creates a session through the same service the web api uses", async () => {

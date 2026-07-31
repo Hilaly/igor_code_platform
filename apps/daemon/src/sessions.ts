@@ -515,14 +515,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is busy" };
     }
 
-    if (wanted.title !== undefined && wanted.title !== summary.name) {
+    if (wanted.title !== summary.name) {
       const persisted = await options.store.open(sessionId);
 
       if (persisted === undefined) {
         return { kind: "unknown" };
       }
 
-      await persisted.setName(wanted.title);
+      await persisted.setName(wanted.title ?? "");
     }
 
     if (moving) {

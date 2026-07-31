@@ -55,6 +55,17 @@ describe("the sdk without a host", () => {
 });
 
 describe("the session surface", () => {
+  it("can ask for the archived sessions of one project", async () => {
+    const host = installTestHost({ id: "tracker" });
+
+    host.answerSessions(() => ({ kind: "session-list", sessions: [] }));
+
+    assert.deepEqual(await sessions.list("p1", true), []);
+    assert.deepEqual(host.sessionRequests, [
+      { kind: "session-list", projectId: "p1", archived: true },
+    ]);
+  });
+
   it("asks the platform for the agents and hands them over as they came", async () => {
     const host = installTestHost({ id: "tracker" });
     const agent = {

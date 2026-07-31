@@ -933,6 +933,30 @@ describe("the session lifecycle over http", () => {
     );
   });
 
+  it("clears the session name when the replacement body omits it", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(
+      (
+        await call("PUT", sessionPath(sessionId), {
+          title: "разбор бага",
+          archived: false,
+        })
+      ).status,
+      200,
+    );
+
+    const cleared = await call("PUT", sessionPath(sessionId), { archived: false });
+
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body["title"], undefined);
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      undefined,
+    );
+  });
+
   it("archives a session out of the list and reads it by its own address", async () => {
     const { call, start, directory } = await serve();
     const sessionId = String((await start()).body["id"]);

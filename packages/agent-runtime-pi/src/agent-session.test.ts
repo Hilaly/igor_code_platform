@@ -105,6 +105,10 @@ describe("an agent session over pi", () => {
         .endsWith("привет от двойника"),
       true,
     );
+    assert.equal(
+      deltas.filter((delta) => delta.kind === "message-start" && delta.role === "user").length,
+      1,
+    );
     // Конец турна и возврат в простой — две разные дельты, и порядок между ними именно такой:
     // сначала «турн кончился», потом «сессия свободна».
     assert.deepEqual(
@@ -494,6 +498,26 @@ describe("naming, counting and removing a session", () => {
     assert.deepEqual(
       (await restarted.list()).map((summary) => summary.name),
       ["разбор бага"],
+    );
+  });
+
+  it("clears the name with an empty one", async () => {
+    const { open, store, directory, archivedDirectory } = await withStore([]);
+    const session = await open();
+    const persisted = await store.open(session.summary().id);
+
+    assert.ok(persisted !== undefined);
+    await persisted.setName("разбор бага");
+    await persisted.setName("");
+
+    assert.equal(session.summary().name, undefined);
+    await session.close();
+
+    const restarted = await freshStore(directory, archivedDirectory);
+
+    assert.deepEqual(
+      (await restarted.list()).map((summary) => summary.name),
+      [undefined],
     );
   });
 

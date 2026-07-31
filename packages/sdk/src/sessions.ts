@@ -133,7 +133,7 @@ export type SessionStats = {
 
 export type SessionRequest =
   | { kind: "agent-list" }
-  | { kind: "session-list"; projectId?: string }
+  | { kind: "session-list"; projectId?: string; archived?: boolean }
   | { kind: "session-create"; draft: SessionDraft }
   | { kind: "session-entries"; sessionId: string; after?: number }
   | { kind: "session-prompt"; turn: TurnRequest }
@@ -181,11 +181,15 @@ export const sessions = {
   agents: async (): Promise<AgentSummary[]> =>
     (await ask({ kind: "agent-list" }, "agent-list")).agents,
 
-  /** Сессии, при желании — только одного проекта. Архивные в список не попадают. */
-  list: async (projectId?: string): Promise<Session[]> =>
+  /** Сессии, при желании — только одного проекта; `archived` переключает список на архивные. */
+  list: async (projectId?: string, archived = false): Promise<Session[]> =>
     (
       await ask(
-        projectId === undefined ? { kind: "session-list" } : { kind: "session-list", projectId },
+        {
+          kind: "session-list",
+          ...(projectId === undefined ? {} : { projectId }),
+          ...(archived ? { archived: true } : {}),
+        },
         "session-list",
       )
     ).sessions,
