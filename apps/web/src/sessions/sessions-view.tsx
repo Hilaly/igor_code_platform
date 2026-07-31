@@ -10,6 +10,7 @@ import type {
   SessionDraft,
   SessionForkRequest,
   SessionMessage,
+  SessionNavigateRequest,
   SessionUpdate,
 } from "@sovereign/protocol";
 import {
@@ -34,6 +35,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useState } from "react";
 
+import type { NavigationOutcome } from "./api.ts";
 import { ChatPlaceholder, ChatView } from "./chat-view.tsx";
 import { NewSessionDialog } from "./new-session-dialog.tsx";
 import type { SessionsState } from "./state.ts";
@@ -56,6 +58,10 @@ export type SessionsViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись открытой сессии или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
+  /** Спросить ветку открытой сессии: панель дерева зовёт это по своему открытию. */
+  onLoadBranch: () => void;
+  /** Перейти к записи дерева. Ответ несёт текст реплики, если целью была она. */
+  onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   onShowArchived: (archived: boolean) => void;
   translator: ScopedTranslator;
 };
@@ -221,6 +227,8 @@ export function SessionsView(props: SessionsViewProps) {
             onFork={props.onFork}
             onCompact={props.onCompact}
             onSetLabel={props.onSetLabel}
+            onLoadBranch={props.onLoadBranch}
+            onNavigate={props.onNavigate}
             translator={translator}
           />
         )}

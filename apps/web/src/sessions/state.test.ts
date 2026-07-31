@@ -2,6 +2,7 @@ import { coreEventTypes, type Session, type SessionEntry } from "@sovereign/prot
 import { describe, expect, it } from "vitest";
 
 import {
+  applyBranch,
   applyContext,
   applyDegradation,
   applyEntries,
@@ -10,7 +11,9 @@ import {
   applySessions,
   applyStreamEvent,
   applySummary,
+  buildEntryTree,
   closeSession,
+  entryPath,
   initialSessionsState,
   isBusy,
   isFeedEntry,
@@ -212,6 +215,112 @@ describe("the marks of the entries", () => {
     const marked = applyEntries(opened(), "0199", [marking("l1", "m1", "тут")], 1);
 
     expect(reconnected(marked).open?.labels.size).toBe(0);
+  });
+});
+
+describe("the tree of entries", () => {
+  const at = (id: string, parentId?: string): SessionEntry => ({
+    id,
+    ...(parentId === undefined ? {} : { parentId }),
+    time: "2026-07-29T00:00:00.000Z",
+    kind: "message",
+    role: "agent",
+    content: [{ kind: "text", text: id }],
+  });
+
+  /** Форма дерева одной строкой: `a(b,c)` — у `a` двое детей. Так видно уровень, а не только связь. */
+  const shape = (nodes: ReturnType<typeof buildEntryTree>): string =>
+    nodes
+      .map(({ entry, children }) =>
+        children.length === 0 ? entry.id : `${entry.id}(${shape(children)})`,
+      )
+      .join(",");
+
+  it("lays a linear conversation flat: a hundred replies are not a hundred levels", () => {
+    // У каждой записи ровно один ребёнок — уровень тут добавлять не за что.
+    const tree = buildEntryTree([at("e1"), at("e2", "e1"), at("e3", "e2"), at("e4", "e3")]);
+
+    expect(shape(tree)).toBe("e1,e2,e3,e4");
+    expect(tree.every(({ children }) => children.length === 0)).toBe(true);
+  });
+
+  it("adds a level only where the conversation forked", () => {
+    // e2 переспросили иначе: две ветки, и каждая уезжает под свою первую запись.
+    const tree = buildEntryTree([
+      at("e1"),
+      at("e2", "e1"),
+      at("a1", "e2"),
+      at("a2", "a1"),
+      at("b1", "e2"),
+      at("b2", "b1"),
+    ]);
+
+    expect(shape(tree)).toBe("e1,e2(a1(a2),b1(b2))");
+  });
+
+  it("keeps the runs of two branches apart instead of mixing them on one level", () => {
+    const tree = buildEntryTree([
+      at("root"),
+      at("a1", "root"),
+      at("b1", "root"),
+      at("a2", "a1"),
+      at("b2", "b1"),
+      at("a3", "a2"),
+    ]);
+
+    const [rootNode] = tree;
+
+    expect(rootNode?.children.map(({ entry }) => entry.id)).toEqual(["a1", "b1"]);
+    expect(shape(rootNode?.children[0]?.children ?? [])).toBe("a2,a3");
+  });
+
+  it("keeps an entry whose parent was not read as a root of its own", () => {
+    // Пропасть из дерева она не имеет права: родитель либо обрезан, либо ещё не доехал.
+    const tree = buildEntryTree([at("e2", "gone"), at("e3", "e2")]);
+
+    expect(shape(tree)).toBe("e2,e3");
+  });
+
+  it("does not loop forever on a ring of parents, and loses no entry to it", () => {
+    // Корня у кольца нет вовсе, и без доводки дерево вышло бы пустым: записи пропали бы молча.
+    expect(shape(buildEntryTree([at("e1", "e2"), at("e2", "e1")]))).toBe("e1,e2");
+  });
+
+  it("gives the path from the root to the leaf, so the branch opens expanded", () => {
+    const entries = [at("e1"), at("e2", "e1"), at("a1", "e2"), at("b1", "e2"), at("b2", "b1")];
+
+    expect(entryPath(entries, "b2")).toEqual(["e1", "e2", "b1", "b2"]);
+    expect(entryPath(entries, undefined)).toEqual([]);
+  });
+});
+
+describe("the leaf of the session", () => {
+  it("takes the leaf out of the branch and leaves its entries alone", () => {
+    // Записи ветки — те же, что уже прочитаны курсором: вторая их копия развела бы дерево с лентой.
+    const state = applyBranch(opened(), "0199", {
+      sessionId: "0199",
+      entries: [entry("a"), entry("b")],
+      leafId: "b",
+    });
+
+    expect(state.open?.leafId).toBe("b");
+    expect(state.open?.entries).toEqual([]);
+  });
+
+  it("forgets the leaf when the stream comes back: it could have moved", () => {
+    const known = applyBranch(opened(), "0199", {
+      sessionId: "0199",
+      entries: [],
+      leafId: "b",
+    });
+
+    expect(reconnected(known).open?.leafId).toBeUndefined();
+  });
+
+  it("ignores a branch of a session nobody is looking at", () => {
+    const state = opened();
+
+    expect(applyBranch(state, "0200", { sessionId: "0200", entries: [] })).toBe(state);
   });
 });
 

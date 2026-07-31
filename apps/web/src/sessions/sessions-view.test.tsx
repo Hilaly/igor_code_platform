@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionsView, type SessionsViewProps } from "./sessions-view.tsx";
 import {
+  applyBranch,
   applyContext,
   applyDegradation,
   applyEntries,
@@ -97,6 +98,8 @@ const show = (state: SessionsState, handlers: Partial<SessionsViewProps> = {}) =
       onFork={vi.fn()}
       onCompact={vi.fn()}
       onSetLabel={vi.fn()}
+      onLoadBranch={vi.fn()}
+      onNavigate={vi.fn()}
       onShowArchived={vi.fn()}
       {...handlers}
       translator={translator}
@@ -701,15 +704,38 @@ describe("the session lifecycle from the view", () => {
   });
 
   it("says why a compaction was refused instead of swallowing the reason", async () => {
-    // Занятая и архивная сессии отвечают `409`: причина от демона — то, что показывают человеку.
+    // Снимок мог устареть между отрисовкой и нажатием: причина от демона — то, что показывают.
     const onCompact = vi.fn().mockResolvedValue("the session is busy");
 
-    show(withOpen([], { phase: "turn" }), { onCompact });
+    show(withOpen(), { onCompact });
 
     fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
     fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
 
     expect(await screen.findByText(/the session is busy/)).not.toBeNull();
+  });
+
+  it("does not offer to fold the context of an archived session at all", () => {
+    // Сервер отклонит её `409`: кнопка обещала бы невозможное, а архив — состояние, а не задержка.
+    show(withOpen([entryMessage("m1", "сохранено")], { archived: true }));
+
+    expect(screen.queryByRole("button", { name: "Свернуть контекст" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Метка этой записи" })).toBeNull();
+  });
+
+  it("keeps folding and marking visible but switched off while the session is busy", () => {
+    // Занятость проходит сама, и контрол, исчезающий на время турна, хуже выключенного.
+    show(withOpen([entryMessage("m1", "реплика")], { phase: "turn" }));
+
+    expect(screen.getByRole("button", { name: "Свернуть контекст" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Пометить запись" }).getAttribute("disabled"),
+    ).not.toBeNull();
   });
 
   it("marks an entry and shows the mark on it", async () => {
@@ -758,7 +784,7 @@ describe("the session lifecycle from the view", () => {
   it("says why a mark was refused", async () => {
     const onSetLabel = vi.fn().mockResolvedValue("the session is archived");
 
-    show(withOpen([entryMessage("m1", "реплика")], { archived: true }), { onSetLabel });
+    show(withOpen([entryMessage("m1", "реплика")]), { onSetLabel });
 
     fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
@@ -768,6 +794,126 @@ describe("the session lifecycle from the view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
 
     expect(await screen.findByText(/the session is archived/)).not.toBeNull();
+  });
+
+  it("opens the tree on the branch the session works in, with the leaf picked", async () => {
+    const onLoadBranch = vi.fn();
+    // e2 переспросили иначе: рабочая ветка — вторая, и раскрыта должна быть она.
+    const forked = applyBranch(
+      withOpen([
+        entryMessage("e1", "вопрос", "user"),
+        { ...entryMessage("e2", "ответ"), parentId: "e1" },
+        { ...entryMessage("a1", "первая попытка"), parentId: "e2" },
+        { ...entryMessage("b1", "вторая попытка"), parentId: "e2" },
+      ]),
+      "0199",
+      { sessionId: "0199", entries: [], leafId: "b1" },
+    );
+
+    show(forked, { onLoadBranch });
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+
+    expect(onLoadBranch).toHaveBeenCalledTimes(1);
+
+    const leaf = await screen.findByRole("treeitem", { name: /вторая попытка/ });
+
+    expect(leaf.getAttribute("aria-selected")).toBe("true");
+    // Ветвление добавило уровень, а линейное начало разговора осталось на первом.
+    expect(leaf.getAttribute("aria-level")).toBe("2");
+    expect(
+      screen.getByRole("treeitem", { name: /Человек: вопрос/ }).getAttribute("aria-level"),
+    ).toBe("1");
+  });
+
+  it("goes to the entry and puts the text it gave back into the composer", async () => {
+    // Ради этого переход к своей реплике и делается: переспросить иначе тем же текстом.
+    const onNavigate = vi.fn().mockResolvedValue({
+      kind: "navigated",
+      navigated: { sessionId: "0199", leafId: "e1", editorText: "вопрос", summarized: false },
+    });
+
+    show(withOpen([entryMessage("e1", "вопрос", "user")]), { onNavigate });
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: /Человек: вопрос/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Перейти к записи" }));
+
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith({ entryId: "e1" }));
+    // Панель закрывается сама: то, что она показывала, относится теперь к другой ветке.
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("вопрос");
+  });
+
+  it("asks for the summary of the branch being left only when told to", async () => {
+    const onNavigate = vi.fn().mockResolvedValue({
+      kind: "navigated",
+      navigated: { sessionId: "0199", leafId: "e1", summarized: true },
+    });
+
+    show(withOpen([entryMessage("e1", "вопрос", "user")]), { onNavigate });
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: /Человек: вопрос/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Пересказать покидаемую ветку" }));
+    fireEvent.click(screen.getByRole("button", { name: "Перейти к записи" }));
+
+    await waitFor(() =>
+      expect(onNavigate).toHaveBeenCalledWith({ entryId: "e1", summarize: true }),
+    );
+  });
+
+  it("says why a move was refused and keeps the panel open", async () => {
+    const onNavigate = vi
+      .fn()
+      .mockResolvedValue({ kind: "refused", reason: "the session is busy" });
+
+    show(withOpen([entryMessage("e1", "вопрос", "user")]), { onNavigate });
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: /Человек: вопрос/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Перейти к записи" }));
+
+    expect(await screen.findByText(/the session is busy/)).not.toBeNull();
+    expect(screen.getByRole("dialog")).not.toBeNull();
+  });
+
+  it("shows the mark of an entry in the tree and lets it be written there", async () => {
+    const onSetLabel = vi.fn().mockResolvedValue(undefined);
+
+    show(
+      withOpen([
+        entryMessage("e1", "вопрос", "user"),
+        { id: "l1", time: "2026-07-29T00:00:01.000Z", kind: "label", targetId: "e1", label: "тут" },
+      ]),
+      { onSetLabel },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+
+    const node = await screen.findByRole("treeitem", { name: /Человек: вопрос/ });
+
+    // Метка попадает в имя узла: она часть того, что скринридер называет.
+    expect(node.getAttribute("aria-label")).toBeNull();
+    expect(node.textContent).toContain("тут");
+
+    fireEvent.click(node);
+    fireEvent.click(screen.getByRole("button", { name: "Снять метку" }));
+
+    await waitFor(() => expect(onSetLabel).toHaveBeenCalledWith("e1", null));
+  });
+
+  it("offers no writing at all in the tree of an archived session", async () => {
+    show(withOpen([entryMessage("e1", "вопрос", "user")], { archived: true }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: /Человек: вопрос/ }));
+
+    expect(screen.getByText(/Сессия в архиве/)).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Перейти к записи" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Снять метку" })).toBeNull();
   });
 
   it("says what the session lost, keeping every loss", () => {

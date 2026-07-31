@@ -25,6 +25,7 @@ import {
   type Project,
   type ProviderSummary,
   type Session,
+  type SessionBranch,
   type SessionContextUsage,
   type SessionDelta,
   type SessionEntry,
@@ -96,6 +97,12 @@ export type OpenSession = {
    * Считается по прочитанным записям, поэтому живёт рядом с ними, а не спрашивается отдельно.
    */
   labels: Map<string, string>;
+  /**
+   * Лист сессии: запись, от которой пойдёт следующий турн. Единственное, что берётся из ответа
+   * `GET .../branch` — сами записи ветки уже прочитаны курсором, и вторая их копия развела бы дерево
+   * с лентой. Вывести лист из записей нечем: после перехода он лежит не в конце файла.
+   */
+  leafId?: string;
   /**
    * Чего сессия лишилась на ходу: инструмент исчез вместе с плагином или модель пропала из
    * каталога. Копится списком, потому что за одну пересборку набора пропасть может несколько
@@ -302,6 +309,115 @@ export function isFeedEntry(entry: SessionEntry): boolean {
   }
 }
 
+/** Узел дерева записей. Своей подписи здесь нет: переводит запись в строку вью, а не правило. */
+export type EntryTreeNode = {
+  entry: SessionEntry;
+  children: EntryTreeNode[];
+};
+
+/**
+ * Дерево записей из плоского списка, по `parentId`.
+ *
+ * **Вложенность появляется только в точках ветвления.** Прогон записей, у каждой из которых ровно
+ * один ребёнок, ложится плоской чередой сиблингов на один уровень: у разговора в сто реплик иначе
+ * было бы сто уровней отступа, и панель стала бы лестницей.
+ *
+ * В точке ветвления каждая ветка уезжает под свою первую запись — иначе два прогона легли бы
+ * вперемешку на один уровень, и по дереву стало бы невозможно сказать, чей ответ чей.
+ *
+ * Запись, чей родитель не прочитан, считается корнем: пропасть из дерева она не имеет права, а
+ * потерянный родитель — это либо начало файла, либо ещё не доехавшая страница.
+ */
+export function buildEntryTree(entries: readonly SessionEntry[]): EntryTreeNode[] {
+  const known = new Set(entries.map(({ id }) => id));
+  const byParent = new Map<string, SessionEntry[]>();
+  const roots: SessionEntry[] = [];
+
+  for (const entry of entries) {
+    const parentId = entry.parentId;
+
+    if (parentId === undefined || !known.has(parentId)) {
+      roots.push(entry);
+      continue;
+    }
+
+    const siblings = byParent.get(parentId);
+
+    if (siblings === undefined) {
+      byParent.set(parentId, [entry]);
+    } else {
+      siblings.push(entry);
+    }
+  }
+
+  // Испорченный файл может замкнуть `parentId` в кольцо, и обход по нему не кончился бы никогда.
+  const visited = new Set<string>();
+
+  /** Прогон от записи вниз: пока ребёнок ровно один, следующая запись — сиблинг, а не потомок. */
+  function runFrom(start: SessionEntry): EntryTreeNode[] {
+    const line: EntryTreeNode[] = [];
+    let current: SessionEntry | undefined = start;
+
+    while (current !== undefined && !visited.has(current.id)) {
+      visited.add(current.id);
+
+      // Типы названы явно: без них вывод замыкается через `nest` на самого себя и сдаётся.
+      const children: SessionEntry[] = byParent.get(current.id) ?? [];
+      const only: SessionEntry | undefined = children.length === 1 ? children[0] : undefined;
+
+      if (only !== undefined) {
+        line.push({ entry: current, children: [] });
+        current = only;
+        continue;
+      }
+
+      line.push({ entry: current, children: children.map(nest) });
+      current = undefined;
+    }
+
+    return line;
+  }
+
+  /** Ветка целиком под своей первой записью: остаток прогона становится её детьми. */
+  function nest(entry: SessionEntry): EntryTreeNode {
+    const [head, ...rest] = runFrom(entry);
+
+    // Пусто всегда одно из двух: у ветвящейся записи прогон обрывается на ней самой, у линейной
+    // детей нет вовсе.
+    return { entry, children: [...(head?.children ?? []), ...rest] };
+  }
+
+  const tree = roots.flatMap(runFrom);
+  // Кольцо в `parentId` не оставляет ни одного корня, и дерево вышло бы пустым — то есть записи
+  // пропали бы молча. Не дошедшие до обхода дописываются корнями: испорченный файл виден, а не нем.
+  const unreached = entries.filter(({ id }) => !visited.has(id));
+
+  return unreached.length === 0 ? tree : [...tree, ...unreached.flatMap(runFrom)];
+}
+
+/**
+ * Путь от корня до записи по `parentId`, включая её саму. Из него получается набор раскрытых узлов:
+ * панель дерева обязана открыться на той ветке, в которой сессия работает сейчас.
+ */
+export function entryPath(entries: readonly SessionEntry[], entryId: string | undefined): string[] {
+  if (entryId === undefined) {
+    return [];
+  }
+
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const path: string[] = [];
+  const visited = new Set<string>();
+  let current = byId.get(entryId);
+
+  while (current !== undefined && !visited.has(current.id)) {
+    visited.add(current.id);
+    path.unshift(current.id);
+    current = current.parentId === undefined ? undefined : byId.get(current.parentId);
+  }
+
+  return path;
+}
+
 /**
  * Турн отправлен. Текст показывается сразу, до первой дельты: в очереди дельт нет, и без этого
  * реплика человека появлялась бы с задержкой в целый турн впереди.
@@ -343,6 +459,21 @@ export function applyStats(
   const open = state.open;
 
   return open?.id === sessionId ? { ...state, open: { ...open, stats } } : state;
+}
+
+/**
+ * Ветка сессии. Из ответа берётся **только лист**: записи ветки — те же самые записи, что уже
+ * прочитаны курсором, и хранить их вторым списком значило бы завести второй источник истины на одно
+ * и то же дерево. Ветка спрашивается по открытию панели дерева и после перехода.
+ */
+export function applyBranch(
+  state: SessionsState,
+  sessionId: string,
+  branch: SessionBranch | undefined,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, leafId: branch?.leafId } } : state;
 }
 
 /**
@@ -601,6 +732,8 @@ export function reconnected(state: SessionsState): SessionsState {
       // Метки — свёртка прочитанных записей: обнулённая лента обнуляет и их, иначе метка снятой
       // записи пережила бы ленту, из которой она выведена.
       labels: new Map(),
+      // За время разрыва лист мог переехать: спросить его заново дешевле, чем показывать прежний.
+      leafId: undefined,
       live: undefined,
       pending: {},
       // Очереди обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за время

@@ -116,6 +116,7 @@
  * между лентой и вводом. Они не внутри `.sessions-composer` намеренно: там первый ребёнок
  * растягивается на всю ширину, и это поле ввода.
  */
+.sessions-chat-head,
 .sessions-stats,
 .sessions-context,
 .sessions-queues,
@@ -131,6 +132,40 @@
 
 /* Полоса заполнения тянется на свободное место: подписи по краям от неё читаются, а она — шкала. */
 .sessions-context > :nth-child(2) {
+  flex: 1;
+  min-width: var(--sovereign-space-8);
+}
+
+/* Шапка чата прижимает свои кнопки вправо: слева от них ничего нет, а лента начинается под ними. */
+.sessions-chat-head {
+  justify-content: flex-end;
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  padding-block-end: var(--sovereign-space-2);
+}
+
+/*
+ * Выбранная запись под деревом: описание, переход и правка метки в колонку. Панель выдвижная и
+ * узкая, и класть их в строку значит резать подписи.
+ */
+.sessions-tree-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sovereign-space-2);
+  margin-block-start: var(--sovereign-space-3);
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.sessions-tree-label {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.sessions-tree-label > :first-child {
   flex: 1;
   min-width: var(--sovereign-space-8);
 }

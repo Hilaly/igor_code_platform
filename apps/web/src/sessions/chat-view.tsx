@@ -16,6 +16,7 @@ import type {
   SessionForkRequest,
   SessionMessage,
   SessionMessageMode,
+  SessionNavigateRequest,
 } from "@sovereign/protocol";
 import {
   Badge,
@@ -42,6 +43,8 @@ import {
 } from "@sovereign/ui-kit";
 import { useState } from "react";
 
+import type { NavigationOutcome } from "./api.ts";
+import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { isBusy, isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 
 export type ChatViewProps = {
@@ -54,6 +57,9 @@ export type ChatViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
+  /** Спросить ветку сессии. Зовётся по открытию панели дерева: лист знает демон, а не вью. */
+  onLoadBranch: () => void;
+  onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   translator: ScopedTranslator;
 };
 
@@ -83,6 +89,7 @@ export function ChatView(props: ChatViewProps) {
   const { t } = translator;
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<SessionMessageMode>("steer");
+  const [treeOpen, setTreeOpen] = useState(false);
   const [compacting, setCompacting] = useState(false);
   const [instructions, setInstructions] = useState("");
   /** Запись, которой правят метку, и черновик метки — как у переименования сессии. */
@@ -166,6 +173,32 @@ export function ChatView(props: ChatViewProps) {
 
   return (
     <div className="sessions-chat">
+      <div className="sessions-chat-head">
+        <Button
+          onClick={() => {
+            // Ветка спрашивается по открытию панели, а не всё время: ответ несёт весь путь до листа.
+            props.onLoadBranch();
+            setTreeOpen(true);
+          }}
+        >
+          {t("chat.tree.open")}
+        </Button>
+      </div>
+
+      <EntryTreeDrawer
+        open={treeOpen}
+        onClose={() => setTreeOpen(false)}
+        entries={open.entries}
+        labels={open.labels}
+        {...(open.leafId === undefined ? {} : { leafId: open.leafId })}
+        busy={busy}
+        archived={archived}
+        onNavigate={props.onNavigate}
+        onSetLabel={onSetLabel}
+        onEditorText={setDraft}
+        translator={translator}
+      />
+
       {open.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
       )}
@@ -202,8 +235,17 @@ export function ChatView(props: ChatViewProps) {
                 entry={entry}
                 outcomes={outcomes}
                 {...(mark === undefined ? {} : { label: mark })}
-                onLabel={() => setLabelling({ entryId: entry.id, label: mark ?? "" })}
-                onClearLabel={() => void label(entry.id, null)}
+                // Метка архивной сессии отклоняется `409`: меню в ней не показывается вовсе, а у
+                // занятой остаётся видимым, но выключенным.
+                {...(archived
+                  ? {}
+                  : {
+                      marking: {
+                        busy,
+                        onLabel: () => setLabelling({ entryId: entry.id, label: mark ?? "" }),
+                        onClearLabel: () => void label(entry.id, null),
+                      },
+                    })}
                 // До реплики режем только вопрос человека; включить запись можно для любого места
                 // дерева, поэтому `at` доступен и на ответе агента.
                 {...(!busy
@@ -316,11 +358,19 @@ export function ChatView(props: ChatViewProps) {
           <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
         )}
         {/*
-         * Компакция предлагается и занятой, и архивной сессии. Обе сервер отклонит `409`, и отказ
-         * виден врезкой выше: фаза в снимке живёт своей жизнью, и выключенная по ней кнопка всё
-         * равно не спасает от гонки — она только прячет причину, по которой ничего не произошло.
+         * Архивной сессии компакции не предлагается вовсе: сервер отклонит её `409`, и кнопка
+         * обещала бы невозможное (docs/sessions-and-projects.md). Занятой она показана выключенной —
+         * занятость проходит сама, и контрол, исчезающий на время турна, хуже выключенного.
          */}
-        <Button onClick={() => setCompacting(true)}>{t("chat.compact")}</Button>
+        {archived ? undefined : (
+          <Button
+            onClick={() => setCompacting(true)}
+            disabled={busy}
+            {...(busy ? { title: t("chat.busy.hint") } : {})}
+          >
+            {t("chat.compact")}
+          </Button>
+        )}
       </div>
 
       <ConfirmDialog
@@ -427,14 +477,13 @@ function EntryMessage(props: {
   outcomes: Map<string, ToolOutcome>;
   /** Действующая метка записи, если она есть. Значение уже свёрнуто состоянием. */
   label?: string;
-  onLabel: () => void;
-  onClearLabel: () => void;
+  /** Чем метку правят. Нет вовсе — метку в этой сессии не поставить: она архивная. */
+  marking?: { busy: boolean; onLabel: () => void; onClearLabel: () => void };
   onForkBefore?: () => void;
   onForkAt?: () => void;
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, label, onLabel, onClearLabel, onForkBefore, onForkAt, translator } =
-    props;
+  const { entry, outcomes, label, marking, onForkBefore, onForkAt, translator } = props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -486,21 +535,28 @@ function EntryMessage(props: {
         <Button onClick={onForkBefore}>{t("chat.fork.before")}</Button>
       )}
       {onForkAt === undefined ? undefined : <Button onClick={onForkAt}>{t("chat.fork.at")}</Button>}
-      <Menu
-        label={t("chat.label.menu")}
-        trigger="…"
-        triggerLabel={t("chat.label.menu")}
-        items={[
-          { id: "label", label: t("chat.label.set"), onSelect: onLabel },
-          {
-            id: "clear",
-            label: t("chat.label.clear"),
-            // Снимать нечего, пока метки нет: пункт остаётся видимым, но выключен.
-            disabled: label === undefined,
-            onSelect: onClearLabel,
-          },
-        ]}
-      />
+      {marking === undefined ? undefined : (
+        <Menu
+          label={t("chat.label.menu")}
+          trigger="…"
+          triggerLabel={t("chat.label.menu")}
+          items={[
+            {
+              id: "label",
+              label: t("chat.label.set"),
+              disabled: marking.busy,
+              onSelect: marking.onLabel,
+            },
+            {
+              id: "clear",
+              label: t("chat.label.clear"),
+              // Снимать нечего, пока метки нет: пункт остаётся видимым, но выключен.
+              disabled: marking.busy || label === undefined,
+              onSelect: marking.onClearLabel,
+            },
+          ]}
+        />
+      )}
     </Message>
   );
 }

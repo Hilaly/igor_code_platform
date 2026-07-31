@@ -13,6 +13,7 @@ import type {
   SessionDraft,
   SessionForkRequest,
   SessionMessage,
+  SessionNavigateRequest,
   SessionUpdate,
 } from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -24,6 +25,7 @@ import { fetchProviderModels, fetchProvidersSnapshot } from "../providers/api.ts
 import {
   createSession as createSessionRequest,
   fetchAgents,
+  fetchBranch,
   fetchContextUsage,
   fetchEntries,
   fetchSession,
@@ -31,6 +33,7 @@ import {
   fetchStats,
   forkSession as forkSessionRequest,
   interruptTurn,
+  navigateTo,
   removeSession as removeSessionRequest,
   requestCompaction,
   sendMessage as sendMessageRequest,
@@ -38,11 +41,13 @@ import {
   submitTurn as submitTurnRequest,
   updateSession as updateSessionRequest,
   type CreateSessionOutcome,
+  type NavigationOutcome,
   type RemoveSessionOutcome,
   type SessionOutcome,
 } from "./api.ts";
 import {
   applyAgents,
+  applyBranch,
   applyContext,
   applyEntries,
   applyFailure,
@@ -87,6 +92,10 @@ export type SessionsController = {
   interrupt: () => void;
   /** Свернуть контекст руками. Инструкции пересказа необязательны. Возвращает причину отказа. */
   compact: (instructions?: string) => Promise<string | undefined>;
+  /** Спросить ветку открытой сессии. Зовётся по открытию панели дерева, как `prepareDraft`. */
+  loadBranch: () => void;
+  /** Перейти к записи дерева. Ответ несёт `editorText` — его подставляет в композер вызывающий. */
+  navigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
   setEntryLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
   /** Переименование, архивация и восстановление. Возвращает причину отказа, если демон отказал. */
@@ -443,6 +452,56 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   /**
+   * Ветка сессии. Спрашивается по открытию панели дерева, а не вместе со снимком: ответ несёт весь
+   * путь до листа, и возить его на каждом событии шины значило бы платить за него всё время, пока
+   * панель закрыта. Из ответа применяется только лист.
+   */
+  const loadBranch = useCallback(() => {
+    const id = latest.current.open?.id;
+
+    if (id === undefined) {
+      return;
+    }
+
+    void fetchBranch(id)
+      .then((branch) => apply((current) => applyBranch(current, id, branch)))
+      .catch((cause: unknown) =>
+        onDiagnostic(`the branch of ${id} could not be read: ${reasonOf(cause)}`),
+      );
+  }, [apply, onDiagnostic]);
+
+  /**
+   * Переход к записи дерева. Лист после него другой, поэтому перечитываются и лента, и ветка: всё
+   * показанное относится теперь к другому разговору.
+   */
+  const navigate = useCallback(
+    async (request: SessionNavigateRequest): Promise<NavigationOutcome> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return { kind: "refused", reason: "no session is open" };
+      }
+
+      const outcome = await navigateTo(id, request).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the navigation in ${id} was refused: ${outcome.reason}`);
+
+        return outcome;
+      }
+
+      reloadOpen();
+      loadBranch();
+
+      return outcome;
+    },
+    [loadBranch, onDiagnostic, reloadOpen],
+  );
+
+  /**
    * Метка на записи. Своего состояния метка не заводит: рантайм пишет её записью в дерево, и
    * действующее значение — свёртка прочитанных записей. Поэтому после записи лента дочитывается.
    */
@@ -552,6 +611,8 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     sendMessage,
     interrupt,
     compact,
+    loadBranch,
+    navigate,
     setEntryLabel,
     updateSession,
     removeSession,

@@ -12,6 +12,7 @@
 import {
   agentsPath,
   coreEventTypes,
+  sessionBranchPath,
   sessionCompactPath,
   sessionContextPath,
   sessionDeltaFrameKind,
@@ -19,6 +20,7 @@ import {
   sessionEntryLabelPath,
   sessionForkPath,
   sessionMessagesPath,
+  sessionNavigatePath,
   sessionPath,
   sessionTurnsPath,
   sessionsPath,
@@ -26,6 +28,7 @@ import {
   type SessionContextUsage,
   type SessionDeltaFrame,
   type SessionEntriesPage,
+  type SessionEntry,
 } from "@sovereign/protocol";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,6 +60,14 @@ const frame = (overrides: Partial<SessionDeltaFrame> = {}): SessionDeltaFrame =>
   turnId: "turn-1",
   delta: { kind: "message-delta", messageId: "turn-1:1", channel: "text", text: "привет" },
   ...overrides,
+});
+
+const entry = (id: string): SessionEntry => ({
+  id,
+  time: "2026-07-29T00:00:00.000Z",
+  kind: "message",
+  role: "agent",
+  content: [{ kind: "text", text: id }],
 });
 
 type Call = { url: string; method: string; body?: string };
@@ -415,6 +426,72 @@ describe("useSessions", () => {
 
     expect(reason).toBe("the session is busy");
     expect(view.diagnostics).toContain("the compaction of 0199 was refused: the session is busy");
+  });
+
+  it("takes only the leaf out of the branch, leaving the feed to the cursor", async () => {
+    // Записи ветки — те же, что уже прочитаны курсором. Вторая их копия развела бы дерево с лентой.
+    refusals[`GET ${sessionBranchPath("0199")}`] = {
+      status: 200,
+      body: { sessionId: "0199", entries: [entry("e1"), entry("e2")], leafId: "e2" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    // Ветка не спрашивается сама: пока панель дерева закрыта, платить за путь до листа не за что.
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(0);
+
+    act(() => {
+      view.result.current.loadBranch();
+    });
+
+    await waitFor(() => expect(view.result.current.state.open?.leafId).toBe("e2"));
+    expect(view.result.current.state.open?.entries).toEqual([]);
+  });
+
+  it("reads the feed and the branch again after a move, because the leaf is elsewhere now", async () => {
+    refusals[`POST ${sessionNavigatePath("0199")}`] = {
+      status: 200,
+      body: { sessionId: "0199", leafId: "e6", editorText: "вопрос", summarized: false },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    const before = asked(`${sessionEntriesPath("0199")}?after=0`).length;
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await view.result.current.navigate({ entryId: "e7" });
+    });
+
+    // Текст реплики отдаётся вызывающему: подставить его в композер — дело вью, а не связи.
+    expect(outcome).toEqual({
+      kind: "navigated",
+      navigated: { sessionId: "0199", leafId: "e6", editorText: "вопрос", summarized: false },
+    });
+    await waitFor(() =>
+      expect(asked(`${sessionEntriesPath("0199")}?after=0`).length).toBeGreaterThan(before),
+    );
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(1);
+  });
+
+  it("gives the refusal of a move back and reads nothing again", async () => {
+    refusals[`POST ${sessionNavigatePath("0199")}`] = {
+      status: 409,
+      body: { error: "the session is busy" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await view.result.current.navigate({ entryId: "e7" });
+    });
+
+    expect(outcome).toEqual({ kind: "refused", reason: "the session is busy" });
+    expect(view.diagnostics).toContain("the navigation in 0199 was refused: the session is busy");
+    // Лист остался прежним, и перечитывать было нечего.
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(0);
   });
 
   it("reads the feed again after a mark, because the mark is an entry of the tree", async () => {
