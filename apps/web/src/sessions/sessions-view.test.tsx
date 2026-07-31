@@ -317,6 +317,63 @@ describe("the chat", () => {
 
     expect(screen.getByText(/the model refused/)).not.toBeNull();
   });
+
+  it("does not render a persisted human message again from the live turn", () => {
+    const persisted = message("m1", "привет", "user");
+    const live = applySessionDelta(withOpen([persisted], { phase: "turn" }), "0199", "turn-1", {
+      kind: "message-start",
+      messageId: "turn-1:1",
+      role: "user",
+    }).state;
+    const withText = applySessionDelta(live, "0199", "turn-1", {
+      kind: "message-delta",
+      messageId: "turn-1:1",
+      channel: "text",
+      text: "привет",
+    }).state;
+
+    show(withText);
+
+    expect(screen.getAllByText("привет")).toHaveLength(1);
+  });
+
+  it("still renders steering that repeats an earlier human message", () => {
+    const persisted = message("m1", "привет", "user");
+    const firstUser = applySessionDelta(
+      withOpen([persisted], { phase: "turn" }),
+      "0199",
+      "turn-1",
+      { kind: "message-start", messageId: "turn-1:1", role: "user" },
+    ).state;
+    const agent = applySessionDelta(firstUser, "0199", "turn-1", {
+      kind: "message-start",
+      messageId: "turn-1:2",
+      role: "agent",
+    }).state;
+    const steering = applySessionDelta(agent, "0199", "turn-1", {
+      kind: "message-start",
+      messageId: "turn-1:3",
+      role: "user",
+    }).state;
+    const withText = applySessionDelta(steering, "0199", "turn-1", {
+      kind: "message-delta",
+      messageId: "turn-1:3",
+      channel: "text",
+      text: "привет",
+    }).state;
+
+    show(withText);
+
+    expect(screen.getAllByText("привет")).toHaveLength(2);
+  });
+
+  it("keeps an archived session readable without offering a composer", () => {
+    show(withOpen([message("m1", "сохранено")], { archived: true }));
+
+    expect(screen.getByText("сохранено")).not.toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Сообщение агенту" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Отправить" })).toBeNull();
+  });
 });
 
 describe("the session lifecycle from the view", () => {
@@ -330,6 +387,14 @@ describe("the session lifecycle from the view", () => {
 
     // Тело заменяет запись целиком, и тело без имени сняло бы его заодно с архивацией.
     expect(onUpdate).toHaveBeenCalledWith("0199", { archived: true, title: "разбор бага" });
+  });
+
+  it("keeps the row action beside the row selection instead of nesting buttons", () => {
+    show(withSessions([session({ title: "разбор бага" })]));
+
+    const action = screen.getByRole("button", { name: "Действия над сессией разбор бага" });
+
+    expect(action.closest("button")).toBe(action);
   });
 
   it("offers to restore an archived session instead of archiving it again", () => {
@@ -413,7 +478,22 @@ describe("the session lifecycle from the view", () => {
     expect(onSendMessage).toHaveBeenCalledWith({ text: "возьми левее", mode: "steer" });
   });
 
-  it("forks from a question of the human, and only from it", () => {
+  it("can append a message in an idle session without starting a turn", () => {
+    const onSendMessage = vi.fn();
+    const onSubmit = vi.fn();
+
+    show(withOpen(), { onSendMessage, onSubmit });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "заметка" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Дописать без запуска" }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSendMessage).toHaveBeenCalledWith({ text: "заметка", mode: "append" });
+  });
+
+  it("forks before a human question or through any visible message", () => {
     const onFork = vi.fn();
     const entries: SessionEntry[] = [
       {
@@ -434,12 +514,25 @@ describe("the session lifecycle from the view", () => {
 
     show(withOpen(entries), { onFork });
 
-    // Кнопка одна: у ответа модели форка «до записи» не бывает вовсе.
-    const buttons = screen.getAllByRole("button", { name: "Форк отсюда" });
+    const before = screen.getAllByRole("button", { name: "Форк до этой реплики" });
+    const through = screen.getAllByRole("button", { name: "Форк по эту запись" });
 
-    expect(buttons).toHaveLength(1);
-    fireEvent.click(buttons[0] as HTMLElement);
+    expect(before).toHaveLength(1);
+    expect(through).toHaveLength(2);
+    fireEvent.click(before[0] as HTMLElement);
     expect(onFork).toHaveBeenCalledWith({ entryId: "e1" });
+    fireEvent.click(through[1] as HTMLElement);
+    expect(onFork).toHaveBeenLastCalledWith({ entryId: "e2", position: "at" });
+  });
+
+  it("forks the whole session without inventing an entry id", () => {
+    const onFork = vi.fn();
+
+    show(withOpen(), { onFork });
+
+    fireEvent.click(screen.getByRole("button", { name: "Форк всей сессии" }));
+
+    expect(onFork).toHaveBeenCalledWith({});
   });
 
   it("says what the session lost, keeping every loss", () => {

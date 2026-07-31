@@ -14,6 +14,8 @@ import {
   coreEventTypes,
   sessionDeltaFrameKind,
   sessionEntriesPath,
+  sessionForkPath,
+  sessionMessagesPath,
   sessionPath,
   sessionTurnsPath,
   sessionsPath,
@@ -335,5 +337,39 @@ describe("useSessions", () => {
 
     expect(outcome).toEqual({ kind: "refused", reason: "the project is archived" });
     expect(view.diagnostics).toContain("the session could not be created: the project is archived");
+  });
+
+  it("gives the created fork back so the caller can open it", async () => {
+    const forked = session({ id: "0200" });
+    refusals[`POST ${sessionForkPath("0199")}`] = {
+      status: 200,
+      body: forked,
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await view.result.current.forkSession({ entryId: "e1", position: "at" });
+    });
+
+    expect(outcome).toEqual({ kind: "done", session: forked });
+  });
+
+  it("reads the open entries again after an appended message", async () => {
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    const before = asked(`${sessionEntriesPath("0199")}?after=0`).length;
+
+    await act(async () => {
+      await view.result.current.sendMessage({ text: "ещё контекст", mode: "append" });
+    });
+
+    expect(asked(sessionMessagesPath("0199"), "POST")).toHaveLength(1);
+    await waitFor(() =>
+      expect(asked(`${sessionEntriesPath("0199")}?after=0`).length).toBeGreaterThan(before),
+    );
   });
 });

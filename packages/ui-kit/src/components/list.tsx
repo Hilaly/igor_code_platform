@@ -19,9 +19,11 @@ export type ListRowProps = {
   selected?: boolean;
   onSelect?: () => void;
   children: ReactNode;
+  /** Действия строки стоят рядом с кнопкой выбора: интерактивный элемент нельзя вкладывать в неё. */
+  actions?: ReactNode;
 };
 
-export function ListRow({ selected = false, onSelect, children }: ListRowProps) {
+export function ListRow({ selected = false, onSelect, children, actions }: ListRowProps) {
   const className = `${styles.row}${selected ? ` ${styles.selected}` : ""}`;
 
   if (onSelect === undefined) {
@@ -33,6 +35,7 @@ export function ListRow({ selected = false, onSelect, children }: ListRowProps) 
       <button type="button" className={styles.select} onClick={onSelect} aria-current={selected}>
         {children}
       </button>
+      {actions === undefined ? undefined : <span className={styles.actions}>{actions}</span>}
     </li>
   );
 }

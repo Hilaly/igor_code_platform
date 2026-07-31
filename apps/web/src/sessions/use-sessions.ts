@@ -85,7 +85,7 @@ export type SessionsController = {
   updateSession: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
   removeSession: (sessionId: string) => Promise<string | undefined>;
   /** Форк открытой сессии от записи. Новая сессия открывается сразу: смотреть на неё и есть смысл. */
-  forkSession: (request: SessionForkRequest) => Promise<string | undefined>;
+  forkSession: (request: SessionForkRequest) => Promise<SessionOutcome>;
   /** Переключить список между действующими и архивными. */
   setShowArchived: (archived: boolean) => void;
   /** Кадр дельты из потока. Не событие шины (docs/sessions-and-projects.md). */
@@ -383,9 +383,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         return outcome.reason;
       }
 
+      reloadOpen();
+
       return undefined;
     },
-    [onDiagnostic],
+    [onDiagnostic, reloadOpen],
   );
 
   /** Запись, отдающая сессию. Список после неё перечитывается: изменилась не только открытая. */
@@ -426,11 +428,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   const forkSession = useCallback(
-    async (request: SessionForkRequest): Promise<string | undefined> => {
+    async (request: SessionForkRequest): Promise<SessionOutcome> => {
       const id = latest.current.open?.id;
 
       if (id === undefined) {
-        return undefined;
+        return { kind: "refused", reason: "no session is open" };
       }
 
       const outcome = await forkSessionRequest(id, request).catch((cause: unknown) => ({
@@ -441,12 +443,12 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       if (outcome.kind === "refused") {
         onDiagnostic(`the session ${id} could not be forked: ${outcome.reason}`);
 
-        return outcome.reason;
+        return outcome;
       }
 
       reloadSessions();
 
-      return undefined;
+      return outcome;
     },
     [onDiagnostic, reloadSessions],
   );

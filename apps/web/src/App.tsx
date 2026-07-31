@@ -511,7 +511,13 @@ export function App() {
 
               return reason;
             }}
-            onFork={sessions.forkSession}
+            onFork={async (request) => {
+              const outcome = await sessions.forkSession(request);
+
+              if (outcome.kind === "done") {
+                navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
+              }
+            }}
             onShowArchived={sessions.setShowArchived}
             translator={translator}
           />

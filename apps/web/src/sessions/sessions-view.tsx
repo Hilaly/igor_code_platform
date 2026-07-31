@@ -51,7 +51,7 @@ export type SessionsViewProps = {
   onInterrupt: () => void;
   onUpdate: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
   onRemove: (sessionId: string) => Promise<string | undefined>;
-  onFork: (request: SessionForkRequest) => Promise<string | undefined>;
+  onFork: (request: SessionForkRequest) => Promise<void>;
   onShowArchived: (archived: boolean) => void;
   translator: ScopedTranslator;
 };
@@ -177,6 +177,14 @@ export function SessionsView(props: SessionsViewProps) {
                   key={session.id}
                   selected={session.id === state.open?.id}
                   onSelect={() => props.onOpen(session.id)}
+                  actions={
+                    <Menu
+                      label={t("sessions.actions", { name: session.title ?? session.id })}
+                      trigger="…"
+                      triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
+                      items={rowActions(session)}
+                    />
+                  }
                 >
                   <span className="sessions-row">
                     <span className="sessions-row-facts">
@@ -186,12 +194,6 @@ export function SessionsView(props: SessionsViewProps) {
                     <Badge tone={phaseTone(session.phase)}>
                       {t(`sessions.phase.${session.phase}`)}
                     </Badge>
-                    <Menu
-                      label={t("sessions.actions", { name: session.title ?? session.id })}
-                      trigger="…"
-                      triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
-                      items={rowActions(session)}
-                    />
                   </span>
                 </ListRow>
               ))}

@@ -54,6 +54,7 @@
   width: 100%;
   /* Длинный путь режется, а не растягивает строку: папка бывает глубокой. */
   min-width: 0;
+  padding-inline-end: calc(var(--sovereign-space-5) + var(--sovereign-space-3));
 }
 
 .sessions-row-facts {

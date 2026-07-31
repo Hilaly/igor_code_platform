@@ -42,14 +42,14 @@ export type ChatViewProps = {
   onSubmit: (text: string) => void;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
-  onFork: (request: SessionForkRequest) => Promise<string | undefined>;
+  onFork: (request: SessionForkRequest) => Promise<void>;
   translator: ScopedTranslator;
 };
 
 /**
  * Что делает кнопка отправки у занятой сессии. Турна она запустить не может — сессия занята, — и
- * выбор между тремя очередями заменяет его собой (docs/web-api.md). `append` сюда не входит: он,
- * наоборот, требует простоя, и в простое кнопка запускает турн.
+ * выбор между тремя очередями заменяет его собой (docs/web-api.md). `append` требует простоя и
+ * поэтому доступен отдельной кнопкой рядом с обычным запуском турна.
  */
 const busyModes: SessionMessageMode[] = ["steer", "follow-up", "next-turn"];
 
@@ -99,7 +99,29 @@ export function ChatView(props: ChatViewProps) {
   );
   const pending = Object.entries(open.pending);
   const live = open.live;
+  const liveOrder =
+    live?.order.filter((key, index) => {
+      const item = live.items[key];
+
+      if (item?.kind !== "message" || item.role !== "user") {
+        return true;
+      }
+
+      // Первый prompt уже успевает попасть в дерево к моменту, когда UI видит live-буфер.
+      // Стиринг же может ещё не попасть в дочитанные записи, поэтому глушить все user-дельты нельзя.
+      if (index > 0) {
+        return true;
+      }
+
+      return !shown.some(
+        (entry) =>
+          entry.kind === "message" &&
+          entry.role === "user" &&
+          entry.content.some((block) => block.kind === "text" && block.text === item.text),
+      );
+    }) ?? [];
   const empty = shown.length === 0 && pending.length === 0 && live === undefined;
+  const archived = open.summary?.archived === true;
 
   return (
     <div className="sessions-chat">
@@ -128,10 +150,15 @@ export function ChatView(props: ChatViewProps) {
               key={entry.id}
               entry={entry}
               outcomes={outcomes}
-              // Форк идёт от реплики человека: рантайм иначе и не режет — «переспросить иначе»
-              // единственный смысл, в котором отрезать ответ вместе с вопросом осмысленно.
-              {...(entry.kind === "message" && entry.role === "user" && !busy
-                ? { onFork: () => void onFork({ entryId: entry.id }) }
+              // До реплики режем только вопрос человека; включить запись можно для любого места
+              // дерева, поэтому `at` доступен и на ответе агента.
+              {...(!busy
+                ? {
+                    onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
+                    ...(entry.kind === "message" && entry.role === "user"
+                      ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
+                      : {}),
+                  }
                 : {})}
               translator={translator}
             />
@@ -143,8 +170,8 @@ export function ChatView(props: ChatViewProps) {
             </Message>
           ))}
 
-          {live?.order.map((key) => {
-            const item = live.items[key];
+          {liveOrder.map((key) => {
+            const item = live?.items[key];
 
             return item === undefined ? undefined : (
               <LiveMessage key={key} item={item} translator={translator} />
@@ -174,7 +201,7 @@ export function ChatView(props: ChatViewProps) {
         </div>
       )}
 
-      {busy ? (
+      {!archived && busy ? (
         <div className="sessions-modes">
           <SegmentedControl
             options={busyModes.map((option) => ({
@@ -188,26 +215,48 @@ export function ChatView(props: ChatViewProps) {
         </div>
       ) : undefined}
 
-      <div className="sessions-composer">
-        <Textarea
-          value={draft}
-          onChange={setDraft}
-          onSubmit={send}
-          placeholder={t("chat.compose.placeholder")}
-          aria-label={t("chat.compose.label")}
-          autoGrow
-          rows={2}
-          maxRows={12}
-        />
-        <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
-          {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
-        </Button>
-        {busy ? (
-          <Button tone="danger" onClick={onInterrupt}>
-            {t("chat.stop")}
+      {archived ? undefined : (
+        <div className="sessions-composer">
+          <Textarea
+            value={draft}
+            onChange={setDraft}
+            onSubmit={send}
+            placeholder={t("chat.compose.placeholder")}
+            aria-label={t("chat.compose.label")}
+            autoGrow
+            rows={2}
+            maxRows={12}
+          />
+          <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
+            {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
           </Button>
-        ) : undefined}
-      </div>
+          {!busy ? (
+            <Button
+              onClick={() => {
+                if (draft.trim() === "") {
+                  return;
+                }
+
+                void onSendMessage({ text: draft, mode: "append" });
+                setDraft("");
+              }}
+              disabled={draft.trim() === ""}
+            >
+              {t("chat.append")}
+            </Button>
+          ) : undefined}
+          {busy ? (
+            <Button tone="danger" onClick={onInterrupt}>
+              {t("chat.stop")}
+            </Button>
+          ) : undefined}
+        </div>
+      )}
+      {!busy ? (
+        <div className="sessions-session-actions">
+          <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
+        </div>
+      ) : undefined}
     </div>
   );
 }
@@ -215,10 +264,11 @@ export function ChatView(props: ChatViewProps) {
 function EntryMessage(props: {
   entry: SessionEntry;
   outcomes: Map<string, ToolOutcome>;
-  onFork?: () => void;
+  onForkBefore?: () => void;
+  onForkAt?: () => void;
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, onFork, translator } = props;
+  const { entry, outcomes, onForkBefore, onForkAt, translator } = props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -245,7 +295,10 @@ function EntryMessage(props: {
           translator={translator}
         />
       ))}
-      {onFork === undefined ? undefined : <Button onClick={onFork}>{t("chat.fork")}</Button>}
+      {onForkBefore === undefined ? undefined : (
+        <Button onClick={onForkBefore}>{t("chat.fork.before")}</Button>
+      )}
+      {onForkAt === undefined ? undefined : <Button onClick={onForkAt}>{t("chat.fork.at")}</Button>}
     </Message>
   );
 }

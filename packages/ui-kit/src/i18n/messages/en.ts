@@ -34,7 +34,10 @@ export const coreEnglish: CatalogRegistration = {
     "chat.degraded.model":
       "The model {name} is no longer available: the session waits for it or for another one.",
     "chat.degraded.tool": "The tool {name} is gone: the agent carries on without it.",
-    "chat.fork": "Fork from here",
+    "chat.append": "Append without starting",
+    "chat.fork.at": "Fork through this entry",
+    "chat.fork.before": "Fork before this message",
+    "chat.fork.session": "Fork the whole session",
     "chat.mode.follow-up": "After the turn",
     "chat.mode.follow-up.send": "Send after the turn",
     "chat.mode.label": "When the message reaches the agent",
