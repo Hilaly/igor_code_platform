@@ -58,8 +58,6 @@ export type SessionsViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись открытой сессии или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
-  /** Спросить ветку открытой сессии: панель дерева зовёт это по своему открытию. */
-  onLoadBranch: () => void;
   /** Перейти к записи дерева. Ответ несёт текст реплики, если целью была она. */
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   onShowArchived: (archived: boolean) => void;
@@ -227,7 +225,6 @@ export function SessionsView(props: SessionsViewProps) {
             onFork={props.onFork}
             onCompact={props.onCompact}
             onSetLabel={props.onSetLabel}
-            onLoadBranch={props.onLoadBranch}
             onNavigate={props.onNavigate}
             translator={translator}
           />

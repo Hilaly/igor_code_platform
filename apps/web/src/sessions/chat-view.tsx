@@ -57,8 +57,6 @@ export type ChatViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
-  /** Спросить ветку сессии. Зовётся по открытию панели дерева: лист знает демон, а не вью. */
-  onLoadBranch: () => void;
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   translator: ScopedTranslator;
 };

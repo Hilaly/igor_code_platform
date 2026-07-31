@@ -98,7 +98,6 @@ const show = (state: SessionsState, handlers: Partial<SessionsViewProps> = {}) =
       onFork={vi.fn()}
       onCompact={vi.fn()}
       onSetLabel={vi.fn()}
-      onLoadBranch={vi.fn()}
       onNavigate={vi.fn()}
       onShowArchived={vi.fn()}
       {...handlers}
@@ -815,7 +814,6 @@ describe("the session lifecycle from the view", () => {
   });
 
   it("opens the tree on the branch the session works in, with the leaf picked", async () => {
-    const onLoadBranch = vi.fn();
     // e2 переспросили иначе: рабочая ветка — вторая, и раскрыта должна быть она.
     const forked = applyBranch(
       withOpen([
@@ -828,11 +826,9 @@ describe("the session lifecycle from the view", () => {
       { sessionId: "0199", entries: [], leafId: "b1" },
     );
 
-    show(forked, { onLoadBranch });
+    show(forked);
 
     fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
-
-    expect(onLoadBranch).not.toHaveBeenCalled();
 
     const leaf = await screen.findByRole("treeitem", { name: /вторая попытка/ });
 

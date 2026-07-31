@@ -92,8 +92,6 @@ export type SessionsController = {
   interrupt: () => void;
   /** Свернуть контекст руками. Инструкции пересказа необязательны. Возвращает причину отказа. */
   compact: (instructions?: string) => Promise<string | undefined>;
-  /** Спросить ветку открытой сессии. Зовётся по открытию панели дерева, как `prepareDraft`. */
-  loadBranch: () => void;
   /** Перейти к записи дерева. Ответ несёт `editorText` — его подставляет в композер вызывающий. */
   navigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
@@ -455,25 +453,6 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   /**
-   * Ветка сессии. Спрашивается по открытию панели дерева, а не вместе со снимком: ответ несёт весь
-   * путь до листа, и возить его на каждом событии шины значило бы платить за него всё время, пока
-   * панель закрыта. Из ответа применяется только лист.
-   */
-  const loadBranch = useCallback(() => {
-    const id = latest.current.open?.id;
-
-    if (id === undefined) {
-      return;
-    }
-
-    void fetchBranch(id)
-      .then((branch) => apply((current) => applyBranch(current, id, branch)))
-      .catch((cause: unknown) =>
-        onDiagnostic(`the branch of ${id} could not be read: ${reasonOf(cause)}`),
-      );
-  }, [apply, onDiagnostic]);
-
-  /**
    * Переход к записи дерева. Лист после него другой, поэтому перечитываются и лента, и ветка: всё
    * показанное относится теперь к другому разговору.
    */
@@ -613,7 +592,6 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     sendMessage,
     interrupt,
     compact,
-    loadBranch,
     navigate,
     setEntryLabel,
     updateSession,

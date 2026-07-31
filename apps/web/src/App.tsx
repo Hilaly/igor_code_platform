@@ -520,7 +520,6 @@ export function App() {
             }}
             onCompact={sessions.compact}
             onSetLabel={sessions.setEntryLabel}
-            onLoadBranch={sessions.loadBranch}
             onNavigate={sessions.navigate}
             onShowArchived={sessions.setShowArchived}
             translator={translator}
