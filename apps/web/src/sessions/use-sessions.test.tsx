@@ -77,6 +77,7 @@ let sessions: Session[] = [session()];
 let page: SessionEntriesPage = { sessionId: "0199", entries: [], seen: 0 };
 let context: SessionContextUsage = { sessionId: "0199", tokens: 0, threshold: 0 };
 let delayedBranch: Promise<Response> | undefined;
+let delayedBranches: Promise<Response>[] | undefined;
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -94,6 +95,7 @@ beforeEach(() => {
   context = { sessionId: "0199", tokens: 0, threshold: 0 };
   refusals = {};
   delayedBranch = undefined;
+  delayedBranches = undefined;
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -125,6 +127,12 @@ beforeEach(() => {
     }
 
     if (url.startsWith(sessionBranchPath("0199"))) {
+      const delayed = delayedBranches?.shift();
+
+      if (delayed !== undefined) {
+        return delayed;
+      }
+
       if (delayedBranch !== undefined) {
         return delayedBranch;
       }
@@ -510,6 +518,35 @@ describe("useSessions", () => {
 
     resolveBranch(await answer({ sessionId: "0199", entries: [entry("new")], leafId: "new" }));
     await waitFor(() => expect(view.result.current.state.open?.leafId).toBe("new"));
+  });
+
+  it("ignores an aborted branch response that arrives after its replacement", async () => {
+    let resolveOld!: (response: Response) => void;
+    const oldBranch = new Promise<Response>((resolve) => {
+      resolveOld = resolve;
+    });
+    let resolveFresh!: (response: Response) => void;
+    const freshBranch = new Promise<Response>((resolve) => {
+      resolveFresh = resolve;
+    });
+    delayedBranches = [oldBranch, freshBranch];
+
+    const view = connect({ sessionId: "0199" });
+    await waitFor(() => expect(asked(sessionBranchPath("0199"))).toHaveLength(1));
+
+    view.rerender({ stream: "reconnecting", sessionId: "0199" });
+    view.rerender({ stream: "open", sessionId: "0199" });
+    await waitFor(() => expect(asked(sessionBranchPath("0199"))).toHaveLength(2));
+
+    await act(async () => {
+      resolveFresh(await answer({ sessionId: "0199", entries: [entry("fresh")], leafId: "fresh" }));
+    });
+    await waitFor(() => expect(view.result.current.state.open?.leafId).toBe("fresh"));
+
+    await act(async () => {
+      resolveOld(await answer({ sessionId: "0199", entries: [entry("old")], leafId: "old" }));
+    });
+    expect(view.result.current.state.open?.leafId).toBe("fresh");
   });
 
   it("reads the feed and the branch again after a move, because the leaf is elsewhere now", async () => {

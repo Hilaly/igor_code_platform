@@ -48,7 +48,6 @@ import {
 import {
   applyAgents,
   applyBranch,
-  applyBranchFailure,
   applyContext,
   applyEntries,
   applyFailure,
@@ -195,6 +194,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       fetchContextUsage(id, controller.signal),
     ])
       .then(([summary, page, stats, context]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         apply((current) => applySummary(current, id, summary));
         apply((current) => applyStats(current, id, stats));
         apply((current) => applyContext(current, id, context));
@@ -215,7 +218,13 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       });
 
     void fetchBranch(id, undefined, controller.signal)
-      .then((branch) => apply((current) => applyBranch(current, id, branch)))
+      .then((branch) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        apply((current) => applyBranch(current, id, branch));
+      })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
           return;
@@ -224,7 +233,6 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         const reason = reasonOf(cause);
 
         onDiagnostic(`the branch of ${id} could not be read: ${reason}`);
-        apply((current) => applyBranchFailure(current, id));
       });
   }, [apply, onDiagnostic]);
 

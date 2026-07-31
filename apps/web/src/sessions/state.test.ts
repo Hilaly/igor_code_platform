@@ -316,7 +316,7 @@ describe("the leaf of the session", () => {
     });
 
     expect(reconnected(known).open?.leafId).toBeUndefined();
-    expect(reconnected(known).open?.branchEntryIds).toBeUndefined();
+    expect(reconnected(known).open?.branchEntryIds).toEqual(new Set());
   });
 
   it("ignores a branch of a session nobody is looking at", () => {

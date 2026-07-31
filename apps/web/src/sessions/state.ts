@@ -104,7 +104,7 @@ export type OpenSession = {
    */
   leafId?: string;
   /** Идентификаторы активной ветки, выведенные из `GET .../branch`, без второй копии записей. */
-  branchEntryIds?: Set<string>;
+  branchEntryIds: Set<string>;
   /**
    * Чего сессия лишилась на ходу: инструмент исчез вместе с плагином или модель пропала из
    * каталога. Копится списком, потому что за одну пересборку набора пропасть может несколько
@@ -247,6 +247,7 @@ export function openSession(state: SessionsState, sessionId: string): SessionsSt
       entries: [],
       seen: 0,
       labels: new Map(),
+      branchEntryIds: new Set(),
       pending: {},
       degradations: [],
       loading: true,
@@ -481,19 +482,9 @@ export function applyBranch(
         open: {
           ...open,
           leafId: branch?.leafId,
-          branchEntryIds:
-            branch === undefined ? undefined : new Set(branch.entries.map(({ id }) => id)),
+          branchEntryIds: new Set(branch?.entries.map(({ id }) => id)),
         },
       }
-    : state;
-}
-
-/** Ошибка чтения ветки не отменяет снимок: пустой набор удерживает ленту от показа чужих веток. */
-export function applyBranchFailure(state: SessionsState, sessionId: string): SessionsState {
-  const open = state.open;
-
-  return open?.id === sessionId && open.branchEntryIds === undefined
-    ? { ...state, open: { ...open, branchEntryIds: new Set() } }
     : state;
 }
 
@@ -764,7 +755,7 @@ export function reconnected(state: SessionsState): SessionsState {
       labels: new Map(),
       // За время разрыва лист мог переехать: спросить его заново дешевле, чем показывать прежний.
       leafId: undefined,
-      branchEntryIds: undefined,
+      branchEntryIds: new Set(),
       live: undefined,
       pending: {},
       // Очереди обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за время

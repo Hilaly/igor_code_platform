@@ -142,10 +142,7 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "label", reason });
   };
 
-  const activeEntries =
-    open.branchEntryIds === undefined
-      ? open.entries
-      : open.entries.filter(({ id }) => open.branchEntryIds?.has(id));
+  const activeEntries = open.entries.filter(({ id }) => open.branchEntryIds.has(id));
   const shown = activeEntries.filter(isFeedEntry);
   const pending = Object.entries(open.pending);
   const live = open.live;

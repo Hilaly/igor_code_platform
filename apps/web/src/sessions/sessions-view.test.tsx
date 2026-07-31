@@ -67,7 +67,11 @@ const withOpen = (
 ): SessionsState => {
   const state = openSession(withSessions([session(overrides)]), "0199");
 
-  return applyEntries(applySummary(state, "0199", session(overrides)), "0199", entries, 1);
+  return applyBranch(
+    applyEntries(applySummary(state, "0199", session(overrides)), "0199", entries, 1),
+    "0199",
+    { sessionId: "0199", entries },
+  );
 };
 
 const entryMessage = (
