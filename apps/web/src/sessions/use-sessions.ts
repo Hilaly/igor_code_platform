@@ -171,7 +171,8 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
    * отменой на всех: порознь они разошлись бы — фаза из одного ответа, записи из другого. Контекст
    * едет здесь же, потому что меняется он тогда же, когда фаза: турн дописал ветку или её свернули.
    *
-   * Курсор берётся из состояния: после переподъёма он обнулён, и история читается заново.
+   * Курсор берётся из состояния: после переподъёма он обнулён, и история читается заново. Ветка
+   * спрашивается здесь же: без неё лента не может скрыть брошенные попытки до открытия дерева.
    */
   const reloadOpen = useCallback(() => {
     const open = latest.current.open;
@@ -189,11 +190,13 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     void Promise.all([
       fetchSession(id, controller.signal),
       fetchEntries(id, seen, controller.signal),
+      fetchBranch(id, undefined, controller.signal),
       fetchStats(id, controller.signal),
       fetchContextUsage(id, controller.signal),
     ])
-      .then(([summary, page, stats, context]) => {
+      .then(([summary, page, branch, stats, context]) => {
         apply((current) => applySummary(current, id, summary));
+        apply((current) => applyBranch(current, id, branch));
         apply((current) => applyStats(current, id, stats));
         apply((current) => applyContext(current, id, context));
 
@@ -494,11 +497,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       }
 
       reloadOpen();
-      loadBranch();
 
       return outcome;
     },
-    [loadBranch, onDiagnostic, reloadOpen],
+    [onDiagnostic, reloadOpen],
   );
 
   /**

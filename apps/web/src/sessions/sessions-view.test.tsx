@@ -170,6 +170,24 @@ describe("the chat", () => {
     expect(screen.getByText("жирным").tagName).toBe("STRONG");
   });
 
+  it("shows only the active branch after navigating to its leaf", () => {
+    const root = message("root", "общий корень", "user");
+    const first = { ...message("first", "первая попытка"), parentId: "root" };
+    const second = { ...message("second", "вторая попытка"), parentId: "root" };
+    const entries = [root, first, second];
+    const activeBranch = applyBranch(withOpen(entries), "0199", {
+      sessionId: "0199",
+      entries: [root, second],
+      leafId: "second",
+    });
+
+    show(activeBranch);
+
+    expect(screen.getByText("общий корень")).not.toBeNull();
+    expect(screen.getByText("вторая попытка")).not.toBeNull();
+    expect(screen.queryByText("первая попытка")).toBeNull();
+  });
+
   it("folds the reasoning away instead of drowning the answer in it", () => {
     show(
       withOpen([
@@ -814,7 +832,7 @@ describe("the session lifecycle from the view", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
 
-    expect(onLoadBranch).toHaveBeenCalledTimes(1);
+    expect(onLoadBranch).not.toHaveBeenCalled();
 
     const leaf = await screen.findByRole("treeitem", { name: /вторая попытка/ });
 

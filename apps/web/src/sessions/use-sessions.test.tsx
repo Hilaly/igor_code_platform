@@ -122,6 +122,10 @@ beforeEach(() => {
       return answer(context);
     }
 
+    if (url.startsWith(sessionBranchPath("0199"))) {
+      return answer({ sessionId: "0199", entries: [] });
+    }
+
     if (url.startsWith(sessionEntriesPath("0199"))) {
       return answer(page);
     }
@@ -428,7 +432,7 @@ describe("useSessions", () => {
     expect(view.diagnostics).toContain("the compaction of 0199 was refused: the session is busy");
   });
 
-  it("takes only the leaf out of the branch, leaving the feed to the cursor", async () => {
+  it("loads the active branch with the initial session snapshot", async () => {
     // Записи ветки — те же, что уже прочитаны курсором. Вторая их копия развела бы дерево с лентой.
     refusals[`GET ${sessionBranchPath("0199")}`] = {
       status: 200,
@@ -437,14 +441,12 @@ describe("useSessions", () => {
     const view = connect({ sessionId: "0199" });
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
-    // Ветка не спрашивается сама: пока панель дерева закрыта, платить за путь до листа не за что.
-    expect(asked(sessionBranchPath("0199"))).toHaveLength(0);
-
-    act(() => {
-      view.result.current.loadBranch();
-    });
-
     await waitFor(() => expect(view.result.current.state.open?.leafId).toBe("e2"));
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(1);
+    expect([...(view.result.current.state.open?.branchEntryIds ?? new Set()).values()]).toEqual([
+      "e1",
+      "e2",
+    ]);
     expect(view.result.current.state.open?.entries).toEqual([]);
   });
 
@@ -471,7 +473,7 @@ describe("useSessions", () => {
     await waitFor(() =>
       expect(asked(`${sessionEntriesPath("0199")}?after=0`).length).toBeGreaterThan(before),
     );
-    expect(asked(sessionBranchPath("0199"))).toHaveLength(1);
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(2);
   });
 
   it("gives the refusal of a move back and reads nothing again", async () => {
@@ -491,7 +493,7 @@ describe("useSessions", () => {
     expect(outcome).toEqual({ kind: "refused", reason: "the session is busy" });
     expect(view.diagnostics).toContain("the navigation in 0199 was refused: the session is busy");
     // Лист остался прежним, и перечитывать было нечего.
-    expect(asked(sessionBranchPath("0199"))).toHaveLength(0);
+    expect(asked(sessionBranchPath("0199"))).toHaveLength(1);
   });
 
   it("reads the feed again after a mark, because the mark is an entry of the tree", async () => {

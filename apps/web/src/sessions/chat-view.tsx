@@ -144,7 +144,11 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "label", reason });
   };
 
-  const shown = open.entries.filter(isFeedEntry);
+  const activeEntries =
+    open.branchEntryIds === undefined
+      ? open.entries
+      : open.entries.filter(({ id }) => open.branchEntryIds?.has(id));
+  const shown = activeEntries.filter(isFeedEntry);
   const pending = Object.entries(open.pending);
   const live = open.live;
   const liveOrder =
@@ -176,8 +180,6 @@ export function ChatView(props: ChatViewProps) {
       <div className="sessions-chat-head">
         <Button
           onClick={() => {
-            // Ветка спрашивается по открытию панели, а не всё время: ответ несёт весь путь до листа.
-            props.onLoadBranch();
             setTreeOpen(true);
           }}
         >

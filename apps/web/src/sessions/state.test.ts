@@ -295,7 +295,7 @@ describe("the tree of entries", () => {
 });
 
 describe("the leaf of the session", () => {
-  it("takes the leaf out of the branch and leaves its entries alone", () => {
+  it("takes the leaf and its entry ids out of the branch, leaving its entries alone", () => {
     // Записи ветки — те же, что уже прочитаны курсором: вторая их копия развела бы дерево с лентой.
     const state = applyBranch(opened(), "0199", {
       sessionId: "0199",
@@ -304,6 +304,7 @@ describe("the leaf of the session", () => {
     });
 
     expect(state.open?.leafId).toBe("b");
+    expect([...(state.open?.branchEntryIds ?? new Set()).values()]).toEqual(["a", "b"]);
     expect(state.open?.entries).toEqual([]);
   });
 
@@ -315,6 +316,7 @@ describe("the leaf of the session", () => {
     });
 
     expect(reconnected(known).open?.leafId).toBeUndefined();
+    expect(reconnected(known).open?.branchEntryIds).toBeUndefined();
   });
 
   it("ignores a branch of a session nobody is looking at", () => {
