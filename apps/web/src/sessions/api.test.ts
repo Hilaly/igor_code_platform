@@ -1,6 +1,11 @@
 import {
   agentsPath,
+  sessionBranchPath,
+  sessionCompactPath,
+  sessionContextPath,
   sessionEntriesPath,
+  sessionEntryLabelPath,
+  sessionNavigatePath,
   sessionPath,
   sessionTurnsPath,
   sessionsPath,
@@ -10,10 +15,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSession,
   fetchAgents,
+  fetchBranch,
+  fetchContextUsage,
   fetchEntries,
   fetchSession,
   fetchSessions,
   interruptTurn,
+  navigateTo,
+  requestCompaction,
+  setEntryLabel,
   submitTurn,
 } from "./api.ts";
 
@@ -95,6 +105,48 @@ describe("reading sessions", () => {
     expect(calls[0]?.url).toBe(`${sessionEntriesPath("0199")}?after=7`);
   });
 
+  it("reads the branch of the current leaf when no entry is named", async () => {
+    // Ветка без `from` — тот разговор, который увидит модель на следующем турне.
+    const calls = daemon({ status: 200, body: { sessionId: "0199", entries: [], leafId: "e9" } });
+
+    await expect(fetchBranch("0199")).resolves.toEqual({
+      sessionId: "0199",
+      entries: [],
+      leafId: "e9",
+    });
+    expect(calls[0]?.url).toBe(sessionBranchPath("0199"));
+  });
+
+  it("reads the branch of a named entry through the query parameter", async () => {
+    const calls = daemon({ status: 200, body: { sessionId: "0199", entries: [] } });
+
+    await fetchBranch("0199", "e/7");
+
+    expect(calls[0]?.url).toBe(sessionBranchPath("0199", "e/7"));
+    expect(calls[0]?.url).toContain("from=e%2F7");
+  });
+
+  it("takes a missing session for no branch at all, not for a failure", async () => {
+    daemon({ status: 404, body: { error: "no such session" } });
+
+    await expect(fetchBranch("0199")).resolves.toBeUndefined();
+  });
+
+  it("reads how full the context is, keeping an unknown window absent", async () => {
+    // Окна модели может не быть вовсе: тогда доли не существует, и выдумывать её нечем.
+    const calls = daemon({
+      status: 200,
+      body: { sessionId: "0199", tokens: 4096, threshold: 0.8 },
+    });
+
+    await expect(fetchContextUsage("0199")).resolves.toEqual({
+      sessionId: "0199",
+      tokens: 4096,
+      threshold: 0.8,
+    });
+    expect(calls[0]?.url).toBe(sessionContextPath("0199"));
+  });
+
   it("escapes the session identifier in the address", async () => {
     const calls = daemon({ status: 200, body: {} });
 
@@ -170,5 +222,95 @@ describe("changing sessions", () => {
     daemon({ status: 404, body: { error: "no such session" } });
 
     await expect(interruptTurn("0199")).resolves.toBeUndefined();
+  });
+});
+
+describe("the context of a session", () => {
+  it("asks for a compaction without instructions and carries the phase back", async () => {
+    // Как и у турна, `queued` значит «принято, но ещё не начато»: компакция идёт той же очередью.
+    const calls = daemon({ status: 202, body: { sessionId: "0199", phase: "queued" } });
+
+    await expect(requestCompaction("0199")).resolves.toEqual({
+      kind: "accepted",
+      accepted: { sessionId: "0199", phase: "queued" },
+    });
+    expect(calls[0]?.url).toBe(sessionCompactPath("0199"));
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.init?.body).toBe("{}");
+  });
+
+  it("carries the instructions of the summary when they were given", async () => {
+    const calls = daemon({ status: 202, body: { sessionId: "0199", phase: "compaction" } });
+
+    await requestCompaction("0199", "сохрани решения");
+
+    expect(calls[0]?.init?.body).toBe('{"instructions":"сохрани решения"}');
+  });
+
+  it("turns a busy session into a refusal instead of an exception", async () => {
+    daemon({ status: 409, body: { error: "the session is busy" } });
+
+    await expect(requestCompaction("0199")).resolves.toEqual({
+      kind: "refused",
+      reason: "the session is busy",
+    });
+  });
+
+  it("navigates to an entry and carries the text of the human back", async () => {
+    // Цель — реплика человека: рантайм ставит листом её родителя и отдаёт текст, чтобы переспросить.
+    const calls = daemon({
+      status: 200,
+      body: { sessionId: "0199", leafId: "e6", editorText: "вопрос", summarized: false },
+    });
+
+    await expect(navigateTo("0199", { entryId: "e7" })).resolves.toEqual({
+      kind: "navigated",
+      navigated: { sessionId: "0199", leafId: "e6", editorText: "вопрос", summarized: false },
+    });
+    expect(calls[0]?.url).toBe(sessionNavigatePath("0199"));
+    expect(calls[0]?.init?.body).toBe('{"entryId":"e7"}');
+  });
+
+  it("asks for the summary of the branch it leaves when told to", async () => {
+    const calls = daemon({ status: 200, body: { sessionId: "0199", summarized: true } });
+
+    await navigateTo("0199", { entryId: "e7", summarize: true, instructions: "коротко" });
+
+    expect(calls[0]?.init?.body).toBe('{"entryId":"e7","summarize":true,"instructions":"коротко"}');
+  });
+
+  it("writes the mark of an entry wholesale, escaping its identifier", async () => {
+    const calls = daemon({
+      status: 200,
+      body: { sessionId: "0199", entryId: "e/7", label: "тут" },
+    });
+
+    await expect(setEntryLabel("0199", "e/7", "тут")).resolves.toEqual({
+      kind: "labelled",
+      labelled: { sessionId: "0199", entryId: "e/7", label: "тут" },
+    });
+    expect(calls[0]?.url).toBe(sessionEntryLabelPath("0199", "e/7"));
+    expect(calls[0]?.url).not.toContain("e/7");
+    expect(calls[0]?.init?.method).toBe("PUT");
+  });
+
+  it("says the removal of a mark with an explicit null, not with an absent key", async () => {
+    // Отсутствующий ключ значил бы «не трогать», а «не трогать» у целой записи — не операция.
+    const calls = daemon({ status: 200, body: { sessionId: "0199", entryId: "e7" } });
+
+    await expect(setEntryLabel("0199", "e7", null)).resolves.toEqual({
+      kind: "labelled",
+      labelled: { sessionId: "0199", entryId: "e7" },
+    });
+    expect(calls[0]?.init?.body).toBe('{"label":null}');
+  });
+
+  it("turns a refused mark into an outcome the view can show", async () => {
+    daemon({ status: 409, body: { error: "the session is archived" } });
+
+    await expect(setEntryLabel("0199", "e7", "тут")).resolves.toEqual({
+      kind: "refused",
+      reason: "the session is archived",
+    });
   });
 });

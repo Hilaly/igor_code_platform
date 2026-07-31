@@ -518,6 +518,8 @@ export function App() {
                 navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
               }
             }}
+            onCompact={sessions.compact}
+            onSetLabel={sessions.setEntryLabel}
             onShowArchived={sessions.setShowArchived}
             translator={translator}
           />

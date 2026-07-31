@@ -10,10 +10,15 @@
 import {
   agentsPath,
   sessionArchivedParameter,
+  sessionBranchPath,
+  sessionCompactPath,
+  sessionContextPath,
   sessionEntriesAfterParameter,
   sessionEntriesPath,
+  sessionEntryLabelPath,
   sessionForkPath,
   sessionMessagesPath,
+  sessionNavigatePath,
   sessionPath,
   sessionProjectParameter,
   sessionStatsPath,
@@ -21,10 +26,16 @@ import {
   sessionsPath,
   type AgentsSnapshot,
   type Session,
+  type SessionBranch,
+  type SessionCompactAccepted,
+  type SessionContextUsage,
   type SessionDraft,
   type SessionEntriesPage,
+  type SessionEntryLabelled,
   type SessionForkRequest,
   type SessionMessage,
+  type SessionNavigateRequest,
+  type SessionNavigated,
   type SessionsSnapshot,
   type SessionStats,
   type SessionUpdate,
@@ -107,6 +118,56 @@ export async function fetchEntries(
   }
 
   return (await response.json()) as SessionEntriesPage;
+}
+
+/**
+ * Ветка дерева: путь от записи вверх до корня. Курсора у неё нет — она читается целиком
+ * (docs/sessions-and-projects.md). Без `from` читается ветка текущего листа, то есть тот разговор,
+ * который увидит модель на следующем турне.
+ */
+export async function fetchBranch(
+  sessionId: string,
+  from?: string,
+  signal?: AbortSignal,
+): Promise<SessionBranch | undefined> {
+  const response = await fetch(
+    sessionBranchPath(sessionId, from),
+    signal === undefined ? {} : { signal },
+  );
+
+  if (response.status === 404) {
+    return undefined;
+  }
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as SessionBranch;
+}
+
+/**
+ * Заполнение контекста действующей ветки. Отдельно от статистики: та отвечает «сколько заплачено» по
+ * всему файлу, эта — «сколько ещё влезет».
+ */
+export async function fetchContextUsage(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<SessionContextUsage | undefined> {
+  const response = await fetch(
+    sessionContextPath(sessionId),
+    signal === undefined ? {} : { signal },
+  );
+
+  if (response.status === 404) {
+    return undefined;
+  }
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as SessionContextUsage;
 }
 
 export type CreateSessionOutcome =
@@ -237,6 +298,82 @@ export async function sendMessage(
   });
 
   return response.ok ? { kind: "accepted" } : { kind: "refused", reason: await reasonOf(response) };
+}
+
+export type CompactionOutcome =
+  { kind: "accepted"; accepted: SessionCompactAccepted } | { kind: "refused"; reason: string };
+
+/**
+ * Ручная компакция. Как и у турна, в ответе фаза: компакция идёт через ту же очередь походов к
+ * модели, и при исчерпанном пределе она принята, но ещё не начата.
+ *
+ * Отказ здесь ожидаем и разметён исходом: занятая сессия и архивная отвечают `409`.
+ */
+export async function requestCompaction(
+  sessionId: string,
+  instructions?: string,
+): Promise<CompactionOutcome> {
+  const response = await fetch(sessionCompactPath(sessionId), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    // Пустое тело — законная компакция по промпту рантайма; ключа с `undefined` в JSON не бывает,
+    // но объявить отсутствие инструкций отсутствием ключа честнее, чем полагаться на сериализацию.
+    body: JSON.stringify(instructions === undefined ? {} : { instructions }),
+  });
+
+  if (response.ok) {
+    return { kind: "accepted", accepted: (await response.json()) as SessionCompactAccepted };
+  }
+
+  return { kind: "refused", reason: await reasonOf(response) };
+}
+
+export type NavigationOutcome =
+  { kind: "navigated"; navigated: SessionNavigated } | { kind: "refused"; reason: string };
+
+/** Переход к записи дерева. `summarize` заказывает пересказ покидаемой ветки — это поход к модели. */
+export async function navigateTo(
+  sessionId: string,
+  request: SessionNavigateRequest,
+): Promise<NavigationOutcome> {
+  const response = await fetch(sessionNavigatePath(sessionId), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (response.ok) {
+    return { kind: "navigated", navigated: (await response.json()) as SessionNavigated };
+  }
+
+  return { kind: "refused", reason: await reasonOf(response) };
+}
+
+export type LabelOutcome =
+  { kind: "labelled"; labelled: SessionEntryLabelled } | { kind: "refused"; reason: string };
+
+/**
+ * Метка на записи. `null` снимает её, и снятие пишется явно: отсутствующий ключ значил бы «не
+ * трогать», а «не трогать» у записи, которая заменяет запись целиком, — не операция.
+ *
+ * `PUT`, как и у самой сессии: тело здесь тоже заменяет запись целиком, а не дописывает к ней.
+ */
+export async function setEntryLabel(
+  sessionId: string,
+  entryId: string,
+  label: string | null,
+): Promise<LabelOutcome> {
+  const response = await fetch(sessionEntryLabelPath(sessionId, entryId), {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+
+  if (response.ok) {
+    return { kind: "labelled", labelled: (await response.json()) as SessionEntryLabelled };
+  }
+
+  return { kind: "refused", reason: await reasonOf(response) };
 }
 
 /** Запись, отдающая сессию в ответ. Форма запроса у форка и изменения одна, различается только тело. */

@@ -52,6 +52,10 @@ export type SessionsViewProps = {
   onUpdate: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
   onRemove: (sessionId: string) => Promise<string | undefined>;
   onFork: (request: SessionForkRequest) => Promise<void>;
+  /** Свернуть контекст открытой сессии. Возвращает причину отказа: её показывает панель чата. */
+  onCompact: (instructions?: string) => Promise<string | undefined>;
+  /** Пометить запись открытой сессии или снять метку (`null`). Возвращает причину отказа. */
+  onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
   onShowArchived: (archived: boolean) => void;
   translator: ScopedTranslator;
 };
@@ -215,6 +219,8 @@ export function SessionsView(props: SessionsViewProps) {
             onSendMessage={props.onSendMessage}
             onInterrupt={props.onInterrupt}
             onFork={props.onFork}
+            onCompact={props.onCompact}
+            onSetLabel={props.onSetLabel}
             translator={translator}
           />
         )}

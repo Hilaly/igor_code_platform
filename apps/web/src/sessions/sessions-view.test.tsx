@@ -13,11 +13,12 @@
 
 import type { Session, SessionEntry } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionsView, type SessionsViewProps } from "./sessions-view.tsx";
 import {
+  applyContext,
   applyDegradation,
   applyEntries,
   applyPendingTurn,
@@ -68,6 +69,18 @@ const withOpen = (
   return applyEntries(applySummary(state, "0199", session(overrides)), "0199", entries, 1);
 };
 
+const entryMessage = (
+  id: string,
+  text: string,
+  role: "user" | "agent" = "agent",
+): SessionEntry => ({
+  id,
+  time: "2026-07-29T00:00:00.000Z",
+  kind: "message",
+  role,
+  content: [{ kind: "text", text }],
+});
+
 const show = (state: SessionsState, handlers: Partial<SessionsViewProps> = {}) =>
   render(
     <SessionsView
@@ -82,6 +95,8 @@ const show = (state: SessionsState, handlers: Partial<SessionsViewProps> = {}) =
       onUpdate={vi.fn()}
       onRemove={vi.fn()}
       onFork={vi.fn()}
+      onCompact={vi.fn()}
+      onSetLabel={vi.fn()}
       onShowArchived={vi.fn()}
       {...handlers}
       translator={translator}
@@ -367,6 +382,126 @@ describe("the chat", () => {
     expect(screen.getAllByText("привет")).toHaveLength(2);
   });
 
+  it("shows the share of the context window, and marks where it folds by itself", () => {
+    show(
+      applyContext(withOpen(), "0199", {
+        sessionId: "0199",
+        tokens: 160000,
+        contextWindow: 200000,
+        threshold: 0.8,
+      }),
+    );
+
+    expect(screen.getByText("Контекст: 160000 из 200000 (80%)")).not.toBeNull();
+    expect(
+      screen
+        .getByRole("progressbar", { name: "Заполнение контекста" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("80");
+    expect(screen.getByText("Сворачивается сам на 80%")).not.toBeNull();
+  });
+
+  it("shows the tokens alone when the window of the model is unknown", () => {
+    // Окна нет — доли не существует: полоса «из неизвестно чего» была бы выдуманным числом.
+    show(applyContext(withOpen(), "0199", { sessionId: "0199", tokens: 4096, threshold: 0.8 }));
+
+    expect(screen.getByText("Контекст: 4096 токенов")).not.toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("marks nothing when the automatic threshold is switched off", () => {
+    show(
+      applyContext(withOpen(), "0199", {
+        sessionId: "0199",
+        tokens: 4096,
+        contextWindow: 200000,
+        threshold: 0,
+      }),
+    );
+
+    expect(screen.getByRole("progressbar", { name: "Заполнение контекста" })).not.toBeNull();
+    expect(screen.queryByText(/Сворачивается сам/)).toBeNull();
+  });
+
+  it("says in the feed that the context was folded, and keeps the summary at hand", () => {
+    // Иначе агент «забыл» половину разговора без единого следа в переписке.
+    show(
+      withOpen([
+        {
+          id: "c1",
+          time: "2026-07-29T00:00:00.000Z",
+          kind: "compaction",
+          summary: "договорились о схеме",
+          tokensBefore: 120000,
+          fromHook: true,
+        },
+      ]),
+    );
+
+    expect(screen.getByText("Контекст свёрнут, в него ушло 120000 токенов")).not.toBeNull();
+    expect(screen.getByText("договорились о схеме")).not.toBeNull();
+    expect(screen.getByText("Пересказ").closest("details")?.open).toBe(false);
+  });
+
+  it("says that another branch was left behind", () => {
+    show(
+      withOpen([
+        {
+          id: "b1",
+          time: "2026-07-29T00:00:00.000Z",
+          kind: "branch-summary",
+          fromId: "e9",
+          summary: "там чинили другое",
+          fromHook: false,
+        },
+      ]),
+    );
+
+    expect(screen.getByText(/Другая ветка оставлена/)).not.toBeNull();
+    expect(screen.getByText("там чинили другое")).not.toBeNull();
+  });
+
+  it("shows a message of the application only while it asks to be shown", () => {
+    show(
+      withOpen([
+        {
+          id: "x1",
+          time: "2026-07-29T00:00:00.000Z",
+          kind: "custom-message",
+          type: "core.note",
+          text: "видно",
+          display: true,
+        },
+        {
+          id: "x2",
+          time: "2026-07-29T00:00:01.000Z",
+          kind: "custom-message",
+          type: "core.note",
+          text: "не видно",
+          display: false,
+        },
+      ]),
+    );
+
+    expect(screen.getByText("видно")).not.toBeNull();
+    expect(screen.queryByText("не видно")).toBeNull();
+  });
+
+  it("keeps the bookkeeping of the tree out of the conversation", () => {
+    show(
+      withOpen([
+        message("m1", "реплика"),
+        { id: "l1", time: "2026-07-29T00:00:01.000Z", kind: "label", targetId: "m1", label: "тут" },
+        { id: "n1", time: "2026-07-29T00:00:02.000Z", kind: "session-name", name: "разбор" },
+        { id: "f1", time: "2026-07-29T00:00:03.000Z", kind: "leaf", targetId: "m1" },
+      ]),
+    );
+
+    expect(screen.queryByText("разбор")).toBeNull();
+    // Метка при этом видна — но значком на самой записи, а не строкой в ленте.
+    expect(screen.getByText("тут")).not.toBeNull();
+  });
+
   it("keeps an archived session readable without offering a composer", () => {
     show(withOpen([message("m1", "сохранено")], { archived: true }));
 
@@ -533,6 +668,106 @@ describe("the session lifecycle from the view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Форк всей сессии" }));
 
     expect(onFork).toHaveBeenCalledWith({});
+  });
+
+  it("asks before folding the context, and carries the instructions of the summary", async () => {
+    // Компакция необратима и стоит обращения к модели: спросить обязаны до, а не после.
+    const onCompact = vi.fn().mockResolvedValue(undefined);
+
+    show(withOpen(), { onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+
+    expect(screen.getByText(/Обратного хода нет/)).not.toBeNull();
+    expect(onCompact).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: /Что пересказ обязан сохранить/ }), {
+      target: { value: "сохрани решения" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
+
+    await waitFor(() => expect(onCompact).toHaveBeenCalledWith("сохрани решения"));
+  });
+
+  it("folds by the prompt of the runtime when no instructions were given", async () => {
+    const onCompact = vi.fn().mockResolvedValue(undefined);
+
+    show(withOpen(), { onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
+
+    await waitFor(() => expect(onCompact).toHaveBeenCalledWith(undefined));
+  });
+
+  it("says why a compaction was refused instead of swallowing the reason", async () => {
+    // Занятая и архивная сессии отвечают `409`: причина от демона — то, что показывают человеку.
+    const onCompact = vi.fn().mockResolvedValue("the session is busy");
+
+    show(withOpen([], { phase: "turn" }), { onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
+
+    expect(await screen.findByText(/the session is busy/)).not.toBeNull();
+  });
+
+  it("marks an entry and shows the mark on it", async () => {
+    const onSetLabel = vi.fn().mockResolvedValue(undefined);
+
+    show(withOpen([entryMessage("m1", "реплика")]), { onSetLabel });
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Метка/ }), {
+      target: { value: "сюда вернуться" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
+
+    await waitFor(() => expect(onSetLabel).toHaveBeenCalledWith("m1", "сюда вернуться"));
+  });
+
+  it("shows the mark that holds and offers to take it off", async () => {
+    const onSetLabel = vi.fn().mockResolvedValue(undefined);
+    const marked = withOpen([
+      entryMessage("m1", "реплика"),
+      { id: "l1", time: "2026-07-29T00:00:01.000Z", kind: "label", targetId: "m1", label: "тут" },
+    ]);
+
+    show(marked, { onSetLabel });
+
+    expect(screen.getByText("тут")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Снять метку" }));
+
+    // `null`, а не пустая строка: отличать «снять» от «не трогать» обязан отправитель.
+    await waitFor(() => expect(onSetLabel).toHaveBeenCalledWith("m1", null));
+  });
+
+  it("leaves nothing to take off while the entry has no mark", () => {
+    show(withOpen([entryMessage("m1", "реплика")]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Снять метку" }).getAttribute("disabled"),
+    ).not.toBeNull();
+  });
+
+  it("says why a mark was refused", async () => {
+    const onSetLabel = vi.fn().mockResolvedValue("the session is archived");
+
+    show(withOpen([entryMessage("m1", "реплика")], { archived: true }), { onSetLabel });
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Метка/ }), {
+      target: { value: "тут" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
+
+    expect(await screen.findByText(/the session is archived/)).not.toBeNull();
   });
 
   it("says what the session lost, keeping every loss", () => {

@@ -24,6 +24,7 @@ import { fetchProviderModels, fetchProvidersSnapshot } from "../providers/api.ts
 import {
   createSession as createSessionRequest,
   fetchAgents,
+  fetchContextUsage,
   fetchEntries,
   fetchSession,
   fetchSessions,
@@ -31,7 +32,9 @@ import {
   forkSession as forkSessionRequest,
   interruptTurn,
   removeSession as removeSessionRequest,
+  requestCompaction,
   sendMessage as sendMessageRequest,
+  setEntryLabel as setEntryLabelRequest,
   submitTurn as submitTurnRequest,
   updateSession as updateSessionRequest,
   type CreateSessionOutcome,
@@ -40,6 +43,7 @@ import {
 } from "./api.ts";
 import {
   applyAgents,
+  applyContext,
   applyEntries,
   applyFailure,
   applyStats,
@@ -81,6 +85,10 @@ export type SessionsController = {
   /** Сообщение, которое не запускает турн. Отказ приезжает причиной, а не исключением. */
   sendMessage: (message: SessionMessage) => Promise<string | undefined>;
   interrupt: () => void;
+  /** Свернуть контекст руками. Инструкции пересказа необязательны. Возвращает причину отказа. */
+  compact: (instructions?: string) => Promise<string | undefined>;
+  /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
+  setEntryLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
   /** Переименование, архивация и восстановление. Возвращает причину отказа, если демон отказал. */
   updateSession: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
   removeSession: (sessionId: string) => Promise<string | undefined>;
@@ -150,8 +158,9 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   }, [apply, onDiagnostic]);
 
   /**
-   * Снимок открытой сессии и её записи. Спрашиваются вместе и одним отменяемым запросом на двоих:
-   * порознь они разошлись бы — фаза из одного ответа, записи из другого.
+   * Снимок открытой сессии, её записи, счёт и заполнение контекста. Спрашиваются вместе и под одной
+   * отменой на всех: порознь они разошлись бы — фаза из одного ответа, записи из другого. Контекст
+   * едет здесь же, потому что меняется он тогда же, когда фаза: турн дописал ветку или её свернули.
    *
    * Курсор берётся из состояния: после переподъёма он обнулён, и история читается заново.
    */
@@ -172,10 +181,12 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       fetchSession(id, controller.signal),
       fetchEntries(id, seen, controller.signal),
       fetchStats(id, controller.signal),
+      fetchContextUsage(id, controller.signal),
     ])
-      .then(([summary, page, stats]) => {
+      .then(([summary, page, stats, context]) => {
         apply((current) => applySummary(current, id, summary));
         apply((current) => applyStats(current, id, stats));
+        apply((current) => applyContext(current, id, context));
 
         if (page !== undefined) {
           apply((current) => applyEntries(current, id, page.entries, page.seen));
@@ -390,6 +401,77 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [onDiagnostic, reloadOpen],
   );
 
+  /**
+   * Ручная компакция. Отказ возвращается причиной, а не исключением: занятая и архивная сессии
+   * отвечают `409`, и это то, что показывают человеку.
+   */
+  const compact = useCallback(
+    async (instructions?: string): Promise<string | undefined> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return undefined;
+      }
+
+      const outcome = await requestCompaction(id, instructions).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the compaction of ${id} was refused: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      // Фаза из ответа применяется сразу, как у турна: компакция — поход к модели, и при исчерпанном
+      // пределе она принята, но ещё не начата. Записи здесь не дочитываются: пересказ появится в
+      // дереве только к концу компакции, а её конец приедет событием шины — оно и перечитает.
+      apply((current) =>
+        applySummary(
+          current,
+          id,
+          current.open?.summary === undefined
+            ? undefined
+            : { ...current.open.summary, phase: outcome.accepted.phase },
+        ),
+      );
+
+      return undefined;
+    },
+    [apply, onDiagnostic],
+  );
+
+  /**
+   * Метка на записи. Своего состояния метка не заводит: рантайм пишет её записью в дерево, и
+   * действующее значение — свёртка прочитанных записей. Поэтому после записи лента дочитывается.
+   */
+  const setEntryLabel = useCallback(
+    async (entryId: string, label: string | null): Promise<string | undefined> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return undefined;
+      }
+
+      const outcome = await setEntryLabelRequest(id, entryId, label).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the entry ${entryId} could not be labelled: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      reloadOpen();
+
+      return undefined;
+    },
+    [onDiagnostic, reloadOpen],
+  );
+
   /** Запись, отдающая сессию. Список после неё перечитывается: изменилась не только открытая. */
   const written = useCallback(
     async (
@@ -469,6 +551,8 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     submitTurn,
     sendMessage,
     interrupt,
+    compact,
+    setEntryLabel,
     updateSession,
     removeSession,
     forkSession,

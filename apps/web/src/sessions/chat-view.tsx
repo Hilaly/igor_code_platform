@@ -11,6 +11,7 @@
 
 import type {
   SessionContentBlock,
+  SessionContextUsage,
   SessionEntry,
   SessionForkRequest,
   SessionMessage,
@@ -19,12 +20,18 @@ import type {
 import {
   Badge,
   Button,
+  ConfirmDialog,
+  Dialog,
   Disclosure,
   EmptyState,
+  Field,
+  Input,
   Markdown,
+  Menu,
   Message,
   MessageFeed,
   Notice,
+  Progress,
   SegmentedControl,
   Spinner,
   StreamingText,
@@ -35,7 +42,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useState } from "react";
 
-import { isBusy, type OpenSession, type StreamedItem } from "./state.ts";
+import { isBusy, isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 
 export type ChatViewProps = {
   open: OpenSession;
@@ -43,8 +50,15 @@ export type ChatViewProps = {
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   onFork: (request: SessionForkRequest) => Promise<void>;
+  /** Свернуть контекст руками. Возвращает причину отказа — её показывает вью, а не диагностика. */
+  onCompact: (instructions?: string) => Promise<string | undefined>;
+  /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
+  onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
   translator: ScopedTranslator;
 };
+
+/** Что именно отказались сделать: у компакции и метки разные сообщения об отказе. */
+type Refusal = { what: "compact" | "label"; reason: string };
 
 /**
  * Что делает кнопка отправки у занятой сессии. Турна она запустить не может — сессия занята, — и
@@ -64,10 +78,22 @@ const outcomesOf = (entries: SessionEntry[]): Map<string, ToolOutcome> =>
   );
 
 export function ChatView(props: ChatViewProps) {
-  const { open, onSubmit, onSendMessage, onInterrupt, onFork, translator } = props;
+  const { open, onSubmit, onSendMessage, onInterrupt, onFork, onCompact, onSetLabel, translator } =
+    props;
   const { t } = translator;
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<SessionMessageMode>("steer");
+  const [compacting, setCompacting] = useState(false);
+  const [instructions, setInstructions] = useState("");
+  /** Запись, которой правят метку, и черновик метки — как у переименования сессии. */
+  const [labelling, setLabelling] = useState<{ entryId: string; label: string } | undefined>(
+    undefined,
+  );
+  /**
+   * Отказ последнего действия. Живёт во вью, а не в состоянии сессии: это исход нажатия, а не
+   * свойство сессии, — так же показывает свой отказ диалог создания.
+   */
+  const [refusal, setRefusal] = useState<Refusal | undefined>(undefined);
   const busy = isBusy(open.summary);
   const outcomes = outcomesOf(open.entries);
   const queues = open.queues;
@@ -93,10 +119,25 @@ export function ChatView(props: ChatViewProps) {
     setDraft("");
   };
 
-  const shown = open.entries.filter(
-    (entry) =>
-      entry.kind !== "tool-result" && entry.kind !== "tools-change" && entry.kind !== "other",
-  );
+  const compact = async (): Promise<void> => {
+    setCompacting(false);
+
+    const asked = instructions.trim();
+    const reason = await onCompact(asked === "" ? undefined : asked);
+
+    setInstructions("");
+    setRefusal(reason === undefined ? undefined : { what: "compact", reason });
+  };
+
+  const label = async (entryId: string, next: string | null): Promise<void> => {
+    setLabelling(undefined);
+
+    const reason = await onSetLabel(entryId, next);
+
+    setRefusal(reason === undefined ? undefined : { what: "label", reason });
+  };
+
+  const shown = open.entries.filter(isFeedEntry);
   const pending = Object.entries(open.pending);
   const live = open.live;
   const liveOrder =
@@ -129,6 +170,13 @@ export function ChatView(props: ChatViewProps) {
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
       )}
 
+      {refusal === undefined ? undefined : (
+        <Notice
+          tone="danger"
+          title={t(`chat.${refusal.what}.refused`, { reason: refusal.reason })}
+        />
+      )}
+
       {open.degradations.map((lost, index) => (
         <Notice
           key={`${lost.kind}:${lost.name}:${String(index)}`}
@@ -145,24 +193,31 @@ export function ChatView(props: ChatViewProps) {
             <EmptyState title={t("chat.empty.title")} hint={t("chat.empty.hint")} />
           ) : undefined}
 
-          {shown.map((entry) => (
-            <EntryMessage
-              key={entry.id}
-              entry={entry}
-              outcomes={outcomes}
-              // До реплики режем только вопрос человека; включить запись можно для любого места
-              // дерева, поэтому `at` доступен и на ответе агента.
-              {...(!busy
-                ? {
-                    onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
-                    ...(entry.kind === "message" && entry.role === "user"
-                      ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
-                      : {}),
-                  }
-                : {})}
-              translator={translator}
-            />
-          ))}
+          {shown.map((entry) => {
+            const mark = open.labels.get(entry.id);
+
+            return (
+              <EntryMessage
+                key={entry.id}
+                entry={entry}
+                outcomes={outcomes}
+                {...(mark === undefined ? {} : { label: mark })}
+                onLabel={() => setLabelling({ entryId: entry.id, label: mark ?? "" })}
+                onClearLabel={() => void label(entry.id, null)}
+                // До реплики режем только вопрос человека; включить запись можно для любого места
+                // дерева, поэтому `at` доступен и на ответе агента.
+                {...(!busy
+                  ? {
+                      onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
+                      ...(entry.kind === "message" && entry.role === "user"
+                        ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
+                        : {}),
+                    }
+                  : {})}
+                translator={translator}
+              />
+            );
+          })}
 
           {pending.map(([turnId, text]) => (
             <Message key={turnId} role="human" header={t("chat.turn.queued")}>
@@ -189,6 +244,10 @@ export function ChatView(props: ChatViewProps) {
             {t("chat.stats.cost", { cost: open.stats.costTotal.toFixed(4) })}
           </Text>
         </div>
+      )}
+
+      {open.context === undefined ? undefined : (
+        <ContextGauge context={open.context} translator={translator} />
       )}
 
       {waiting.length === 0 ? undefined : (
@@ -252,11 +311,113 @@ export function ChatView(props: ChatViewProps) {
           ) : undefined}
         </div>
       )}
-      {!busy ? (
-        <div className="sessions-session-actions">
+      <div className="sessions-session-actions">
+        {busy ? undefined : (
           <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
-        </div>
-      ) : undefined}
+        )}
+        {/*
+         * Компакция предлагается и занятой, и архивной сессии. Обе сервер отклонит `409`, и отказ
+         * виден врезкой выше: фаза в снимке живёт своей жизнью, и выключенная по ней кнопка всё
+         * равно не спасает от гонки — она только прячет причину, по которой ничего не произошло.
+         */}
+        <Button onClick={() => setCompacting(true)}>{t("chat.compact")}</Button>
+      </div>
+
+      <ConfirmDialog
+        open={compacting}
+        onClose={() => setCompacting(false)}
+        title={t("chat.compact.title")}
+        description={t("chat.compact.hint")}
+        confirmLabel={t("chat.compact.confirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void compact()}
+      >
+        <Field label={t("chat.compact.instructions")} hint={t("chat.compact.instructions.hint")}>
+          {(control) => <Input {...control} value={instructions} onChange={setInstructions} />}
+        </Field>
+      </ConfirmDialog>
+
+      <Dialog
+        open={labelling !== undefined}
+        onClose={() => setLabelling(undefined)}
+        title={t("chat.label.title")}
+        footer={
+          <>
+            <Button onClick={() => setLabelling(undefined)}>{t("common.cancel")}</Button>
+            <Button
+              tone="accent"
+              onClick={() => {
+                if (labelling === undefined) {
+                  return;
+                }
+
+                // Пустая метка — снятие: отдельной кнопки «стереть» в диалоге не нужно, а `null`
+                // отличается от пустой строки тем, что его понимает демон.
+                const next = labelling.label.trim();
+
+                void label(labelling.entryId, next === "" ? null : next);
+              }}
+            >
+              {t("chat.label.confirm")}
+            </Button>
+          </>
+        }
+      >
+        <Field label={t("chat.label.field")} hint={t("chat.label.hint")}>
+          {(control) => (
+            <Input
+              {...control}
+              value={labelling?.label ?? ""}
+              onChange={(next) =>
+                setLabelling((current) =>
+                  current === undefined ? current : { ...current, label: next },
+                )
+              }
+            />
+          )}
+        </Field>
+      </Dialog>
+    </div>
+  );
+}
+
+/**
+ * Заполнение контекста. Проценты показываются только когда известно окно модели: без него доли не
+ * существует вовсе, и рисовать полосу «из неизвестно чего» значит выдумывать число.
+ *
+ * Порог автокомпакции виден двумя способами сразу — подписью и цветом полосы, когда он перейдён.
+ * `threshold === 0` значит «автопорог выключен», и помечать тогда нечего.
+ */
+function ContextGauge(props: { context: SessionContextUsage; translator: ScopedTranslator }) {
+  const { context, translator } = props;
+  const { t } = translator;
+  const window = context.contextWindow;
+  const share = window === undefined || window <= 0 ? undefined : context.tokens / window;
+  const percent = (value: number): string => String(Math.round(value * 100));
+
+  return (
+    <div className="sessions-context">
+      <Text tone="muted">
+        {share === undefined
+          ? t("chat.context.tokens", { tokens: String(context.tokens) })
+          : t("chat.context.used", {
+              tokens: String(context.tokens),
+              window: String(window),
+              percent: percent(share),
+            })}
+      </Text>
+      {share === undefined ? undefined : (
+        <Progress
+          value={share}
+          label={t("chat.context.label")}
+          tone={context.threshold > 0 && share >= context.threshold ? "warning" : "accent"}
+        />
+      )}
+      {share === undefined || context.threshold === 0 ? undefined : (
+        <Text tone="muted">
+          {t("chat.context.threshold", { percent: percent(context.threshold) })}
+        </Text>
+      )}
     </div>
   );
 }
@@ -264,11 +425,16 @@ export function ChatView(props: ChatViewProps) {
 function EntryMessage(props: {
   entry: SessionEntry;
   outcomes: Map<string, ToolOutcome>;
+  /** Действующая метка записи, если она есть. Значение уже свёрнуто состоянием. */
+  label?: string;
+  onLabel: () => void;
+  onClearLabel: () => void;
   onForkBefore?: () => void;
   onForkAt?: () => void;
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, onForkBefore, onForkAt, translator } = props;
+  const { entry, outcomes, label, onLabel, onClearLabel, onForkBefore, onForkAt, translator } =
+    props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -281,12 +447,33 @@ function EntryMessage(props: {
     );
   }
 
+  // Свёртка контекста и пересказ покинутой ветки — служебные строки, а не реплики: человек обязан
+  // видеть, что часть разговора модель больше не видит. Сам пересказ свёрнут — он бывает длинным.
+  if (entry.kind === "compaction" || entry.kind === "branch-summary") {
+    return (
+      <Message role="service">
+        {entry.kind === "compaction"
+          ? t("chat.compaction", { tokens: String(entry.tokensBefore) })
+          : t("chat.branch.summary")}
+        <Disclosure summary={t("chat.summary")}>
+          <Text tone="muted">{entry.summary}</Text>
+        </Disclosure>
+      </Message>
+    );
+  }
+
+  // Запись приложения, которая является репликой. Разметки в ней нет: текст пишет не модель.
+  if (entry.kind === "custom-message") {
+    return <Message role="service">{entry.text}</Message>;
+  }
+
   if (entry.kind !== "message") {
     return undefined;
   }
 
   return (
     <Message role={entry.role === "user" ? "human" : "agent"}>
+      {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
       {entry.content.map((block, index) => (
         <ContentBlock
           key={`${entry.id}:${String(index)}`}
@@ -299,6 +486,21 @@ function EntryMessage(props: {
         <Button onClick={onForkBefore}>{t("chat.fork.before")}</Button>
       )}
       {onForkAt === undefined ? undefined : <Button onClick={onForkAt}>{t("chat.fork.at")}</Button>}
+      <Menu
+        label={t("chat.label.menu")}
+        trigger="…"
+        triggerLabel={t("chat.label.menu")}
+        items={[
+          { id: "label", label: t("chat.label.set"), onSelect: onLabel },
+          {
+            id: "clear",
+            label: t("chat.label.clear"),
+            // Снимать нечего, пока метки нет: пункт остаётся видимым, но выключен.
+            disabled: label === undefined,
+            onSelect: onClearLabel,
+          },
+        ]}
+      />
     </Message>
   );
 }

@@ -2,6 +2,7 @@ import { coreEventTypes, type Session, type SessionEntry } from "@sovereign/prot
 import { describe, expect, it } from "vitest";
 
 import {
+  applyContext,
   applyDegradation,
   applyEntries,
   applyPendingTurn,
@@ -12,6 +13,7 @@ import {
   closeSession,
   initialSessionsState,
   isBusy,
+  isFeedEntry,
   openSession,
   reconnected,
   showArchived,
@@ -122,6 +124,124 @@ describe("entries", () => {
     const state = opened();
 
     expect(applyEntries(state, "0200", [entry("a")], 1)).toBe(state);
+  });
+});
+
+describe("what the feed shows", () => {
+  const of = (kind: SessionEntry["kind"], rest: Record<string, unknown> = {}): SessionEntry =>
+    ({ id: kind, time: "2026-07-29T00:00:00.000Z", kind, ...rest }) as SessionEntry;
+
+  it("keeps the compaction and the summary of a branch visible", () => {
+    // Свёртка выбрасывает часть разговора из контекста: не показать её значит оставить агента
+    // «забывшим» без единого следа в ленте.
+    expect(
+      isFeedEntry(of("compaction", { summary: "было так", tokensBefore: 40000, fromHook: true })),
+    ).toBe(true);
+    expect(
+      isFeedEntry(of("branch-summary", { fromId: "e1", summary: "ушли туда", fromHook: false })),
+    ).toBe(true);
+  });
+
+  it("shows a message of the application only while it asks to be shown", () => {
+    expect(
+      isFeedEntry(of("custom-message", { type: "note", text: "к сведению", display: true })),
+    ).toBe(true);
+    expect(
+      isFeedEntry(of("custom-message", { type: "note", text: "к сведению", display: false })),
+    ).toBe(false);
+  });
+
+  it("keeps the bookkeeping of the tree out of the conversation", () => {
+    // Метка, лист и имя сессии — состояние дерева, а не реплики; `custom` модели не показана вовсе.
+    expect(isFeedEntry(of("label", { targetId: "e1", label: "тут" }))).toBe(false);
+    expect(isFeedEntry(of("leaf", { targetId: "e1" }))).toBe(false);
+    expect(isFeedEntry(of("session-name", { name: "разбор бага" }))).toBe(false);
+    expect(isFeedEntry(of("custom", { type: "core.degraded" }))).toBe(false);
+    expect(isFeedEntry(of("tools-change", { toolNames: [] }))).toBe(false);
+    expect(isFeedEntry(of("other", { type: "unknown-to-us" }))).toBe(false);
+    // Вывод инструмента показывает сам вызов, найдя его по `toolCallId`.
+    expect(
+      isFeedEntry(
+        of("tool-result", { toolCallId: "c1", toolName: "bash", text: "", failed: false }),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps replies and the settings said aloud", () => {
+    expect(isFeedEntry(entry("m1"))).toBe(true);
+    expect(isFeedEntry(of("model-change", { model: "anthropic/claude" }))).toBe(true);
+    expect(isFeedEntry(of("thinking-level-change", { thinkingLevel: "high" }))).toBe(true);
+  });
+});
+
+describe("the marks of the entries", () => {
+  const marking = (id: string, targetId: string, label?: string): SessionEntry => ({
+    id,
+    time: "2026-07-29T00:00:00.000Z",
+    kind: "label",
+    targetId,
+    ...(label === undefined ? {} : { label }),
+  });
+
+  it("folds the marks of the read entries into what holds right now", () => {
+    const state = applyEntries(opened(), "0199", [entry("m1"), marking("l1", "m1", "тут")], 2);
+
+    expect(state.open?.labels.get("m1")).toBe("тут");
+  });
+
+  it("takes a mark written without a value for a removal, not for an empty one", () => {
+    // Снятие рантайм пишет такой же записью: действующее значение — свёртка, а не наличие записи.
+    const marked = applyEntries(opened(), "0199", [entry("m1"), marking("l1", "m1", "тут")], 2);
+    const cleared = applyEntries(marked, "0199", [marking("l2", "m1")], 3);
+
+    expect(cleared.open?.labels.has("m1")).toBe(false);
+  });
+
+  it("folds over the whole feed, so a page cannot lose the order of two writes", () => {
+    const state = applyEntries(
+      applyEntries(opened(), "0199", [marking("l1", "m1", "первая")], 1),
+      "0199",
+      [marking("l2", "m1"), marking("l3", "m1", "вторая")],
+      3,
+    );
+
+    expect(state.open?.labels.get("m1")).toBe("вторая");
+  });
+
+  it("forgets the marks when the feed is read from the start again", () => {
+    const marked = applyEntries(opened(), "0199", [marking("l1", "m1", "тут")], 1);
+
+    expect(reconnected(marked).open?.labels.size).toBe(0);
+  });
+});
+
+describe("how full the context is", () => {
+  it("keeps what the daemon answered where the view can show it", () => {
+    const state = applyContext(opened(), "0199", {
+      sessionId: "0199",
+      tokens: 4096,
+      contextWindow: 200000,
+      threshold: 0.8,
+    });
+
+    expect(state.open?.context?.tokens).toBe(4096);
+    expect(state.open?.context?.threshold).toBe(0.8);
+  });
+
+  it("drops the number when the session is gone: it is about nothing now", () => {
+    const known = applyContext(opened(), "0199", {
+      sessionId: "0199",
+      tokens: 4096,
+      threshold: 0,
+    });
+
+    expect(applyContext(known, "0199", undefined).open?.context).toBeUndefined();
+  });
+
+  it("ignores an answer about a session nobody is looking at", () => {
+    const state = opened();
+
+    expect(applyContext(state, "0200", { sessionId: "0200", tokens: 1, threshold: 0 })).toBe(state);
   });
 });
 

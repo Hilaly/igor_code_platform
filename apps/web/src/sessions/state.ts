@@ -16,6 +16,7 @@
 
 import {
   coreEventTypes,
+  foldEntryLabels,
   isPluginStreamEvent,
   streamGapType,
   type AgentSummary,
@@ -24,6 +25,7 @@ import {
   type Project,
   type ProviderSummary,
   type Session,
+  type SessionContextUsage,
   type SessionDelta,
   type SessionEntry,
   type SessionQueues,
@@ -83,6 +85,17 @@ export type OpenSession = {
   queues?: SessionQueues;
   /** Токены и деньги. Спрашиваются отдельным запросом по открытию сессии и по концу турна. */
   stats?: SessionStats;
+  /**
+   * Насколько заполнен контекст. Не то же, что `stats`: та отвечает «сколько заплачено» по всему
+   * файлу, эта — «сколько ещё влезет» в действующую ветку (docs/sessions-and-projects.md).
+   */
+  context?: SessionContextUsage;
+  /**
+   * Действующие метки записей. Свёртка, а не список записей `label`: снятие рантайм пишет такой же
+   * записью, и «есть ли метка» — это результат свёртки, а не наличие записи (docs/web-api.md).
+   * Считается по прочитанным записям, поэтому живёт рядом с ними, а не спрашивается отдельно.
+   */
+  labels: Map<string, string>;
   /**
    * Чего сессия лишилась на ходу: инструмент исчез вместе с плагином или модель пропала из
    * каталога. Копится списком, потому что за одну пересборку набора пропасть может несколько
@@ -224,6 +237,7 @@ export function openSession(state: SessionsState, sessionId: string): SessionsSt
       summary: state.sessions?.find(({ id }) => id === sessionId),
       entries: [],
       seen: 0,
+      labels: new Map(),
       pending: {},
       degradations: [],
       loading: true,
@@ -248,10 +262,44 @@ export function applyEntries(
     return state;
   }
 
+  const grown = [...open.entries, ...entries];
+
+  // Метки пересчитываются по всей ленте, а не по приросту: страница могла принести снятие метки,
+  // поставленной страницей раньше, и сложение приращением потеряло бы порядок этих двух записей.
   return {
     ...state,
-    open: { ...open, entries: [...open.entries, ...entries], seen, loading: false },
+    open: { ...open, entries: grown, labels: foldEntryLabels(grown), seen, loading: false },
   };
+}
+
+/**
+ * Попадает ли запись в ленту. Правило живёт здесь, а не в разметке: типов записей одиннадцать
+ * (docs/sessions-and-projects.md), и «что человек видит в переписке» — решение, а не деталь показа.
+ *
+ * - `compaction` и `branch-summary` **видны**: свёртка выбрасывает из контекста часть разговора, и не
+ *   показать её значит оставить агента «забывшим» без следа в ленте;
+ * - `custom-message` — запись приложения, которая и есть реплика: показывается ровно при `display`;
+ * - `tool-result` скрыт, потому что его показывает сам вызов инструмента, найдя по `toolCallId`;
+ * - `label`, `leaf`, `session-name` скрыты: это не реплики, а состояние дерева и его пометки;
+ * - `custom` скрыт: модели она не показана, а платформенное содержимое (деградация) приезжает во вью
+ *   событием шины и рисуется врезкой;
+ * - `tools-change` и `other` скрыты по-прежнему: показывать в переписке нечего.
+ */
+export function isFeedEntry(entry: SessionEntry): boolean {
+  switch (entry.kind) {
+    case "message":
+    case "model-change":
+    case "thinking-level-change":
+    case "compaction":
+    case "branch-summary":
+      return true;
+
+    case "custom-message":
+      return entry.display;
+
+    default:
+      return false;
+  }
 }
 
 /**
@@ -295,6 +343,21 @@ export function applyStats(
   const open = state.open;
 
   return open?.id === sessionId ? { ...state, open: { ...open, stats } } : state;
+}
+
+/**
+ * Заполнение контекста. Приходит вместе со снимком: меняется оно тогда же, когда фаза, — турн
+ * дописал ветку или компакция её свернула. Пропавшая сессия отвечает `undefined`, и показывать
+ * прежнее число нельзя: оно уже ни о чём.
+ */
+export function applyContext(
+  state: SessionsState,
+  sessionId: string,
+  context: SessionContextUsage | undefined,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, context } } : state;
 }
 
 /**
@@ -535,6 +598,9 @@ export function reconnected(state: SessionsState): SessionsState {
       ...open,
       entries: [],
       seen: 0,
+      // Метки — свёртка прочитанных записей: обнулённая лента обнуляет и их, иначе метка снятой
+      // записи пережила бы ленту, из которой она выведена.
+      labels: new Map(),
       live: undefined,
       pending: {},
       // Очереди обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за время

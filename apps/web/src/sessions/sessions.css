@@ -112,18 +112,27 @@
 }
 
 /*
- * Строка цифр, очереди и выбор момента доставки — три полоски между лентой и вводом. Они не внутри
- * `.sessions-composer` намеренно: там первый ребёнок растягивается на всю ширину, и это поле ввода.
+ * Строка цифр, заполнение контекста, очереди, выбор момента доставки и действия над сессией — полоски
+ * между лентой и вводом. Они не внутри `.sessions-composer` намеренно: там первый ребёнок
+ * растягивается на всю ширину, и это поле ввода.
  */
 .sessions-stats,
+.sessions-context,
 .sessions-queues,
-.sessions-modes {
+.sessions-modes,
+.sessions-session-actions {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);
   padding-inline: var(--sovereign-space-3);
   padding-block-start: var(--sovereign-space-2);
   flex-wrap: wrap;
+}
+
+/* Полоса заполнения тянется на свободное место: подписи по краям от неё читаются, а она — шкала. */
+.sessions-context > :nth-child(2) {
+  flex: 1;
+  min-width: var(--sovereign-space-8);
 }
 
 .sessions-head-actions {

@@ -12,14 +12,18 @@
 import {
   agentsPath,
   coreEventTypes,
+  sessionCompactPath,
+  sessionContextPath,
   sessionDeltaFrameKind,
   sessionEntriesPath,
+  sessionEntryLabelPath,
   sessionForkPath,
   sessionMessagesPath,
   sessionPath,
   sessionTurnsPath,
   sessionsPath,
   type Session,
+  type SessionContextUsage,
   type SessionDeltaFrame,
   type SessionEntriesPage,
 } from "@sovereign/protocol";
@@ -60,6 +64,7 @@ type Call = { url: string; method: string; body?: string };
 let calls: Call[] = [];
 let sessions: Session[] = [session()];
 let page: SessionEntriesPage = { sessionId: "0199", entries: [], seen: 0 };
+let context: SessionContextUsage = { sessionId: "0199", tokens: 0, threshold: 0 };
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -74,6 +79,7 @@ beforeEach(() => {
   calls = [];
   sessions = [session()];
   page = { sessionId: "0199", entries: [], seen: 0 };
+  context = { sessionId: "0199", tokens: 0, threshold: 0 };
   refusals = {};
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
@@ -99,6 +105,10 @@ beforeEach(() => {
       const found = sessions.find(({ id }) => id === "0199");
 
       return found === undefined ? answer({ error: "no such session" }, 404) : answer(found);
+    }
+
+    if (url === sessionContextPath("0199")) {
+      return answer(context);
     }
 
     if (url.startsWith(sessionEntriesPath("0199"))) {
@@ -355,6 +365,92 @@ describe("useSessions", () => {
     });
 
     expect(outcome).toEqual({ kind: "done", session: forked });
+  });
+
+  it("reads how full the context is together with the snapshot", async () => {
+    // Контекст меняется тогда же, когда фаза: спрашивать его отдельным поводом было бы нечем.
+    context = { sessionId: "0199", tokens: 4096, contextWindow: 200000, threshold: 0.8 };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.context?.tokens).toBe(4096));
+    expect(asked(sessionContextPath("0199"))).toHaveLength(1);
+  });
+
+  it("applies the phase an accepted compaction came back with", async () => {
+    // Фаза — единственное, что известно сразу: пересказ появится в дереве только к концу компакции,
+    // и дочитывать ленту прямо сейчас нечего. Без применения фазы работа выглядела бы простоем.
+    refusals[`POST ${sessionCompactPath("0199")}`] = {
+      status: 202,
+      body: { sessionId: "0199", phase: "compaction" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    let reason: unknown = "не спрошено";
+    await act(async () => {
+      reason = await view.result.current.compact("сохрани решения");
+    });
+
+    expect(reason).toBeUndefined();
+    expect(calls.find((call) => call.url === sessionCompactPath("0199"))?.body).toBe(
+      '{"instructions":"сохрани решения"}',
+    );
+    expect(view.result.current.state.open?.summary?.phase).toBe("compaction");
+  });
+
+  it("gives the refusal of a compaction back to the caller and says it in the diagnostics", async () => {
+    refusals[`POST ${sessionCompactPath("0199")}`] = {
+      status: 409,
+      body: { error: "the session is busy" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    let reason: unknown;
+    await act(async () => {
+      reason = await view.result.current.compact();
+    });
+
+    expect(reason).toBe("the session is busy");
+    expect(view.diagnostics).toContain("the compaction of 0199 was refused: the session is busy");
+  });
+
+  it("reads the feed again after a mark, because the mark is an entry of the tree", async () => {
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+    const before = asked(`${sessionEntriesPath("0199")}?after=0`).length;
+
+    await act(async () => {
+      await view.result.current.setEntryLabel("e7", "тут");
+    });
+
+    expect(asked(sessionEntryLabelPath("0199", "e7"), "PUT")).toHaveLength(1);
+    await waitFor(() =>
+      expect(asked(`${sessionEntriesPath("0199")}?after=0`).length).toBeGreaterThan(before),
+    );
+  });
+
+  it("gives the refusal of a mark back instead of throwing", async () => {
+    refusals[`PUT ${sessionEntryLabelPath("0199", "e7")}`] = {
+      status: 409,
+      body: { error: "the session is archived" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    let reason: unknown;
+    await act(async () => {
+      reason = await view.result.current.setEntryLabel("e7", null);
+    });
+
+    expect(reason).toBe("the session is archived");
+    expect(view.diagnostics).toContain(
+      "the entry e7 could not be labelled: the session is archived",
+    );
   });
 
   it("reads the open entries again after an appended message", async () => {
