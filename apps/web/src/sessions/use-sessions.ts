@@ -239,6 +239,13 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
 
   // Порядок эффектов важен: сначала состояние узнаёт про адрес, потом по нему идут запросы.
   useEffect(() => {
+    return () => {
+      pendingOpen.current?.abort();
+      pendingOpen.current = undefined;
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
     apply((current) =>
       sessionId === undefined ? closeSession(current) : openSession(current, sessionId),
     );

@@ -236,7 +236,7 @@ describe("useSessions", () => {
     await waitFor(() => expect(asked(`${sessionEntriesPath("0199")}?after=0`)).toHaveLength(1));
     const request = asked(`${sessionEntriesPath("0199")}?after=0`)[0];
 
-    view.rerender({ stream: "open" });
+    view.rerender({ stream: "reconnecting" });
     expect(request?.signal?.aborted).toBe(true);
 
     resolveEntries(await answer({ error: "late failure" }, 503));
