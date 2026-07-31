@@ -24,6 +24,22 @@ export type Config = {
    * спрашивается в момент, когда слот освобождается, а не при старте демона.
    */
   maxConcurrentTurns: number;
+  /**
+   * Доля контекстного окна модели, после которой компакция запускается сама. `0` — выключено, и это
+   * умолчание: компакция стоит денег и необратимо меняет разговор, поэтому её включает человек
+   * (docs/roadmap.md, срез 10b).
+   *
+   * Доля, а не число токенов: окна моделей различаются на порядок, и одно и то же абсолютное число
+   * означало бы на разных моделях совершенно разное.
+   */
+  compactionThreshold: number;
+  /**
+   * Сколько токенов окна оставить под ответ модели и сколько хвоста разговора не трогать. Наши, а не
+   * рантаймовые: Pi зашивает их константой и параметром `compact()` не принимает, поэтому платформа
+   * собирает компакцию сама и подсовывает её хуком (docs/sessions-and-projects.md).
+   */
+  compactionReserveTokens: number;
+  compactionKeepRecentTokens: number;
 };
 
 /**
@@ -82,7 +98,14 @@ export type AppearancePreferences = {
   locale: string;
 };
 
-export const defaultConfig: Config = { logLevel: "info", maxConcurrentTurns: 4 };
+export const defaultConfig: Config = {
+  logLevel: "info",
+  maxConcurrentTurns: 4,
+  compactionThreshold: 0,
+  // Совпадают с зашитыми в Pi: своя компакция заведена ради управляемости, а не ради других чисел.
+  compactionReserveTokens: 16384,
+  compactionKeepRecentTokens: 20000,
+};
 export const defaultAppearance: Appearance = {
   colorScheme: baseColorScheme,
   variant: "system",
@@ -112,6 +135,9 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
   const diagnostics = diagnoseUnknownKeys(configFileName, fields, [
     "logLevel",
     "maxConcurrentTurns",
+    "compactionThreshold",
+    "compactionReserveTokens",
+    "compactionKeepRecentTokens",
   ]);
   const value: Config = { ...defaultConfig };
   const logLevel = fields["logLevel"];
@@ -140,6 +166,45 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     }
 
     value.maxConcurrentTurns = maxConcurrentTurns as number;
+  }
+
+  const threshold = fields["compactionThreshold"];
+
+  if (threshold !== undefined) {
+    // Верхняя граница строгая: порог, равный целому окну, не сработал бы никогда — запрос к модели
+    // отклонится раньше, чем контекст дорастёт до ста процентов.
+    if (
+      typeof threshold !== "number" ||
+      !Number.isFinite(threshold) ||
+      threshold < 0 ||
+      threshold >= 1
+    ) {
+      diagnostics.push(
+        `${configFileName}: compactionThreshold must be a fraction of the context window in [0, 1), got ${JSON.stringify(threshold)}`,
+      );
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    value.compactionThreshold = threshold;
+  }
+
+  for (const key of ["compactionReserveTokens", "compactionKeepRecentTokens"] as const) {
+    const tokens = fields[key];
+
+    if (tokens === undefined) {
+      continue;
+    }
+
+    if (!Number.isInteger(tokens) || (tokens as number) < 1) {
+      diagnostics.push(
+        `${configFileName}: ${key} must be an integer above zero, got ${JSON.stringify(tokens)}`,
+      );
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    value[key] = tokens as number;
   }
 
   return { kind: "parsed", value, diagnostics };

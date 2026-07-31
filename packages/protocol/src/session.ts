@@ -21,6 +21,11 @@ export const sessionTurnsPathPattern = `${sessionsPath}/:sessionId/turns`;
 export const sessionForkPathPattern = `${sessionsPath}/:sessionId/fork`;
 export const sessionMessagesPathPattern = `${sessionsPath}/:sessionId/messages`;
 export const sessionStatsPathPattern = `${sessionsPath}/:sessionId/stats`;
+export const sessionBranchPathPattern = `${sessionsPath}/:sessionId/branch`;
+export const sessionCompactPathPattern = `${sessionsPath}/:sessionId/compact`;
+export const sessionNavigatePathPattern = `${sessionsPath}/:sessionId/navigate`;
+export const sessionContextPathPattern = `${sessionsPath}/:sessionId/context`;
+export const sessionEntryLabelPathPattern = `${sessionsPath}/:sessionId/entries/:entryId/label`;
 
 /** Параметр фильтра списка: сессии одного проекта. */
 export const sessionProjectParameter = "projectId";
@@ -34,6 +39,12 @@ export const sessionArchivedParameter = "archived";
 
 /** Курсор чтения записей: сколько записей клиент уже видел. */
 export const sessionEntriesAfterParameter = "after";
+
+/**
+ * От какой записи читать ветку. Без него ветка читается от текущего листа — то есть это тот
+ * разговор, который увидит модель на следующем турне.
+ */
+export const sessionBranchFromParameter = "from";
 
 export function sessionPath(sessionId: string): string {
   return `${sessionsPath}/${encodeURIComponent(sessionId)}`;
@@ -57,6 +68,30 @@ export function sessionMessagesPath(sessionId: string): string {
 
 export function sessionStatsPath(sessionId: string): string {
   return `${sessionPath(sessionId)}/stats`;
+}
+
+export function sessionBranchPath(sessionId: string, from?: string): string {
+  const base = `${sessionPath(sessionId)}/branch`;
+
+  return from === undefined
+    ? base
+    : `${base}?${sessionBranchFromParameter}=${encodeURIComponent(from)}`;
+}
+
+export function sessionCompactPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/compact`;
+}
+
+export function sessionNavigatePath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/navigate`;
+}
+
+export function sessionContextPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/context`;
+}
+
+export function sessionEntryLabelPath(sessionId: string, entryId: string): string {
+  return `${sessionEntriesPath(sessionId)}/${encodeURIComponent(entryId)}/label`;
 }
 
 /**
@@ -239,9 +274,15 @@ export type SessionContentBlock =
   | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown };
 
 /**
- * Запись дерева сессии в терминах контракта. Дерево ведёт рантайм, поэтому запись, которую этот срез
- * не переводит, приезжает как `other` с типом рантайма: молчаливая потеря записи сделала бы ленту
- * сообщений неполной без всякого следа.
+ * Запись дерева сессии в терминах контракта.
+ *
+ * **Разобраны все одиннадцать типов записей рантайма** — решение владельца продукта по срезу 10b.
+ * `other` остаётся только под то, чего рантайм ещё не умеет: обновление Pi, принёсшее новый тип
+ * записи, обязано доехать до клиента хоть чем-то, а не пропасть. Молчаливая потеря записи сделала бы
+ * ленту неполной без всякого следа.
+ *
+ * `parentId` — публичное поле: из него строится дерево. Его нет только у корня ветки; у остальных
+ * записей он есть всегда.
  */
 export type SessionEntry = {
   id: string;
@@ -253,8 +294,58 @@ export type SessionEntry = {
   | { kind: "model-change"; model: string }
   | { kind: "thinking-level-change"; thinkingLevel: ThinkingLevel }
   | { kind: "tools-change"; toolNames: string[] }
+  /**
+   * Контекст свёрнут в пересказ. `firstKeptEntryId` — с какой записи хвост оставлен как есть; его
+   * может не быть, когда свёрнута вся ветка. `fromHook` различает пересказ, сделанный рантаймом, и
+   * подсунутый хуком — а платформа подсовывает свой всегда (docs/sessions-and-projects.md).
+   */
+  | {
+      kind: "compaction";
+      summary: string;
+      tokensBefore: number;
+      firstKeptEntryId?: string;
+      fromHook: boolean;
+    }
+  /** Пересказ покинутой ветки, записанный при переходе к другой записи дерева. */
+  | { kind: "branch-summary"; fromId: string; summary: string; fromHook: boolean }
+  /**
+   * Метка на записи. Отсутствие `label` — снятая метка, а не пустая: рантайм пишет снятие такой же
+   * записью, и действующее значение — это свёртка всех записей `label` по `targetId`.
+   */
+  | { kind: "label"; targetId: string; label?: string }
+  /** Сессию назвали. Отсутствие `name` — имя сняли. */
+  | { kind: "session-name"; name?: string }
+  /** Лист дерева переставлен. Отсутствие `targetId` — дерево вернули в пустое состояние. */
+  | { kind: "leaf"; targetId?: string }
+  /** Запись приложения, модели не показанная. Сюда платформа кладёт своё — например деградацию. */
+  | { kind: "custom"; type: string; data?: unknown }
+  /** Запись приложения, которая **является** сообщением в разговоре. */
+  | { kind: "custom-message"; type: string; text: string; display: boolean }
   | { kind: "other"; type: string }
 );
+
+/**
+ * Действующие метки ветки: свёртка записей `label` по `targetId`. Считается там же, где читаются
+ * записи, чтобы каждый потребитель не повторял свёртку — и не расходился с соседом в том, что
+ * значит метка, снятая и поставленная заново.
+ */
+export function foldEntryLabels(entries: readonly SessionEntry[]): Map<string, string> {
+  const labels = new Map<string, string>();
+
+  for (const entry of entries) {
+    if (entry.kind !== "label") {
+      continue;
+    }
+
+    if (entry.label === undefined) {
+      labels.delete(entry.targetId);
+    } else {
+      labels.set(entry.targetId, entry.label);
+    }
+  }
+
+  return labels;
+}
 
 /**
  * Ссылка на модель на проводе: `<провайдер>/<модель>`. Идентификатор модели сам вправе содержать
@@ -285,6 +376,89 @@ export type SessionEntriesPage = {
   entries: SessionEntry[];
   /** Сколько записей клиент теперь видел: значение курсора для следующего запроса. */
   seen: number;
+};
+
+/**
+ * Ветка дерева: путь от записи вверх до корня, в хронологическом порядке. Курсора у неё нет
+ * намеренно — ветка читается целиком: она и так обрезана последней компакцией, а страница ветки
+ * означала бы, что клиент склеивает путь по кускам и обязан помнить, где он его оборвал.
+ *
+ * `leafId` — лист **сессии**, а не конец возвращённой ветки: по нему клиент отличает ветку, в
+ * которой сессия сейчас работает, от осмотренной чужой.
+ */
+export type SessionBranch = {
+  sessionId: string;
+  entries: SessionEntry[];
+  leafId?: string;
+};
+
+/**
+ * Насколько заполнен контекст. Считается по действующей ветке, а не по файлу целиком, — этим и
+ * отличается от `SessionStats`: та отвечает «сколько заплачено», эта — «сколько ещё влезет».
+ *
+ * `contextWindow` берётся у модели сессии; его может не быть, если модель недоступна — тогда доли
+ * не существует, и показывать проценты не из чего.
+ */
+export type SessionContextUsage = {
+  sessionId: string;
+  tokens: number;
+  contextWindow?: number;
+  /** Доля окна, после которой компакция запускается сама. `0` — автопорог выключен. */
+  threshold: number;
+};
+
+/** Тело компакции. Инструкции необязательны: без них рантайм пересказывает по своему промпту. */
+export type SessionCompactRequest = {
+  instructions?: string;
+};
+
+/**
+ * Ответ на запуск компакции. Как и у турна, здесь фаза: компакция идёт через ту же очередь походов
+ * к модели, и при исчерпанном пределе она принята, но ещё не начата (docs/architecture.md).
+ */
+export type SessionCompactAccepted = {
+  sessionId: string;
+  phase: SessionPhase;
+};
+
+/**
+ * Тело перехода к записи дерева.
+ *
+ * `summarize` заказывает пересказ покидаемой ветки — это запрос к модели, и он занимает слот в
+ * очереди. `replaceInstructions` относится к `instructions`: заменить промпт пересказа целиком, а не
+ * дописать к нему.
+ */
+export type SessionNavigateRequest = {
+  entryId: string;
+  summarize?: boolean;
+  instructions?: string;
+  replaceInstructions?: boolean;
+};
+
+/**
+ * Ответ перехода.
+ *
+ * `editorText` появляется, когда целью была реплика человека: рантайм в этом случае ставит листом
+ * её **родителя** и возвращает текст, чтобы человек переспросил иначе. Пустой `leafId` — дерево
+ * вернулось в пустое состояние.
+ */
+export type SessionNavigated = {
+  sessionId: string;
+  leafId?: string;
+  editorText?: string;
+  summarized: boolean;
+};
+
+/** Тело простановки метки. `null` снимает метку; отличать «снять» от «не трогать» обязан отправитель. */
+export type SessionLabelUpdate = {
+  label: string | null;
+};
+
+/** Ответ простановки метки. Без `label` — метка снята. */
+export type SessionEntryLabelled = {
+  sessionId: string;
+  entryId: string;
+  label?: string;
 };
 
 /**
@@ -337,6 +511,9 @@ const turnKeys = ["text", "model", "thinkingLevel"];
 const updateKeys = ["title", "archived"];
 const forkKeys = ["entryId", "position"];
 const messageKeys = ["text", "mode"];
+const compactKeys = ["instructions"];
+const navigateKeys = ["entryId", "summarize", "instructions", "replaceInstructions"];
+const labelKeys = ["label"];
 
 export function parseSessionDraft(
   raw: unknown,
@@ -517,6 +694,142 @@ export function parseSessionMessage(
   }
 
   return { kind: "parsed", value: { text, mode }, diagnostics };
+}
+
+export function parseSessionCompactRequest(
+  raw: unknown,
+  label = "compaction",
+): SettingsParseResult<SessionCompactRequest> {
+  // Пустое тело — законная компакция по промпту рантайма, поэтому отсутствующее равно пустому.
+  const fields = raw === undefined || raw === null ? {} : asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, compactKeys);
+  const rawInstructions = fields["instructions"];
+  const instructions = rawInstructions === undefined ? undefined : trimmedText(rawInstructions);
+
+  if (rawInstructions !== undefined && instructions === undefined) {
+    diagnostics.push(`${label}.instructions must be a non-empty text, or absent`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: { ...(instructions === undefined ? {} : { instructions }) },
+    diagnostics,
+  };
+}
+
+export function parseSessionNavigateRequest(
+  raw: unknown,
+  label = "navigation",
+): SettingsParseResult<SessionNavigateRequest> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, navigateKeys);
+  const entryId = trimmedText(fields["entryId"]);
+
+  // Умолчания у цели нет: «перейти неизвестно куда» — не операция. Форк себе такое позволяет,
+  // потому что форк без записи значит «вся сессия», а у перехода такого смысла не существует.
+  if (entryId === undefined) {
+    diagnostics.push(`${label}.entryId must be a non-empty entry identifier`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const summarize = fields["summarize"];
+
+  if (summarize !== undefined && typeof summarize !== "boolean") {
+    diagnostics.push(`${label}.summarize must be a boolean, got ${JSON.stringify(summarize)}`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const replaceInstructions = fields["replaceInstructions"];
+
+  if (replaceInstructions !== undefined && typeof replaceInstructions !== "boolean") {
+    diagnostics.push(
+      `${label}.replaceInstructions must be a boolean, got ${JSON.stringify(replaceInstructions)}`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  const rawInstructions = fields["instructions"];
+  const instructions = rawInstructions === undefined ? undefined : trimmedText(rawInstructions);
+
+  if (rawInstructions !== undefined && instructions === undefined) {
+    diagnostics.push(`${label}.instructions must be a non-empty text, or absent`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  // Инструкции без пересказа никуда не поедут: пересказывать нечего. Отказ вместо тихого игнора —
+  // иначе отправитель уверен, что его промпт применён.
+  if (instructions !== undefined && summarize !== true) {
+    diagnostics.push(
+      `${label}.instructions needs ${label}.summarize: there is nothing to instruct`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  if (replaceInstructions !== undefined && instructions === undefined) {
+    diagnostics.push(
+      `${label}.replaceInstructions needs ${label}.instructions: there is nothing to replace with`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: {
+      entryId,
+      ...(summarize === undefined ? {} : { summarize }),
+      ...(instructions === undefined ? {} : { instructions }),
+      ...(replaceInstructions === undefined ? {} : { replaceInstructions }),
+    },
+    diagnostics,
+  };
+}
+
+export function parseSessionLabelUpdate(
+  raw: unknown,
+  label = "label",
+): SettingsParseResult<SessionLabelUpdate> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, labelKeys);
+  const value = fields["label"];
+
+  // `null` — это снятие, и оно обязано быть написано явно. Отсутствующий ключ значил бы «не трогать»,
+  // а «не трогать» у записи, которая заменяет запись целиком, — не операция.
+  if (value === null) {
+    return { kind: "parsed", value: { label: null }, diagnostics };
+  }
+
+  const text = trimmedText(value);
+
+  if (text === undefined) {
+    diagnostics.push(`${label}.label must be a non-empty text, or null to clear it`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: { label: text }, diagnostics };
 }
 
 /** Модель и уровень ризонинга разбираются одинаково и в теле создания, и в теле турна. */
