@@ -1,2 +1,5 @@
 pnpm-lock.yaml
 dist/
+
+# Служебный указатель на CLAUDE.md для AI-агентов: одна строка, держим как есть.
+AGENTS.md
