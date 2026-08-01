@@ -30,6 +30,29 @@
     transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
+/* Меньший размер — для тесных мест: шапка панели, строка действий. Шкала та же, что у вкладок и меню. */
+.sm {
+  height: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-3);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+/*
+ * Только значок: квадратная кнопка без боковых отступов, контент отцентрирован. Сторона квадрата
+ * совпадает с высотой выбранного размера — отдельно на md и на sm. Видимого текста нет, значит имя
+ * даёт `aria-label`, а подсказку — `title`; подпись в `children` — это сам значок.
+ */
+.iconOnly {
+  width: var(--sovereign-control-height-md);
+  padding: 0;
+  font-size: var(--sovereign-font-size-md);
+  line-height: 1;
+}
+
+.sm.iconOnly {
+  width: var(--sovereign-control-height-sm);
+}
+
 .normal {
   border-color: var(--sovereign-border);
   background: var(--sovereign-control-surface);

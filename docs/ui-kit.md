@@ -219,10 +219,12 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
 поверхность переписана под наши соглашения: явные пропсы, `onChange` со значением вместо события,
 строки только пропсами и уже переведёнными.
 
-- **`Button`** — `tone`, `onClick`, `disabled`, `pressed`, `busy`, `title` и стандартные для
-  интерактивного элемента `id`, `aria-label`, `aria-describedby`, `aria-expanded`,
-  `aria-controls`, `aria-haspopup`, `onFocus`, `onBlur`, `onKeyDown`; `describedBy` сохранён как
-  совместимое имя связи с описанием.
+- **`Button`** — `tone`, `size` (`md` | `sm`), `iconOnly`, `onClick`, `disabled`, `pressed`, `busy`,
+  `title` и стандартные для интерактивного элемента `id`, `aria-label`, `aria-describedby`,
+  `aria-expanded`, `aria-controls`, `aria-haspopup`, `onFocus`, `onBlur`, `onKeyDown`; `describedBy`
+  сохранён как совместимое имя связи с описанием. `size="sm"` — для тесных мест (шапка панели); `iconOnly`
+  делает кнопку квадратной без боковых отступов, а контент отцентрованным — это кнопка-значок, и
+  видимого текста у неё нет, поэтому имя обязан дать `aria-label`, а подсказку — `title`.
 - **`Input` и `Textarea`** — `value`, `onChange(value)`, `placeholder`, `invalid`, `disabled`, `id`,
   `describedBy`; у поля ещё `type` (`text` | `password` | `search`), `autoComplete`
   (`off` | `username` | `current-password` | `new-password`), `role`, `ref`, `readOnly`, обработчики

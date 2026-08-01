@@ -189,6 +189,23 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain(`aria-describedby="field-hint ${tooltipId}"`);
   });
 
+  it("button carries its size and icon-only classes only when asked", () => {
+    // По умолчанию ни размер, ни iconOnly в классы не попадают: дефолт md — это базовая `.button`.
+    const plain = renderToStaticMarkup(<Button>Действие</Button>);
+    expect(plain).not.toContain("undefined");
+
+    const icon = renderToStaticMarkup(
+      <Button size="sm" iconOnly aria-label="Скрыть">
+        «
+      </Button>,
+    );
+    // Имена классов хешируются CSS Modules (`_sm_<hash>`, `_iconOnly_<hash>`), поэтому ищем модульный
+    // префикс имени, а не голое слово.
+    expect(icon).toMatch(/class="[^"]*_sm_[a-z0-9]+[^"]*"/);
+    expect(icon).toMatch(/class="[^"]*_iconOnly_[a-z0-9]+[^"]*"/);
+    expect(icon).toContain('aria-label="Скрыть"');
+  });
+
   it("menu", () => {
     const markup = renderToStaticMarkup(
       <Menu

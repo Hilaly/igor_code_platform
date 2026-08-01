@@ -6,8 +6,18 @@ import styles from "./button.module.css";
 
 export type ButtonTone = "normal" | "accent" | "danger";
 
+export type ButtonSize = "md" | "sm";
+
 export type ButtonProps = {
   tone?: ButtonTone;
+  /** Размер: `md` — обычная кнопка действия, `sm` — там, где места мало (шапка панели). */
+  size?: ButtonSize;
+  /**
+   * Только значок: кнопка квадратная, без боковых отступов, контент отцентрирован. Видимого текста у
+   * такой кнопки нет, поэтому доступное имя обязано приезжать через `aria-label`, а подсказка — через
+   * `title`. Нужно для кнопок скрытия/возврата панелей в оболочке.
+   */
+  iconOnly?: boolean;
   onClick?: () => void;
   disabled?: boolean;
   pressed?: boolean;
@@ -31,6 +41,8 @@ export type ButtonProps = {
 
 export function Button({
   tone = "normal",
+  size = "md",
+  iconOnly = false,
   onClick,
   disabled = false,
   pressed,
@@ -49,11 +61,20 @@ export function Button({
   onKeyDown,
   children,
 }: ButtonProps) {
+  const className = [
+    styles.button,
+    styles[tone],
+    size === "sm" ? styles.sm : "",
+    iconOnly ? styles.iconOnly : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       type="button"
       id={id}
-      className={`${styles.button} ${styles[tone]}`}
+      className={className}
       onClick={onClick}
       disabled={disabled || busy}
       aria-pressed={pressed}
