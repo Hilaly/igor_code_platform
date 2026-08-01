@@ -6,7 +6,7 @@
  * перевода фокуса, а его поверхность не принимает ни того, ни другого.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import styles from "./menu.module.css";
 import { nextEnabledIndex } from "./roving-focus.ts";
@@ -25,18 +25,32 @@ export type MenuItemDescription = {
 export type MenuProps = {
   /** Название меню для скринридера: у списка пунктов нет своей подписи. */
   label: string;
-  /** Подпись кнопки, открывающей меню. */
-  trigger: string;
+  /** Подпись кнопки, открывающей меню. Не только текст: кнопке внизу панели нужен ещё и значок рядом. */
+  trigger: ReactNode;
   /**
    * Название кнопки для скринридера. Нужно, когда подпись — значок вроде `…`: видимого текста для
    * имени тогда не хватает, и кнопка называется многоточием. Без значка не задаётся: дублировать
    * видимую подпись в `aria-label` значит расходиться с ней при первой же правке.
    */
   triggerLabel?: string;
+  /**
+   * Куда раскрывается список: `"below"` — обычное меню, `"above"` — для кнопки в самом низу панели,
+   * которой раскрываться вниз некуда.
+   */
+  placement?: "below" | "above";
+  /** Кнопка и список занимают всю ширину контейнера, а не по содержимому — для кнопки во всю панель. */
+  block?: boolean;
   items: MenuItemDescription[];
 };
 
-export function Menu({ label, trigger, triggerLabel, items }: MenuProps) {
+export function Menu({
+  label,
+  trigger,
+  triggerLabel,
+  placement = "below",
+  block = false,
+  items,
+}: MenuProps) {
   const menuId = useId();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -116,10 +130,10 @@ export function Menu({ label, trigger, triggerLabel, items }: MenuProps) {
   }, [open]);
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className={`${styles.root}${block ? ` ${styles.block}` : ""}`} ref={rootRef}>
       <button
         type="button"
-        className={styles.trigger}
+        className={`${styles.trigger}${block ? ` ${styles.block}` : ""}`}
         ref={triggerRef}
         aria-haspopup="menu"
         aria-label={triggerLabel}
@@ -130,7 +144,12 @@ export function Menu({ label, trigger, triggerLabel, items }: MenuProps) {
         {trigger}
       </button>
       {open ? (
-        <div className={styles.menu} id={menuId} role="menu" aria-label={label}>
+        <div
+          className={`${styles.menu}${placement === "above" ? ` ${styles.above}` : ""}`}
+          id={menuId}
+          role="menu"
+          aria-label={label}
+        >
           {items.map((item, index) => (
             <button
               key={item.id}

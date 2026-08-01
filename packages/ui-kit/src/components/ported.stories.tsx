@@ -182,6 +182,25 @@ export const TabsAndMenu = () => {
   );
 };
 
+/**
+ * Меню в самом низу панели: раскрывается вверх, чтобы список не уезжал за край окна, и занимает всю
+ * ширину — так стоит кнопка в нижней части левой панели оболочки (shell.tsx).
+ */
+export const PanelMenu = () => (
+  <div style={{ ...column, maxWidth: "16rem", paddingTop: "8rem" }}>
+    <Menu
+      label="Учётная запись"
+      trigger="Настройки и выход"
+      placement="above"
+      block
+      items={[
+        { id: "settings", label: "Настройки", onSelect: () => {} },
+        { id: "log-out", label: "Выйти", tone: "danger", onSelect: () => {} },
+      ]}
+    />
+  </div>
+);
+
 export const Waiting = () => (
   <div style={column}>
     <Progress label="Установка зависимостей" value={0.35} />

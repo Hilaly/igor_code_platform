@@ -4,6 +4,12 @@
   display: inline-flex;
 }
 
+/* Кнопка во всю ширину панели: меню внизу левой панели должно совпасть с её краями, а не жаться к тексту. */
+.root.block {
+  display: flex;
+  width: 100%;
+}
+
 .trigger {
   display: inline-flex;
   align-items: center;
@@ -23,6 +29,11 @@
   transition:
     background var(--sovereign-duration-fast) var(--sovereign-ease-out),
     border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.trigger.block {
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .trigger:hover {
@@ -51,6 +62,12 @@
   background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
   box-shadow: var(--sovereign-elevation-2);
   backdrop-filter: var(--sovereign-backdrop-blur);
+}
+
+/* Кнопка внизу панели раскрывается вверх: вниз ей раскрываться некуда, там край окна. */
+.menu.above {
+  top: auto;
+  bottom: calc(100% + var(--sovereign-space-1));
 }
 
 .item {

@@ -203,6 +203,21 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain('role="menu"');
   });
 
+  it("menu that opens upward and fills its container", () => {
+    const markup = renderToStaticMarkup(
+      <Menu
+        label="Учётная запись"
+        trigger="Настройки"
+        placement="above"
+        block
+        items={[{ id: "log-out", label: "Выйти", onSelect: () => {} }]}
+      />,
+    );
+    expect(markup).not.toContain("undefined");
+    expect(markup).toMatch(/class="[^"]*root[^"]*block[^"]*"/);
+    expect(markup).toMatch(/class="[^"]*trigger[^"]*block[^"]*"/);
+  });
+
   it("progress", () => {
     const determinate = renderToStaticMarkup(<Progress value={0.423} label="Загрузка" />);
     expect(determinate).not.toContain("undefined");
