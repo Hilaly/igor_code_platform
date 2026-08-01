@@ -82,6 +82,12 @@
   overflow: auto;
 }
 
+/* Вкладок нет: правая панель до среза 12 — место хоста, которое плагин заполнит своими вкладками. */
+.shell-tab-empty {
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-sm);
+}
+
 /* Граница панели: тянется мышью, а с клавиатуры — стрелками, поэтому у неё есть фокус. */
 .shell-resizer {
   flex: 0 0 auto;
@@ -101,25 +107,10 @@
 
 .shell-nav,
 .shell-home,
-.shell-appearance,
 .shell-daemon {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
-}
-
-.shell-appearance-choice,
-.shell-appearance-buttons {
-  display: flex;
-  gap: var(--sovereign-space-2);
-}
-
-.shell-appearance-choice {
-  flex-direction: column;
-}
-
-.shell-appearance-buttons {
-  flex-wrap: wrap;
 }
 
 /* Вью плагинов: панель на плагин, в панели — строки вкладов. Геометрия здесь, вид — в ките. */

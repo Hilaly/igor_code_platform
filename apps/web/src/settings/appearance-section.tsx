@@ -1,6 +1,8 @@
 /**
- * Выбор внешнего вида. Записывается в `preferences.json` через API: файл остаётся источником истины
- * (docs/data-directory.md), а не копией того, что помнит вкладка.
+ * Раздел «Внешний вид» страницы настроек. Записывается в `preferences.json` через API: файл остаётся
+ * источником истины (docs/data-directory.md), а не копией того, что помнит вкладка.
+ *
+ * Прежде это была вкладка `appearance` правой панели; разделом стало содержимое, логика не менялась.
  */
 
 import {
@@ -17,7 +19,7 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
-export type AppearancePanelProps = {
+export type AppearanceSectionProps = {
   preferences: AppearancePreferences;
   schemes: readonly ColorScheme[];
   locales: string[];
@@ -27,18 +29,18 @@ export type AppearancePanelProps = {
   translator: ScopedTranslator;
 };
 
-export function AppearancePanel({
+export function AppearanceSection({
   preferences,
   schemes,
   locales,
   onChange,
   refusal,
   translator,
-}: AppearancePanelProps) {
+}: AppearanceSectionProps) {
   const { t } = translator;
 
   return (
-    <div className="shell-appearance">
+    <div className="settings-appearance">
       {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
       <Select
         label={t("appearance.scheme")}
@@ -52,9 +54,9 @@ export function AppearancePanel({
         }
         placeholder={t("common.choose")}
       />
-      <div className="shell-appearance-choice">
+      <div className="settings-appearance-choice">
         <Text tone="muted">{t("appearance.variant")}</Text>
-        <div className="shell-appearance-buttons">
+        <div className="settings-appearance-buttons">
           {appearanceVariants.map((variant) => (
             <Button
               key={variant}
@@ -70,9 +72,9 @@ export function AppearancePanel({
       </div>
       {/* Тот же вид выбора из трёх, что и вариант темы, поэтому и контрол тот же: два разных вида
           управления в одной панели выглядели бы случайностью. Классы раскладки те же по той же причине. */}
-      <div className="shell-appearance-choice">
+      <div className="settings-appearance-choice">
         <Text tone="muted">{t("appearance.scale")}</Text>
-        <div className="shell-appearance-buttons">
+        <div className="settings-appearance-buttons">
           {interfaceScales.map((scale) => (
             <Button
               key={scale}

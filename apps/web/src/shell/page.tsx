@@ -16,6 +16,7 @@ export type PageViewProps = {
   projects: ReactNode;
   providers: ReactNode;
   sessions: ReactNode;
+  settings: ReactNode;
   translator: ScopedTranslator;
 };
 
@@ -25,6 +26,7 @@ export function PageView({
   projects,
   providers,
   sessions,
+  settings,
   translator,
 }: PageViewProps) {
   const { t } = translator;
@@ -43,6 +45,10 @@ export function PageView({
 
   if (page.kind === "sessions") {
     return sessions;
+  }
+
+  if (page.kind === "settings") {
+    return settings;
   }
 
   if (page.kind === "plugin") {

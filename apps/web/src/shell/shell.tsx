@@ -7,10 +7,10 @@
 import { Button } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
-import { clampPanelWidth, panelWidthLimits, type ShellLayout, type ShellTab } from "./layout.ts";
+import { clampPanelWidth, panelWidthLimits, type ShellLayout } from "./layout.ts";
 
 export type ShellTabDescription = {
-  id: ShellTab;
+  id: string;
   label: string;
   content: ReactNode;
 };
@@ -18,7 +18,7 @@ export type ShellTabDescription = {
 export type ShellProps = {
   layout: ShellLayout;
   onLayoutChange: (layout: ShellLayout) => void;
-  labels: { left: string; right: string };
+  labels: { left: string; right: string; emptyTabs: string };
   navigation: ReactNode;
   /** Низ левой панели: индикатор связи с демоном. Он виден всегда, а не по переходу на страницу. */
   status: ReactNode;
@@ -83,7 +83,11 @@ export function Shell({
             </Button>
           ))}
         </div>
-        {open === undefined ? undefined : <div className="shell-tab-body">{open.content}</div>}
+        {open === undefined ? (
+          <div className="shell-tab-empty">{labels.emptyTabs}</div>
+        ) : (
+          <div className="shell-tab-body">{open.content}</div>
+        )}
       </aside>
     </div>
   );

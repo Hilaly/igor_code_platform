@@ -1,15 +1,18 @@
-/** Вкладка диагностики: то, что в демоне ушло бы в журнал, а в браузере уходить некуда. */
+/**
+ * Раздел «Диагностика» страницы настроек: то, что в демоне ушло бы в журнал, а в браузере уходить
+ * некуда. Прежде это была вкладка `diagnostics` правой панели; логика не менялась.
+ */
 
 import { EmptyState, List, ListRow, Text, type ScopedTranslator } from "@sovereign/ui-kit";
 
 import type { Diagnostic } from "../diagnostics.ts";
 
-export type DiagnosticsPanelProps = {
+export type DiagnosticsSectionProps = {
   diagnostics: Diagnostic[];
   translator: ScopedTranslator;
 };
 
-export function DiagnosticsPanel({ diagnostics, translator }: DiagnosticsPanelProps) {
+export function DiagnosticsSection({ diagnostics, translator }: DiagnosticsSectionProps) {
   if (diagnostics.length === 0) {
     return <EmptyState title={translator.t("diagnostics.empty")} />;
   }

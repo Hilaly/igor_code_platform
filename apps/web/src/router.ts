@@ -14,6 +14,12 @@ export const pluginsPagePath = "/plugins";
 export const projectsPagePath = "/projects";
 export const providersPagePath = "/providers";
 export const sessionsPagePath = "/sessions";
+export const settingsPagePath = "/settings";
+
+/** Разделы вью настроек. Список закрыт: раздел, который ядро не знает, не превращается в запрос. */
+export const settingsSections = ["appearance", "daemon", "diagnostics"] as const;
+
+export type SettingsSection = (typeof settingsSections)[number];
 
 export type Page =
   | { kind: "home" }
@@ -22,6 +28,8 @@ export type Page =
   | { kind: "providers" }
   /** Мастер-деталь: список сессий, а с идентификатором — ещё и открытый чат. */
   | { kind: "sessions"; sessionId?: string }
+  /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
+  | { kind: "settings"; section?: SettingsSection }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -56,6 +64,18 @@ export function matchPage(path: string): Page {
     return isSessionId(sessionId) ? { kind: "sessions", sessionId } : { kind: "unknown", path };
   }
 
+  if (`/${segments[0]}` === settingsPagePath && segments.length <= 2) {
+    const section = segments[1];
+
+    if (section === undefined) {
+      return { kind: "settings" };
+    }
+
+    return settingsSections.includes(section as SettingsSection)
+      ? { kind: "settings", section: section as SettingsSection }
+      : { kind: "unknown", path };
+  }
+
   if (segments[0] === pluginPagePrefix) {
     const [, pluginId, pageId, ...rest] = segments;
 
@@ -84,6 +104,8 @@ export function pathOf(page: Page): string {
       return page.sessionId === undefined
         ? sessionsPagePath
         : `${sessionsPagePath}/${page.sessionId}`;
+    case "settings":
+      return page.section === undefined ? settingsPagePath : `${settingsPagePath}/${page.section}`;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":

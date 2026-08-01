@@ -16,7 +16,6 @@ import {
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
 import {
-  Button,
   coreEnglish,
   coreNamespace,
   coreRussian,
@@ -24,6 +23,7 @@ import {
   Heading,
   List,
   ListRow,
+  Menu,
   Spinner,
   Text,
 } from "@sovereign/ui-kit";
@@ -52,9 +52,11 @@ import { SessionsView } from "./sessions/sessions-view.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
-import { AppearancePanel } from "./shell/appearance-panel.tsx";
+import { AppearanceSection } from "./settings/appearance-section.tsx";
+import { DaemonSection } from "./settings/daemon-section.tsx";
+import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
+import { SettingsView } from "./settings/settings-view.tsx";
 import { DaemonStatus } from "./shell/daemon-status.tsx";
-import { DiagnosticsPanel } from "./shell/diagnostics-panel.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { PageView } from "./shell/page.tsx";
 import { Shell } from "./shell/shell.tsx";
@@ -370,7 +372,11 @@ export function App() {
     <Shell
       layout={layout}
       onLayoutChange={setLayout}
-      labels={{ left: translator.t("panel.left"), right: translator.t("panel.right") }}
+      labels={{
+        left: translator.t("panel.left"),
+        right: translator.t("panel.right"),
+        emptyTabs: translator.t("panel.tabs.empty"),
+      }}
       navigation={
         <div className="shell-nav">
           <Heading level={3}>{translator.t("nav.title")}</Heading>
@@ -411,42 +417,36 @@ export function App() {
       status={
         <div className="shell-status">
           <DaemonStatus stream={stream} health={health} failure={failure} translator={translator} />
-          <Button
-            onClick={() => {
-              // Выход закрывает серверную запись сессии, поэтому обрывает и живой поток
-              // (docs/authentication.md); вкладка возвращается к форме, не дожидаясь этого.
-              void logOut().then(() => {
-                setExpired(false);
-                setLoginRefusal(undefined);
-                setAccess("unauthenticated");
-              });
-            }}
-          >
-            {translator.t("logout")}
-          </Button>
+          <Menu
+            label={translator.t("account.menu")}
+            trigger={translator.t("account.menu")}
+            placement="above"
+            block
+            items={[
+              {
+                id: "settings",
+                label: translator.t("settings.title"),
+                onSelect: () => navigation.navigate({ kind: "settings" }),
+              },
+              {
+                id: "log-out",
+                label: translator.t("logout"),
+                tone: "danger",
+                onSelect: () => {
+                  // Выход закрывает серверную запись сессии, поэтому обрывает и живой поток
+                  // (docs/authentication.md); вкладка возвращается к форме, не дожидаясь этого.
+                  void logOut().then(() => {
+                    setExpired(false);
+                    setLoginRefusal(undefined);
+                    setAccess("unauthenticated");
+                  });
+                },
+              },
+            ]}
+          />
         </div>
       }
-      tabs={[
-        {
-          id: "appearance",
-          label: translator.t("appearance.variant"),
-          content: (
-            <AppearancePanel
-              preferences={preferences}
-              schemes={shippedSchemes}
-              locales={shippedLocales}
-              onChange={change}
-              refusal={refusal}
-              translator={translator}
-            />
-          ),
-        },
-        {
-          id: "diagnostics",
-          label: translator.t("diagnostics.title"),
-          content: <DiagnosticsPanel diagnostics={reported} translator={translator} />,
-        },
-      ]}
+      tabs={[]}
     >
       <PageView
         page={page}
@@ -522,6 +522,33 @@ export function App() {
             onSetLabel={sessions.setEntryLabel}
             onNavigate={sessions.navigate}
             onShowArchived={sessions.setShowArchived}
+            translator={translator}
+          />
+        }
+        settings={
+          <SettingsView
+            section={page.kind === "settings" ? page.section : undefined}
+            onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
+            appearance={
+              <AppearanceSection
+                preferences={preferences}
+                schemes={shippedSchemes}
+                locales={shippedLocales}
+                onChange={change}
+                refusal={refusal}
+                translator={translator}
+              />
+            }
+            daemon={
+              <DaemonSection
+                stream={stream}
+                health={health}
+                failure={failure}
+                locale={preferences.locale}
+                translator={translator}
+              />
+            }
+            diagnostics={<DiagnosticsSection diagnostics={reported} translator={translator} />}
             translator={translator}
           />
         }

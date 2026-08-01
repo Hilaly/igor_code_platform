@@ -1,0 +1,75 @@
+/*
+ * Раскладка страницы настроек. Цвета — только переменные ролей, размеры — только шкалы кита: значения
+ * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
+ *
+ * Своим файлом, а не строками в `shell.css`: под-навигация настроек ничего общего с раскладкой панелей
+ * оболочки вокруг неё не имеет — как и `sessions.css` рядом.
+ */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  /* Вью забирает высоту хоста целиком: раздел прокручивается внутри себя, а не вместе со страницей. */
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  container-type: inline-size;
+}
+
+/*
+ * Под-навигация фиксированной доли, раздел — всё остальное; на узком экране они встают в колонку:
+ * то же поведение, что у мастер-детали сессий, и по той же причине.
+ */
+.settings-split {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  gap: var(--sovereign-space-3);
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-split > * {
+  min-width: 0;
+}
+
+@container (width < 40rem) {
+  .settings-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.settings-nav {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.settings-section,
+.settings-appearance,
+.settings-daemon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+}
+
+.settings-daemon-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+}
+
+.settings-appearance-choice,
+.settings-appearance-buttons {
+  display: flex;
+  gap: var(--sovereign-space-2);
+}
+
+.settings-appearance-choice {
+  flex-direction: column;
+}
+
+.settings-appearance-buttons {
+  flex-wrap: wrap;
+}

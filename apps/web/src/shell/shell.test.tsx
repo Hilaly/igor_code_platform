@@ -22,7 +22,7 @@ function show(overrides: Partial<ShellProps> = {}) {
   const props: ShellProps = {
     layout: defaultLayout,
     onLayoutChange,
-    labels: { left: "левая панель", right: "правая панель" },
+    labels: { left: "левая панель", right: "правая панель", emptyTabs: "вкладок нет" },
     navigation: <div>навигация</div>,
     status: <div>статус демона</div>,
     tabs: [],

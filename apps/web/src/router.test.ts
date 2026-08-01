@@ -71,8 +71,24 @@ describe("matchPage", () => {
     expect(matchPage("/p")).toEqual({ kind: "unknown", path: "/p" });
   });
 
+  it("keeps the settings on their own address, with an optional section", () => {
+    expect(matchPage("/settings")).toEqual({ kind: "settings" });
+    expect(matchPage("/settings/appearance")).toEqual({
+      kind: "settings",
+      section: "appearance",
+    });
+  });
+
+  it("takes an unknown settings section for an unknown address", () => {
+    // Список разделов закрыт: раздел, которого ядро не знает, не превращается в запрос.
+    expect(matchPage("/settings/нет-такого")).toEqual({
+      kind: "unknown",
+      path: "/settings/нет-такого",
+    });
+  });
+
   it("gives back an unknown address as it came", () => {
-    expect(matchPage("/settings")).toEqual({ kind: "unknown", path: "/settings" });
+    expect(matchPage("/nowhere")).toEqual({ kind: "unknown", path: "/nowhere" });
   });
 });
 
@@ -85,9 +101,11 @@ describe("pathOf", () => {
       "/providers",
       "/sessions",
       "/sessions/0199abcd-ef01",
+      "/settings",
+      "/settings/appearance",
       "/p/tracker/board",
       "/p/tracker/board/15/edit",
-      "/settings",
+      "/nowhere",
     ]) {
       expect(pathOf(matchPage(path))).toBe(path === "" ? "/" : path);
     }

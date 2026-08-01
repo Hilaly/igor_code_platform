@@ -16,7 +16,7 @@ import { formatUptime } from "../uptime.ts";
  */
 const tickMilliseconds = 10_000;
 
-function useUptimeSeconds(health: Health | undefined): number | undefined {
+export function useUptimeSeconds(health: Health | undefined): number | undefined {
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
 
   useEffect(() => {

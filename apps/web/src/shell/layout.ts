@@ -4,15 +4,15 @@
  * между машинами незачем.
  */
 
-export const shellTabs = ["appearance", "diagnostics"] as const;
-
-export type ShellTab = (typeof shellTabs)[number];
-
 export type ShellLayout = {
   leftWidth: number;
   rightWidth: number;
-  /** Открытой вкладки может не быть: правая панель закрывается целиком. */
-  openTab: ShellTab | undefined;
+  /**
+   * Идентификатор открытой вкладки правой панели. До среза 12 вкладки приносят плагины, поэтому список
+   * открыт — это `string`, а не закрытый тип ядра. Проверку «такая вкладка есть» делает сама оболочка
+   * (`tabs.find(...)`): ядро знает только то, что идентификатор — строка.
+   */
+  openTab: string | undefined;
 };
 
 export const layoutStorageKey = "sovereign.layout";
@@ -20,10 +20,11 @@ export const layoutStorageKey = "sovereign.layout";
 export const defaultLayout: ShellLayout = {
   leftWidth: 260,
   rightWidth: 320,
-  openTab: "appearance",
+  // По умолчанию правая панель скрыта: вкладок ядра у неё больше нет, а плагины принесут свои в срезе 12.
+  openTab: undefined,
 };
 
-/** Пределы: панель, утянутая в ноль, из интерфейса уже не возвращается. */
+/** Пределы: панель, утянутую в ноль, из интерфейса уже не возвращается. */
 export const panelWidthLimits = { minimum: 180, maximum: 560 };
 
 export type LayoutStorage = {
@@ -53,7 +54,9 @@ export function readLayout(storage: LayoutStorage): ShellLayout {
     return {
       leftWidth: clampPanelWidth(parsed.leftWidth ?? defaultLayout.leftWidth),
       rightWidth: clampPanelWidth(parsed.rightWidth ?? defaultLayout.rightWidth),
-      openTab: shellTabs.includes(parsed.openTab as ShellTab) ? parsed.openTab : undefined,
+      // Строка или ничего: вкладки, которую знает ядро, больше нет, а неизвестную открывает лишь та
+      // оболочка, у которой она реально есть.
+      openTab: typeof parsed.openTab === "string" ? parsed.openTab : undefined,
     };
   } catch {
     return defaultLayout;

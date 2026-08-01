@@ -67,6 +67,7 @@ describe("the style sheets of the application", () => {
       "projects.css",
       "providers.css",
       "sessions.css",
+      "settings.css",
       "shell.css",
     ]);
   });

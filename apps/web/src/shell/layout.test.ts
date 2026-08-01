@@ -42,8 +42,13 @@ describe("readLayout", () => {
     expect(readLayout(storage("null"))).toEqual(defaultLayout);
   });
 
-  it("drops a tab it does not know: it could come from a newer platform", () => {
-    expect(readLayout(storage(JSON.stringify({ openTab: "sessions" }))).openTab).toBeUndefined();
+  it("keeps any tab identifier as a string: the shell decides if it has that tab", () => {
+    // Список вкладок ядра закрыли: их приносят плагины в срезе 12, и ядру список не описать. Хранится
+    // любая строка, а «есть ли такая вкладка» проверяет сама оболочка — это её вкладки.
+    expect(readLayout(storage(JSON.stringify({ openTab: "plugin:tracker:board" }))).openTab).toBe(
+      "plugin:tracker:board",
+    );
+    expect(readLayout(storage(JSON.stringify({ openTab: 7 }))).openTab).toBeUndefined();
   });
 
   it("pulls a width outside the limits back in", () => {
