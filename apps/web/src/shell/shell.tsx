@@ -7,7 +7,7 @@
 import { Button } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
-import { clampPanelWidth, type ShellLayout, type ShellTab } from "./layout.ts";
+import { clampPanelWidth, panelWidthLimits, type ShellLayout, type ShellTab } from "./layout.ts";
 
 export type ShellTabDescription = {
   id: ShellTab;
@@ -48,16 +48,18 @@ export function Shell({
         <div className="shell-left-bottom">{status}</div>
       </nav>
       <PanelResizer
-        onResize={(delta) =>
-          onLayoutChange({ ...layout, leftWidth: clampPanelWidth(layout.leftWidth + delta) })
-        }
+        edge="left"
+        width={layout.leftWidth}
+        label={labels.left}
+        onWidth={(leftWidth) => onLayoutChange({ ...layout, leftWidth })}
       />
       <main className="shell-page">{children}</main>
       {open === undefined ? undefined : (
         <PanelResizer
-          onResize={(delta) =>
-            onLayoutChange({ ...layout, rightWidth: clampPanelWidth(layout.rightWidth - delta) })
-          }
+          edge="right"
+          width={layout.rightWidth}
+          label={labels.right}
+          onWidth={(rightWidth) => onLayoutChange({ ...layout, rightWidth })}
         />
       )}
       <aside
@@ -88,33 +90,50 @@ export function Shell({
 }
 
 type PanelResizerProps = {
-  onResize: (delta: number) => void;
+  /** Какой край панели тянет граница: определяет знак смещения и подпись для скринридера. */
+  edge: "left" | "right";
+  /** Текущая ширина панели. Пришедшая пропом, а не запомненная при нажатии — от неё же считает клавиатура. */
+  width: number;
+  /** Имя панели: у самой границы подписи нет, а `aria-valuenow` без имени говорит только число. */
+  label: string;
+  onWidth: (width: number) => void;
 };
 
 /**
  * Граница панели. Работает от `pointer`-событий, а не от `mouse`: с тачпада и с планшета тянуть надо
  * так же. С клавиатуры границу двигают стрелки — иначе размер панели недоступен без мыши.
+ *
+ * Ширина при протаскивании считается от точки начала жеста, а не приращением между кадрами: замыкание
+ * внутри `onPointerDown` живёт весь жест и не видит новых пропов, поэтому шаг от предыдущей точки
+ * складывался бы поверх состояния, которое уже устарело в момент нажатия, — панель дёргалась к стартовой
+ * ширине на каждом кадре и не оставалась там, куда её потянули.
  */
-function PanelResizer({ onResize }: PanelResizerProps) {
+function PanelResizer({ edge, width, label, onWidth }: PanelResizerProps) {
+  const sign = edge === "left" ? 1 : -1;
+
   return (
     <div
       className="shell-resizer"
       role="separator"
       aria-orientation="vertical"
+      aria-label={label}
+      aria-valuemin={panelWidthLimits.minimum}
+      aria-valuemax={panelWidthLimits.maximum}
+      aria-valuenow={width}
       tabIndex={0}
       onPointerDown={(event) => {
         // Выделение текста при протаскивании границы — не то, чего просили мышью.
         event.preventDefault();
 
-        // Смещение считается от предыдущей точки, а не от начала: ширина меняется приращением, и от
-        // начала она уезжала бы в стену за первые же несколько кадров.
-        let previous = event.clientX;
+        // Обе точки отсчёта берутся один раз на весь жест и с этого момента не устаревают: конечная
+        // ширина каждого кадра — расстояние от начала жеста, а не сумма его собственных шагов.
+        const startX = event.clientX;
+        const startWidth = width;
 
         // Слушает окно, а не сама граница: курсор во время протаскивания уходит с неё, и события
         // после этого приходят другому элементу.
         const move = (moved: PointerEvent): void => {
-          onResize(moved.clientX - previous);
-          previous = moved.clientX;
+          onWidth(clampPanelWidth(startWidth + (moved.clientX - startX) * sign));
         };
         const drop = (): void => {
           window.removeEventListener("pointermove", move);
@@ -126,16 +145,16 @@ function PanelResizer({ onResize }: PanelResizerProps) {
         window.addEventListener("pointerup", drop);
         // Браузер отменяет поток pointer-событий, если пользователь сменил вкладку, открыл DevTools
         // или ОС прервала жест: без этой ветки `pointerup` не приходит, и listener-ы висят вечно,
-        // вызывая onResize на каждом последующем движении мыши по странице.
+        // вызывая onWidth на каждом последующем движении мыши по странице.
         window.addEventListener("pointercancel", drop);
       }}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
-          onResize(-16);
+          onWidth(clampPanelWidth(width - sign * 16));
         }
 
         if (event.key === "ArrowRight") {
-          onResize(16);
+          onWidth(clampPanelWidth(width + sign * 16));
         }
       }}
     />
