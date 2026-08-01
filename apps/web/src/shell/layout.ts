@@ -13,6 +13,9 @@ export type ShellLayout = {
    * (`tabs.find(...)`): ядро знает только то, что идентификатор — строка.
    */
   openTab: string | undefined;
+  /** Спрятана ли панель человеком. Скрытая панель не рисуется вовсе — вместе с её границей-ресайзером. */
+  leftHidden: boolean;
+  rightHidden: boolean;
 };
 
 export const layoutStorageKey = "sovereign.layout";
@@ -22,6 +25,8 @@ export const defaultLayout: ShellLayout = {
   rightWidth: 320,
   // По умолчанию правая панель скрыта: вкладок ядра у неё больше нет, а плагины принесут свои в срезе 12.
   openTab: undefined,
+  leftHidden: false,
+  rightHidden: true,
 };
 
 /** Пределы: панель, утянутую в ноль, из интерфейса уже не возвращается. */
@@ -57,6 +62,8 @@ export function readLayout(storage: LayoutStorage): ShellLayout {
       // Строка или ничего: вкладки, которую знает ядро, больше нет, а неизвестную открывает лишь та
       // оболочка, у которой она реально есть.
       openTab: typeof parsed.openTab === "string" ? parsed.openTab : undefined,
+      leftHidden: parsed.leftHidden === true,
+      rightHidden: parsed.rightHidden === true,
     };
   } catch {
     return defaultLayout;

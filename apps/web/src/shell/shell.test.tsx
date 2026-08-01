@@ -1,28 +1,41 @@
 // @vitest-environment jsdom
 
 /**
- * Регресс на баг границ панелей: `pointermove`-слушатель внутри `onPointerDown` замыкал устаревшую
- * ширину и терял всё протаскивание, кроме последнего кадра (shell.tsx, `PanelResizer`). Тест ведёт
- * границу серией кадров и проверяет итоговую ширину — не одну лишь дельту последнего.
+ * Поведение оболочки на настоящем DOM. Первая часть — регресс на баг границ панелей:
+ * `pointermove`-слушатель внутри `onPointerDown` замыкал устаревшую ширину и терял всё протаскивание,
+ * кроме последнего кадра (shell.tsx, `PanelResizer`). Вторая — скрытие и возврат панелей.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Shell, type ShellProps } from "./shell.tsx";
-import { defaultLayout, panelWidthLimits } from "./layout.ts";
+import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
 afterEach(cleanup);
 
+const labels = {
+  left: "левая панель",
+  right: "правая панель",
+  emptyTabs: "вкладок нет",
+  hideLeft: "скрыть левую",
+  hideRight: "скрыть правую",
+  showLeft: "показать левую",
+  showRight: "показать правую",
+};
+
+/** Левая панель по умолчанию видна, правая — нет: её вкладок у ядра больше нет. */
+const rightVisible: ShellLayout = { ...defaultLayout, rightHidden: false, openTab: "appearance" };
+
 function show(overrides: Partial<ShellProps> = {}) {
   const onLayoutChange = vi.fn();
   const props: ShellProps = {
     layout: defaultLayout,
     onLayoutChange,
-    labels: { left: "левая панель", right: "правая панель", emptyTabs: "вкладок нет" },
+    labels,
     navigation: <div>навигация</div>,
     status: <div>статус демона</div>,
     tabs: [],
@@ -60,7 +73,7 @@ describe("PanelResizer", () => {
 
   it("moves the right edge the opposite way of the cursor", () => {
     const { onLayoutChange } = show({
-      layout: { ...defaultLayout, openTab: "appearance" },
+      layout: rightVisible,
       tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
     });
     const separator = screen.getByRole("separator", { name: "правая панель" });
@@ -68,8 +81,7 @@ describe("PanelResizer", () => {
     drag(separator, 500, [480, 460]);
 
     expect(onLayoutChange).toHaveBeenLastCalledWith({
-      ...defaultLayout,
-      openTab: "appearance",
+      ...rightVisible,
       rightWidth: defaultLayout.rightWidth + 40,
     });
   });
@@ -122,5 +134,53 @@ describe("PanelResizer", () => {
     expect(left.getAttribute("aria-valuemin")).toBe(String(panelWidthLimits.minimum));
     expect(left.getAttribute("aria-valuemax")).toBe(String(panelWidthLimits.maximum));
     expect(left.getAttribute("aria-valuenow")).toBe(String(defaultLayout.leftWidth));
+  });
+});
+
+describe("hiding and restoring the panels", () => {
+  it("a hidden left panel is gone with its edge, and a restore button takes its place", () => {
+    show({ layout: { ...defaultLayout, leftHidden: true } });
+
+    expect(screen.queryByRole("separator", { name: "левая панель" })).toBeNull();
+    expect(screen.getByRole("button", { name: "показать левую" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "скрыть левую" })).toBeNull();
+  });
+
+  it("the restore button brings the panel back", () => {
+    const { onLayoutChange } = show({ layout: { ...defaultLayout, leftHidden: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "показать левую" }));
+
+    expect(onLayoutChange).toHaveBeenLastCalledWith({ ...defaultLayout, leftHidden: false });
+  });
+
+  it("the hide button removes the panel and drops its edge", () => {
+    const { onLayoutChange } = show();
+
+    fireEvent.click(screen.getByRole("button", { name: "скрыть левую" }));
+
+    expect(onLayoutChange).toHaveBeenLastCalledWith({ ...defaultLayout, leftHidden: true });
+  });
+
+  it("hiding the right panel also clears its open tab", () => {
+    const { onLayoutChange } = show({
+      layout: rightVisible,
+      tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "скрыть правую" }));
+
+    expect(onLayoutChange).toHaveBeenLastCalledWith({
+      ...rightVisible,
+      rightHidden: true,
+      openTab: undefined,
+    });
+  });
+
+  it("the right panel is hidden by default", () => {
+    show();
+
+    expect(screen.queryByRole("separator", { name: "правая панель" })).toBeNull();
+    expect(screen.getByRole("button", { name: "показать правую" })).toBeDefined();
   });
 });

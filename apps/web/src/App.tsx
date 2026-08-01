@@ -376,6 +376,10 @@ export function App() {
         left: translator.t("panel.left"),
         right: translator.t("panel.right"),
         emptyTabs: translator.t("panel.tabs.empty"),
+        hideLeft: translator.t("panel.left.hide"),
+        hideRight: translator.t("panel.right.hide"),
+        showLeft: translator.t("panel.left.show"),
+        showRight: translator.t("panel.right.show"),
       }}
       navigation={
         <div className="shell-nav">

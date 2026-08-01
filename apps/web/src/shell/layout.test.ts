@@ -27,10 +27,27 @@ describe("readLayout", () => {
     expect(readLayout(storage())).toEqual(defaultLayout);
   });
 
-  it("restores the widths and the open tab", () => {
-    const kept = { leftWidth: 300, rightWidth: 400, openTab: "diagnostics" };
+  it("restores the widths, the open tab and the hidden flags", () => {
+    const kept = {
+      leftWidth: 300,
+      rightWidth: 400,
+      openTab: "diagnostics",
+      leftHidden: false,
+      rightHidden: true,
+    };
 
     expect(readLayout(storage(JSON.stringify(kept)))).toEqual(kept);
+  });
+
+  it("defaults the hidden flags when the entry does not carry them", () => {
+    // Запись без новых полей — от платформы, которая о них не знала: берутся значения по умолчанию,
+    // а не «отсутствует», иначе панель без флага читалась бы как видимое `undefined`.
+    const restored = readLayout(
+      storage(JSON.stringify({ leftWidth: 300, rightWidth: 400, openTab: "diagnostics" })),
+    );
+
+    expect(restored.leftHidden).toBe(false);
+    expect(restored.rightHidden).toBe(false);
   });
 
   it("keeps a closed right panel closed", () => {

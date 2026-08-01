@@ -38,6 +38,19 @@
   min-height: 0;
 }
 
+/* Шапка панели: единственная кнопка «скрыть», прижатая к правому краю. */
+.shell-left-head {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.shell-right-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  justify-content: space-between;
+}
+
 /* Состояние демона и выход стоят в одной колонке: и то и другое про соединение, не про вью. */
 .shell-status {
   display: flex;
@@ -54,10 +67,49 @@
 /* Фоновая заливка страницы — единственное место, где второй акцент работает на всю площадь. */
 .shell-page {
   flex: 1 1 auto;
+  position: relative;
   min-width: 0;
   padding: var(--sovereign-space-5);
   background: var(--sovereign-gradient-backdrop);
   overflow: auto;
+}
+
+/*
+ * Кнопки скрытия и возврата панелей. Скрытие живёт в шапке панели; возврат — плавает над углом
+ * страницы абсолютно, прижатый к краю, к которому относится.
+ */
+.shell-hide,
+.shell-restore {
+  flex: 0 0 auto;
+  width: var(--sovereign-control-height-sm);
+  height: var(--sovereign-control-height-sm);
+  padding: 0;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-2xs);
+  background: var(--sovereign-control-surface);
+  color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-md);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shell-hide:hover,
+.shell-restore:hover {
+  border-color: var(--sovereign-border-strong);
+  background: var(--sovereign-control-surface-hover);
+}
+
+.shell-restore {
+  position: absolute;
+  top: var(--sovereign-space-2);
+}
+
+.shell-restore-left {
+  left: var(--sovereign-space-2);
+}
+
+.shell-restore-right {
+  right: var(--sovereign-space-2);
 }
 
 .shell-right {
@@ -75,6 +127,9 @@
   display: flex;
   gap: var(--sovereign-space-2);
   flex-wrap: wrap;
+  /* В шапке правой панели делит ширину с кнопкой «скрыть»: вкладки забирают всё, что не кнопка. */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .shell-tab-body {

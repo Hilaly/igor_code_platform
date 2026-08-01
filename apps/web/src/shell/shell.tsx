@@ -18,7 +18,15 @@ export type ShellTabDescription = {
 export type ShellProps = {
   layout: ShellLayout;
   onLayoutChange: (layout: ShellLayout) => void;
-  labels: { left: string; right: string; emptyTabs: string };
+  labels: {
+    left: string;
+    right: string;
+    emptyTabs: string;
+    hideLeft: string;
+    hideRight: string;
+    showLeft: string;
+    showRight: string;
+  };
   navigation: ReactNode;
   /** Низ левой панели: индикатор связи с демоном. Он виден всегда, а не по переходу на страницу. */
   status: ReactNode;
@@ -39,56 +47,110 @@ export function Shell({
 
   return (
     <div className="shell">
-      <nav
-        className="shell-left"
-        aria-label={labels.left}
-        style={{ width: `${layout.leftWidth}px` }}
-      >
-        <div className="shell-left-main">{navigation}</div>
-        <div className="shell-left-bottom">{status}</div>
-      </nav>
-      <PanelResizer
-        edge="left"
-        width={layout.leftWidth}
-        label={labels.left}
-        onWidth={(leftWidth) => onLayoutChange({ ...layout, leftWidth })}
-      />
-      <main className="shell-page">{children}</main>
-      {open === undefined ? undefined : (
-        <PanelResizer
-          edge="right"
-          width={layout.rightWidth}
-          label={labels.right}
-          onWidth={(rightWidth) => onLayoutChange({ ...layout, rightWidth })}
-        />
+      {layout.leftHidden ? undefined : (
+        <>
+          <nav
+            className="shell-left"
+            aria-label={labels.left}
+            style={{ width: `${layout.leftWidth}px` }}
+          >
+            {/* Шапка панели: одна кнопка «скрыть», прижатая к правому краю. Заголовок навигации
+                приходит внутри `navigation` ниже, и совать кнопку в чужое содержимое не нужно. */}
+            <div className="shell-left-head">
+              <button
+                type="button"
+                className="shell-hide"
+                aria-label={labels.hideLeft}
+                title={labels.hideLeft}
+                onClick={() => onLayoutChange({ ...layout, leftHidden: true })}
+              >
+                «
+              </button>
+            </div>
+            <div className="shell-left-main">{navigation}</div>
+            <div className="shell-left-bottom">{status}</div>
+          </nav>
+          <PanelResizer
+            edge="left"
+            width={layout.leftWidth}
+            label={labels.left}
+            onWidth={(leftWidth) => onLayoutChange({ ...layout, leftWidth })}
+          />
+        </>
       )}
-      <aside
-        className="shell-right"
-        aria-label={labels.right}
-        style={open === undefined ? undefined : { width: `${layout.rightWidth}px` }}
-      >
-        <div className="shell-tabs" role="tablist">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              onClick={() =>
-                onLayoutChange({
-                  ...layout,
-                  openTab: layout.openTab === tab.id ? undefined : tab.id,
-                })
-              }
-              pressed={layout.openTab === tab.id}
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
-        {open === undefined ? (
-          <div className="shell-tab-empty">{labels.emptyTabs}</div>
-        ) : (
-          <div className="shell-tab-body">{open.content}</div>
-        )}
-      </aside>
+      <main className="shell-page">
+        {children}
+        {/* Возврат скрытой панели — кнопка поверх угла страницы, а не постоянный рельс: рельс
+            постоянно отъедал бы ширину у страницы ради кнопки, которая нужна редко. Кнопка идёт после
+            страницы, и порядка документа достаточно для её слоя — лишний z-index конкурировал бы с
+            меню на --sovereign-z-overlay. */}
+        {layout.leftHidden ? (
+          <button
+            type="button"
+            className="shell-restore shell-restore-left"
+            aria-label={labels.showLeft}
+            title={labels.showLeft}
+            onClick={() => onLayoutChange({ ...layout, leftHidden: false })}
+          >
+            «
+          </button>
+        ) : undefined}
+        {layout.rightHidden ? (
+          <button
+            type="button"
+            className="shell-restore shell-restore-right"
+            aria-label={labels.showRight}
+            title={labels.showRight}
+            onClick={() => onLayoutChange({ ...layout, rightHidden: false })}
+          >
+            »
+          </button>
+        ) : undefined}
+      </main>
+      {layout.rightHidden || open === undefined ? undefined : (
+        <>
+          <PanelResizer
+            edge="right"
+            width={layout.rightWidth}
+            label={labels.right}
+            onWidth={(rightWidth) => onLayoutChange({ ...layout, rightWidth })}
+          />
+          <aside
+            className="shell-right"
+            aria-label={labels.right}
+            style={{ width: `${layout.rightWidth}px` }}
+          >
+            <div className="shell-right-head">
+              <div className="shell-tabs" role="tablist">
+                {tabs.map((tab) => (
+                  <Button
+                    key={tab.id}
+                    onClick={() =>
+                      onLayoutChange({
+                        ...layout,
+                        openTab: layout.openTab === tab.id ? undefined : tab.id,
+                      })
+                    }
+                    pressed={layout.openTab === tab.id}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="shell-hide"
+                aria-label={labels.hideRight}
+                title={labels.hideRight}
+                onClick={() => onLayoutChange({ ...layout, rightHidden: true, openTab: undefined })}
+              >
+                »
+              </button>
+            </div>
+            <div className="shell-tab-body">{open.content}</div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }
