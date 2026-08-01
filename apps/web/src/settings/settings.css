@@ -32,6 +32,9 @@
 
 .settings-split > * {
   min-width: 0;
+  /* Каждая панель забирает свою долю высоты, а не вырастает под содержимое: иначе длинный список
+     разделов или большой раздел толкал бы раскладку. */
+  min-height: 0;
 }
 
 @container (width < 40rem) {
@@ -45,7 +48,6 @@
   min-height: 0;
 }
 
-.settings-section,
 .settings-appearance,
 .settings-daemon {
   display: flex;

@@ -1,13 +1,13 @@
 /**
- * Страница настроек: под-навигация разделов слева, содержимое раздела справа. Те же `List`/`ListRow`,
- * что и в навигации оболочки. Форму переняла у соседней репы `sovereign_node_claude`, но без её
- * собственной реализации списка: наш кит уже умеет выбираемую строку.
+ * Страница настроек: под-навигация разделов слева, содержимое раздела справа — мастер-деталь, как во
+ * вью сессий. Обе колонки лежат в китовых `Panel`: поверхность с границей одинакова, разница только в
+ * наполнении. Под-навигация собрана из того же `List`/`ListRow`, что и навигация оболочки.
  *
  * Адрес раздела (`/settings/<section>`) переживает перезагрузку: это `page.section` из маршрута.
  * Раздела по умолчанию нет — берётся первый, но в адрес не пишется, пока человек его не выберет.
  */
 
-import { Heading, List, ListRow, Text, type ScopedTranslator } from "@sovereign/ui-kit";
+import { Heading, List, ListRow, Panel, Text, type ScopedTranslator } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import { settingsSections, type SettingsSection } from "../router.ts";
@@ -41,20 +41,22 @@ export function SettingsView({
     <div className="settings">
       <Heading level={1}>{t("settings.title")}</Heading>
       <div className="settings-split">
-        <nav className="settings-nav" aria-label={t("settings.sections")}>
-          <List>
-            {settingsSections.map((candidate) => (
-              <ListRow
-                key={candidate}
-                selected={candidate === active}
-                onSelect={() => onSectionChange(candidate)}
-              >
-                <Text>{t(`settings.section.${candidate}`)}</Text>
-              </ListRow>
-            ))}
-          </List>
-        </nav>
-        <div className="settings-section">{content}</div>
+        <Panel title={t("settings.sections")}>
+          <nav className="settings-nav" aria-label={t("settings.sections")}>
+            <List>
+              {settingsSections.map((candidate) => (
+                <ListRow
+                  key={candidate}
+                  selected={candidate === active}
+                  onSelect={() => onSectionChange(candidate)}
+                >
+                  <Text>{t(`settings.section.${candidate}`)}</Text>
+                </ListRow>
+              ))}
+            </List>
+          </nav>
+        </Panel>
+        <Panel title={t(`settings.section.${active}`)}>{content}</Panel>
       </div>
     </div>
   );
