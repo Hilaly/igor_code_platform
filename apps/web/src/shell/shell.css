@@ -22,7 +22,6 @@
 .shell-left {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: var(--sovereign-space-3);
   padding: var(--sovereign-space-3);
   background: var(--sovereign-panel-surface);
@@ -36,6 +35,15 @@
   flex-direction: column;
   gap: var(--sovereign-space-3);
   min-height: 0;
+  /* Навигация прижата к верху: шапка и основной блок стоят в начале панели, а `shell-left-bottom`
+     (статус демона) оттесняется вниз распором. Так список вью не висит посередине пустой панели. */
+  flex: 1 1 auto;
+}
+
+.shell-left-bottom {
+  flex: 0 0 auto;
+  border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  padding-top: var(--sovereign-space-2);
 }
 
 /* Шапка панели: единственная кнопка «скрыть», прижатая к правому краю. */
@@ -59,11 +67,6 @@
   align-items: stretch;
 }
 
-.shell-left-bottom {
-  border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  padding-top: var(--sovereign-space-2);
-}
-
 /* Фоновая заливка страницы — единственное место, где второй акцент работает на всю площадь. */
 .shell-page {
   flex: 1 1 auto;
@@ -75,33 +78,17 @@
 }
 
 /*
- * Кнопки скрытия и возврата панелей. Скрытие живёт в шапке панели; возврат — плавает над углом
- * страницы абсолютно, прижатый к краю, к которому относится.
+ * Кнопку скрытия рисует кит (`Button`), а не этот файл: раньше здесь была её геометрия и цвет, и это
+ * дублировало кит. Осталась только раскладка вокруг неё и позиционирование возврата.
+ *
+ * Возврат скрытой панели — обёртка над китовой `Button`, плавающая над углом страницы абсолютно,
+ * прижатая к краю, к которому относится. Кнопка вкладывается внутрь, а не получает класс: имена
+ * классов кита хешируются, и позиционировать сам примитив снаружи нельзя.
  */
-.shell-hide,
-.shell-restore {
-  flex: 0 0 auto;
-  width: var(--sovereign-control-height-sm);
-  height: var(--sovereign-control-height-sm);
-  padding: 0;
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  border-radius: var(--sovereign-radius-2xs);
-  background: var(--sovereign-control-surface);
-  color: var(--sovereign-text);
-  font-size: var(--sovereign-font-size-md);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.shell-hide:hover,
-.shell-restore:hover {
-  border-color: var(--sovereign-border-strong);
-  background: var(--sovereign-control-surface-hover);
-}
-
 .shell-restore {
   position: absolute;
   top: var(--sovereign-space-2);
+  display: inline-flex;
 }
 
 .shell-restore-left {

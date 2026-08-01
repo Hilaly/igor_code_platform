@@ -55,17 +55,18 @@ export function Shell({
             style={{ width: `${layout.leftWidth}px` }}
           >
             {/* Шапка панели: одна кнопка «скрыть», прижатая к правому краю. Заголовок навигации
-                приходит внутри `navigation` ниже, и совать кнопку в чужое содержимое не нужно. */}
+                приходит внутри `navigation` ниже, и совать кнопку в чужое содержимое не нужно. Стрелка
+                скрытия смотрит наружу — туда, куда панель свернётся. */}
             <div className="shell-left-head">
-              <button
-                type="button"
-                className="shell-hide"
+              <Button
+                size="sm"
+                iconOnly
                 aria-label={labels.hideLeft}
                 title={labels.hideLeft}
                 onClick={() => onLayoutChange({ ...layout, leftHidden: true })}
               >
                 «
-              </button>
+              </Button>
             </div>
             <div className="shell-left-main">{navigation}</div>
             <div className="shell-left-bottom">{status}</div>
@@ -85,26 +86,32 @@ export function Shell({
             страницы, и порядка документа достаточно для её слоя — лишний z-index конкурировал бы с
             меню на --sovereign-z-overlay. */}
         {layout.leftHidden ? (
-          <button
-            type="button"
-            className="shell-restore shell-restore-left"
-            aria-label={labels.showLeft}
-            title={labels.showLeft}
-            onClick={() => onLayoutChange({ ...layout, leftHidden: false })}
-          >
-            «
-          </button>
+          <span className="shell-restore shell-restore-left">
+            <Button
+              size="sm"
+              iconOnly
+              aria-label={labels.showLeft}
+              title={labels.showLeft}
+              onClick={() => onLayoutChange({ ...layout, leftHidden: false })}
+            >
+              {/* Стрелка возврата смотрит к панели: левая панель спрятана слева, значит вернуть её —
+                  движение вправо. Скрывали её стрелкой «, возвращаем противоположной. */}
+              »
+            </Button>
+          </span>
         ) : undefined}
         {layout.rightHidden ? (
-          <button
-            type="button"
-            className="shell-restore shell-restore-right"
-            aria-label={labels.showRight}
-            title={labels.showRight}
-            onClick={() => onLayoutChange({ ...layout, rightHidden: false })}
-          >
-            »
-          </button>
+          <span className="shell-restore shell-restore-right">
+            <Button
+              size="sm"
+              iconOnly
+              aria-label={labels.showRight}
+              title={labels.showRight}
+              onClick={() => onLayoutChange({ ...layout, rightHidden: false })}
+            >
+              «
+            </Button>
+          </span>
         ) : undefined}
       </main>
       {layout.rightHidden || open === undefined ? undefined : (
@@ -137,15 +144,15 @@ export function Shell({
                   </Button>
                 ))}
               </div>
-              <button
-                type="button"
-                className="shell-hide"
+              <Button
+                size="sm"
+                iconOnly
                 aria-label={labels.hideRight}
                 title={labels.hideRight}
                 onClick={() => onLayoutChange({ ...layout, rightHidden: true, openTab: undefined })}
               >
                 »
-              </button>
+              </Button>
             </div>
             <div className="shell-tab-body">{open.content}</div>
           </aside>
