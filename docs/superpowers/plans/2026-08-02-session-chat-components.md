@@ -1,38 +1,53 @@
-# Session Chat Components Implementation Plan
+# План реализации компонентов чата сессии
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Для агентов-исполнителей:** ОБЯЗАТЕЛЬНЫЙ ДОПОЛНИТЕЛЬНЫЙ SKILL: используйте
+> superpowers:subagent-driven-development (рекомендуется) или superpowers:executing-plans, чтобы
+> выполнять этот план задача за задачей. Для отслеживания шагов используется синтаксис checkbox
+> (`- [ ]`).
 
-**Goal:** Extract the session message feed and controlled message composer from `ChatView` without changing user-visible behavior.
+**Цель:** выделить ленту сообщений сессии и контролируемый композер из `ChatView` без изменения
+видимого пользователю поведения.
 
-**Architecture:** `ChatView` remains the coordinator for the open-session panel and owns the message draft so `EntryTreeDrawer` can replace it after navigation. `MessageComposer` owns only its delivery-mode selection and emits controlled draft changes; `SessionMessageList` owns feed derivation and rendering, including entry actions and label editing. Both remain feature components under `apps/web/src/sessions` and make no requests of their own.
+**Архитектура:** `ChatView` остаётся координатором панели открытой сессии и владеет черновиком
+сообщения, чтобы `EntryTreeDrawer` мог заменить его после навигации. `MessageComposer` владеет только
+выбором режима доставки и сообщает об управляемых изменениях черновика; `SessionMessageList` владеет
+формированием и отображением ленты, включая действия над записями и редактирование меток. Оба
+остаются feature-компонентами в `apps/web/src/sessions` и не выполняют собственных запросов.
 
-**Tech Stack:** TypeScript, React 19, Vitest, Testing Library, `@sovereign/protocol`, `@sovereign/ui-kit`.
+**Технологический стек:** TypeScript, React 19, Vitest, Testing Library, `@sovereign/protocol`,
+`@sovereign/ui-kit`.
 
-## Global Constraints
+## Общие ограничения
 
-- Preserve every existing session-screen behavior and translation key.
-- Keep `draft` state in `ChatView` and pass `draft` plus `onDraftChange` to `MessageComposer`.
-- Keep session HTTP/API calls outside all view components.
-- Keep both extracted components in `apps/web/src/sessions`; do not add UI-kit primitives or dependencies.
-- Preserve the feed order: persisted active-branch entries, pending turns, then live items.
-- Preserve first-live-prompt deduplication without hiding later steering that repeats an earlier human message.
-- Follow TDD: add the direct component test, observe the expected failure, then add production code.
-- End each task with passing focused tests, the existing `sessions-view.test.tsx`, web typechecking, and an atomic commit.
+- Сохранить всё существующее поведение экрана сессии и каждый ключ перевода.
+- Оставить состояние `draft` в `ChatView` и передавать `draft` вместе с `onDraftChange` в
+  `MessageComposer`.
+- Оставить HTTP/API-вызовы сессии за пределами всех view-компонентов.
+- Оставить оба выделенных компонента в `apps/web/src/sessions`; не добавлять примитивы или
+  зависимости UI-кита.
+- Сохранить порядок ленты: сохранённые записи активной ветки, ожидающие турны, затем live-элементы.
+- Сохранить дедупликацию первого live-prompt, не скрывая более поздний steering, повторяющий прежнее
+  сообщение человека.
+- Следовать TDD: добавить прямой компонентный тест, увидеть ожидаемый отказ, затем добавить
+  production-код.
+- Завершать каждую задачу зелёными focused-тестами, существующим `sessions-view.test.tsx`, проверкой
+  типов веб-пакета и атомарным коммитом.
 
 ---
 
-### Task 1: Extract the controlled message composer
+### Задача 1: выделить контролируемый композер сообщений
 
-**Files:**
+**Файлы:**
 
-- Create: `apps/web/src/sessions/message-composer.tsx`
-- Create: `apps/web/src/sessions/message-composer.test.tsx`
-- Modify: `apps/web/src/sessions/chat-view.tsx:12-370`
+- Создать: `apps/web/src/sessions/message-composer.tsx`
+- Создать: `apps/web/src/sessions/message-composer.test.tsx`
+- Изменить: `apps/web/src/sessions/chat-view.tsx:12-370`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: `SessionMessage`, `SessionMessageMode`, and `ScopedTranslator`; callbacks already received by `ChatView`.
-- Produces:
+- Получает: `SessionMessage`, `SessionMessageMode` и `ScopedTranslator`; колбэки, уже получаемые
+  `ChatView`.
+- Предоставляет:
 
 ```ts
 export type MessageComposerProps = {
@@ -48,47 +63,54 @@ export type MessageComposerProps = {
 export function MessageComposer(props: MessageComposerProps): React.JSX.Element;
 ```
 
-- `ChatView` remains responsible for hiding the component when the session is archived and passes its `draft`/`setDraft` pair directly.
+- `ChatView` сохраняет ответственность за скрытие компонента, когда сессия архивная, и напрямую
+  передаёт свою пару `draft`/`setDraft`.
 
-- [x] **Step 1: Write the failing direct component tests**
+- [x] **Шаг 1: написать падающие прямые компонентные тесты**
 
-Create `message-composer.test.tsx` with a stateful harness that renders `MessageComposer`. Prove these component-boundary behaviors through the DOM:
+Создать `message-composer.test.tsx` с harness-компонентом с состоянием, который отображает
+`MessageComposer`. Доказать через DOM следующее поведение границы компонента:
 
 ```tsx
-it("reports draft changes through its controlled interface", () => {
-  // Type through the textarea and assert that the harness displays the updated controlled value.
+it("сообщает об изменениях черновика через контролируемый интерфейс", () => {
+  // Ввести текст через textarea и проверить, что harness показывает обновлённое контролируемое значение.
 });
 
-it("submits an idle draft and asks its owner to clear it", () => {
-  // Type "привет", click "Отправить", assert onSubmit("привет") and an empty textarea.
+it("отправляет черновик простаивающей сессии и просит владельца очистить его", () => {
+  // Ввести "привет", нажать "Отправить", проверить onSubmit("привет") и пустую textarea.
 });
 
-it("owns the delivery mode while the session is busy", () => {
-  // Select follow-up, send "продолжай", and assert { text: "продолжай", mode: "follow-up" }.
+it("владеет режимом доставки, пока сессия занята", () => {
+  // Выбрать follow-up, отправить "продолжай" и проверить { text: "продолжай", mode: "follow-up" }.
 });
 
-it("offers append only while idle and interrupt only while busy", () => {
-  // Assert append calls mode "append" in idle state, rerender busy, then assert interrupt.
+it("предлагает append только в простое, а interrupt — только во время работы", () => {
+  // Проверить вызов append с режимом "append" в простое, перерисовать занятую сессию и проверить interrupt.
 });
 ```
 
-- [x] **Step 2: Run the direct test and verify RED**
+- [x] **Шаг 2: запустить прямой тест и подтвердить RED**
 
-Run:
+Выполнить:
 
 ```bash
 pnpm --filter @sovereign/web test -- src/sessions/message-composer.test.tsx
 ```
 
-Expected: FAIL because `./message-composer.tsx` does not exist. Do not add production code before recording this failure in the task report.
+Ожидается: FAIL, потому что `./message-composer.tsx` не существует. Не добавлять production-код до
+фиксации этого отказа в отчёте о задаче.
 
-- [x] **Step 3: Implement the minimal controlled component**
+- [x] **Шаг 3: реализовать минимальный контролируемый компонент**
 
-Move `busyModes`, delivery-mode state, the mode selector, textarea, send/append decisions, draft clearing, and interrupt button from `ChatView` into `message-composer.tsx`. Use `props.onDraftChange("")` after a non-empty send or append. Keep raw draft text on submission and use `trim()` only to reject/disable empty input, matching current behavior.
+Перенести из `ChatView` в `message-composer.tsx` `busyModes`, состояние режима доставки, селектор
+режима, textarea, выбор отправки/append, очистку черновика и кнопку прерывания. После непустой
+отправки или append вызывать `props.onDraftChange("")`. При отправке сохранять исходный текст
+черновика и использовать `trim()` только для отклонения/блокировки пустого ввода, как в текущем
+поведении.
 
-- [x] **Step 4: Integrate it into `ChatView`**
+- [x] **Шаг 4: встроить компонент в `ChatView`**
 
-Remove the moved UI-kit imports and inline composer code. Render:
+Удалить перенесённые импорты UI-кита и встроенный код композера. Отобразить:
 
 ```tsx
 {
@@ -106,38 +128,39 @@ Remove the moved UI-kit imports and inline composer code. Render:
 }
 ```
 
-Keep `<EntryTreeDrawer onEditorText={setDraft} />` unchanged so navigation still fills the same controlled draft.
+Оставить `<EntryTreeDrawer onEditorText={setDraft} />` без изменений, чтобы навигация продолжала
+заполнять тот же контролируемый черновик.
 
-- [x] **Step 5: Verify GREEN and integration**
+- [x] **Шаг 5: подтвердить GREEN и интеграцию**
 
-Run:
+Выполнить:
 
 ```bash
 pnpm --filter @sovereign/web test -- src/sessions/message-composer.test.tsx src/sessions/sessions-view.test.tsx
 pnpm --filter @sovereign/web typecheck
 ```
 
-Expected: both test files pass and typechecking exits 0.
+Ожидается: оба тестовых файла проходят, проверка типов завершается с кодом 0.
 
-- [x] **Step 6: Commit**
+- [x] **Шаг 6: сделать коммит**
 
 ```bash
 git add apps/web/src/sessions/message-composer.tsx apps/web/src/sessions/message-composer.test.tsx apps/web/src/sessions/chat-view.tsx
 git commit -m "refactor(web): extract the session message composer" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
-### Task 2: Extract the session message list
+### Задача 2: выделить список сообщений сессии
 
-**Files:**
+**Файлы:**
 
-- Create: `apps/web/src/sessions/session-message-list.tsx`
-- Create: `apps/web/src/sessions/session-message-list.test.tsx`
-- Modify: `apps/web/src/sessions/chat-view.tsx:12-644`
+- Создать: `apps/web/src/sessions/session-message-list.tsx`
+- Создать: `apps/web/src/sessions/session-message-list.test.tsx`
+- Изменить: `apps/web/src/sessions/chat-view.tsx:12-644`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: the `OpenSession` snapshot and existing callbacks for fork and entry labels.
-- Produces:
+- Получает: снимок `OpenSession` и существующие колбэки для fork и меток записей.
+- Предоставляет:
 
 ```ts
 export type SessionMessageListProps = {
@@ -152,57 +175,62 @@ export type SessionMessageListProps = {
 export function SessionMessageList(props: SessionMessageListProps): React.JSX.Element;
 ```
 
-- Owns its label-editor dialog and label-refusal notice because both originate from message-row actions.
-- Leaves turn-failure/degradation notices, stats, context, queue badges, tree, session fork, and compaction in `ChatView`.
+- Владеет собственным диалогом редактирования метки и уведомлением об отказе метки, потому что оба
+  возникают из действий строки сообщения.
+- Оставляет уведомления об отказах/деградации турна, статистику, контекст, значки очереди, дерево,
+  fork сессии и компакцию в `ChatView`.
 
-- [x] **Step 1: Write the failing direct component tests**
+- [x] **Шаг 1: написать падающие прямые компонентные тесты**
 
-Create `session-message-list.test.tsx` using a minimal `OpenSession` fixture. Prove these component-boundary behaviors through the DOM:
+Создать `session-message-list.test.tsx` с минимальной фикстурой `OpenSession`. Доказать через DOM
+следующее поведение границы компонента:
 
 ```tsx
-it("renders persisted entries, pending turns, and live items in that order", () => {
-  // Use three unique texts and compare their element positions.
+it("отображает по порядку сохранённые записи, ожидающие турны и live-элементы", () => {
+  // Использовать три уникальных текста и сравнить положения их элементов.
 });
 
-it("deduplicates the persisted first prompt but keeps repeated steering", () => {
-  // Persist "привет" and provide two live user messages with that text; expect two visible copies.
+it("дедуплицирует сохранённый первый prompt, но сохраняет повторный steering", () => {
+  // Сохранить "привет" и передать два live-сообщения пользователя с этим текстом; ожидать две видимые копии.
 });
 
-it("keeps message actions and label editing with the list", async () => {
-  // Open a message label menu, save a label, and assert onSetLabel(entryId, label).
+it("оставляет действия над сообщениями и редактирование меток в списке", async () => {
+  // Открыть меню метки сообщения, сохранить метку и проверить onSetLabel(entryId, label).
 });
 
-it("does not offer writing actions for archived messages", () => {
-  // Assert label actions are absent while persisted content remains readable.
+it("не предлагает изменяющих действий для архивных сообщений", () => {
+  // Проверить отсутствие действий с метками при сохранении читаемого содержимого.
 });
 ```
 
-- [x] **Step 2: Run the direct test and verify RED**
+- [x] **Шаг 2: запустить прямой тест и подтвердить RED**
 
-Run:
+Выполнить:
 
 ```bash
 pnpm --filter @sovereign/web test -- src/sessions/session-message-list.test.tsx
 ```
 
-Expected: FAIL because `./session-message-list.tsx` does not exist. Do not add production code before recording this failure in the task report.
+Ожидается: FAIL, потому что `./session-message-list.tsx` не существует. Не добавлять production-код
+до фиксации этого отказа в отчёте о задаче.
 
-- [x] **Step 3: Implement the minimal list component**
+- [x] **Шаг 3: реализовать минимальный компонент списка**
 
-Move from `ChatView` into `session-message-list.tsx`:
+Перенести из `ChatView` в `session-message-list.tsx`:
 
-- tool-result lookup;
-- active-branch/feed filtering;
-- pending and live ordering and first-prompt deduplication;
-- loading and empty states around `MessageFeed`;
-- `EntryMessage`, `ContentBlock`, and `LiveMessage`;
-- label-dialog state, label request, its refusal notice, and row-level fork/label callbacks.
+- поиск результата вызова инструмента;
+- фильтрацию активной ветки/ленты;
+- порядок ожидающих и live-элементов и дедупликацию первого prompt;
+- состояния загрузки и пустой ленты вокруг `MessageFeed`;
+- `EntryMessage`, `ContentBlock` и `LiveMessage`;
+- состояние диалога метки, запрос метки, уведомление об отказе и колбэки fork/метки на уровне строки.
 
-Preserve existing comments that explain non-obvious ordering, streaming markdown, archive behavior, and fork positions.
+Сохранить существующие комментарии, объясняющие неочевидный порядок, потоковую Markdown-разметку,
+поведение архива и позиции fork.
 
-- [x] **Step 4: Integrate it into `ChatView`**
+- [x] **Шаг 4: встроить компонент в `ChatView`**
 
-Replace the inline feed and label dialog with:
+Заменить встроенную ленту и диалог метки на:
 
 ```tsx
 <SessionMessageList
@@ -215,22 +243,24 @@ Replace the inline feed and label dialog with:
 />
 ```
 
-Remove only imports, state, helpers, and refusal handling now owned by the list. Keep compaction refusal local to `ChatView` and preserve its translated notice.
+Удалить только импорты, состояние, вспомогательные функции и обработку отказа, которыми теперь
+владеет список. Оставить отказ компакции локальным для `ChatView` и сохранить его переведённое
+уведомление.
 
-- [x] **Step 5: Verify GREEN and integration**
+- [x] **Шаг 5: подтвердить GREEN и интеграцию**
 
-Run:
+Выполнить:
 
 ```bash
 pnpm --filter @sovereign/web test -- src/sessions/session-message-list.test.tsx src/sessions/message-composer.test.tsx src/sessions/sessions-view.test.tsx
 pnpm --filter @sovereign/web typecheck
 ```
 
-Expected: all three test files pass and typechecking exits 0.
+Ожидается: все три тестовых файла проходят, проверка типов завершается с кодом 0.
 
-- [x] **Step 6: Run feature-wide verification**
+- [x] **Шаг 6: выполнить проверку всей feature-области**
 
-Run:
+Выполнить:
 
 ```bash
 pnpm --filter @sovereign/web test
@@ -238,42 +268,48 @@ pnpm exec eslint apps/web/src/sessions
 pnpm exec prettier --check apps/web/src/sessions
 ```
 
-Expected: the whole web suite passes, ESLint exits 0, and Prettier reports all matched files formatted.
+Ожидается: весь набор тестов веб-пакета проходит, ESLint завершается с кодом 0, а Prettier сообщает,
+что все подходящие файлы отформатированы.
 
-- [x] **Step 7: Commit**
+- [x] **Шаг 7: сделать коммит**
 
 ```bash
 git add apps/web/src/sessions/session-message-list.tsx apps/web/src/sessions/session-message-list.test.tsx apps/web/src/sessions/chat-view.tsx
 git commit -m "refactor(web): extract the session message list" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
-### Task 3: Verify the complete refactor
+### Задача 3: проверить завершённый рефакторинг
 
-**Files:**
+**Файлы:**
 
-- Modify only if a verification failure exposes a regression in files changed by Tasks 1–2.
+- Изменять только в том случае, если отказ проверки обнаружит регрессию в файлах, изменённых в
+  задачах 1–2.
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: the two extracted components integrated by `ChatView`.
-- Produces: a branch whose complete repository checks and web production build pass.
+- Получает: два выделенных компонента, встроенных в `ChatView`.
+- Предоставляет: ветку, в которой проходят полные проверки репозитория и production-сборка веба.
 
-- [x] **Step 1: Run the full repository check**
+- [x] **Шаг 1: запустить полную проверку репозитория**
 
 ```bash
 make check
 ```
 
-Expected: typechecking, ESLint, Prettier, and every package test exit 0.
+Ожидается: проверка типов, ESLint, Prettier и тесты каждого пакета завершаются с кодом 0.
 
-- [x] **Step 2: Run the production build**
+- [x] **Шаг 2: запустить production-сборку**
 
 ```bash
 make build
 ```
 
-Expected: every package with a build script succeeds and the web Vite production bundle is emitted without errors.
+Ожидается: каждый пакет со скриптом сборки успешно собирается, а production-бандл веба Vite
+создаётся без ошибок.
 
-- [x] **Step 3: Record verification**
+- [x] **Шаг 3: зафиксировать проверку**
 
-If no code changes were needed, do not create an empty commit. Record commands, exit codes, and test counts in the task report and SDD ledger. If an in-scope regression required a change, first add a failing regression test, observe RED, implement the minimal fix, repeat both commands, and commit atomically with the required co-author trailer.
+Если изменения кода не понадобились, не создавать пустой коммит. Записать команды, коды выхода и
+число тестов в отчёте о задаче и SDD-журнале. Если потребовалось исправить регрессию в заданных
+границах, сначала добавить падающий регрессионный тест, увидеть RED, реализовать минимальное
+исправление, повторить обе команды и сделать атомарный коммит с обязательным co-author-трейлером.
