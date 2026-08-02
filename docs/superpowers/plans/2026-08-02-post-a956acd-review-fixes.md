@@ -34,15 +34,15 @@
 - Использует: `ShellProps.labels.emptyTabs`, `ShellLayout.rightHidden`, `ShellTabDescription[]`.
 - Даёт: видимый `aside` и заглушку при `rightHidden === false` и отсутствии открытой вкладки.
 
-- [ ] Добавить DOM-тест: восстановить правую панель при `tabs={[]}`, перерендерить с полученной
+- [x] Добавить DOM-тест: восстановить правую панель при `tabs={[]}`, перерендерить с полученной
       раскладкой и проверить видимую заглушку `labels.emptyTabs`.
-- [ ] Запустить
+- [x] Запустить
       `pnpm --filter @sovereign/web test -- src/shell/shell.test.tsx` и получить падение из-за
       отсутствующей заглушки.
-- [ ] Убрать `open === undefined` из условия, скрывающего всю панель; внутри `aside` рисовать
+- [x] Убрать `open === undefined` из условия, скрывающего всю панель; внутри `aside` рисовать
       `<div className="shell-tab-empty">{labels.emptyTabs}</div>` вместо контента вкладки.
-- [ ] Повторить тематический тест и убедиться, что весь файл зелёный.
-- [ ] Закоммитить как `fix(web): let the empty right panel be restored`.
+- [x] Повторить тематический тест и убедиться, что весь файл зелёный.
+- [x] Закоммитить как `fix(web): let the empty right panel be restored`.
 
 ### Задача 2: безопасный адрес произвольного провайдера
 
@@ -57,14 +57,14 @@
 - Даёт: `pathOf` с `encodeURIComponent(providerId)` и `matchPage` с безопасным
   `decodeURIComponent` одного сегмента.
 
-- [ ] Добавить тест полного круга для `providerId === "vendor/модель с пробелом"` и тест, что
+- [x] Добавить тест полного круга для `providerId === "vendor/модель с пробелом"` и тест, что
       `/providers/%` разбирается как неизвестный маршрут без исключения.
-- [ ] Запустить `pnpm --filter @sovereign/web test -- src/router.test.ts` и увидеть неверный путь
+- [x] Запустить `pnpm --filter @sovereign/web test -- src/router.test.ts` и увидеть неверный путь
       или разбор идентификатора.
-- [ ] Кодировать сегмент в `pathOf`; декодировать его в `matchPage` через локальную функцию, которая
+- [x] Кодировать сегмент в `pathOf`; декодировать его в `matchPage` через локальную функцию, которая
       возвращает `undefined` при `URIError`, после чего вернуть `unknown`.
-- [ ] Повторить тематический тест.
-- [ ] Закоммитить как `fix(web): round-trip provider identifiers in routes`.
+- [x] Повторить тематический тест.
+- [x] Закоммитить как `fix(web): round-trip provider identifiers in routes`.
 
 ### Задача 3: нативный submit форм
 
@@ -83,15 +83,15 @@
 - Использует: существующий `Form.onSubmit`; подтверждающие кнопки задают `type="submit"` и не
   вызывают тот же submit повторно через `onClick`.
 
-- [ ] Добавить серверный тест разметки: обычный `Button` имеет `type="button"`, а
+- [x] Добавить серверный тест разметки: обычный `Button` имеет `type="button"`, а
       `<Button type="submit">` — `type="submit"`.
-- [ ] Запустить `pnpm --filter @sovereign/ui-kit test -- src/components/rendering.test.tsx` и
+- [x] Запустить `pnpm --filter @sovereign/ui-kit test -- src/components/rendering.test.tsx` и
       получить ошибку TypeScript/неверную разметку из-за отсутствующего пропа.
-- [ ] Добавить проп в `Button`, передать его в нативную кнопку, заменить `onClick={submit}` на
+- [x] Добавить проп в `Button`, передать его в нативную кнопку, заменить `onClick={submit}` на
       `type="submit"` в трёх формах.
-- [ ] Обновить публичный контракт `Button` в `docs/ui-kit.md`.
-- [ ] Запустить тесты UI-кита, login, projects и providers view.
-- [ ] Закоммитить как `fix(ui-kit): restore native form submission`.
+- [x] Обновить публичный контракт `Button` в `docs/ui-kit.md`.
+- [x] Запустить тесты UI-кита, login, projects и providers view.
+- [x] Закоммитить как `fix(ui-kit): restore native form submission`.
 
 ### Задача 4: состояние пикера папки проекта
 
@@ -106,14 +106,14 @@
 - Даёт: при навигации `cwd` меняется вместе с очисткой `entries`, `value` и `pickerError`; в
   `entries` пикера передаются только элементы `kind === "directory"`.
 
-- [ ] Добавить тест с отложенным вторым запросом: после двойного клика по каталогу прежние строки
+- [x] Добавить тест с отложенным вторым запросом: после двойного клика по каталогу прежние строки
       сразу исчезают. В том же сценарии ответ корня содержит файл, но в пикере его нет.
-- [ ] Запустить `pnpm --filter @sovereign/web test -- src/projects/projects-view.test.tsx` и
+- [x] Запустить `pnpm --filter @sovereign/web test -- src/projects/projects-view.test.tsx` и
       увидеть старый каталог и файл.
-- [ ] Ввести локальный обработчик навигации, который синхронно очищает список, выбор и ошибку;
+- [x] Ввести локальный обработчик навигации, который синхронно очищает список, выбор и ошибку;
       фильтровать файлы перед передачей `entries`.
-- [ ] Повторить тематический тест.
-- [ ] Закоммитить как `fix(web): harden project folder picking`.
+- [x] Повторить тематический тест.
+- [x] Закоммитить как `fix(web): harden project folder picking`.
 
 ### Задача 5: абсолютный путь filesystem API
 
@@ -128,15 +128,15 @@
 - Даёт: `400 {"error":"the path query parameter must be absolute"}` для относительного пути до
   вызова `readdirSync`.
 
-- [ ] Добавить HTTP-тест с `path=relative/directory` и ожидаемым `400`.
-- [ ] Запустить `pnpm --filter @sovereign/daemon exec node --test src/filesystem.test.ts` и увидеть
+- [x] Добавить HTTP-тест с `path=relative/directory` и ожидаемым `400`.
+- [x] Запустить `pnpm --filter @sovereign/daemon exec node --test src/filesystem.test.ts` и увидеть
       текущий `404` вместо `400`.
-- [ ] Импортировать `isAbsolute` и добавить проверку после обязательности параметра.
-- [ ] Повторить тематический тест.
-- [ ] Закоммитить как `fix(daemon): reject relative filesystem paths`.
+- [x] Импортировать `isAbsolute` и добавить проверку после обязательности параметра.
+- [x] Повторить тематический тест.
+- [x] Закоммитить как `fix(daemon): reject relative filesystem paths`.
 
 ### Финальная проверка
 
-- [ ] Запустить `make check` на Node 24.
-- [ ] Запустить `make build` на Node 24.
-- [ ] Проверить `git diff --check`, чистый `git status`, трейлеры и атомарность новых коммитов.
+- [x] Запустить `make check` на Node 24.
+- [x] Запустить `make build` на Node 24.
+- [x] Проверить `git diff --check`, чистый `git status`, трейлеры и атомарность новых коммитов.
