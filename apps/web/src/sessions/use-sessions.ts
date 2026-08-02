@@ -78,6 +78,8 @@ export type UseSessionsOptions = {
   stream: StreamStatus;
   /** Открытая сессия приходит из адреса: маршрут — источник истины, а не состояние вью. */
   sessionId?: string;
+  /** На странице проекта список ограничен его идентификатором; адрес открытой сессии остаётся отдельным. */
+  projectId?: string;
   onDiagnostic: (diagnostic: string) => void;
 };
 
@@ -115,7 +117,7 @@ const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
 export function useSessions(options: UseSessionsOptions): SessionsController {
-  const { bus, stream, sessionId, onDiagnostic } = options;
+  const { bus, stream, sessionId, projectId, onDiagnostic } = options;
   const [state, setState] = useState<SessionsState>(initialSessionsState);
 
   // То же зеркало, что во вью провайдеров: правило смотрит на предыдущее состояние, а дельты
@@ -136,7 +138,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     const controller = new AbortController();
     pendingSessions.current = controller;
 
-    void fetchSessions(undefined, latest.current.showArchived, controller.signal)
+    void fetchSessions(projectId, latest.current.showArchived, controller.signal)
       .then((snapshot) => apply((current) => applySessions(current, snapshot)))
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
@@ -148,7 +150,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         onDiagnostic(`the sessions could not be read: ${reason}`);
         apply((current) => applyFailure(current, reason));
       });
-  }, [apply, onDiagnostic]);
+  }, [apply, onDiagnostic, projectId]);
 
   const reloadAgents = useCallback(() => {
     pendingAgents.current?.abort();

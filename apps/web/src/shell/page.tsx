@@ -14,6 +14,7 @@ export type PageViewProps = {
   /** Вью приходят собранными: страница не знает ни про шину, ни про запросы. */
   plugins: ReactNode;
   projects: ReactNode;
+  project: ReactNode;
   providers: ReactNode;
   sessions: ReactNode;
   /** Создание сессии — отдельный адресуемый экран, не часть мастер-детали. */
@@ -26,6 +27,7 @@ export function PageView({
   page,
   plugins,
   projects,
+  project,
   providers,
   sessions,
   newSession,
@@ -40,6 +42,10 @@ export function PageView({
 
   if (page.kind === "projects") {
     return projects;
+  }
+
+  if (page.kind === "project") {
+    return project;
   }
 
   if (page.kind === "providers") {

@@ -17,6 +17,48 @@
   gap: var(--sovereign-space-2);
 }
 
+.projects-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+}
+
+.projects-toolbar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-detail,
+.project-detail-header,
+.project-detail-summary,
+.project-detail-topbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
+.project-detail {
+  min-width: 0;
+}
+
+.project-detail-topbar {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.project-detail-header,
+.project-detail-summary {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.project-detail-header > :first-child {
+  min-width: 0;
+}
+
 /*
  * В строке ровно двое: сведения о проекте и его пометки с действиями. Действия держатся правого
  * края распором между ними, а не селектором по классу примитива: имена классов кита хешируются
@@ -32,6 +74,7 @@
   justify-content: space-between;
   gap: var(--sovereign-space-3);
   flex-wrap: wrap;
+  min-height: var(--sovereign-control-height-lg);
 }
 
 .projects-row-facts {

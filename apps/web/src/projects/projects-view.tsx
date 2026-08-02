@@ -39,6 +39,7 @@ export type ProjectsViewProps = {
   onUpdate: (id: string, update: ProjectUpdate) => void;
   onRemove: (id: string) => void;
   onDismissComplaints: () => void;
+  onOpen?: (id: string) => void;
   translator: ScopedTranslator;
 };
 
@@ -46,6 +47,8 @@ export function ProjectsView(props: ProjectsViewProps) {
   const { state, translator } = props;
   const { t } = translator;
   const snapshot = state.snapshot;
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
 
   if (snapshot === undefined) {
     return (
@@ -74,27 +77,58 @@ export function ProjectsView(props: ProjectsViewProps) {
         <Notice tone="danger" title={t("projects.write.failed", { reason: state.failure })} />
       )}
 
-      <NewProject
-        onCreate={props.onCreate}
-        onDismissComplaints={props.onDismissComplaints}
-        conflict={state.conflict}
-        translator={translator}
-      />
+      <div className="projects-toolbar">
+        <Input
+          value={query}
+          onChange={setQuery}
+          type="search"
+          aria-label={t("projects.search")}
+          placeholder={t("projects.search")}
+        />
+        <Button
+          tone="accent"
+          onClick={() => setCreating((open) => !open)}
+          aria-expanded={creating || state.conflict !== undefined}
+        >
+          + {t("projects.new.title")}
+        </Button>
+      </div>
+
+      {creating || state.conflict !== undefined ? (
+        <NewProject
+          onCreate={async (draft) => {
+            const created = await props.onCreate(draft);
+
+            if (created) {
+              setCreating(false);
+            }
+
+            return created;
+          }}
+          onDismissComplaints={props.onDismissComplaints}
+          conflict={state.conflict}
+          translator={translator}
+        />
+      ) : undefined}
 
       {/* Список — в панели, как и каждый плагин во вью плагинов: без неё строки лежат прямо на
           фоне страницы и не читаются блоком. */}
+
       <Panel>
         {snapshot.projects.length === 0 ? (
           <EmptyState title={t("projects.empty")} hint={t("projects.empty.hint")} />
+        ) : filterProjects(snapshot.projects, query).length === 0 ? (
+          <EmptyState title={t("projects.search.empty")} hint={t("projects.search.empty.hint")} />
         ) : (
           <List>
-            {snapshot.projects.map((project) => (
+            {filterProjects(snapshot.projects, query).map((project) => (
               <ProjectRow
                 key={project.id}
                 project={project}
                 conflicting={state.conflict?.project.id === project.id}
                 onUpdate={props.onUpdate}
                 onRemove={props.onRemove}
+                onOpen={props.onOpen === undefined ? undefined : () => props.onOpen?.(project.id)}
                 translator={translator}
               />
             ))}
@@ -106,13 +140,14 @@ export function ProjectsView(props: ProjectsViewProps) {
         <Disclosure summary={t("projects.archived", { count: snapshot.archived.length })}>
           <Panel>
             <List>
-              {snapshot.archived.map((project) => (
+              {filterProjects(snapshot.archived, query).map((project) => (
                 <ProjectRow
                   key={project.id}
                   project={project}
                   conflicting={state.conflict?.project.id === project.id}
                   onUpdate={props.onUpdate}
                   onRemove={props.onRemove}
+                  onOpen={props.onOpen === undefined ? undefined : () => props.onOpen?.(project.id)}
                   translator={translator}
                 />
               ))}
@@ -275,12 +310,32 @@ type ProjectRowProps = {
   conflicting: boolean;
   onUpdate: (id: string, update: ProjectUpdate) => void;
   onRemove: (id: string) => void;
+  onOpen?: () => void;
   translator: ScopedTranslator;
 };
 
 type OpenDialog = "rename" | "remove" | undefined;
 
-function ProjectRow({ project, conflicting, onUpdate, onRemove, translator }: ProjectRowProps) {
+function filterProjects(projects: Project[], query: string): Project[] {
+  const needle = query.trim().toLocaleLowerCase();
+
+  if (needle === "") {
+    return projects;
+  }
+
+  return projects.filter((project) =>
+    `${project.name} ${project.folder}`.toLocaleLowerCase().includes(needle),
+  );
+}
+
+function ProjectRow({
+  project,
+  conflicting,
+  onUpdate,
+  onRemove,
+  onOpen,
+  translator,
+}: ProjectRowProps) {
   const { t } = translator;
   const [dialog, setDialog] = useState<OpenDialog>(undefined);
   const [name, setName] = useState(project.name);
@@ -313,7 +368,10 @@ function ProjectRow({ project, conflicting, onUpdate, onRemove, translator }: Pr
       ];
 
   return (
-    <ListRow>
+    <ListRow
+      onSelect={onOpen}
+      actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
+    >
       <div className="projects-row">
         <div className="projects-row-facts">
           <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
@@ -328,17 +386,7 @@ function ProjectRow({ project, conflicting, onUpdate, onRemove, translator }: Pr
             <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
           ) : undefined}
           {conflicting ? <Badge tone="warning">{t("projects.conflict.mark")}</Badge> : undefined}
-          {actions.length === 0 ? undefined : (
-            <Menu
-              label={t("projects.actions", { name: project.name })}
-              // Подпись кнопки — значок: строка узкая, а слово «Действия» рядом с именем проекта
-              // читалось бы как часть имени. Имя для скринридера приходит отдельно.
-              trigger="…"
-              triggerLabel={t("projects.actions", { name: project.name })}
-              compact
-              items={actions}
-            />
-          )}
+          {onOpen === undefined && actions.length > 0 ? <ProjectMenu /> : undefined}
         </div>
       </div>
 
@@ -382,4 +430,16 @@ function ProjectRow({ project, conflicting, onUpdate, onRemove, translator }: Pr
       </ConfirmDialog>
     </ListRow>
   );
+
+  function ProjectMenu() {
+    return (
+      <Menu
+        label={t("projects.actions", { name: project.name })}
+        trigger="…"
+        triggerLabel={t("projects.actions", { name: project.name })}
+        compact
+        items={actions}
+      />
+    );
+  }
 }

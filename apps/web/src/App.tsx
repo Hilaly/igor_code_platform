@@ -45,6 +45,7 @@ import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
+import { ProjectDetailView } from "./projects/project-detail-view.tsx";
 import { useProjects } from "./projects/use-projects.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
@@ -269,6 +270,7 @@ export function App() {
     ...(page.kind === "sessions" && page.sessionId !== undefined
       ? { sessionId: page.sessionId }
       : {}),
+    ...(page.kind === "project" ? { projectId: page.projectId } : {}),
   });
 
   // Обработчик кадра берётся у вью провайдеров, а соединение живёт своей жизнью: связывает их
@@ -398,7 +400,7 @@ export function App() {
               <Text>{translator.t("nav.home")}</Text>
             </ListRow>
             <ListRow
-              selected={page.kind === "projects"}
+              selected={page.kind === "projects" || page.kind === "project"}
               onSelect={() => navigation.navigate({ kind: "projects" })}
             >
               <Text>{translator.t("nav.projects")}</Text>
@@ -474,6 +476,45 @@ export function App() {
             onUpdate={projects.update}
             onRemove={projects.remove}
             onDismissComplaints={projects.dismissComplaints}
+            onOpen={(id) => navigation.navigate({ kind: "project", projectId: id })}
+            translator={translator}
+          />
+        }
+        project={
+          <ProjectDetailView
+            project={
+              projects.state.snapshot === undefined
+                ? undefined
+                : [...projects.state.snapshot.projects, ...projects.state.snapshot.archived].find(
+                    ({ id }) => id === (page.kind === "project" ? page.projectId : ""),
+                  )
+            }
+            loaded={projects.state.snapshot !== undefined}
+            failure={projects.state.failure}
+            onBack={() => navigation.navigate({ kind: "projects" })}
+            onNewSession={() => navigation.navigate({ kind: "new-session" })}
+            sessions={
+              <SessionsView
+                state={sessions.state}
+                onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
+                onStartCreating={() => navigation.navigate({ kind: "new-session" })}
+                onSubmit={sessions.submitTurn}
+                onSendMessage={sessions.sendMessage}
+                onInterrupt={sessions.interrupt}
+                onUpdate={sessions.updateSession}
+                onRemove={async (sessionId) => sessions.removeSession(sessionId)}
+                onFork={async (request) => {
+                  const outcome = await sessions.forkSession(request);
+                  if (outcome.kind === "done")
+                    navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
+                }}
+                onCompact={sessions.compact}
+                onSetLabel={sessions.setEntryLabel}
+                onNavigate={sessions.navigate}
+                onShowArchived={sessions.setShowArchived}
+                translator={translator}
+              />
+            }
             translator={translator}
           />
         }

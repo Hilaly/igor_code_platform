@@ -25,6 +25,7 @@ export type Page =
   | { kind: "home" }
   | { kind: "plugins" }
   | { kind: "projects" }
+  | { kind: "project"; projectId: string }
   /**
    * Список провайдеров, а с идентификатором — страница одного: вход и модели живут там, а не в
    * раскрывающейся панели списка (docs/models-and-providers.md).
@@ -99,6 +100,13 @@ export function matchPage(path: string): Page {
     return { kind: "projects" };
   }
 
+  if (`/${segments[0]}` === projectsPagePath && segments.length === 2) {
+    const segment = segments[1];
+    const projectId = segment === undefined ? undefined : decodePathSegment(segment);
+
+    return projectId === undefined ? { kind: "unknown", path } : { kind: "project", projectId };
+  }
+
   if (`/${segments[0]}` === providersPagePath && segments.length <= 2) {
     const encodedProviderId = segments[1];
 
@@ -165,6 +173,8 @@ export function pathOf(page: Page): string {
       return pluginsPagePath;
     case "projects":
       return projectsPagePath;
+    case "project":
+      return `${projectsPagePath}/${encodeURIComponent(page.projectId)}`;
     case "providers":
       return page.providerId === undefined
         ? providersPagePath
