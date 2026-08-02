@@ -24,3 +24,6 @@ build/
 
 # Review/report artifacts — вывод код-ревью, не часть репозитория
 glm_review_*.html
+
+# Coding agents
+.zcode/
