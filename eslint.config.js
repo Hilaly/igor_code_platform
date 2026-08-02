@@ -55,21 +55,21 @@ const daemonAreaDependencies = {
 };
 
 function daemonAreaBoundary(area, allowedAreas) {
-  const forbiddenAreaFacades = daemonAreas
-    .filter((candidate) => candidate !== area && !allowedAreas.includes(candidate))
-    .map((candidate) => `../${candidate}/public.ts`);
+  const forbiddenAreas = daemonAreas.filter(
+    (candidate) => candidate !== area && !allowedAreas.includes(candidate),
+  );
   const patterns = [
     noApplicationImports,
     noAgentRuntimeImports,
     {
-      regex: String.raw`^\.\./[^/]+/(?!public\.ts$).+`,
+      regex: String.raw`^(?:\./)*\.\./[^/]+/(?!public\.ts$).+`,
       message: "Области демона обращаются к соседям только через public.ts.",
     },
   ];
 
-  if (forbiddenAreaFacades.length > 0) {
+  if (forbiddenAreas.length > 0) {
     patterns.push({
-      group: forbiddenAreaFacades,
+      regex: String.raw`^(?:\./)*\.\./(?:${forbiddenAreas.join("|")})/public\.ts$`,
       message: "Направление зависимостей областей задано в docs/repository-structure.md.",
     });
   }
@@ -78,6 +78,15 @@ function daemonAreaBoundary(area, allowedAreas) {
     files: [`apps/daemon/src/${area}/**/*.ts`],
     rules: {
       "no-restricted-imports": ["error", { patterns }],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "ImportExpression:not([source.type='Literal']), ImportExpression[source.value=/^(?:\\.\\/)*\\.\\.\\//]",
+          message:
+            "Динамические импорты между областями демона запрещены: статический импорт должен идти через public.ts.",
+        },
+      ],
     },
   };
 }
@@ -96,6 +105,13 @@ const daemonCompositionRootUsesFacades = {
             message: "Точка композиции демона обращается к областям только через public.ts.",
           },
         ],
+      },
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector: "ImportExpression",
+        message: "Точка композиции демона подключает области статически и только через public.ts.",
       },
     ],
   },

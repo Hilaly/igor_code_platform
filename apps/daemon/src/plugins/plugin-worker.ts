@@ -212,6 +212,8 @@ port.on("message", (message: PluginIncoming) => {
 
 const started = (async () => {
   try {
+    // Это абсолютный file: URL внешнего плагина, а не импорт соседней области демона.
+    // eslint-disable-next-line no-restricted-syntax
     const loaded: unknown = await import(pathToFileURL(data.workerEntry).href);
 
     if (typeof (loaded as PluginModule).activate !== "function") {
