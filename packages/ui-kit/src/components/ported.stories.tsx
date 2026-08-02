@@ -15,6 +15,7 @@ import { Button } from "./button.tsx";
 import { Combobox } from "./combobox.tsx";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Field } from "./field.tsx";
+import { FilePicker } from "./file-picker.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Menu } from "./menu.tsx";
 import { MultiSelect } from "./multi-select.tsx";
@@ -132,6 +133,49 @@ export const Layers = () => {
         destructive
         pending={pending}
         onConfirm={() => setPending(true)}
+      />
+    </div>
+  );
+};
+
+export const FilePickerStory = () => {
+  const [open, setOpen] = useState(false);
+  const [cwd, setCwd] = useState("/");
+  const [value, setValue] = useState("");
+
+  // Статический листинг для каталога: компонент не знает про файловую систему, ему всё равно, откуда
+  // приехали записи. Дерево из двух каталогов и файла в каждом.
+  const listing: Record<string, { name: string; kind: "file" | "directory" }[]> = {
+    "/": [
+      { name: "alpha", kind: "directory" },
+      { name: "beta", kind: "directory" },
+      { name: "readme.md", kind: "file" },
+    ],
+    "/alpha": [{ name: "notes.txt", kind: "file" }],
+    "/beta": [{ name: "image.png", kind: "file" }],
+  };
+
+  return (
+    <div style={row}>
+      <Button onClick={() => setOpen(true)}>Открыть проводник</Button>
+
+      <FilePicker
+        open={open}
+        cwd={cwd}
+        value={value}
+        entries={listing[cwd] ?? []}
+        onNavigate={setCwd}
+        onValueChange={setValue}
+        onSelect={(path) => {
+          setOpen(false);
+          setValue(path);
+        }}
+        onClose={() => setOpen(false)}
+        title="Выбрать папку"
+        upLabel="Наверх"
+        emptyLabel="Пусто"
+        confirmLabel="Выбрать"
+        cancelLabel="Отмена"
       />
     </div>
   );

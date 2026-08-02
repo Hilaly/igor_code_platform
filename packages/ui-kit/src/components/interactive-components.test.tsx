@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Combobox } from "./combobox.tsx";
+import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
 import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
@@ -726,5 +727,111 @@ describe("chat composer", () => {
       />,
     );
     expect(field.style.height).not.toBe("");
+  });
+
+  describe("file picker", () => {
+    /** Дерево из двух каталогов и файла в каждом; пикер получает только текущий уровень. */
+    const inRoot: FilePickerEntry[] = [
+      { name: "alpha", kind: "directory" },
+      { name: "beta", kind: "directory" },
+      { name: "readme.md", kind: "file" },
+    ];
+    const inAlpha: FilePickerEntry[] = [{ name: "notes.txt", kind: "file" }];
+
+    type Cwd = string;
+    const listing: Record<Cwd, FilePickerEntry[]> = {
+      "/": inRoot,
+      "/alpha": inAlpha,
+    };
+
+    /** Пикер с управляемым `value` иcwd; листинг выбирается по текущему каталогу. */
+    function Picker(
+      props: Partial<Parameters<typeof FilePicker>[0]> & { cwd: string; value: string },
+    ) {
+      return (
+        <FilePicker
+          open
+          entries={listing[props.cwd] ?? []}
+          onNavigate={() => {}}
+          onValueChange={() => {}}
+          onSelect={() => {}}
+          onClose={() => {}}
+          title="Файлы"
+          upLabel="Наверх"
+          emptyLabel="Пусто"
+          confirmLabel="Выбрать"
+          cancelLabel="Отмена"
+          {...props}
+        />
+      );
+    }
+
+    it("picks a file with one click and confirm, and a folder opens on a double click", () => {
+      // Два жеста не сводятся в один: одинарный клик выбирает кандидата, двойной по папке —
+      // переходит. Иначе подтверждение открывало бы пикер от случайного нажатия.
+      const onNavigate = vi.fn();
+      const onSelect = vi.fn();
+      // `value` управляется состоянием вызывающего, как и в реальном приложении: клик сообщает
+      // кандидата, а перерисовка с новым `value` его подсвечивает. Здесь то же — через rerender.
+      let value = "";
+      const onValueChange = vi.fn((next: string) => {
+        value = next;
+      });
+      const { rerender } = render(
+        <Picker
+          cwd="/"
+          value={value}
+          onValueChange={onValueChange}
+          onNavigate={onNavigate}
+          onSelect={onSelect}
+        />,
+      );
+
+      // Одинарный клик по файлу делает его кандидатом; «Выбрать» подтверждает и закрывает.
+      fireEvent.click(screen.getByRole("button", { name: "readme.md" }));
+      expect(onValueChange).toHaveBeenCalledWith("/readme.md");
+      rerender(
+        <Picker
+          cwd="/"
+          value={value}
+          onValueChange={onValueChange}
+          onNavigate={onNavigate}
+          onSelect={onSelect}
+        />,
+      );
+
+      // Двойной клик по папке переходит в неё, не подтверждая выбор.
+      fireEvent.dblClick(screen.getByRole("button", { name: "alpha" }));
+      expect(onNavigate).toHaveBeenCalledWith("/alpha");
+
+      // После клика по файлу кнопка «Выбрать» оживает — кандидат в `value`.
+      expect(screen.getByRole("button", { name: "Выбрать" })).toHaveProperty("disabled", false);
+      fireEvent.click(screen.getByRole("button", { name: "Выбрать" }));
+      expect(onSelect).toHaveBeenCalledWith("/readme.md");
+
+      // Переход в `/alpha` сменил листинг — пикер рисует то, что пришло в `entries`.
+      rerender(
+        <Picker
+          cwd="/alpha"
+          value={value}
+          onValueChange={onValueChange}
+          onNavigate={onNavigate}
+          onSelect={onSelect}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "notes.txt" })).toBeDefined();
+      expect(screen.queryByRole("button", { name: "alpha" })).toBeNull();
+    });
+
+    it("climbs to the parent with the «up» button and keeps it silent at the root", () => {
+      const onNavigate = vi.fn();
+      render(<Picker cwd="/" value="" onNavigate={onNavigate} />);
+
+      // На корне родителя нет — кнопка «…» выключена и ничего не зовёт.
+      const upAtRoot = screen.getByRole("button", { name: "Наверх" });
+      expect(upAtRoot).toHaveProperty("disabled", true);
+      fireEvent.click(upAtRoot);
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
   });
 });

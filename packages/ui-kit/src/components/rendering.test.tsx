@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
+import { FilePicker } from "./file-picker.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
@@ -140,6 +141,30 @@ describe("markup of the ported primitives", () => {
           confirmLabel="Да"
           cancelLabel="Нет"
           pending
+        />,
+      ),
+    ).toBe("");
+  });
+
+  it("file picker stays out of the markup without a document too", () => {
+    // Пикер собран на `Dialog`, и на сервере его портал ставить некуда — первый кадр пуст. Поведение
+    // то же, что у диалога, и проверяется затем же.
+    expect(
+      renderToStaticMarkup(
+        <FilePicker
+          open
+          cwd="/tmp"
+          value=""
+          entries={[]}
+          onNavigate={() => {}}
+          onValueChange={() => {}}
+          onSelect={() => {}}
+          onClose={() => {}}
+          title="Файлы"
+          upLabel="Наверх"
+          emptyLabel="Пусто"
+          confirmLabel="Выбрать"
+          cancelLabel="Отмена"
         />,
       ),
     ).toBe("");
