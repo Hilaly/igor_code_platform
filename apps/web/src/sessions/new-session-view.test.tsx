@@ -186,6 +186,34 @@ describe("the screen that creates a session", () => {
     );
   });
 
+  it("clears the previous agent defaults when the next agent has none", async () => {
+    const agentWithDefaults: AgentSummary = {
+      ...baseAgent,
+      id: "agent-with-defaults.agent",
+      title: "Агент с умолчаниями",
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "high",
+    };
+    const agentWithoutDefaults: AgentSummary = {
+      ...baseAgent,
+      id: "agent-without-defaults.agent",
+      title: "Агент без умолчаний",
+    };
+    const view = show({ agents: [agentWithDefaults, agentWithoutDefaults], models: ready });
+
+    pick("Агент", "Агент с умолчаниями");
+    pick("Агент", "Агент без умолчаний");
+    pick("Проект", "Платформа — /code/platform");
+    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+
+    await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
+    expect(view.onCreate).toHaveBeenCalledWith({
+      projectId: "b7Kq",
+      agentId: "agent-without-defaults.agent",
+      thinkingLevel: "medium",
+    });
+  });
+
   it("turns the thinking level off for a model that has no reasoning", async () => {
     const view = show({
       models: { anthropic: { kind: "ready", models: [model({ reasoning: false })] } },
@@ -234,7 +262,7 @@ describe("the screen that creates a session", () => {
 
     await waitFor(() => expect(view.onNavigate).toHaveBeenCalledWith("0199"));
     // Текст уезжает турном уже в созданную сессию — отдельным запросом, не полем черновика.
-    expect(view.onSubmit).toHaveBeenCalledWith("привет, разбери баг");
+    expect(view.onSubmit).toHaveBeenCalledWith("0199", "привет, разбери баг");
   });
 
   it("creates a session without a turn when the first message is empty", async () => {

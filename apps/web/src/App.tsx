@@ -546,7 +546,7 @@ export function App() {
 
               return { sessionId: outcome.session.id };
             }}
-            onSubmit={sessions.submitTurn}
+            onSubmit={sessions.submitTurnToSession}
             onNavigate={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
             translator={translator}
           />

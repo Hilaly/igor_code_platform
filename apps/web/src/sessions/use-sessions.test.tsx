@@ -370,6 +370,23 @@ describe("useSessions", () => {
     expect(view.result.current.state.open?.summary?.phase).toBe("queued");
   });
 
+  it("submits the first turn to an explicitly named newly created session", async () => {
+    refusals[`POST ${sessionTurnsPath("0200")}`] = {
+      status: 202,
+      body: { sessionId: "0200", turnId: "turn-9", phase: "turn" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    act(() => {
+      view.result.current.submitTurnToSession("0200", "первое сообщение");
+    });
+
+    await waitFor(() => expect(asked(sessionTurnsPath("0200"), "POST")).toHaveLength(1));
+    expect(asked(sessionTurnsPath("0199"), "POST")).toHaveLength(0);
+  });
+
   it("does not double the line of a turn that started at once", async () => {
     // Начатый турн уже пишет запись реплики: вторая копия висела бы в ленте до конца работы.
     refusals[`POST ${sessionTurnsPath("0199")}`] = {

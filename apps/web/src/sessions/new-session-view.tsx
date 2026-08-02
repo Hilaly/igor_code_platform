@@ -50,7 +50,7 @@ export type NewSessionViewProps = {
   /** Создать сессию. Возвращает идентификатор новой сессии или причину отказа. */
   onCreate: (draft: SessionDraft) => Promise<{ sessionId: string } | { reason: string }>;
   /** Отправить первый турн в только что созданную сессию. */
-  onSubmit: (text: string) => void;
+  onSubmit: (sessionId: string, text: string) => void;
   /** Уйти в открытый чат новой сессии. Зовётся после создания, до отправки турна. */
   onNavigate: (sessionId: string) => void;
   translator: ScopedTranslator;
@@ -83,9 +83,9 @@ export function NewSessionView(props: NewSessionViewProps) {
 
     const chosen = agents?.find((candidate) => candidate.id === id);
 
-    if (chosen?.thinkingLevel !== undefined) {
-      setThinkingLevel(chosen.thinkingLevel);
-    }
+    // Умолчания принадлежат выбранному агенту: значения прошлого агента не должны протекать в
+    // новый черновик. Если уровень не задан, сохраняется исторический fallback формы `medium`.
+    setThinkingLevel(chosen?.thinkingLevel ?? "medium");
 
     if (chosen?.model !== undefined) {
       const parsed = parseModelReference(chosen.model);
@@ -93,8 +93,11 @@ export function NewSessionView(props: NewSessionViewProps) {
       if (parsed !== undefined) {
         setModelRef(chosen.model);
         props.onPickProvider(parsed.providerId);
+        return;
       }
     }
+
+    setModelRef(undefined);
   };
 
   // Группы для ModelPicker: провайдер → его модели. Опции — составная ссылка `providerId/modelId`,
@@ -158,7 +161,7 @@ export function NewSessionView(props: NewSessionViewProps) {
         const trimmed = firstMessage.trim();
 
         if (trimmed !== "") {
-          props.onSubmit(trimmed);
+          props.onSubmit(outcome.sessionId, trimmed);
         }
       });
   };
@@ -225,7 +228,6 @@ export function NewSessionView(props: NewSessionViewProps) {
           onExpandGroup={props.onPickProvider}
           placeholder={t("common.choose")}
           emptyText={t("state.empty")}
-          loadingText={t("state.loading")}
         />
 
         <Select

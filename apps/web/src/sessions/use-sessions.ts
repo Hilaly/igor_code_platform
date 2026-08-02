@@ -89,6 +89,8 @@ export type SessionsController = {
   /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
   loadModels: (providerId: string) => void;
   submitTurn: (text: string) => void;
+  /** Первый турн новой сессии адресуется явно: переход по маршруту применяется React асинхронно. */
+  submitTurnToSession: (sessionId: string, text: string) => void;
   /** Сообщение, которое не запускает турн. Отказ приезжает причиной, а не исключением. */
   sendMessage: (message: SessionMessage) => Promise<string | undefined>;
   interrupt: () => void;
@@ -343,14 +345,8 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [onDiagnostic],
   );
 
-  const submitTurn = useCallback(
-    (text: string) => {
-      const id = latest.current.open?.id;
-
-      if (id === undefined) {
-        return;
-      }
-
+  const submitTurnToSession = useCallback(
+    (id: string, text: string) => {
       void submitTurnRequest(id, { text })
         .then((outcome) => {
           if (outcome.kind === "refused") {
@@ -384,6 +380,17 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         });
     },
     [apply, onDiagnostic],
+  );
+
+  const submitTurn = useCallback(
+    (text: string) => {
+      const id = latest.current.open?.id;
+
+      if (id !== undefined) {
+        submitTurnToSession(id, text);
+      }
+    },
+    [submitTurnToSession],
   );
 
   const interrupt = useCallback(() => {
@@ -620,6 +627,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     prepareDraft,
     loadModels,
     submitTurn,
+    submitTurnToSession,
     sendMessage,
     interrupt,
     compact,
