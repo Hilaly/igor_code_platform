@@ -97,6 +97,15 @@ describe("filesystem listing route", () => {
     assert.equal(JSON.parse(answer.body).error, "the path query parameter is required");
   });
 
+  it("answers 400 when the path parameter is relative", async () => {
+    const call = await serve();
+
+    const answer = await call(`${filesystemPath}?path=${encodeURIComponent("relative/directory")}`);
+
+    assert.equal(answer.status, 400);
+    assert.equal(JSON.parse(answer.body).error, "the path query parameter must be absolute");
+  });
+
   it("answers 404 for a directory that is not there", async () => {
     const call = await serve();
 

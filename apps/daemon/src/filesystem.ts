@@ -13,6 +13,7 @@
  */
 
 import { readdirSync } from "node:fs";
+import { isAbsolute } from "node:path";
 
 import {
   filesystemPath,
@@ -34,6 +35,12 @@ export function filesystemRoutes(): Route[] {
 
         if (path === undefined) {
           respondWithError(response, 400, "the path query parameter is required");
+
+          return;
+        }
+
+        if (!isAbsolute(path)) {
+          respondWithError(response, 400, "the path query parameter must be absolute");
 
           return;
         }
