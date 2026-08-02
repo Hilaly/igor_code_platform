@@ -195,12 +195,15 @@ describe("projectPluginRoots", () => {
     ...overrides,
   });
 
-  it("gives every working project the plugins folder inside it", () => {
+  it("gives every working project the Sovereign plugins folder inside it", () => {
     assert.deepEqual(
       projectPluginRoots([folder("work"), folder("b7Kq3xv9pQdT")], () => "available"),
       [
-        { source: "project:work", directory: join("/code/work", "plugins") },
-        { source: "project:b7Kq3xv9pQdT", directory: join("/code/b7Kq3xv9pQdT", "plugins") },
+        { source: "project:work", directory: join("/code/work", ".sovereign", "plugins") },
+        {
+          source: "project:b7Kq3xv9pQdT",
+          directory: join("/code/b7Kq3xv9pQdT", ".sovereign", "plugins"),
+        },
       ],
     );
   });

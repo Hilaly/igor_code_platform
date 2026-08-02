@@ -67,7 +67,7 @@ export function defaultPluginRoots(dataDirectory: string): PluginRoot[] {
 }
 
 /**
- * Третий, самый частный источник — папка `plugins/` внутри папки проекта
+ * Третий, самый частный источник — папка `.sovereign/plugins/` внутри папки проекта
  * (docs/sessions-and-projects.md, docs/plugins.md). Корней столько, сколько проектов, и набор
  * меняется на живом демоне: проект создали, архивировали, папку отмонтировали.
  *
@@ -87,7 +87,7 @@ export function projectPluginRoots(
     .filter((project) => !project.archived && availability(project) === "available")
     .map((project) => ({
       source: projectPluginSource(project.id),
-      directory: join(project.folder, "plugins"),
+      directory: join(project.folder, ".sovereign", "plugins"),
     }));
 }
 
