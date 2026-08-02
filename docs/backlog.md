@@ -13,7 +13,7 @@
 
 - **Внутренние subpath SDK неотличимы от публичных.** `@sovereign/sdk` экспортирует `./host` и
   `./events` наравне с легитимным `./testing`, но их собственные комментарии говорят: «автору
-  плагина не нужно». Единственный потребитель — `apps/daemon/src/plugin-worker.ts`. Любой
+  плагина не нужно». Единственный потребитель — `apps/daemon/src/plugins/plugin-worker.ts`. Любой
   внешний плагин может сделать `import { installPluginHost } from "@sovereign/sdk/host"` — и
   убрать subpath уже ломающее изменение. Варианты: переименовать в `./internal/host`,
   `./internal/events` (рекомендуется — синтаксически различимо, один потребитель); импорт
@@ -40,9 +40,10 @@
   ([roadmap.md](roadmap.md)). Вью настроек, где ей место, теперь есть (`/settings`,
   [ui-kit.md](ui-kit.md)) и приехало раньше среза 12 — а вот серверного маршрута смены пароля по-прежнему
   нет, как и маршрута `/api/config` для правки `config.json` из интерфейса. Серверная часть при этом
-  почти вся есть: `createAccountStore` (`apps/daemon/src/account.ts`) умеет пересчитывать хеш — это
-  делает переход на новые параметры scrypt. Не хватает маршрута и закрытия всех сессий владельца: у
-  `createLoginSessionStore` (`apps/daemon/src/login-sessions.ts`) есть `close(token)` по одному
+  почти вся есть: `createAccountStore` (`apps/daemon/src/authentication/account.ts`) умеет
+  пересчитывать хеш — это делает переход на новые параметры scrypt. Не хватает маршрута и закрытия
+  всех сессий владельца: у `createLoginSessionStore`
+  (`apps/daemon/src/authentication/login-sessions.ts`) есть `close(token)` по одному
   токену, метода «закрыть все» нет намеренно — писать его без потребителя значило бы писать вслепую.
 
 ## Плагины
