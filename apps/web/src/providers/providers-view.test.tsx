@@ -267,7 +267,7 @@ describe("ProvidersView", () => {
 
     expect(screen.getByText("Модели: Anthropic")).toBeDefined();
     expect(screen.getByText("Opus 4")).toBeDefined();
-    expect(screen.getByText("claude-opus-4")).toBeDefined();
+    expect(screen.getByText("anthropic/claude-opus-4")).toBeDefined();
     expect(screen.getByText(/Контекст: 200/)).toBeDefined();
     expect(screen.getByText(/\$3/)).toBeDefined();
   });
@@ -310,7 +310,7 @@ describe("ProvidersView", () => {
 
     show(state);
 
-    expect(screen.queryByText("claude-opus-4")).toBeNull();
+    expect(screen.queryByText("anthropic/claude-opus-4")).toBeNull();
   });
 });
 

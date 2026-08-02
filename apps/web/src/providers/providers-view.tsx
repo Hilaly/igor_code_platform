@@ -13,6 +13,7 @@
  * ничего не делает, врёт про возможность. Сам диалог входа рисует `login-view.tsx`.
  */
 
+import { modelReference } from "@sovereign/protocol";
 import type {
   ModelSummary,
   ProviderAuthState,
@@ -407,7 +408,7 @@ function ModelRow({ model, translator }: ModelRowProps) {
       <div className="providers-model">
         <div className="providers-model-facts">
           <Text>{model.name}</Text>
-          <Code>{model.id}</Code>
+          <Code>{modelReference(model.providerId, model.id)}</Code>
         </div>
 
         <div className="providers-model-marks">
