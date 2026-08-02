@@ -21,8 +21,8 @@ import {
   type SettingsParseResult,
 } from "@sovereign/protocol";
 
-import { writeFileAtomically } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
+import { writeFileAtomically } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 
 export type SettingsSnapshot = {
   config: Config;

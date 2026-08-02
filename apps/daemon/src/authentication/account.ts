@@ -11,8 +11,8 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeFileAtomically } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
+import { writeFileAtomically } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 
 export const accountFileName = "account.json";
 

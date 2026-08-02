@@ -11,7 +11,7 @@ import {
   preferencesFileName,
 } from "@sovereign/protocol";
 
-import type { Logger } from "./platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 import { createSettingsStore, type SettingsSnapshot, type SettingsStore } from "./settings.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-settings-"));

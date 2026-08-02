@@ -17,7 +17,7 @@ import {
 import { createDispatcher } from "./http/public.ts";
 import { createLogger } from "./platform/public.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
-import { createSettingsStore, type SettingsStore, type WriteOutcome } from "./settings.ts";
+import { createSettingsStore, type SettingsStore } from "./settings/public.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-preferences-"));
 const servers: Server[] = [];
@@ -178,7 +178,7 @@ describe("pluginPreferencesRoute", () => {
   });
 
   it("reports a refused write as a conflict and writes down why", async () => {
-    const refused: WriteOutcome = { kind: "refused", reason: "preferences.json is not valid json" };
+    const refused = { kind: "refused" as const, reason: "preferences.json is not valid json" };
     const { put, records } = await serve({ writePluginPreferences: () => refused });
 
     const answer = await put("data:hello", JSON.stringify({ enabled: true }));

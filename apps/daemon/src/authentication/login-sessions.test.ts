@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 
 import type { LogRecord } from "@sovereign/protocol";
 
-import { createLogger } from "./platform/public.ts";
+import { createLogger } from "../platform/public.ts";
 import {
   createLoginSessionStore,
   loginSessionsFileName,

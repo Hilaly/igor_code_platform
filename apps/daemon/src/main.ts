@@ -1,9 +1,12 @@
 import { join } from "node:path";
 
-import { createAccountStore } from "./account.ts";
-import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
+import {
+  authenticationRoutes,
+  createAccountStore,
+  createLoginSessionStore,
+  createSessionCheck,
+} from "./authentication/public.ts";
 import { parseArguments } from "./platform/public.ts";
-import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createCredentialStore } from "./credential-store.ts";
 import {
@@ -21,7 +24,6 @@ import {
 import { createEventStream } from "./http/public.ts";
 import { healthRoute } from "./http/public.ts";
 import { acquireInstanceLock, InstanceLockError } from "./platform/public.ts";
-import { createLoginSessionStore } from "./login-sessions.ts";
 import { createLogger } from "./platform/public.ts";
 import { createModelCatalogStore } from "./model-catalog-store.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
@@ -50,7 +52,11 @@ import {
 import { createProviderLogins } from "./provider-logins.ts";
 import { providersRoutes } from "./providers.ts";
 import { createDaemonServer } from "./http/public.ts";
-import { createSettingsStore } from "./settings.ts";
+import {
+  appearancePreferencesRoutes,
+  createSettingsStore,
+  publishAppearanceChanges,
+} from "./settings/public.ts";
 
 const parsed = parseArguments(process.argv.slice(2));
 

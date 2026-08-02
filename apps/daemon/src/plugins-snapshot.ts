@@ -11,7 +11,7 @@ import type { ContributionRegistry } from "./contribution-registry.ts";
 import { respondWithJson, type Route } from "./http/public.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import type { PluginSupervisor } from "./plugin-supervisor.ts";
-import type { SettingsStore } from "./settings.ts";
+import type { SettingsStore } from "./settings/public.ts";
 
 export type PluginsSnapshotSources = {
   plugins: Pick<PluginSupervisor, "statuses">;
