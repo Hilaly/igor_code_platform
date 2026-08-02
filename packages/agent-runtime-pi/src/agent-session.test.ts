@@ -140,6 +140,51 @@ describe("an agent session over pi", () => {
     await session.close();
   });
 
+  it("uses the latest instructions and skills on every turn", async () => {
+    const { open, requests } = await withStore([
+      { text: "reviewed" },
+      { text: "deployed" },
+      { text: "finished" },
+    ]);
+    const session = await open();
+
+    session.setSkills([
+      {
+        name: "review",
+        description: "Review the change",
+        location: "/tmp/review/SKILL.md",
+      },
+    ]);
+    await session.prompt("review", "t1");
+
+    assert.equal(
+      requests[0]?.systemPrompt,
+      `ты двойник\n\n<available_skills>\n  <skill>\n    <name>review</name>\n    <description>Review the change</description>\n    <location>/tmp/review/SKILL.md</location>\n  </skill>\n</available_skills>`,
+    );
+
+    session.setInstructions("updated");
+    session.setSkills([
+      {
+        name: "deploy",
+        description: "Deploy the change",
+        location: "/tmp/deploy/SKILL.md",
+      },
+    ]);
+    await session.prompt("deploy", "t2");
+
+    assert.equal(
+      requests[1]?.systemPrompt,
+      `updated\n\n<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the change</description>\n    <location>/tmp/deploy/SKILL.md</location>\n  </skill>\n</available_skills>`,
+    );
+
+    session.setSkills([]);
+    await session.prompt("finish", "t3");
+
+    assert.equal(requests[2]?.systemPrompt, "updated");
+    assert.throws(() => session.setInstructions(""), /instructions/i);
+    await session.close();
+  });
+
   it("lets the agent change a file in the project folder", async () => {
     const folder = await freshFolder("project");
     const { open } = await withStore(
