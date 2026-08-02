@@ -7,6 +7,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ModelPicker, type ModelPickerGroup, type ModelPickerProps } from "./model-picker.tsx";
@@ -39,7 +40,6 @@ const show = (overrides: Partial<ModelPickerProps> = {}) => {
     label: "Модель",
     placeholder: "Выберите модель",
     emptyText: "Моделей нет",
-    loadingText: "Модели загружаются",
     ...overrides,
   };
 
@@ -51,13 +51,17 @@ describe("the ModelPicker", () => {
     const view = show();
 
     expect(view.onExpandGroup).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+    const trigger = screen.getByRole("combobox", { name: "Модель" });
+    expect(trigger.tagName).toBe("BUTTON");
+    fireEvent.click(trigger);
 
     // Шапка группы — это group с раскрывающейся подписью.
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    const group = screen.getByRole("group", { name: "Anthropic" });
+    fireEvent.click(group.querySelector("div")!);
 
     expect(view.onExpandGroup).toHaveBeenCalledWith("anthropic");
     expect(view.onExpandGroup).toHaveBeenCalledTimes(1);
+    expect(group.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("lists the options of the expanded group and emits the chosen composite value", () => {
@@ -79,7 +83,18 @@ describe("the ModelPicker", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
     fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
 
-    expect(screen.getByText("Модели загружаются")).not.toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("Anthropic");
+  });
+
+  it("keeps an unloaded controlled value visible in the trigger", () => {
+    show({
+      groups: [{ ...anthropic, options: [], loading: true }],
+      value: "anthropic/claude-opus",
+    });
+
+    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain(
+      "anthropic/claude-opus",
+    );
   });
 
   it("shows the failure reason instead of the list when the models could not be read", () => {
@@ -110,12 +125,9 @@ describe("the ModelPicker", () => {
     fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
 
     expect(view.onExpandGroup).not.toHaveBeenCalled();
-    expect(
-      screen
-        .getByRole("group", { name: "Anthropic" })
-        .querySelector("div")!
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
+    expect(screen.getByRole("group", { name: "Anthropic" }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
   });
 
   it("does not pick a disabled option", () => {
@@ -158,6 +170,17 @@ describe("the ModelPicker", () => {
     expect(view.onChange).toHaveBeenCalledWith("anthropic/claude-opus");
   });
 
+  it("points aria-activedescendant at the active group header", () => {
+    show();
+
+    const trigger = screen.getByRole("combobox", { name: "Модель" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const activeId = trigger.getAttribute("aria-activedescendant");
+    expect(activeId).not.toBeNull();
+    expect(document.getElementById(activeId!)).not.toBeNull();
+  });
+
   it("marks the chosen option selected in the open list", () => {
     show({ value: "anthropic/claude-opus" });
 
@@ -190,5 +213,27 @@ describe("the ModelPicker", () => {
     fireEvent.click(header); // Сворачивание не должно повторно просить подгрузку.
 
     expect(view.onExpandGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires onExpandGroup once per expansion under React StrictMode", () => {
+    const onExpandGroup = vi.fn();
+    render(
+      <StrictMode>
+        <ModelPicker
+          groups={[anthropic]}
+          value={undefined}
+          onChange={vi.fn()}
+          onExpandGroup={onExpandGroup}
+          label="Модель"
+          placeholder="Выберите модель"
+          emptyText="Моделей нет"
+        />
+      </StrictMode>,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+
+    expect(onExpandGroup).toHaveBeenCalledTimes(1);
   });
 });

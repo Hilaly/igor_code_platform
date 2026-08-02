@@ -150,7 +150,6 @@ export const ModelPickerStory = () => {
         label="Модель"
         placeholder="Выберите модель"
         emptyText="Моделей нет"
-        loadingText="Модели загружаются"
       />
       <Text tone="muted">Выбрано: {value ?? "—"}</Text>
     </div>

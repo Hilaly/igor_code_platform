@@ -51,8 +51,6 @@ export type ModelPickerProps = {
   placeholder: string;
   /** Что рисуется, когда групп нет вовсе. То же правило — переводит вызывающий. */
   emptyText: string;
-  /** Подпись крутилки внутри раскрывшейся группы: что именно грузится. */
-  loadingText: string;
   disabled?: boolean;
 };
 
@@ -66,7 +64,6 @@ export function ModelPicker({
   label,
   placeholder,
   emptyText,
-  loadingText,
   disabled = false,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
@@ -106,6 +103,8 @@ export function ModelPicker({
   const rowId = useCallback((index: number) => `${safeListId}-row-${index}`, [safeListId]);
 
   function toggleGroup(groupId: string): void {
+    const willExpand = !expanded.has(groupId);
+
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -113,9 +112,14 @@ export function ModelPicker({
         return next;
       }
       next.add(groupId);
-      onExpandGroup?.(groupId);
       return next;
     });
+
+    // Пользовательский callback не живёт внутри updater: React StrictMode вправе повторно вызвать
+    // updater для проверки чистоты, но одно раскрытие остаётся одним внешним событием.
+    if (willExpand) {
+      onExpandGroup?.(groupId);
+    }
   }
 
   useEffect(() => {
@@ -181,7 +185,7 @@ export function ModelPicker({
     return next >= 0 && next < rows.length ? next : from;
   }
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (disabled) return;
 
     if (event.key === "ArrowDown") {
@@ -263,7 +267,8 @@ export function ModelPicker({
   return (
     <div className={styles.root} ref={rootRef}>
       {label ? <span className={styles.label}>{label}</span> : null}
-      <div
+      <button
+        type="button"
         tabIndex={disabled ? -1 : 0}
         role="combobox"
         aria-expanded={open}
@@ -278,9 +283,9 @@ export function ModelPicker({
         }}
         onKeyDown={handleKeyDown}
       >
-        <span className={styles.valueText}>{selectedOption?.label ?? placeholder}</span>
+        <span className={styles.valueText}>{selectedOption?.label ?? value ?? placeholder}</span>
         <span className={`${styles.arrow}${open ? ` ${styles.open}` : ""}`}>▼</span>
-      </div>
+      </button>
       {open ? (
         <div
           id={listId}
@@ -294,13 +299,21 @@ export function ModelPicker({
           ) : (
             groups.map((group) => {
               const isExpanded = expanded.has(group.id) && !group.disabled;
+              const headerIndex = rows.findIndex(
+                (row) => row.kind === "header" && row.groupId === group.id,
+              );
               return (
-                <div key={group.id} role="group" aria-label={group.label} className={styles.group}>
+                <div
+                  key={group.id}
+                  role="group"
+                  aria-label={group.label}
+                  aria-expanded={isExpanded}
+                  aria-disabled={group.disabled}
+                  className={styles.group}
+                >
                   <div
-                    id={`${safeListId}-group-${group.id}`}
+                    id={headerIndex >= 0 ? rowId(headerIndex) : undefined}
                     className={`${styles.groupHeader}${group.disabled ? ` ${styles.disabled}` : ""}`}
-                    aria-expanded={isExpanded}
-                    aria-disabled={group.disabled}
                     onClick={() => {
                       if (!group.disabled) toggleGroup(group.id);
                     }}
@@ -317,7 +330,7 @@ export function ModelPicker({
                     <div className={styles.groupOptions}>
                       {group.loading ? (
                         <div className={styles.state}>
-                          <Spinner label={loadingText} />
+                          <Spinner label={group.label} />
                         </div>
                       ) : group.failureReason !== undefined ? (
                         <div className={styles.state}>
