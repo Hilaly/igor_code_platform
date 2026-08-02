@@ -32,6 +32,11 @@ export type Page =
   | { kind: "providers"; providerId?: string }
   /** Мастер-деталь: список сессий, а с идентификатором — ещё и открытый чат. */
   | { kind: "sessions"; sessionId?: string }
+  /**
+   * Создание сессии — отдельный адресуемый экран, а не модал: у модала фиксированная ширина, и
+   * список моделей в нём не помещается. Адрес даёт ещё и рабочую кнопку «назад» и перезагрузку.
+   */
+  | { kind: "new-session" }
   /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
   | { kind: "settings"; section?: SettingsSection }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
@@ -116,6 +121,12 @@ export function matchPage(path: string): Page {
       return { kind: "sessions" };
     }
 
+    // Строка "new" проходит регекс `isSessionId`, но означает экран создания, а не идентификатор.
+    // Проверка строго раньше: иначе адрес `/sessions/new` становился бы сессией с id `new`.
+    if (sessionId === "new") {
+      return { kind: "new-session" };
+    }
+
     // Мусор в адресе не превращается в запрос, который вернёт 404: проверка та же, что у демона.
     return isSessionId(sessionId) ? { kind: "sessions", sessionId } : { kind: "unknown", path };
   }
@@ -162,6 +173,8 @@ export function pathOf(page: Page): string {
       return page.sessionId === undefined
         ? sessionsPagePath
         : `${sessionsPagePath}/${page.sessionId}`;
+    case "new-session":
+      return `${sessionsPagePath}/new`;
     case "settings":
       return page.section === undefined ? settingsPagePath : `${settingsPagePath}/${page.section}`;
     case "plugin":

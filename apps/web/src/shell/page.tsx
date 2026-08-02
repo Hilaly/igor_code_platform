@@ -16,6 +16,8 @@ export type PageViewProps = {
   projects: ReactNode;
   providers: ReactNode;
   sessions: ReactNode;
+  /** Создание сессии — отдельный адресуемый экран, не часть мастер-детали. */
+  newSession: ReactNode;
   settings: ReactNode;
   translator: ScopedTranslator;
 };
@@ -26,6 +28,7 @@ export function PageView({
   projects,
   providers,
   sessions,
+  newSession,
   settings,
   translator,
 }: PageViewProps) {
@@ -45,6 +48,10 @@ export function PageView({
 
   if (page.kind === "sessions") {
     return sessions;
+  }
+
+  if (page.kind === "new-session") {
+    return newSession;
   }
 
   if (page.kind === "settings") {

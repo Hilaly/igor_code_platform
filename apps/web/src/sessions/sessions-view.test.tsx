@@ -91,9 +91,7 @@ const show = (state: SessionsState, handlers: Partial<SessionsViewProps> = {}) =
     <SessionsView
       state={state}
       onOpen={vi.fn()}
-      onPrepareDraft={vi.fn()}
-      onPickProvider={vi.fn()}
-      onCreate={vi.fn()}
+      onStartCreating={vi.fn()}
       onSubmit={vi.fn()}
       onSendMessage={vi.fn()}
       onInterrupt={vi.fn()}

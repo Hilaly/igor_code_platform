@@ -332,7 +332,11 @@ export const coreEnglish: CatalogRegistration = {
     "sessions.new": "New session",
     "sessions.new.agent": "Agent",
     "sessions.new.create": "Create",
+    "sessions.new.first-message": "First message",
+    "sessions.new.hint":
+      "Pick a project, an agent and a model — and write where to start right away.",
     "sessions.new.model": "Model",
+    "sessions.new.title": "New session",
     "sessions.new.models.failed": "The models could not be read: {reason}",
     "sessions.new.no-agent": "No agent is enabled. An agent comes from a plugin.",
     "sessions.new.no-project": "There is no project to work in. Create one first.",

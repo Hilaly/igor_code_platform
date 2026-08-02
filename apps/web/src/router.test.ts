@@ -44,6 +44,15 @@ describe("matchPage", () => {
     });
   });
 
+  it("routes the session creation to its own address before the identifier check", () => {
+    // Строка "new" проходит регекс `isSessionId`, но означает экран создания, а не идентификатор.
+    expect(matchPage("/sessions/new")).toEqual({ kind: "new-session" });
+    expect(matchPage("/sessions/new/deeper")).toEqual({
+      kind: "unknown",
+      path: "/sessions/new/deeper",
+    });
+  });
+
   it("takes a malformed session identifier for an unknown address", () => {
     // Мусор в адресе не должен превращаться в запрос, который вернёт 404: проверка та же, что у демона.
     expect(matchPage("/sessions/со слэшем/ещё")).toEqual({
@@ -122,6 +131,7 @@ describe("pathOf", () => {
       "/providers",
       "/providers/anthropic",
       "/sessions",
+      "/sessions/new",
       "/sessions/0199abcd-ef01",
       "/settings",
       "/settings/appearance",

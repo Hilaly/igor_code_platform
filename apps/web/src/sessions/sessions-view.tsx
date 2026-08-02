@@ -7,7 +7,6 @@
 
 import type {
   Session,
-  SessionDraft,
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
@@ -37,17 +36,13 @@ import { useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { ChatPlaceholder, ChatView } from "./chat-view.tsx";
-import { NewSessionDialog } from "./new-session-dialog.tsx";
 import type { SessionsState } from "./state.ts";
 
 export type SessionsViewProps = {
   state: SessionsState;
   onOpen: (sessionId: string) => void;
-  /** Диалог создания спрашивает проекты и провайдеров по своему открытию, а не заранее. */
-  onPrepareDraft: () => void;
-  onPickProvider: (providerId: string) => void;
-  /** Возвращает причину отказа, если демон отказал: диалог при этом остаётся открытым. */
-  onCreate: (draft: SessionDraft) => Promise<string | undefined>;
+  /** Кнопка «новая сессия» уводит на отдельный экран создания, а не открывает модал. */
+  onStartCreating: () => void;
   onSubmit: (text: string) => void;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
@@ -71,17 +66,11 @@ export function SessionsView(props: SessionsViewProps) {
   const { state, translator } = props;
   const { t } = translator;
   const sessions = state.sessions;
-  const [creating, setCreating] = useState(false);
   /** Сессия, чьё имя правят прямо сейчас, и черновик этого имени. */
   const [renaming, setRenaming] = useState<{ session: Session; title: string } | undefined>(
     undefined,
   );
   const [removing, setRemoving] = useState<Session | undefined>(undefined);
-
-  const startCreating = (): void => {
-    setCreating(true);
-    props.onPrepareDraft();
-  };
 
   /**
    * Пункты меню строки. Архивация и удаление у занятой сессии выключены здесь же, а не только
@@ -134,31 +123,11 @@ export function SessionsView(props: SessionsViewProps) {
             onChange={props.onShowArchived}
             label={t("sessions.archived.show")}
           />
-          <Button tone="accent" onClick={startCreating}>
+          <Button tone="accent" onClick={props.onStartCreating}>
             {t("sessions.new")}
           </Button>
         </span>
       </div>
-
-      <NewSessionDialog
-        open={creating}
-        {...(state.projects === undefined ? {} : { projects: state.projects })}
-        {...(state.agents === undefined ? {} : { agents: state.agents })}
-        {...(state.providers === undefined ? {} : { providers: state.providers })}
-        models={state.models}
-        onPickProvider={props.onPickProvider}
-        onCreate={async (draft) => {
-          const reason = await props.onCreate(draft);
-
-          if (reason === undefined) {
-            setCreating(false);
-          }
-
-          return reason;
-        }}
-        onClose={() => setCreating(false)}
-        translator={translator}
-      />
 
       {state.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.failed", { reason: state.failure })} />

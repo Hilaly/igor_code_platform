@@ -48,6 +48,7 @@ import { ProjectsView } from "./projects/projects-view.tsx";
 import { useProjects } from "./projects/use-projects.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
+import { NewSessionView } from "./sessions/new-session-view.tsx";
 import { SessionsView } from "./sessions/sessions-view.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
@@ -494,19 +495,7 @@ export function App() {
           <SessionsView
             state={sessions.state}
             onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
-            onPrepareDraft={sessions.prepareDraft}
-            onPickProvider={sessions.loadModels}
-            onCreate={async (draft) => {
-              const outcome = await sessions.createSession(draft);
-
-              if (outcome.kind === "refused") {
-                return outcome.reason;
-              }
-
-              navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
-
-              return undefined;
-            }}
+            onStartCreating={() => navigation.navigate({ kind: "new-session" })}
             onSubmit={sessions.submitTurn}
             onSendMessage={sessions.sendMessage}
             onInterrupt={sessions.interrupt}
@@ -533,6 +522,32 @@ export function App() {
             onSetLabel={sessions.setEntryLabel}
             onNavigate={sessions.navigate}
             onShowArchived={sessions.setShowArchived}
+            translator={translator}
+          />
+        }
+        newSession={
+          <NewSessionView
+            {...(sessions.state.projects === undefined
+              ? {}
+              : { projects: sessions.state.projects })}
+            {...(sessions.state.agents === undefined ? {} : { agents: sessions.state.agents })}
+            {...(sessions.state.providers === undefined
+              ? {}
+              : { providers: sessions.state.providers })}
+            models={sessions.state.models}
+            onPrepareDraft={sessions.prepareDraft}
+            onPickProvider={sessions.loadModels}
+            onCreate={async (draft) => {
+              const outcome = await sessions.createSession(draft);
+
+              if (outcome.kind === "refused") {
+                return { reason: outcome.reason };
+              }
+
+              return { sessionId: outcome.session.id };
+            }}
+            onSubmit={sessions.submitTurn}
+            onNavigate={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
             translator={translator}
           />
         }
