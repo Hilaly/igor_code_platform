@@ -166,6 +166,53 @@ describe("buildPluginsSnapshot", () => {
       ["project:p1", "project:p2"],
     );
   });
+
+  it("keeps standalone conflicts in project resources rather than plugin management", () => {
+    const state = sources([running]);
+    const registration = (source: string) => ({
+      ownership: "standalone" as const,
+      kind: "skill" as const,
+      id: "review",
+      declaredId: "review",
+      source,
+      scope: "user" as const,
+      name: "review",
+      description: "Review changes",
+      location: `/${source}/review/SKILL.md`,
+      disableModelInvocation: false,
+    });
+
+    state.registry.applyStandalone({
+      rootKey: "first:skills",
+      source: "first",
+      scope: "user",
+      precedence: 100,
+      contributions: [
+        {
+          kind: "skill",
+          path: "/first/review/SKILL.md",
+          diagnostics: [],
+          registration: registration("first"),
+        },
+      ],
+    });
+    state.registry.applyStandalone({
+      rootKey: "second:skills",
+      source: "second",
+      scope: "user",
+      precedence: 100,
+      contributions: [
+        {
+          kind: "skill",
+          path: "/second/review/SKILL.md",
+          diagnostics: [],
+          registration: registration("second"),
+        },
+      ],
+    });
+
+    assert.deepEqual(buildPluginsSnapshot(state).conflicts, []);
+  });
 });
 
 describe("pluginsRoute", () => {

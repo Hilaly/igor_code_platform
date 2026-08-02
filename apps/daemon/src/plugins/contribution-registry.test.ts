@@ -78,23 +78,69 @@ const file = (
   registration: FileRegistration,
   path = `/definitions/${registration.id}`,
   diagnostics: FileResourceDiagnostic[] = [],
-): FileContributionInput => ({ registration, path, diagnostics });
+): FileContributionInput => ({ registration, path, diagnostics, kind: registration.kind });
 
-const standalone = (
+const acceptStandaloneSnapshot = (_snapshot: StandaloneContributionSnapshot): void => {};
+const acceptFileInput = (_input: FileContributionInput): void => {};
+
+// @ts-expect-error Project ownership is incomplete without the project identifier.
+acceptStandaloneSnapshot({
+  rootKey: "project:missing:skills",
+  source: "sovereign",
+  scope: "project",
+  precedence: 400,
+  contributions: [],
+});
+
+// @ts-expect-error Discovery must preserve the requested kind even when parsing failed.
+acceptFileInput({ path: "/broken/ENTRY.md", diagnostics: [] });
+
+function standalone(
   rootKey: string,
   precedence: number,
   contributions: FileContributionInput[],
-  overrides: Partial<StandaloneContributionSnapshot> = {},
-): StandaloneContributionSnapshot => ({
-  rootKey,
-  source: "sovereign",
-  scope: "user",
-  precedence,
-  contributions,
-  ...overrides,
-});
+  overrides: { scope: "project"; projectId: string; source?: string },
+): StandaloneContributionSnapshot;
+function standalone(
+  rootKey: string,
+  precedence: number,
+  contributions: FileContributionInput[],
+  overrides?: { scope?: "user"; projectId?: never; source?: string },
+): StandaloneContributionSnapshot;
+function standalone(
+  rootKey: string,
+  precedence: number,
+  contributions: FileContributionInput[],
+  overrides:
+    | { scope: "project"; projectId: string; source?: string }
+    | { scope?: "user"; projectId?: never; source?: string } = {},
+): StandaloneContributionSnapshot {
+  return {
+    rootKey,
+    source: "sovereign",
+    scope: "user",
+    precedence,
+    contributions,
+    ...overrides,
+  } as StandaloneContributionSnapshot;
+}
 
 describe("createContributionRegistry", () => {
+  it("keeps a malformed project snapshot out of base resolution defensively", () => {
+    const registry = createContributionRegistry();
+    const malformed = {
+      rootKey: "project:missing:skills",
+      source: "sovereign",
+      scope: "project",
+      precedence: 400,
+      contributions: [file(standaloneSkill("review", "sovereign", "project"))],
+    } as unknown as StandaloneContributionSnapshot;
+
+    registry.applyStandalone(malformed);
+
+    assert.deepEqual(registry.resolvedBase(), []);
+  });
+
   it("filters project declarations before precedence and conflict resolution", () => {
     const registry = createContributionRegistry();
 
@@ -163,6 +209,56 @@ describe("createContributionRegistry", () => {
     );
 
     assert.equal(registry.resolvedBase("skill")[0]?.source, "sovereign");
+  });
+
+  it("reports equal-rank standalone roots and marks both files invalid", () => {
+    const registry = createContributionRegistry();
+    const firstPath = "/project/.first/skills/review/SKILL.md";
+    const secondPath = "/project/.second/skills/review/SKILL.md";
+
+    registry.applyStandalone({
+      rootKey: "project:p1:skills:first",
+      source: "first",
+      scope: "project",
+      projectId: "p1",
+      precedence: 300,
+      contributions: [file(standaloneSkill("review", "first", "project", "p1"), firstPath)],
+    });
+    registry.applyStandalone({
+      rootKey: "project:p1:skills:second",
+      source: "second",
+      scope: "project",
+      projectId: "p1",
+      precedence: 300,
+      contributions: [file(standaloneSkill("review", "second", "project", "p1"), secondPath)],
+    });
+
+    assert.deepEqual(registry.resolvedForProject("p1", "skill"), []);
+    assert.deepEqual(registry.conflictsForProject("p1"), [
+      {
+        id: "review",
+        source: "first",
+        plugins: [],
+        standaloneRoots: ["project:p1:skills:first", "project:p1:skills:second"],
+      },
+    ]);
+    assert.deepEqual(registry.conflictsForProject("p2"), []);
+
+    const resources = registry.fileResourcesForProject("p1");
+    assert.deepEqual(
+      resources.resources.map((resource) => [resource.path, resource.state]),
+      [
+        [firstPath, "invalid"],
+        [secondPath, "invalid"],
+      ],
+    );
+    assert.deepEqual(
+      resources.diagnostics.map((diagnostic) => [diagnostic.path, diagnostic.code]),
+      [
+        [firstPath, "duplicate-contribution"],
+        [secondPath, "duplicate-contribution"],
+      ],
+    );
   });
 
   it("resolves plugin project over data over built-in", () => {

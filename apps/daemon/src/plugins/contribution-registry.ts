@@ -38,10 +38,10 @@ export type ContributingPlugin = {
 
 export type FileContributionInput = {
   path: string;
+  kind: FileResourceKind;
   diagnostics: FileResourceDiagnostic[];
   registration?: Extract<ContributionRegistration, { kind: "agent" | "skill" }>;
   /** Для invalid-файла registration нет, но диагностическому снимку всё ещё нужны эти поля. */
-  kind?: FileResourceKind;
   id?: string;
   name?: string;
   description?: string;
@@ -54,14 +54,15 @@ export type PluginContributionSnapshot = {
   disabledContributions: ReadonlySet<string>;
 };
 
-export type StandaloneContributionSnapshot = {
+type StandaloneContributionSnapshotCommon = {
   rootKey: string;
   source: string;
-  scope: "user" | "project";
-  projectId?: string;
   precedence: number;
   contributions: FileContributionInput[];
 };
+
+export type StandaloneContributionSnapshot = StandaloneContributionSnapshotCommon &
+  ({ scope: "user"; projectId?: never } | { scope: "project"; projectId: string });
 
 type ApplyOptions = { resourceChanged?: boolean };
 
@@ -133,6 +134,7 @@ type OwnershipSnapshot = {
 type Resolution = {
   registrations: ContributionRegistration[];
   declarations: ContributionDeclaration[];
+  conflictedDeclarations: ContributionDeclaration[];
   conflicts: ContributionConflict[];
 };
 
@@ -179,7 +181,8 @@ export function createContributionRegistry(): ContributionRegistry {
     const applicable = declarations().filter(
       (declaration) =>
         declaration.enabled &&
-        (declaration.scope !== "project" || declaration.projectId === projectId),
+        (declaration.scope !== "project" ||
+          (projectId !== undefined && declaration.projectId === projectId)),
     );
     const claims = new Map<string, ContributionDeclaration[]>();
 
@@ -188,6 +191,7 @@ export function createContributionRegistry(): ContributionRegistry {
     }
 
     const winners: ContributionDeclaration[] = [];
+    const conflictedDeclarations: ContributionDeclaration[] = [];
     const conflicts: ContributionConflict[] = [];
 
     for (const [, claimants] of [...claims].sort(([left], [right]) =>
@@ -199,14 +203,25 @@ export function createContributionRegistry(): ContributionRegistry {
 
       if (leading.length > 1) {
         const pluginClaims = leading.filter((claimant) => claimant.ownership.kind === "plugin");
-        const firstPlugin = pluginClaims[0];
-        if (firstPlugin !== undefined) {
+        const standaloneClaims = leading.filter(
+          (claimant) => claimant.ownership.kind === "standalone",
+        );
+        const first = leading[0];
+        conflictedDeclarations.push(...leading);
+        if (first !== undefined) {
           conflicts.push({
-            id: firstPlugin.registration.id,
-            source: firstPlugin.registration.source as PluginSource,
+            id: first.registration.id,
+            source: first.registration.source,
             plugins: pluginClaims.map((claimant) =>
               claimant.ownership.kind === "plugin" ? claimant.ownership.pluginKey : "",
             ),
+            ...(standaloneClaims.length === 0
+              ? {}
+              : {
+                  standaloneRoots: standaloneClaims.map((claimant) =>
+                    claimant.ownership.kind === "standalone" ? claimant.ownership.root : "",
+                  ),
+                }),
           });
         }
         continue;
@@ -219,6 +234,7 @@ export function createContributionRegistry(): ContributionRegistry {
 
     return {
       declarations: winners,
+      conflictedDeclarations,
       registrations: winners.map((winner) => winner.registration).sort(byRegistration),
       conflicts,
     };
@@ -282,7 +298,7 @@ export function createContributionRegistry(): ContributionRegistry {
       ...[...projectIds].flatMap((projectId) => resolve(projectId).conflicts),
     ];
     const unique = new Map(conflicts.map((conflict) => [JSON.stringify(conflict), conflict]));
-    return [...unique.values()];
+    return [...unique.values()].filter((conflict) => conflict.plugins.length > 0);
   };
 
   return {
@@ -443,10 +459,10 @@ function buildPluginSnapshot(input: PluginContributionSnapshot): {
 
 function buildStandaloneSnapshot(input: StandaloneContributionSnapshot): OwnershipSnapshot {
   const ownership = { kind: "standalone" as const, root: input.rootKey };
-  const origin = {
-    scope: input.scope,
-    ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
-  };
+  const origin =
+    input.scope === "project"
+      ? { scope: "project" as const, projectId: input.projectId }
+      : { scope: "user" as const };
   const declarations: ContributionDeclaration[] = [];
   const invalidFiles: InvalidFileDeclaration[] = [];
 
@@ -524,6 +540,9 @@ function fileResourcesSnapshot(
   resolution: Resolution,
 ): FileResourcesSnapshot {
   const active = new Set(resolution.declarations.map((declaration) => declaration.key));
+  const conflicted = new Set(
+    resolution.conflictedDeclarations.map((declaration) => declaration.key),
+  );
   const applicable = declarations.filter(
     (declaration) =>
       declaration.file !== undefined &&
@@ -546,9 +565,11 @@ function fileResourcesSnapshot(
         path: file.path,
         state: !declaration.enabled
           ? "switched-off"
-          : active.has(declaration.key)
-            ? "active"
-            : "shadowed",
+          : conflicted.has(declaration.key)
+            ? "invalid"
+            : active.has(declaration.key)
+              ? "active"
+              : "shadowed",
         ...(declaration.ownership.kind === "plugin"
           ? { pluginKey: declaration.ownership.pluginKey }
           : {}),
@@ -558,7 +579,7 @@ function fileResourcesSnapshot(
       } satisfies FileResourceSummary;
     }),
     ...applicableInvalid.map((declaration) => ({
-      kind: declaration.file.kind ?? declaration.file.diagnostics[0]?.kind ?? ("skill" as const),
+      kind: declaration.file.kind,
       ...(declaration.file.name === undefined ? {} : { name: declaration.file.name }),
       ...(declaration.file.id === undefined ? {} : { id: declaration.file.id }),
       ownership: declaration.ownership.kind,
@@ -576,6 +597,20 @@ function fileResourcesSnapshot(
   ].sort((left, right) => left.path.localeCompare(right.path, "en"));
   const diagnostics = [
     ...applicable.flatMap((declaration) => declaration.file?.diagnostics ?? []),
+    ...resolution.conflictedDeclarations.flatMap((declaration) =>
+      declaration.file === undefined
+        ? []
+        : [
+            {
+              severity: "error" as const,
+              code: "duplicate-contribution",
+              message: `the ${declaration.registration.kind} ${declaration.registration.id} is claimed by equal-precedence sources`,
+              path: declaration.file.path,
+              kind: declaration.registration.kind as FileResourceKind,
+              id: declaration.registration.id,
+            },
+          ],
+    ),
     ...applicableInvalid.flatMap((declaration) => declaration.file.diagnostics),
   ].sort((left, right) =>
     `${left.path}:${left.code}:${left.message}`.localeCompare(
