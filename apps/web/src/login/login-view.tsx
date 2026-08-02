@@ -68,8 +68,7 @@ export function LoginView({
     <main className="login">
       <Form onSubmit={submit} disabled={check.kind !== "ready" || busy}>
         {/* Раскладку держит внутренний контейнер: кит-`Form` не принимает `className`, а её
-            `display: contents` вынимает форму из потока. Кнопка кита всегда `type="button"`, поэтому
-            сабмит идёт только через Enter (его ловит форма) и через явный `onClick`. */}
+            `display: contents` вынимает форму из потока. */}
         <div className="login-form">
           <Panel>
             <div className="login-body">
@@ -121,7 +120,7 @@ export function LoginView({
                 </Field>
               ) : undefined}
 
-              <Button tone="accent" onClick={submit} disabled={check.kind !== "ready"} busy={busy}>
+              <Button type="submit" tone="accent" disabled={check.kind !== "ready"} busy={busy}>
                 {t(registering ? "login.registration.submit" : "login.submit")}
               </Button>
             </div>

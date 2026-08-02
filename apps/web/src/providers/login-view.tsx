@@ -258,7 +258,7 @@ function LoginPromptForm({ prompt, onAnswer, translator }: LoginPromptFormProps)
           </Field>
         )}
 
-        <Button tone="accent" onClick={() => onAnswer(prompt.stepId, value)}>
+        <Button type="submit" tone="accent">
           {t("providers.login.answer")}
         </Button>
       </div>

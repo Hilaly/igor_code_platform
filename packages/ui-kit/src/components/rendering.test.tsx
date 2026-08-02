@@ -245,6 +245,14 @@ describe("markup of the ported primitives", () => {
     expect(icon).toContain('aria-label="Скрыть"');
   });
 
+  it("keeps ordinary buttons inert in forms and allows an explicit submit button", () => {
+    const ordinary = renderToStaticMarkup(<Button>Обзор</Button>);
+    const submit = renderToStaticMarkup(<Button type="submit">Создать</Button>);
+
+    expect(ordinary).toContain('type="button"');
+    expect(submit).toContain('type="submit"');
+  });
+
   it("menu", () => {
     const markup = renderToStaticMarkup(
       <Menu

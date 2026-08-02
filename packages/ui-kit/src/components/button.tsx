@@ -9,6 +9,8 @@ export type ButtonTone = "normal" | "accent" | "danger";
 export type ButtonSize = "md" | "sm";
 
 export type ButtonProps = {
+  /** Нативное поведение внутри формы. Обычная кнопка не должна случайно отправлять форму. */
+  type?: "button" | "submit";
   tone?: ButtonTone;
   /** Размер: `md` — обычная кнопка действия, `sm` — там, где места мало (шапка панели). */
   size?: ButtonSize;
@@ -40,6 +42,7 @@ export type ButtonProps = {
 };
 
 export function Button({
+  type = "button",
   tone = "normal",
   size = "md",
   iconOnly = false,
@@ -72,7 +75,7 @@ export function Button({
 
   return (
     <button
-      type="button"
+      type={type}
       id={id}
       className={className}
       onClick={onClick}

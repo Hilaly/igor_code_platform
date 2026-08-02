@@ -219,7 +219,8 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
 поверхность переписана под наши соглашения: явные пропсы, `onChange` со значением вместо события,
 строки только пропсами и уже переведёнными.
 
-- **`Button`** — `tone`, `size` (`md` | `sm`), `iconOnly`, `onClick`, `disabled`, `pressed`, `busy`,
+- **`Button`** — `type` (`button` | `submit`, по умолчанию `button`), `tone`, `size` (`md` | `sm`),
+  `iconOnly`, `onClick`, `disabled`, `pressed`, `busy`,
   `title` и стандартные для интерактивного элемента `id`, `aria-label`, `aria-describedby`,
   `aria-expanded`, `aria-controls`, `aria-haspopup`, `onFocus`, `onBlur`, `onKeyDown`; `describedBy`
   сохранён как совместимое имя связи с описанием. `size="sm"` — для тесных мест (шапка панели); `iconOnly`

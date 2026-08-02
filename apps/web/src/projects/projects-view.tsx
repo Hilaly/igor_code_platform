@@ -230,7 +230,7 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
             {(control) => <Input {...control} value={name} onChange={setName} disabled={busy} />}
           </Field>
 
-          <Button tone="accent" onClick={submit} disabled={!ready} busy={busy}>
+          <Button type="submit" tone="accent" disabled={!ready} busy={busy}>
             {t("projects.new.submit")}
           </Button>
         </div>
