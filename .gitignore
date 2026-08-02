@@ -22,9 +22,7 @@ build/
 # OS
 .DS_Store
 
-# Review/report artifacts — вывод код-ревью, не часть репозитория
-glm_review_*.html
-
 # Coding agents
 .zcode/
 .worktrees/
+.superpowers/
