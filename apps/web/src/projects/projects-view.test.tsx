@@ -63,6 +63,7 @@ function show(state: ProjectsState, overrides: Partial<ProjectsViewProps> = {}) 
   const onUpdate = vi.fn();
   const onRemove = vi.fn();
   const onDismissComplaints = vi.fn();
+  const onOpen = vi.fn();
 
   render(
     <ProjectsView
@@ -73,10 +74,11 @@ function show(state: ProjectsState, overrides: Partial<ProjectsViewProps> = {}) 
       onDismissComplaints={onDismissComplaints}
       translator={translator}
       {...overrides}
+      onOpen={onOpen}
     />,
   );
 
-  return { onCreate, onUpdate, onRemove, onDismissComplaints };
+  return { onCreate, onUpdate, onRemove, onDismissComplaints, onOpen };
 }
 
 const withProjects = (projects: Project[], archived: Project[] = []): ProjectsState =>
@@ -98,6 +100,10 @@ const openActions = (name: string): void => {
   fireEvent.click(within(rowOf(name)).getByRole("button", { name: /Действия/ }));
 };
 
+const openNewProject = (): void => {
+  fireEvent.click(screen.getByRole("button", { name: "+ Новый проект" }));
+};
+
 describe("ProjectsView", () => {
   it("waits for the first snapshot instead of showing an empty list", () => {
     show(initialProjectsState);
@@ -117,7 +123,9 @@ describe("ProjectsView", () => {
     // а эфемерный проект не переименовывается никогда (docs/sessions-and-projects.md).
     show(withProjects([work, project("a")]));
 
-    expect(within(rowOf("Работа без проекта")).queryByRole("button")).toBeNull();
+    expect(
+      within(rowOf("Работа без проекта")).queryByRole("button", { name: /Действия/ }),
+    ).toBeNull();
     expect(within(rowOf("a")).getByRole("button", { name: /Действия/ })).toBeDefined();
   });
 
@@ -204,6 +212,7 @@ describe("ProjectsView", () => {
     const onCreate = vi.fn().mockResolvedValue(false);
 
     show(withProjects([]), { onCreate });
+    openNewProject();
 
     const folder = screen.getByLabelText("Папка") as HTMLInputElement;
     const name = screen.getByLabelText("Имя") as HTMLInputElement;
@@ -221,15 +230,14 @@ describe("ProjectsView", () => {
 
   it("clears the form once the project is created", async () => {
     const { onCreate } = show(withProjects([]));
+    openNewProject();
 
     fireEvent.change(screen.getByLabelText("Папка"), { target: { value: "/code/platform" } });
     fireEvent.change(screen.getByLabelText("Имя"), { target: { value: "Платформа" } });
     fireEvent.click(screen.getByRole("button", { name: "Создать проект" }));
 
-    // Ждать надо очистки, а не вызова: поля чистит `then`, который к моменту вызова ещё не дошёл.
-    await waitFor(() =>
-      expect((screen.getByLabelText("Папка") as HTMLInputElement).value).toBe(""),
-    );
+    // После успеха форма сворачивается: следующий проект снова начинается с явного действия.
+    await waitFor(() => expect(screen.queryByLabelText("Папка")).toBeNull());
     expect(onCreate).toHaveBeenCalled();
   });
 
@@ -257,6 +265,7 @@ describe("ProjectsView", () => {
 
     try {
       show(withProjects([]));
+      openNewProject();
 
       fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
 
@@ -289,6 +298,7 @@ describe("ProjectsView", () => {
 
     try {
       show(withProjects([]));
+      openNewProject();
       fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
 
       await waitFor(() => expect(screen.getByRole("button", { name: "code" })).toBeDefined());
@@ -319,6 +329,7 @@ describe("ProjectsView", () => {
 
     try {
       show(withProjects([]));
+      openNewProject();
       fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
       const code = await screen.findByRole("button", { name: "code" });
 
@@ -333,6 +344,7 @@ describe("ProjectsView", () => {
 
   it("keeps the create button locked until both fields say something", () => {
     show(withProjects([]));
+    openNewProject();
 
     const create = (): HTMLButtonElement =>
       screen.getByRole("button", { name: "Создать проект" }) as HTMLButtonElement;
@@ -344,6 +356,30 @@ describe("ProjectsView", () => {
 
     fireEvent.change(screen.getByLabelText("Имя"), { target: { value: "Имя" } });
     expect(create().disabled).toBe(false);
+  });
+
+  it("filters projects by name and folder", () => {
+    show(
+      withProjects([
+        project("alpha", { name: "Alpha", folder: "/code/alpha" }),
+        project("beta", { name: "Beta", folder: "/code/beta" }),
+      ]),
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск проектов" }), {
+      target: { value: "beta" },
+    });
+
+    expect(screen.getByText("Beta")).toBeDefined();
+    expect(screen.queryByText("Alpha")).toBeNull();
+  });
+
+  it("opens a project when its card is selected", () => {
+    const { onOpen } = show(withProjects([project("alpha", { name: "Alpha" })]));
+
+    fireEvent.click(within(rowOf("Alpha")).getAllByRole("button")[0]!);
+
+    expect(onOpen).toHaveBeenCalledWith("alpha");
   });
 
   it("puts the archived projects behind a disclosure, out of the working list", () => {

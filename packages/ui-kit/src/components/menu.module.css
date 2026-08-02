@@ -41,6 +41,32 @@
   background: var(--sovereign-control-surface-hover);
 }
 
+.trigger.compact {
+  height: var(--sovereign-control-height-sm);
+  min-width: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-2);
+  border-color: transparent;
+  border-radius: var(--sovereign-radius-sm);
+  background: transparent;
+  font-size: var(--sovereign-font-size-md);
+  line-height: 1;
+}
+
+.trigger.compact:hover {
+  border-color: transparent;
+  background: var(--sovereign-control-surface-hover);
+}
+
+.trigger.compact:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: calc(var(--sovereign-space-1) * -1);
+}
+
+.trigger.compact[aria-expanded="true"] {
+  border-color: transparent;
+  background: var(--sovereign-accent-surface);
+}
+
 .trigger[aria-expanded="true"] {
   border-color: var(--sovereign-accent-border);
   background: var(--sovereign-accent-surface);
@@ -68,6 +94,20 @@
 .menu.above {
   top: auto;
   bottom: calc(100% + var(--sovereign-space-1));
+}
+
+/* Портал выходит из overflow-контейнера панели; координаты приходят от триггера как fixed-позиция. */
+.menu.portal {
+  position: fixed;
+  top: var(--menu-top, auto);
+  left: var(--menu-left, auto);
+  margin-top: var(--sovereign-space-1);
+}
+
+.menu.portal.above {
+  top: var(--menu-top, auto);
+  bottom: auto;
+  margin-top: calc(var(--sovereign-space-1) * -1);
 }
 
 .item {

@@ -17,8 +17,8 @@ describe("matchPage", () => {
   it("keeps the projects on their own address", () => {
     expect(matchPage("/projects")).toEqual({ kind: "projects" });
     expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
-      kind: "unknown",
-      path: "/projects/b7Kq3xv9pQdT",
+      kind: "project",
+      projectId: "b7Kq3xv9pQdT",
     });
   });
 
@@ -128,6 +128,7 @@ describe("pathOf", () => {
       "/",
       "/plugins",
       "/projects",
+      "/projects/b7Kq3xv9pQdT",
       "/providers",
       "/providers/anthropic",
       "/sessions",

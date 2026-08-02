@@ -115,7 +115,7 @@ beforeEach(() => {
       return answer(refusal.body, refusal.status);
     }
 
-    if (url === sessionsPath && method === "GET") {
+    if ((url === sessionsPath || url.startsWith(`${sessionsPath}?`)) && method === "GET") {
       return answer({ sessions });
     }
 
@@ -163,7 +163,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function connect(props: { stream?: StreamStatus; sessionId?: string } = {}) {
+function connect(props: { stream?: StreamStatus; sessionId?: string; projectId?: string } = {}) {
   const bus = createFrontendBus({
     onListenerError: (cause) => {
       throw cause;
@@ -174,12 +174,13 @@ function connect(props: { stream?: StreamStatus; sessionId?: string } = {}) {
     diagnostics.push(diagnostic);
   };
   const view = renderHook(
-    (current: { stream: StreamStatus; sessionId?: string }) =>
+    (current: { stream: StreamStatus; sessionId?: string; projectId?: string }) =>
       useSessions({
         bus,
         stream: current.stream,
         onDiagnostic: record,
         ...(current.sessionId === undefined ? {} : { sessionId: current.sessionId }),
+        ...(current.projectId === undefined ? {} : { projectId: current.projectId }),
       }),
     { initialProps: { stream: props.stream ?? "open", ...props } },
   );
@@ -200,6 +201,13 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.sessions).toHaveLength(1));
     expect(asked(agentsPath)).toHaveLength(1);
+  });
+
+  it("filters the sessions snapshot by the project from the address", async () => {
+    const view = connect({ projectId: "b7Kq" });
+
+    await waitFor(() => expect(view.result.current.state.sessions).toHaveLength(1));
+    expect(asked(`${sessionsPath}?projectId=b7Kq`)).toHaveLength(1);
   });
 
   it("reads the entries of the session named by the address", async () => {

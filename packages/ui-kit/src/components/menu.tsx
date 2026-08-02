@@ -6,7 +6,8 @@
  * перевода фокуса, а его поверхность не принимает ни того, ни другого.
  */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import styles from "./menu.module.css";
 import { nextEnabledIndex } from "./roving-focus.ts";
@@ -40,6 +41,8 @@ export type MenuProps = {
   placement?: "below" | "above";
   /** Кнопка и список занимают всю ширину контейнера, а не по содержимому — для кнопки во всю панель. */
   block?: boolean;
+  /** Лёгкий триггер для контекстных меню: без капсулы, с подсветкой только при взаимодействии. */
+  compact?: boolean;
   items: MenuItemDescription[];
 };
 
@@ -49,13 +52,16 @@ export function Menu({
   triggerLabel,
   placement = "below",
   block = false,
+  compact = false,
   items,
 }: MenuProps) {
   const menuId = useId();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const itemElements = useRef<(HTMLButtonElement | null)[]>([]);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | undefined>();
   // Ссылка на свежий набор: массив пунктов приходит новым на каждой перерисовке вызывающего, и в
   // зависимостях эффекта он снимал бы слушатели и заново забирал фокус на первый пункт.
   const latestItems = useRef(items);
@@ -84,7 +90,10 @@ export function Menu({
     function handlePointerDown(event: PointerEvent): void {
       // Указатель мимо меню и мимо триггера — меню больше не нужно. Фокус при этом не двигаем: он ушёл
       // туда, куда нажали.
-      if (!(event.target instanceof Node) || !root.contains(event.target)) {
+      if (
+        !(event.target instanceof Node) ||
+        (!root.contains(event.target) && !popupRef.current?.contains(event.target))
+      ) {
         setOpen(false);
       }
     }
@@ -129,11 +138,73 @@ export function Menu({
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !compact || typeof window === "undefined") {
+      return;
+    }
+
+    const updatePosition = (): void => {
+      const triggerElement = triggerRef.current;
+
+      if (triggerElement === null) {
+        return;
+      }
+
+      const rect = triggerElement.getBoundingClientRect();
+      const popupHeight = popupRef.current?.getBoundingClientRect().height ?? 0;
+
+      setPopupPosition({
+        left: rect.left,
+        top: placement === "above" ? rect.top - popupHeight : rect.bottom,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [compact, open, placement]);
+
+  const popup = open ? (
+    <div
+      className={`${styles.menu}${placement === "above" ? ` ${styles.above}` : ""}${compact ? ` ${styles.portal}` : ""}`}
+      id={menuId}
+      role="menu"
+      aria-label={label}
+      ref={popupRef}
+      style={compact && popupPosition !== undefined ? popupPosition : undefined}
+    >
+      {items.map((item, index) => (
+        <button
+          key={item.id}
+          type="button"
+          className={`${styles.item}${item.tone === "danger" ? ` ${styles.danger}` : ""}`}
+          ref={(element) => {
+            itemElements.current[index] = element;
+          }}
+          role="menuitem"
+          disabled={item.disabled}
+          onClick={() => {
+            item.onSelect();
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  ) : undefined;
+
   return (
     <div className={`${styles.root}${block ? ` ${styles.block}` : ""}`} ref={rootRef}>
       <button
         type="button"
-        className={`${styles.trigger}${block ? ` ${styles.block}` : ""}`}
+        className={`${styles.trigger}${block ? ` ${styles.block}` : ""}${compact ? ` ${styles.compact}` : ""}`}
         ref={triggerRef}
         aria-haspopup="menu"
         aria-label={triggerLabel}
@@ -143,34 +214,9 @@ export function Menu({
       >
         {trigger}
       </button>
-      {open ? (
-        <div
-          className={`${styles.menu}${placement === "above" ? ` ${styles.above}` : ""}`}
-          id={menuId}
-          role="menu"
-          aria-label={label}
-        >
-          {items.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`${styles.item}${item.tone === "danger" ? ` ${styles.danger}` : ""}`}
-              ref={(element) => {
-                itemElements.current[index] = element;
-              }}
-              role="menuitem"
-              disabled={item.disabled}
-              onClick={() => {
-                item.onSelect();
-                setOpen(false);
-                triggerRef.current?.focus();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      ) : undefined}
+      {compact && popup !== undefined && typeof document !== "undefined"
+        ? createPortal(popup, document.body)
+        : popup}
     </div>
   );
 }

@@ -267,6 +267,21 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain('role="menu"');
   });
 
+  it("marks a menu trigger compact when requested", () => {
+    const markup = renderToStaticMarkup(
+      <Menu
+        label="Действия"
+        trigger="…"
+        triggerLabel="Действия проекта"
+        compact
+        items={[{ id: "rename", label: "Переименовать", onSelect: () => {} }]}
+      />,
+    );
+
+    expect(markup).toMatch(/class="[^"]*trigger[^"]*compact[^"]*"/);
+    expect(markup).toContain('aria-label="Действия проекта"');
+  });
+
   it("menu that opens upward and fills its container", () => {
     const markup = renderToStaticMarkup(
       <Menu
