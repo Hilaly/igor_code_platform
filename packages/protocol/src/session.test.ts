@@ -15,6 +15,7 @@ import {
   sessionStatsPath,
   sessionTurnsPath,
   type AgentSummary,
+  type Session,
 } from "./session.ts";
 
 describe("AgentSummary", () => {
@@ -71,6 +72,25 @@ describe("AgentSummary", () => {
     assert.ok(pluginWithoutKey);
     assert.ok(standaloneWithKey);
     assert.ok(skillsWithoutExclude);
+  });
+});
+
+describe("Session", () => {
+  it("reports whether its current project agent is available", () => {
+    const session: Session = {
+      id: "0199",
+      projectId: "p1",
+      folder: "/tmp/demo",
+      agentId: "base-agent.agent",
+      agentAvailable: false,
+      model: "scripted/one",
+      thinkingLevel: "off",
+      phase: "idle",
+      archived: false,
+      createdAt: "2026-08-02T09:00:00.000Z",
+    };
+
+    assert.equal(session.agentAvailable, false);
   });
 });
 

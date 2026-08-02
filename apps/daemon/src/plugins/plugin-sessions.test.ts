@@ -11,6 +11,7 @@ const session: Session = {
   projectId: "p1",
   folder: "/tmp/demo",
   agentId: "base-agent.agent",
+  agentAvailable: true,
   model: "scripted/one",
   thinkingLevel: "off",
   phase: "idle",

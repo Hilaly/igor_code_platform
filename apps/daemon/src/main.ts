@@ -300,7 +300,10 @@ const sessions = createSessionService({
     }),
   }),
   projects,
-  contributions: () => contributions.resolved(),
+  contributions: {
+    base: () => contributions.resolvedBase(),
+    forProject: (projectId) => contributions.resolvedForProject(projectId),
+  },
   tools: toolCollector,
   queue: createTurnQueue({
     // Предел читается живьём: правка `config.json` применяется без перезапуска демона.

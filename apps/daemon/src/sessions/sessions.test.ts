@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { scriptedSessionStore, type ScriptedTurn } from "@sovereign/agent-runtime-pi/testing";
-import type { AgentSession, AgentSessionStore } from "@sovereign/agent-runtime-pi";
+import type { AgentSession, AgentSessionStore, AgentSkill } from "@sovereign/agent-runtime-pi";
 import {
   agentsPath,
   coreEventTypes,
@@ -81,6 +81,34 @@ const baseAgent: AgentContributionRegistration = {
   skills: { include: [], exclude: [] },
 };
 
+const skill = (
+  id: string,
+  overrides: Partial<
+    Pick<
+      Extract<ContributionRegistration, { kind: "skill" }>,
+      | "description"
+      | "location"
+      | "license"
+      | "compatibility"
+      | "metadata"
+      | "allowedTools"
+      | "disableModelInvocation"
+    >
+  > = {},
+): Extract<ContributionRegistration, { kind: "skill" }> => ({
+  kind: "skill",
+  ownership: "standalone",
+  id,
+  declaredId: id,
+  source: "sovereign",
+  scope: "user",
+  name: id,
+  description: `${id} description`,
+  location: `/skills/${id}/SKILL.md`,
+  disableModelInvocation: false,
+  ...overrides,
+});
+
 type Answer = { status: number; body: Record<string, unknown> };
 
 function gate() {
@@ -99,7 +127,10 @@ function gate() {
 async function serve(
   options: {
     turns?: ScriptedTurn[];
-    contributions?: ContributionRegistration[] | (() => ContributionRegistration[]);
+    contributions?: {
+      base: () => ContributionRegistration[];
+      forProject: (projectId: string) => ContributionRegistration[];
+    };
     limit?: number;
     modelChangeGate?: ReturnType<typeof gate>;
     openGate?: ReturnType<typeof gate>;
@@ -148,8 +179,27 @@ async function serve(
   }
 
   let openCalls = 0;
-  const delayModelChange = (session: AgentSession): AgentSession => ({
+  const appliedInstructions: string[] = [];
+  const appliedSkills: AgentSkill[][] = [];
+  const appliedToolNames: string[][] = [];
+  const toolContexts: unknown[] = [];
+  const observeSession = (session: AgentSession): AgentSession => ({
     ...session,
+    setInstructions: (instructions) => {
+      appliedInstructions.push(instructions);
+      session.setInstructions(instructions);
+    },
+    setSkills: (skills) => {
+      appliedSkills.push(skills);
+      session.setSkills(skills);
+    },
+    setTools: async (tools, activeToolNames) => {
+      appliedToolNames.push(activeToolNames);
+      await session.setTools(tools, activeToolNames);
+    },
+  });
+  const delayModelChange = (session: AgentSession): AgentSession => ({
+    ...observeSession(session),
     setModel: async (reference) => {
       options.modelChangeGate?.entered();
       await options.modelChangeGate?.wait;
@@ -157,40 +207,37 @@ async function serve(
       return session.setModel(reference);
     },
   });
-  const store: AgentSessionStore =
-    options.modelChangeGate === undefined &&
-    options.openGate === undefined &&
-    options.createGate === undefined
-      ? sessionStore
-      : {
-          ...sessionStore,
-          create: async (input) => {
-            options.createGate?.entered();
-            await options.createGate?.wait;
-            const createdSession = await sessionStore.create(input);
+  const decorate = (session: AgentSession): AgentSession =>
+    options.modelChangeGate === undefined ? observeSession(session) : delayModelChange(session);
+  const store: AgentSessionStore = {
+    ...sessionStore,
+    create: async (input) => {
+      options.createGate?.entered();
+      await options.createGate?.wait;
+      const createdSession = await sessionStore.create(input);
 
-            return "kind" in createdSession ? createdSession : delayModelChange(createdSession);
-          },
-          open: async (id) => {
-            openCalls += 1;
-            options.openGate?.entered();
-            await options.openGate?.wait;
-            const openedSession = await sessionStore.open(id);
+      return "kind" in createdSession ? createdSession : decorate(createdSession);
+    },
+    open: async (id) => {
+      openCalls += 1;
+      options.openGate?.entered();
+      await options.openGate?.wait;
+      const openedSession = await sessionStore.open(id);
 
-            if (openedSession === undefined || options.modelChangeGate === undefined) {
-              return openedSession;
-            }
+      if (openedSession === undefined) {
+        return openedSession;
+      }
 
-            return {
-              ...openedSession,
-              activate: (agent) => {
-                const activated = openedSession.activate(agent);
+      return {
+        ...openedSession,
+        activate: (agent) => {
+          const activated = openedSession.activate(agent);
 
-                return "kind" in activated ? activated : delayModelChange(activated);
-              },
-            };
-          },
-        };
+          return "kind" in activated ? activated : decorate(activated);
+        },
+      };
+    },
+  };
   const bus = createEventBus({
     onListenerError: (cause) => {
       throw cause;
@@ -205,14 +252,23 @@ async function serve(
   const collector = createToolCollector();
 
   collector.register(coreToolSource());
+  collector.register({
+    id: "context-recorder",
+    collect: (context) => {
+      toolContexts.push(context);
+      return [];
+    },
+  });
+
+  const defaultContributions = {
+    base: () => [baseAgent],
+    forProject: () => [baseAgent],
+  };
 
   const service = createSessionService({
     store,
     projects,
-    contributions: () =>
-      typeof options.contributions === "function"
-        ? options.contributions()
-        : (options.contributions ?? [baseAgent]),
+    contributions: options.contributions ?? defaultContributions,
     tools: collector,
     queue: createTurnQueue({ limit: () => options.limit ?? 4 }),
     bus,
@@ -287,6 +343,10 @@ async function serve(
     coldSessionId,
     openCalls: () => openCalls,
     directory,
+    appliedInstructions,
+    appliedSkills,
+    appliedToolNames,
+    toolContexts,
     start: async (body?: Record<string, unknown>) =>
       call("POST", sessionsPath, { projectId, agentId: baseAgent.id, model, ...body }),
     removeProject: () => call("DELETE", projectPath(projectId)),
@@ -326,10 +386,38 @@ describe("GET /api/agents", () => {
   });
 
   it("answers with nothing when every plugin with an agent is off", async () => {
-    const { call } = await serve({ contributions: [] });
+    const { call } = await serve({
+      contributions: { base: () => [], forProject: () => [] },
+    });
 
     // Ноль агентов — законный ответ, а не отказ (docs/sessions-and-projects.md).
     assert.deepEqual((await call("GET", agentsPath)).body, { agents: [] });
+  });
+
+  it("keeps project agents out of the global list and resolves them for their project", async () => {
+    const p1Agent = { ...baseAgent, instructions: "p1", source: "project:p1" as const };
+    const p2Agent = { ...baseAgent, instructions: "p2", source: "project:p2" as const };
+    const { call, service, projectId } = await serve({
+      contributions: {
+        base: () => [baseAgent],
+        forProject: (wanted) => [wanted === projectId ? p1Agent : p2Agent],
+      },
+    });
+
+    assert.deepEqual(
+      ((await call("GET", agentsPath)).body as unknown as AgentsSnapshot).agents.map(
+        ({ source }) => source,
+      ),
+      ["builtin"],
+    );
+    assert.deepEqual(
+      service.agentsForProject(projectId).map(({ source }) => source),
+      ["project:p1"],
+    );
+    assert.deepEqual(
+      service.agentsForProject("p2").map(({ source }) => source),
+      ["project:p2"],
+    );
   });
 });
 
@@ -359,7 +447,7 @@ describe("POST /api/sessions", () => {
     });
 
     assert.equal(answer.status, 409);
-    assert.match(String(answer.body["error"]), /no agent/);
+    assert.match(String(answer.body["error"]), /agent .* is not available/);
   });
 
   it("refuses a project nobody created", async () => {
@@ -392,6 +480,98 @@ describe("POST /api/sessions", () => {
 
     assert.equal(answer.status, 409);
     assert.match(String(answer.body["error"]), /not available/);
+  });
+
+  it("revalidates a project agent after it was listed", async () => {
+    let current: ContributionRegistration[] = [baseAgent];
+    const { service, call, projectId, model } = await serve({
+      contributions: { base: () => [baseAgent], forProject: () => current },
+    });
+
+    assert.deepEqual(
+      service.agentsForProject(projectId).map(({ id }) => id),
+      [baseAgent.id],
+    );
+    current = [];
+
+    const answer = await call("POST", sessionsPath, { projectId, agentId: baseAgent.id, model });
+
+    assert.equal(answer.status, 409);
+    assert.match(String(answer.body["error"]), new RegExp(baseAgent.id));
+  });
+
+  it("uses safe empty selectors for a programmatic agent that omits them", async () => {
+    const programmatic = {
+      ...baseAgent,
+      tools: undefined,
+      skills: undefined,
+    } as unknown as AgentContributionRegistration;
+    const { call, start, appliedToolNames, appliedSkills } = await serve({
+      contributions: { base: () => [programmatic], forProject: () => [programmatic] },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "hello" });
+    await untilIdle(call, sessionId);
+
+    assert.deepEqual(appliedToolNames.at(-1), []);
+    assert.deepEqual(appliedSkills.at(-1), []);
+  });
+
+  it("re-resolves instructions, tool selectors and skill selectors before every turn", async () => {
+    const review = skill("review");
+    const unsafe = skill("review-unsafe");
+    const hidden = skill("hidden", { disableModelInvocation: true });
+    let agent: AgentContributionRegistration = {
+      ...baseAgent,
+      instructions: "first instructions",
+      tools: { include: ["read"], exclude: [] },
+      skills: { include: ["review*", "hidden"], exclude: ["*-unsafe"] },
+    };
+    let contributions: ContributionRegistration[] = [agent, review, unsafe, hidden];
+    const {
+      call,
+      start,
+      appliedInstructions,
+      appliedSkills,
+      appliedToolNames,
+      toolContexts,
+      projectId,
+      folder,
+    } = await serve({
+      turns: [{ text: "first" }, { text: "second" }],
+      contributions: { base: () => [baseAgent], forProject: () => contributions },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "first" });
+    await untilIdle(call, sessionId);
+
+    assert.equal(appliedInstructions.at(-1), "first instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["read"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["review"],
+    );
+    assert.deepEqual(toolContexts.at(-1), { projectId, folder });
+
+    agent = {
+      ...agent,
+      instructions: "second instructions",
+      tools: { include: ["bash", "write"], exclude: ["write"] },
+      skills: { include: ["deploy"], exclude: [] },
+    };
+    contributions = [agent, skill("deploy")];
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "second" });
+    await untilIdle(call, sessionId);
+
+    assert.equal(appliedInstructions.at(-1), "second instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["deploy"],
+    );
   });
 });
 
@@ -802,11 +982,14 @@ describe("reading sessions", () => {
     let contributions: ContributionRegistration[] = [];
     const { call, coldSessionId } = await serve({
       coldSession: true,
-      contributions: () => contributions,
+      contributions: { base: () => contributions, forProject: () => contributions },
     });
 
     assert.ok(coldSessionId);
-    assert.equal((await call("GET", sessionsPath)).status, 200);
+    const snapshot = (await call("GET", sessionsPath)).body as unknown as SessionsSnapshot;
+
+    assert.equal(snapshot.sessions[0]?.agentAvailable, false);
+    assert.equal((await call("GET", sessionPath(coldSessionId))).body["agentAvailable"], false);
 
     const page = await call("GET", sessionEntriesPath(coldSessionId));
 
@@ -815,6 +998,9 @@ describe("reading sessions", () => {
       (page.body as unknown as SessionEntriesPage).entries.map((entry) => entry.kind),
       ["model-change", "thinking-level-change"],
     );
+    assert.equal((await call("GET", sessionBranchPath(coldSessionId))).status, 200);
+    assert.equal((await call("GET", sessionContextPath(coldSessionId))).status, 200);
+    assert.equal((await call("GET", sessionStatsPath(coldSessionId))).status, 200);
 
     const prompt = await call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" });
 
@@ -822,11 +1008,30 @@ describe("reading sessions", () => {
     assert.match(String(prompt.body["error"]), new RegExp(baseAgent.id));
 
     contributions = [baseAgent];
+    assert.equal((await call("GET", sessionPath(coldSessionId))).body["agentAvailable"], true);
     assert.equal(
       (await call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" })).status,
       200,
     );
     await untilIdle(call, coldSessionId);
+  });
+
+  it("refuses harness operations after a live session loses its agent", async () => {
+    let contributions: ContributionRegistration[] = [baseAgent];
+    const { call, start } = await serve({
+      contributions: { base: () => contributions, forProject: () => contributions },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    contributions = [];
+
+    const answer = await call("POST", sessionMessagesPath(sessionId), {
+      text: "remember this",
+      mode: "next-turn",
+    });
+
+    assert.equal(answer.status, 409);
+    assert.match(String(answer.body["error"]), /agent .* is not available/);
   });
 
   it("answers 404 for a session nobody created", async () => {
@@ -1512,7 +1717,7 @@ describe("a session that lost a tool or a model", () => {
     let contributions: ContributionRegistration[] = [baseAgent];
     const { call, start, events } = await serve({
       turns: [{ text: "первый" }, { text: "второй" }, { text: "третий" }],
-      contributions: () => contributions,
+      contributions: { base: () => contributions, forProject: () => contributions },
     });
     const sessionId = String((await start()).body["id"]);
 

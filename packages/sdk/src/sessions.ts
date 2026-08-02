@@ -22,6 +22,7 @@ export type Session = {
   projectId: string;
   folder: string;
   agentId: string;
+  agentAvailable: boolean;
   /** `<провайдер>/<модель>`. */
   model: string;
   thinkingLevel: ThinkingLevel;

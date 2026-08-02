@@ -133,6 +133,8 @@ export type Session = {
   projectId: string;
   folder: string;
   agentId: string;
+  /** Есть ли сохранённый агент в текущем разрешённом наборе именно этого проекта. */
+  agentAvailable: boolean;
   model: string;
   thinkingLevel: ThinkingLevel;
   phase: SessionPhase;

@@ -154,6 +154,7 @@ describe("the session surface", () => {
       projectId: "p1",
       folder: "/tmp/demo",
       agentId: "base-agent.agent",
+      agentAvailable: true,
       model: "scripted/one",
       thinkingLevel: "off" as const,
       phase: "idle" as const,
