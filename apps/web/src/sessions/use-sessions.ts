@@ -347,6 +347,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
 
   const submitTurnToSession = useCallback(
     (id: string, text: string) => {
+      // Маршрут применится отдельным React-рендером, а ответ POST может прийти раньше. Открываем
+      // адресный state синхронно, чтобы queued/refused outcome не потерялся на прежней сессии.
+      apply((current) => openSession(current, id));
+
       void submitTurnRequest(id, { text })
         .then((outcome) => {
           if (outcome.kind === "refused") {

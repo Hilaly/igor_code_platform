@@ -383,8 +383,30 @@ describe("useSessions", () => {
       view.result.current.submitTurnToSession("0200", "первое сообщение");
     });
 
+    expect(view.result.current.state.open?.id).toBe("0200");
     await waitFor(() => expect(asked(sessionTurnsPath("0200"), "POST")).toHaveLength(1));
     expect(asked(sessionTurnsPath("0199"), "POST")).toHaveLength(0);
+  });
+
+  it("keeps a fast refusal of the first turn on the newly created session", async () => {
+    refusals[`POST ${sessionTurnsPath("0200")}`] = {
+      status: 409,
+      body: { error: "the model disappeared" },
+    };
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    act(() => {
+      view.result.current.submitTurnToSession("0200", "первое сообщение");
+    });
+
+    await waitFor(() =>
+      expect(view.result.current.state.open).toMatchObject({
+        id: "0200",
+        failure: "the model disappeared",
+      }),
+    );
   });
 
   it("does not double the line of a turn that started at once", async () => {
