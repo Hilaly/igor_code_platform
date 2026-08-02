@@ -12,14 +12,26 @@
 }
 
 /*
- * В строке провайдера двое: кто он и в каком он состоянии. Пометки держатся правого края распором
+ * Строка провайдера в списке: кто он и в каком он состоянии. Пометки держатся правого края распором
  * между ними, а не селектором по классу примитива: имена классов кита хешируются модулями, и
  * цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
  *
- * Отступа здесь нет: строка провайдера выбирается — по ней раскрываются модели, — и отступ ей даёт
+ * Отступа здесь нет: строка провайдера выбирается — клик уводит на страницу, — и отступ ей даёт
  * сам `ListRow`. Элементы строчные, потому что содержимое выбираемой строки лежит внутри кнопки.
  */
 .providers-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  flex-wrap: wrap;
+}
+
+/*
+ * Шапка страницы одного провайдера: те же двое, что в строке списка, но на отдельной странице.
+ * Раскладка повторяет строку, чтобы взгляд узнавал блок — разница только в отступах страницы.
+ */
+.providers-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,6 +50,23 @@
 }
 
 .providers-row-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+}
+
+/* Содержимое шапки страницы провайдера повторяет содержимое строки списка. */
+.providers-header-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  align-items: flex-start;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.providers-header-marks {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);

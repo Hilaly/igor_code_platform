@@ -255,7 +255,12 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
-  const providers = useProviders({ bus, stream, onDiagnostic: diagnostics.record });
+  const providers = useProviders({
+    bus,
+    stream,
+    onDiagnostic: diagnostics.record,
+    providerId: page.kind === "providers" ? page.providerId : undefined,
+  });
   const sessions = useSessions({
     bus,
     stream,
@@ -474,7 +479,9 @@ export function App() {
         providers={
           <ProvidersView
             state={providers.state}
-            onOpen={providers.open}
+            providerId={page.kind === "providers" ? page.providerId : undefined}
+            onOpen={(providerId) => navigation.navigate({ kind: "providers", providerId })}
+            onBack={() => navigation.navigate({ kind: "providers" })}
             onLogIn={providers.logIn}
             onAnswer={providers.answer}
             onCancelLogin={providers.cancelLogin}

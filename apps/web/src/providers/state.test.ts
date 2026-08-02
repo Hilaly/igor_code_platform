@@ -15,8 +15,9 @@ import {
   applyStreamEvent,
   configuredCount,
   initialProvidersState,
-  openProvider,
+  markModelsLoading,
   orderProviders,
+  shouldFetchModels,
 } from "./state.ts";
 
 const provider = (id: string, overrides: Partial<ProviderSummary> = {}): ProviderSummary => ({
@@ -103,58 +104,59 @@ describe("applySnapshot", () => {
   });
 });
 
-describe("openProvider", () => {
-  it("opens a provider and asks for its models", () => {
-    const outcome = openProvider(withProviders([provider("anthropic")]), "anthropic");
-
-    expect(outcome.fetch).toBe(true);
-    expect(outcome.state.openProviderId).toBe("anthropic");
-    expect(outcome.state.models["anthropic"]).toEqual({ kind: "loading" });
-  });
-
-  it("closes the open one instead of asking again", () => {
-    // Выбор той же строки — «закрыть»: иначе развернуть список моделей можно, а свернуть нечем.
-    const open = openProvider(withProviders([provider("anthropic")]), "anthropic").state;
-    const outcome = openProvider(open, "anthropic");
-
-    expect(outcome.fetch).toBe(false);
-    expect(outcome.state.openProviderId).toBeUndefined();
+describe("shouldFetchModels", () => {
+  it("asks for models it has never read", () => {
+    // На страницу провайдера заходят впервые — моделей ещё нет, спрашивать надо.
+    expect(shouldFetchModels(withProviders([provider("anthropic")]), "anthropic")).toBe(true);
   });
 
   it("does not ask twice for models it already has", () => {
-    const read = applyModels(
-      openProvider(withProviders([provider("anthropic")]), "anthropic").state,
-      "anthropic",
-      [model("claude")],
-    );
-    const closed = openProvider(read, "anthropic").state;
-    const outcome = openProvider(closed, "anthropic");
+    // Прочитанное не перечитывается: каталог моделей лежит в рантайме и сам по себе не меняется.
+    const read = markModelsLoading(withProviders([provider("anthropic")]), "anthropic");
+    const ready = applyModels(read, "anthropic", [model("claude")]);
 
-    expect(outcome.fetch).toBe(false);
-    expect(outcome.state.models["anthropic"]).toEqual({ kind: "ready", models: [model("claude")] });
+    expect(shouldFetchModels(ready, "anthropic")).toBe(false);
+  });
+
+  it("does not ask again while a request is in flight", () => {
+    // Повторный заход на страницу во время загрузки не должен плодить второй запрос.
+    const loading = markModelsLoading(withProviders([provider("anthropic")]), "anthropic");
+
+    expect(shouldFetchModels(loading, "anthropic")).toBe(false);
   });
 
   it("asks again after a failure: the reason may be gone by now", () => {
+    // Отказ — другое дело: причина могла уйти, и повторный заход это единственный способ попробовать.
     const failed = applyModelsFailure(
-      openProvider(withProviders([provider("anthropic")]), "anthropic").state,
+      markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),
       "anthropic",
       "the daemon answered 500",
     );
-    const closed = openProvider(failed, "anthropic").state;
 
-    expect(openProvider(closed, "anthropic").fetch).toBe(true);
+    expect(shouldFetchModels(failed, "anthropic")).toBe(true);
+  });
+});
+
+describe("markModelsLoading", () => {
+  it("stands a spinner up for the provider right away", () => {
+    const next = markModelsLoading(withProviders([provider("anthropic")]), "anthropic");
+
+    expect(next.models["anthropic"]).toEqual({ kind: "loading" });
   });
 });
 
 describe("applyModels", () => {
   it("keeps the models of every provider apart", () => {
-    const first = openProvider(
-      withProviders([provider("anthropic"), provider("openai")]),
+    // Каждый провайдер спрашивается отдельно и живёт своей жизнью — у одного список читается, у
+    // другого уже отказал.
+    const withOpenai = applyModels(
+      markModelsLoading(withProviders([provider("anthropic"), provider("openai")]), "openai"),
       "openai",
+      [model("gpt")],
     );
-    const withOpenai = applyModels(first.state, "openai", [model("gpt")]);
-    const second = openProvider(withOpenai, "anthropic");
-    const both = applyModels(second.state, "anthropic", [model("claude")]);
+    const both = applyModels(markModelsLoading(withOpenai, "anthropic"), "anthropic", [
+      model("claude"),
+    ]);
 
     expect(both.models["openai"]).toEqual({ kind: "ready", models: [model("gpt")] });
     expect(both.models["anthropic"]).toEqual({ kind: "ready", models: [model("claude")] });

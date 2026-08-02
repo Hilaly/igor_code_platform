@@ -31,9 +31,10 @@ export type ProvidersState = {
   snapshot?: ProvidersSnapshot;
   /** Почему список провайдеров не прочитан. Беда с файлом кредов сюда не попадает: она в снимке. */
   failure?: string;
-  /** Раскрыт ровно один: списки моделей бывают в сотни строк, и двух таких на экране не надо. */
-  openProviderId?: string;
-  /** Прочитанное остаётся в памяти вкладки: каталог моделей лежит в пакете рантайма и не меняется. */
+  /**
+   * Прочитанное остаётся в памяти вкладки: каталог моделей лежит в пакете рантайма и не меняется.
+   * Какой провайдер сейчас на странице, адресу знает маршрут (`providerId` в хуке), а не это поле.
+   */
   models: Record<string, ProviderModelsEntry>;
   /** Диалоги входа: правила в `login-state.ts`, здесь они только живут. */
   logins: LoginsState;
@@ -102,35 +103,21 @@ export function applyFailure(state: ProvidersState, reason: string): ProvidersSt
   return { ...state, failure: reason };
 }
 
-export type OpenOutcome = {
-  state: ProvidersState;
-  /** Спрашивать ли модели: прочитанные не перечитываются, отказавшие — да. */
-  fetch: boolean;
-};
-
-export function openProvider(state: ProvidersState, providerId: string): OpenOutcome {
-  // Выбор раскрытой строки закрывает её: иначе развернуть список моделей можно, а свернуть нечем.
-  if (state.openProviderId === providerId) {
-    return { state: { ...state, openProviderId: undefined }, fetch: false };
-  }
-
+/**
+ * Нужно ли спросить модели провайдера при переходе на его страницу. Прочитанное не
+ * перечитывается: каталог моделей лежит в пакете рантайма и сам по себе не меняется (обновление
+ * динамического списка приезжает `refresh`, и его пока нет). Отказ — другое дело: причина могла
+ * уйти, и повторный заход на страницу это единственный способ попробовать снова.
+ */
+export function shouldFetchModels(state: ProvidersState, providerId: string): boolean {
   const known = state.models[providerId];
 
-  // Прочитанное не перечитывается: каталог моделей лежит в пакете рантайма и сам по себе не меняется
-  // (обновление динамического списка приезжает `refresh`, и его пока нет). Отказ — другое дело:
-  // причина могла уйти, и повтор по раскрытию это единственный способ попробовать снова.
-  if (known?.kind === "ready" || known?.kind === "loading") {
-    return { state: { ...state, openProviderId: providerId }, fetch: false };
-  }
+  return known?.kind !== "ready" && known?.kind !== "loading";
+}
 
-  return {
-    state: {
-      ...state,
-      openProviderId: providerId,
-      models: { ...state.models, [providerId]: { kind: "loading" } },
-    },
-    fetch: true,
-  };
+/** Отметить, что модели провайдера спрашиваются: крутилка встаёт сразу, до ответа маршрута. */
+export function markModelsLoading(state: ProvidersState, providerId: string): ProvidersState {
+  return { ...state, models: { ...state.models, [providerId]: { kind: "loading" } } };
 }
 
 export function applyModels(

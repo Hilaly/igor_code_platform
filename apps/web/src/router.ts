@@ -25,7 +25,11 @@ export type Page =
   | { kind: "home" }
   | { kind: "plugins" }
   | { kind: "projects" }
-  | { kind: "providers" }
+  /**
+   * Список провайдеров, а с идентификатором — страница одного: вход и модели живут там, а не в
+   * раскрывающейся панели списка (docs/models-and-providers.md).
+   */
+  | { kind: "providers"; providerId?: string }
   /** Мастер-деталь: список сессий, а с идентификатором — ещё и открытый чат. */
   | { kind: "sessions"; sessionId?: string }
   /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
@@ -49,8 +53,17 @@ export function matchPage(path: string): Page {
     return { kind: "projects" };
   }
 
-  if (segments.length === 1 && `/${segments[0]}` === providersPagePath) {
-    return { kind: "providers" };
+  if (`/${segments[0]}` === providersPagePath && segments.length <= 2) {
+    const providerId = segments[1];
+
+    if (providerId === undefined) {
+      return { kind: "providers" };
+    }
+
+    // Идентификатор провайдера не проверяется форматом, как `sessionId`: это внешние данные
+    // рантайма, и их формат — не наш контракт. «Нет такого провайдера» говорит вью по снимку,
+    // а маршрут только разбирает адрес.
+    return { kind: "providers", providerId };
   }
 
   if (`/${segments[0]}` === sessionsPagePath && segments.length <= 2) {
@@ -99,7 +112,9 @@ export function pathOf(page: Page): string {
     case "projects":
       return projectsPagePath;
     case "providers":
-      return providersPagePath;
+      return page.providerId === undefined
+        ? providersPagePath
+        : `${providersPagePath}/${page.providerId}`;
     case "sessions":
       return page.sessionId === undefined
         ? sessionsPagePath

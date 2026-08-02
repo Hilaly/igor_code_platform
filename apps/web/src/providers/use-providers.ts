@@ -44,7 +44,8 @@ import {
   applySnapshot,
   applyStreamEvent,
   initialProvidersState,
-  openProvider,
+  markModelsLoading,
+  shouldFetchModels,
   type ProvidersState,
 } from "./state.ts";
 
@@ -52,12 +53,15 @@ export type UseProvidersOptions = {
   bus: Pick<FrontendBus, "subscribe">;
   stream: StreamStatus;
   onDiagnostic: (diagnostic: string) => void;
+  /**
+   * Провайдер, чья страница открыта. Модели спрашиваются по этому идентификатору, а не по жесту
+   * раскрытия строки: адрес — единственный источник истины (docs/models-and-providers.md).
+   */
+  providerId?: string;
 };
 
 export type ProvidersController = {
   state: ProvidersState;
-  /** Раскрыть провайдера или свернуть раскрытый; модели читаются по первому раскрытию. */
-  open: (providerId: string) => void;
   logIn: (providerId: string, method: ProviderAuthType) => void;
   /** Ответ на текущий вопрос. Попытку хук находит сам: на провайдера её не больше одной. */
   answer: (providerId: string, stepId: string, value: string) => void;
@@ -73,7 +77,7 @@ const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
 export function useProviders(options: UseProvidersOptions): ProvidersController {
-  const { bus, stream, onDiagnostic } = options;
+  const { bus, stream, onDiagnostic, providerId } = options;
   const [state, setState] = useState<ProvidersState>(initialProvidersState);
 
   // То же зеркало, что во вью проектов: правило применения смотрит на предыдущее состояние, а ответы
@@ -176,35 +180,36 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [],
   );
 
-  const open = useCallback(
-    (providerId: string) => {
-      const outcome = openProvider(latest.current, providerId);
+  // Модели открытой страницы провайдера. Не жест раскрытия строки, а адрес: повторный заход на
+  // страницу не перечитывает прочитанное, но отказавшее — переспрашивает (`shouldFetchModels`).
+  useEffect(() => {
+    if (providerId === undefined) {
+      return;
+    }
 
-      apply(() => outcome.state);
+    if (!shouldFetchModels(latest.current, providerId)) {
+      return;
+    }
 
-      if (!outcome.fetch) {
-        return;
-      }
+    apply((current) => markModelsLoading(current, providerId));
 
-      const controller = new AbortController();
-      pendingModels.current.add(controller);
+    const controller = new AbortController();
+    pendingModels.current.add(controller);
 
-      void fetchProviderModels(providerId, controller.signal)
-        .then((answer) => apply((current) => applyModels(current, providerId, answer.models)))
-        .catch((cause: unknown) => {
-          if (controller.signal.aborted) {
-            return;
-          }
+    void fetchProviderModels(providerId, controller.signal)
+      .then((answer) => apply((current) => applyModels(current, providerId, answer.models)))
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
 
-          const reason = reasonOf(cause);
+        const reason = reasonOf(cause);
 
-          onDiagnostic(`the models of ${providerId} could not be read: ${reason}`);
-          apply((current) => applyModelsFailure(current, providerId, reason));
-        })
-        .finally(() => pendingModels.current.delete(controller));
-    },
-    [apply, onDiagnostic],
-  );
+        onDiagnostic(`the models of ${providerId} could not be read: ${reason}`);
+        apply((current) => applyModelsFailure(current, providerId, reason));
+      })
+      .finally(() => pendingModels.current.delete(controller));
+  }, [apply, onDiagnostic, providerId]);
 
   const logIn = useCallback(
     (providerId: string, method: ProviderAuthType) => {
@@ -305,5 +310,5 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [applyToLogins, reloadAttempts],
   );
 
-  return { state, open, logIn, answer, cancelLogin, closeLogin, logOut, receiveLoginStep };
+  return { state, logIn, answer, cancelLogin, closeLogin, logOut, receiveLoginStep };
 }

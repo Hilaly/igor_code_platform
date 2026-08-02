@@ -22,12 +22,17 @@ describe("matchPage", () => {
     });
   });
 
-  it("keeps the providers on their own address", () => {
+  it("keeps the providers on their own address, with an optional provider page", () => {
     expect(matchPage("/providers")).toEqual({ kind: "providers" });
-    // Провайдер своей страницы не получает: модели раскрываются внутри вью, а не по адресу.
+    // Страница одного провайдера: вход и модели живут здесь, а не в раскрывающейся панели списка.
     expect(matchPage("/providers/anthropic")).toEqual({
-      kind: "unknown",
-      path: "/providers/anthropic",
+      kind: "providers",
+      providerId: "anthropic",
+    });
+    // Идентификатор не проверяется форматом — «нет такого» скажет вью по снимку, а не маршрут.
+    expect(matchPage("/providers/нет-такого")).toEqual({
+      kind: "providers",
+      providerId: "нет-такого",
     });
   });
 
@@ -99,6 +104,7 @@ describe("pathOf", () => {
       "/plugins",
       "/projects",
       "/providers",
+      "/providers/anthropic",
       "/sessions",
       "/sessions/0199abcd-ef01",
       "/settings",

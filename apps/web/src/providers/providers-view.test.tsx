@@ -35,7 +35,7 @@ import {
   applyModelsFailure,
   applySnapshot,
   initialProvidersState,
-  openProvider,
+  markModelsLoading,
   type ProvidersState,
 } from "./state.ts";
 
@@ -79,9 +79,10 @@ const model = (id: string, overrides: Partial<ModelSummary> = {}): ModelSummary 
   ...overrides,
 });
 
-function show(state: ProvidersState) {
+function show(state: ProvidersState, providerId?: string) {
   const handlers = {
     onOpen: vi.fn(),
+    onBack: vi.fn(),
     onLogIn: vi.fn(),
     onAnswer: vi.fn(),
     onCancelLogin: vi.fn(),
@@ -90,13 +91,20 @@ function show(state: ProvidersState) {
   };
 
   const { rerender } = render(
-    <ProvidersView state={state} {...handlers} translator={translator} />,
+    <ProvidersView state={state} providerId={providerId} {...handlers} translator={translator} />,
   );
 
   return {
     ...handlers,
-    again: (next: ProvidersState) =>
-      rerender(<ProvidersView state={next} {...handlers} translator={translator} />),
+    again: (next: ProvidersState, id?: string) =>
+      rerender(
+        <ProvidersView
+          state={next}
+          providerId={id ?? providerId}
+          {...handlers}
+          translator={translator}
+        />,
+      ),
   };
 }
 
@@ -239,7 +247,8 @@ describe("ProvidersView", () => {
     expect(within(rowOf("Anthropic")).queryByText("список из сети")).toBeNull();
   });
 
-  it("asks for the models of the provider the human picked", () => {
+  it("opens the page of the provider the human picked", () => {
+    // Карточка в списке кликабельна целиком и уводит на страницу провайдера — это задача вью.
     const { onOpen } = show(withProviders([provider("anthropic"), provider("openai")]));
 
     fireEvent.click(within(rowOf("Openai")).getByRole("button"));
@@ -248,10 +257,13 @@ describe("ProvidersView", () => {
   });
 
   it("shows the models of the open provider with the window and the price", () => {
-    const opened = openProvider(withProviders([provider("anthropic")]), "anthropic").state;
-    const state = applyModels(opened, "anthropic", [model("claude-opus-4", { name: "Opus 4" })]);
+    const state = applyModels(
+      markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),
+      "anthropic",
+      [model("claude-opus-4", { name: "Opus 4" })],
+    );
 
-    show(state);
+    show(state, "anthropic");
 
     expect(screen.getByText("Модели: Anthropic")).toBeDefined();
     expect(screen.getByText("Opus 4")).toBeDefined();
@@ -260,22 +272,35 @@ describe("ProvidersView", () => {
     expect(screen.getByText(/\$3/)).toBeDefined();
   });
 
-  it("waits for the models of the open provider without emptying the list", () => {
-    const opened = openProvider(withProviders([provider("anthropic")]), "anthropic").state;
+  it("waits for the models of the open provider and offers a way back", () => {
+    const state = markModelsLoading(withProviders([provider("anthropic")]), "anthropic");
 
-    show(opened);
+    const { onBack } = show(state, "anthropic");
 
     expect(screen.getByRole("status")).toBeDefined();
-    expect(rowOf("Anthropic")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /Все провайдеры/ }));
+    expect(onBack).toHaveBeenCalled();
   });
 
-  it("says why the models could not be read and keeps the providers", () => {
-    const opened = openProvider(withProviders([provider("anthropic")]), "anthropic").state;
+  it("says why the models could not be read and offers a way back", () => {
+    const state = applyModelsFailure(
+      markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),
+      "anthropic",
+      "not found",
+    );
 
-    show(applyModelsFailure(opened, "anthropic", "not found"));
+    show(state, "anthropic");
 
     expect(screen.getByText(/not found/)).toBeDefined();
-    expect(rowOf("Anthropic")).toBeDefined();
+    expect(screen.getByRole("button", { name: /Все провайдеры/ })).toBeDefined();
+  });
+
+  it("says outright when the address names a provider nobody has", () => {
+    // Идентификатор не валидируется форматом маршрута: «нет такого» говорит вью по снимку.
+    show(withProviders([provider("anthropic")]), "несуществующий");
+
+    expect(screen.getByText(/несуществующий/)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Все провайдеры/ })).toBeDefined();
   });
 
   it("shows no models of a provider nobody opened", () => {
@@ -290,19 +315,19 @@ describe("ProvidersView", () => {
 });
 
 describe("the way into a provider", () => {
-  const opened = (overrides: Partial<ProviderSummary> = {}): ProvidersState =>
-    openProvider(withProviders([provider("anthropic", overrides)]), "anthropic").state;
-
   it("offers a button per way in, labelled by the provider itself", () => {
     // Подпись приходит от провайдера: «Anthropic API key», «Sign in with SuperGrok» — своей мы бы
     // назвали вход не тем именем, каким его знает человек (docs/web-api.md).
     const { onLogIn } = show(
-      opened({
-        logins: [
-          { type: "api_key", label: "Anthropic API key" },
-          { type: "oauth", label: "Sign in with Claude Pro/Max" },
-        ],
-      }),
+      withProviders([
+        provider("anthropic", {
+          logins: [
+            { type: "api_key", label: "Anthropic API key" },
+            { type: "oauth", label: "Sign in with Claude Pro/Max" },
+          ],
+        }),
+      ]),
+      "anthropic",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in with Claude Pro/Max" }));
@@ -312,7 +337,7 @@ describe("the way into a provider", () => {
   });
 
   it("offers no button at all when the provider declares no way in", () => {
-    show(opened({ logins: [] }));
+    show(withProviders([provider("anthropic", { logins: [] })]), "anthropic");
 
     expect(screen.getByText("Вход в Anthropic")).toBeDefined();
     expect(screen.queryByRole("button", { name: /API key/ })).toBeNull();
@@ -321,9 +346,9 @@ describe("the way into a provider", () => {
   it("does not offer a second login while the first is running", () => {
     // Второй вход в того же провайдера маршрут отклоняет (docs/web-api.md): кнопка, ведущая в
     // заведомый отказ, врёт про возможность.
-    const state = opened();
+    const state = withProviders([provider("anthropic")]);
 
-    show(withLogin(state, applyStarted(state.logins, attempt())));
+    show(withLogin(state, applyStarted(state.logins, attempt())), "anthropic");
 
     expect(screen.getByRole("button", { name: "anthropic API key" })).toHaveProperty(
       "disabled",
@@ -332,9 +357,9 @@ describe("the way into a provider", () => {
   });
 
   it("says the login did not start at all", () => {
-    const state = opened();
+    const state = withProviders([provider("anthropic")]);
 
-    show(withLogin(state, { ...state.logins, failure: "the daemon answered 500" }));
+    show(withLogin(state, { ...state.logins, failure: "the daemon answered 500" }), "anthropic");
 
     expect(screen.getByText(/Вход не начался: the daemon answered 500/)).toBeDefined();
   });
@@ -592,21 +617,18 @@ describe("the end of a login", () => {
 
 describe("logging out of a provider", () => {
   const configured = (source?: string): ProvidersState =>
-    openProvider(
-      withProviders([
-        provider("anthropic", {
-          auth: {
-            kind: "configured",
-            type: "api_key",
-            ...(source === undefined ? {} : { source }),
-          },
-        }),
-      ]),
-      "anthropic",
-    ).state;
+    withProviders([
+      provider("anthropic", {
+        auth: {
+          kind: "configured",
+          type: "api_key",
+          ...(source === undefined ? {} : { source }),
+        },
+      }),
+    ]);
 
   it("offers the way out only where there is a credential to remove", () => {
-    const { onLogOut } = show(configured("stored credential"));
+    const { onLogOut } = show(configured("stored credential"), "anthropic");
 
     fireEvent.click(screen.getByRole("button", { name: "Выйти из провайдера" }));
 
@@ -614,7 +636,7 @@ describe("logging out of a provider", () => {
   });
 
   it("offers no way out of a provider nobody logged into", () => {
-    show(openProvider(withProviders([provider("anthropic")]), "anthropic").state);
+    show(withProviders([provider("anthropic")]), "anthropic");
 
     expect(screen.queryByRole("button", { name: "Выйти из провайдера" })).toBeNull();
   });
@@ -629,7 +651,7 @@ describe("logging out of a provider", () => {
       throw new Error("the provider is missing from the snapshot");
     }
 
-    show(withLogin(state, applyLogout(state.logins, summary)));
+    show(withLogin(state, applyLogout(state.logins, summary)), "anthropic");
 
     expect(screen.getByText("Выход ничего не изменил")).toBeDefined();
     // Имя переменной названо и в подписи строки, и в объяснении: спрашивается второе.
@@ -645,7 +667,7 @@ describe("logging out of a provider", () => {
       throw new Error("the provider is missing from the snapshot");
     }
 
-    show(withLogin(state, applyLogout(state.logins, summary)));
+    show(withLogin(state, applyLogout(state.logins, summary)), "anthropic");
 
     expect(screen.getByText("Выход ничего не изменил")).toBeDefined();
     expect(screen.getByText(/провайдер остался настроенным/)).toBeDefined();

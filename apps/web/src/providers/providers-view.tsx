@@ -5,6 +5,10 @@
  * Своих запросов здесь нет: всё приходит пропами, а нажатия уходят наверх. Так вью проверяется без
  * сети — той же дисциплины держатся соседние вью.
  *
+ * Два режима по адресу: голый `/providers` — список карточек; `/providers/<id>` — страница одного
+ * провайдера, где вход и модели живут. Вход спрятан в панель списка раньше, и жест раскрытия строки
+ * не срабатывал; теперь карточка целиком уводит на страницу (docs/models-and-providers.md).
+ *
  * Кнопки входа показаны только на объявленные провайдером способы (`logins`): кнопка, которая
  * ничего не делает, врёт про возможность. Сам диалог входа рисует `login-view.tsx`.
  */
@@ -36,8 +40,12 @@ import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "
 
 export type ProvidersViewProps = {
   state: ProvidersState;
-  /** Раскрыть или свернуть провайдера. Модели спрашивает владелец состояния, а не вью. */
+  /** Какой провайдер открыт страницей. `undefined` — список. Источник истины — адрес. */
+  providerId: string | undefined;
+  /** Клик по карточке в списке — переход на страницу провайдера. */
   onOpen: (providerId: string) => void;
+  /** «← все провайдера» со страницы деталей — назад к списку. */
+  onBack: () => void;
   onLogIn: (providerId: string, method: ProviderAuthType) => void;
   onAnswer: (providerId: string, stepId: string, value: string) => void;
   onCancelLogin: (providerId: string) => void;
@@ -48,7 +56,9 @@ export type ProvidersViewProps = {
 
 export function ProvidersView({
   state,
+  providerId,
   onOpen,
+  onBack,
   onLogIn,
   onAnswer,
   onCancelLogin,
@@ -73,11 +83,11 @@ export function ProvidersView({
           title={t("providers.login.start.failed", { reason: state.logins.failure })}
         />
       )}
-      {dialogs.map(([providerId, dialog]) => (
+      {dialogs.map(([dialogProviderId, dialog]) => (
         <ProviderLogin
-          key={providerId}
-          providerId={providerId}
-          name={nameOf(providerId)}
+          key={dialogProviderId}
+          providerId={dialogProviderId}
+          name={nameOf(dialogProviderId)}
           dialog={dialog}
           onAnswer={onAnswer}
           onCancel={onCancelLogin}
@@ -102,7 +112,47 @@ export function ProvidersView({
     );
   }
 
-  const open = snapshot.providers.find((provider) => provider.id === state.openProviderId);
+  // Страница одного провайдера: список исчезает, детали получают всё место. Адрес — источник
+  // истины, поэтому провайдер ищется в снимке, а отдельного поля «раскрыт» в состоянии нет.
+  if (providerId !== undefined) {
+    const provider = snapshot.providers.find((candidate) => candidate.id === providerId);
+
+    if (provider === undefined) {
+      // Идентификатор не валидируется форматом маршрута — «нет такого» говорит вью по снимку:
+      // провайдер мог исчезнуть в новой версии рантайма, и мягкое «нет такого» с возвратом к списку
+      // честнее, чем страница «неизвестный адрес».
+      return (
+        <div className="providers">
+          <Heading level={1}>{t("page.providers.title")}</Heading>
+          {logins}
+          <Button onClick={onBack}>{t("providers.back")}</Button>
+          <EmptyState title={t("providers.notfound", { id: providerId })} />
+        </div>
+      );
+    }
+
+    return (
+      <div className="providers">
+        <Button onClick={onBack}>{t("providers.back")}</Button>
+        <Heading level={1}>{provider.name}</Heading>
+        {logins}
+        <ProviderHeader provider={provider} translator={translator} />
+        <ProviderAccess
+          provider={provider}
+          stubborn={state.logins.stubborn[provider.id]}
+          busy={state.logins.dialogs[provider.id] !== undefined}
+          onLogIn={onLogIn}
+          onLogOut={onLogOut}
+          translator={translator}
+        />
+        <ProviderModels
+          provider={provider}
+          entry={state.models[provider.id]}
+          translator={translator}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="providers">
@@ -140,28 +190,44 @@ export function ProvidersView({
               <ProviderRow
                 key={provider.id}
                 provider={provider}
-                open={provider.id === state.openProviderId}
-                onOpen={onOpen}
                 translator={translator}
+                onSelect={() => onOpen(provider.id)}
               />
             ))}
           </List>
         )}
       </Panel>
+    </div>
+  );
+}
 
-      {open === undefined ? undefined : (
-        <>
-          <ProviderAccess
-            provider={open}
-            stubborn={state.logins.stubborn[open.id]}
-            busy={state.logins.dialogs[open.id] !== undefined}
-            onLogIn={onLogIn}
-            onLogOut={onLogOut}
-            translator={translator}
-          />
-          <ProviderModels provider={open} entry={state.models[open.id]} translator={translator} />
-        </>
-      )}
+type ProviderHeaderProps = {
+  provider: ProviderSummary;
+  translator: ScopedTranslator;
+};
+
+/** Шапка страницы провайдера: имя, идентификатор, состояние авторизации. */
+function ProviderHeader({ provider, translator }: ProviderHeaderProps) {
+  const { t } = translator;
+
+  return (
+    <div className="providers-header">
+      <div className="providers-header-facts">
+        <Code>{provider.id}</Code>
+        <Text tone="muted">
+          {provider.logins.length === 0
+            ? t("providers.logins.none")
+            : t("providers.logins", {
+                methods: provider.logins.map((login) => login.label).join(", "),
+              })}
+        </Text>
+      </div>
+      <div className="providers-header-marks">
+        <AuthMark auth={provider.auth} translator={translator} />
+        <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
+        {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
+        {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
+      </div>
     </div>
   );
 }
@@ -178,8 +244,8 @@ type ProviderAccessProps = {
 };
 
 /**
- * Вход и выход у раскрытого провайдера. Кнопки стоят здесь, а не в строке списка: строка целиком —
- * кнопка раскрытия, и кнопке внутри кнопки в разметке места нет.
+ * Вход и выход на странице провайдера. Раньше кнопки стояли в раскрывающейся панели под строкой
+ * списка, и жест раскрытия не срабатывал; теперь у них своя страница (docs/models-and-providers.md).
  */
 function ProviderAccess({
   provider,
@@ -233,18 +299,17 @@ function ProviderAccess({
 
 type ProviderRowProps = {
   provider: ProviderSummary;
-  open: boolean;
-  onOpen: (providerId: string) => void;
+  onSelect: () => void;
   translator: ScopedTranslator;
 };
 
-function ProviderRow({ provider, open, onOpen, translator }: ProviderRowProps) {
+function ProviderRow({ provider, onSelect, translator }: ProviderRowProps) {
   const { t } = translator;
 
   // Строка внутри выбираемой строки — это содержимое кнопки, поэтому здесь только `span`:
   // блочные элементы кнопке не принадлежат.
   return (
-    <ListRow selected={open} onSelect={() => onOpen(provider.id)}>
+    <ListRow onSelect={onSelect}>
       <span className="providers-row">
         <span className="providers-row-facts">
           <Text>{provider.name}</Text>
