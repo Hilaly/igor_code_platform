@@ -41,6 +41,7 @@ import { createSessionService } from "./sessions.ts";
 import { createToolCollector } from "./tool-collection.ts";
 import { createTurnQueue } from "./turn-queue.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";
+import { filesystemRoutes } from "./filesystem.ts";
 import {
   carryLoginSteps,
   providerLoginRoutes,
@@ -322,6 +323,7 @@ const server = createDaemonServer({
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
+    ...filesystemRoutes(),
     events.route(),
   ],
 });
