@@ -56,7 +56,7 @@ describe("the ModelPicker", () => {
     fireEvent.click(trigger);
 
     // Шапка группы — это group с раскрывающейся подписью.
-    const group = screen.getByRole("group", { name: "Anthropic" });
+    const group = screen.getByRole("treeitem", { name: "Anthropic" });
     fireEvent.click(group.querySelector("div")!);
 
     expect(view.onExpandGroup).toHaveBeenCalledWith("anthropic");
@@ -68,9 +68,9 @@ describe("the ModelPicker", () => {
     const view = show();
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Google" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
 
-    fireEvent.click(screen.getByRole("option", { name: /gemini-pro/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /gemini-pro/ }));
 
     expect(view.onChange).toHaveBeenCalledWith("google/gemini-pro");
   });
@@ -81,7 +81,7 @@ describe("the ModelPicker", () => {
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
 
     expect(screen.getByRole("status").textContent).toContain("Anthropic");
   });
@@ -103,7 +103,7 @@ describe("the ModelPicker", () => {
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
 
     expect(screen.getByText("кред недоступен")).not.toBeNull();
   });
@@ -122,10 +122,10 @@ describe("the ModelPicker", () => {
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
 
     expect(view.onExpandGroup).not.toHaveBeenCalled();
-    expect(screen.getByRole("group", { name: "Anthropic" }).getAttribute("aria-expanded")).toBe(
+    expect(screen.getByRole("treeitem", { name: "Anthropic" }).getAttribute("aria-expanded")).toBe(
       "false",
     );
   });
@@ -145,9 +145,9 @@ describe("the ModelPicker", () => {
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
 
-    fireEvent.click(screen.getByRole("option", { name: /opus/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /opus/ }));
 
     expect(view.onChange).not.toHaveBeenCalled();
   });
@@ -185,9 +185,11 @@ describe("the ModelPicker", () => {
     show({ value: "anthropic/claude-opus" });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
 
-    expect(screen.getByRole("option", { name: /claude-opus/ }).getAttribute("aria-selected")).toBe(
+    expect(
+      screen.getByRole("treeitem", { name: /claude-opus/ }).getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(screen.getByRole("treeitem", { name: "Anthropic" }).getAttribute("aria-expanded")).toBe(
       "true",
     );
   });
@@ -200,14 +202,14 @@ describe("the ModelPicker", () => {
     fireEvent.keyDown(trigger, { key: "Escape" });
 
     expect(view.onChange).not.toHaveBeenCalled();
-    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByRole("tree")).toBeNull();
   });
 
   it("does not fire onExpandGroup twice for the same group", () => {
     const view = show();
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    const header = screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!;
+    const header = screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!;
 
     fireEvent.click(header);
     fireEvent.click(header); // Сворачивание не должно повторно просить подгрузку.
@@ -232,7 +234,7 @@ describe("the ModelPicker", () => {
     );
 
     fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("group", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
 
     expect(onExpandGroup).toHaveBeenCalledTimes(1);
   });

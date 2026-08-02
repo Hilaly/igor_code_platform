@@ -9,16 +9,43 @@ import styles from "./popover.module.css";
 export type PopoverSide = "top" | "bottom" | "left" | "right";
 
 export type PopoverProps = {
-  trigger: ReactNode;
+  trigger?: ReactNode;
+  renderTrigger?: (props: { contentId: string; open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode;
   side?: PopoverSide;
   ariaLabel?: string;
+  contentRole?: "dialog" | "listbox" | "tree";
+  rootClassName?: string;
+  contentClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export function Popover({ trigger, children, side = "bottom", ariaLabel }: PopoverProps) {
-  const [open, setOpen] = useState(false);
+export function Popover({
+  trigger,
+  renderTrigger,
+  children,
+  side = "bottom",
+  ariaLabel,
+  contentRole = "dialog",
+  rootClassName,
+  contentClassName,
+  open: controlledOpen,
+  onOpenChange,
+}: PopoverProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const setOpen = (next: boolean): void => {
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
+
+  const toggle = (): void => setOpen(!open);
 
   useEffect(() => {
     if (!open) return;
@@ -42,24 +69,28 @@ export function Popover({ trigger, children, side = "bottom", ariaLabel }: Popov
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, onOpenChange]);
 
   return (
-    <div className={styles.root} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.trigger}
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-controls={open ? popoverId : undefined}
-      >
-        {trigger}
-      </button>
+    <div className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} ref={rootRef}>
+      {renderTrigger === undefined ? (
+        <button
+          type="button"
+          className={styles.trigger}
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls={open ? popoverId : undefined}
+        >
+          {trigger}
+        </button>
+      ) : (
+        renderTrigger({ contentId: popoverId, open, toggle })
+      )}
       {open ? (
         <div
           id={popoverId}
-          className={`${styles.content} ${styles[side]}`}
-          role="dialog"
+          className={`${styles.content} ${styles[side]}${contentClassName ? ` ${contentClassName}` : ""}`}
+          role={contentRole}
           aria-label={ariaLabel}
         >
           {children}

@@ -7,6 +7,7 @@ import { Combobox } from "./combobox.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
 import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
+import { Popover } from "./popover.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
 import { ToolCall } from "./tool-call.tsx";
@@ -25,6 +26,28 @@ const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it("lets a controlled picker render its own trigger and popup role through Popover", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Popover
+        open
+        onOpenChange={onOpenChange}
+        contentRole="tree"
+        renderTrigger={({ contentId, open, toggle }) => (
+          <button type="button" aria-controls={contentId} aria-expanded={open} onClick={toggle}>
+            Модель
+          </button>
+        )}
+      >
+        <div role="treeitem">Anthropic</div>
+      </Popover>,
+    );
+
+    expect(screen.getByRole("tree")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Модель" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("opens Combobox with an enabled active option and selects it from the keyboard", () => {
     const onChange = vi.fn();
     render(

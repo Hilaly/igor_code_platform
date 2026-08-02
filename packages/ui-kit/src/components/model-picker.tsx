@@ -10,9 +10,10 @@
  * контроля над раскрытием `onExpandGroup` не позвать.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { Notice } from "./notice.tsx";
+import { Popover } from "./popover.tsx";
 import { Spinner } from "./state.tsx";
 import styles from "./model-picker.module.css";
 
@@ -69,7 +70,6 @@ export function ModelPicker({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   const safeListId = `model-picker-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
@@ -122,24 +122,20 @@ export function ModelPicker({
     }
   }
 
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
-
-  // При открытии активная строка — выбранная опция (если она видима), иначе первая. Группа с ней
-  // раскрывается, чтобы выбранное было видно сразу.
+  // При открытии группа выбранной загруженной опции раскрывается, и активной становится сама опция.
   useEffect(() => {
     if (!open) {
       setActiveIndex(-1);
       return;
     }
     if (value !== undefined) {
+      const selectedGroup = groups.find((group) =>
+        group.options.some((option) => option.value === value),
+      );
+      if (selectedGroup !== undefined && !expanded.has(selectedGroup.id)) {
+        setExpanded((previous) => new Set(previous).add(selectedGroup.id));
+        return;
+      }
       const selectedIndex = rows.findIndex((row) => row.kind === "option" && row.value === value);
       if (selectedIndex >= 0) {
         setActiveIndex(selectedIndex);
@@ -147,7 +143,7 @@ export function ModelPicker({
       }
     }
     setActiveIndex(rows.findIndex((row) => row.kind === "header"));
-  }, [open, rows, value]);
+  }, [expanded, groups, open, rows, value]);
 
   // Закрытый попап сбрасывает раскрытие только что открытых групп? Нет: сворачивать вышло бы
   // неожиданно для того, кто раскрыл две группы и отвлёкся. Раскрытие живёт, пока пикер живёт.
@@ -265,127 +261,132 @@ export function ModelPicker({
   const activeRowId = open && activeIndex >= 0 ? rowId(activeIndex) : undefined;
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className={styles.root}>
       {label ? <span className={styles.label}>{label}</span> : null}
-      <button
-        type="button"
-        tabIndex={disabled ? -1 : 0}
-        role="combobox"
-        aria-expanded={open}
-        aria-disabled={disabled}
-        aria-controls={open ? listId : undefined}
-        aria-haspopup="listbox"
-        aria-activedescendant={activeRowId}
-        aria-label={label}
-        className={`${styles.control}${disabled ? ` ${styles.disabled}` : ""}`}
-        onClick={() => {
-          if (!disabled) setOpen((prev) => !prev);
-        }}
-        onKeyDown={handleKeyDown}
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        contentRole="tree"
+        ariaLabel={label}
+        rootClassName={styles.popover}
+        contentClassName={styles.dropdown}
+        renderTrigger={({ contentId, toggle }) => (
+          <button
+            type="button"
+            tabIndex={disabled ? -1 : 0}
+            role="combobox"
+            aria-expanded={open}
+            aria-disabled={disabled}
+            aria-controls={open ? contentId : undefined}
+            aria-haspopup="tree"
+            aria-activedescendant={activeRowId}
+            aria-label={label}
+            className={`${styles.control}${disabled ? ` ${styles.disabled}` : ""}`}
+            onClick={() => {
+              if (!disabled) toggle();
+            }}
+            onKeyDown={handleKeyDown}
+          >
+            <span className={styles.valueText}>
+              {selectedOption?.label ?? value ?? placeholder}
+            </span>
+            <span className={`${styles.arrow}${open ? ` ${styles.open}` : ""}`}>▼</span>
+          </button>
+        )}
       >
-        <span className={styles.valueText}>{selectedOption?.label ?? value ?? placeholder}</span>
-        <span className={`${styles.arrow}${open ? ` ${styles.open}` : ""}`}>▼</span>
-      </button>
-      {open ? (
-        <div
-          id={listId}
-          className={styles.dropdown}
-          role="listbox"
-          aria-label={label}
-          tabIndex={-1}
-        >
-          {groups.length === 0 ? (
-            <div className={styles.empty}>{emptyText}</div>
-          ) : (
-            groups.map((group) => {
-              const isExpanded = expanded.has(group.id) && !group.disabled;
-              const headerIndex = rows.findIndex(
-                (row) => row.kind === "header" && row.groupId === group.id,
-              );
-              return (
+        {groups.length === 0 ? (
+          <div className={styles.empty}>{emptyText}</div>
+        ) : (
+          groups.map((group) => {
+            const isExpanded = expanded.has(group.id) && !group.disabled;
+            const headerIndex = rows.findIndex(
+              (row) => row.kind === "header" && row.groupId === group.id,
+            );
+            return (
+              <div
+                key={group.id}
+                id={headerIndex >= 0 ? rowId(headerIndex) : undefined}
+                role="treeitem"
+                aria-label={group.label}
+                aria-level={1}
+                aria-expanded={isExpanded}
+                aria-disabled={group.disabled}
+                className={styles.group}
+              >
                 <div
-                  key={group.id}
-                  role="group"
-                  aria-label={group.label}
-                  aria-expanded={isExpanded}
-                  aria-disabled={group.disabled}
-                  className={styles.group}
+                  className={`${styles.groupHeader}${group.disabled ? ` ${styles.disabled}` : ""}`}
+                  onClick={() => {
+                    if (!group.disabled) toggleGroup(group.id);
+                  }}
                 >
-                  <div
-                    id={headerIndex >= 0 ? rowId(headerIndex) : undefined}
-                    className={`${styles.groupHeader}${group.disabled ? ` ${styles.disabled}` : ""}`}
-                    onClick={() => {
-                      if (!group.disabled) toggleGroup(group.id);
-                    }}
+                  <span
+                    className={`${styles.chevron}${isExpanded ? ` ${styles.chevronOpen}` : ""}`}
+                    aria-hidden="true"
                   >
-                    <span
-                      className={`${styles.chevron}${isExpanded ? ` ${styles.chevronOpen}` : ""}`}
-                      aria-hidden="true"
-                    >
-                      ▶
-                    </span>
-                    <span>{group.label}</span>
-                  </div>
-                  {isExpanded ? (
-                    <div className={styles.groupOptions}>
-                      {group.loading ? (
-                        <div className={styles.state}>
-                          <Spinner label={group.label} />
-                        </div>
-                      ) : group.failureReason !== undefined ? (
-                        <div className={styles.state}>
-                          <Notice tone="danger" title={group.failureReason} />
-                        </div>
-                      ) : group.options.length === 0 ? (
-                        <div className={styles.empty}>{emptyText}</div>
-                      ) : (
-                        group.options.map((option) => {
-                          const rowIndex = rows.findIndex(
-                            (r) => r.kind === "option" && r.value === option.value,
-                          );
-                          const isSelected =
-                            option.value === value && !option.disabled && !group.disabled;
-                          const isActive = rowIndex === activeIndex;
-                          const optionClassName = `${styles.option}${isSelected ? ` ${styles.selected}` : ""}${
-                            isActive ? ` ${styles.active}` : ""
-                          }${option.disabled ? ` ${styles.disabled}` : ""}`;
-
-                          return (
-                            <div
-                              key={option.value}
-                              id={rowIndex >= 0 ? rowId(rowIndex) : undefined}
-                              role="option"
-                              aria-selected={isSelected}
-                              aria-disabled={option.disabled}
-                              className={optionClassName}
-                              onMouseEnter={() => {
-                                if (!option.disabled && rowIndex >= 0) setActiveIndex(rowIndex);
-                              }}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (!option.disabled && !group.disabled) {
-                                  onChange(option.value);
-                                  setOpen(false);
-                                }
-                              }}
-                            >
-                              <span className={styles.optionLabel}>{option.label}</span>
-                              {option.description !== undefined ? (
-                                <span className={styles.optionDesc}>{option.description}</span>
-                              ) : null}
-                              {isSelected ? <span>✓</span> : null}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  ) : null}
+                    ▶
+                  </span>
+                  <span>{group.label}</span>
                 </div>
-              );
-            })
-          )}
-        </div>
-      ) : null}
+                {isExpanded ? (
+                  <div className={styles.groupOptions} role="group">
+                    {group.loading ? (
+                      <div className={styles.state}>
+                        <Spinner label={group.label} />
+                      </div>
+                    ) : group.failureReason !== undefined ? (
+                      <div className={styles.state}>
+                        <Notice tone="danger" title={group.failureReason} />
+                      </div>
+                    ) : group.options.length === 0 ? (
+                      <div className={styles.empty}>{emptyText}</div>
+                    ) : (
+                      group.options.map((option) => {
+                        const rowIndex = rows.findIndex(
+                          (r) => r.kind === "option" && r.value === option.value,
+                        );
+                        const isSelected =
+                          option.value === value && !option.disabled && !group.disabled;
+                        const isActive = rowIndex === activeIndex;
+                        const optionClassName = `${styles.option}${isSelected ? ` ${styles.selected}` : ""}${
+                          isActive ? ` ${styles.active}` : ""
+                        }${option.disabled ? ` ${styles.disabled}` : ""}`;
+
+                        return (
+                          <div
+                            key={option.value}
+                            id={rowIndex >= 0 ? rowId(rowIndex) : undefined}
+                            role="treeitem"
+                            aria-level={2}
+                            aria-selected={isSelected}
+                            aria-disabled={option.disabled}
+                            className={optionClassName}
+                            onMouseEnter={() => {
+                              if (!option.disabled && rowIndex >= 0) setActiveIndex(rowIndex);
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!option.disabled && !group.disabled) {
+                                onChange(option.value);
+                                setOpen(false);
+                              }
+                            }}
+                          >
+                            <span className={styles.optionLabel}>{option.label}</span>
+                            {option.description !== undefined ? (
+                              <span className={styles.optionDesc}>{option.description}</span>
+                            ) : null}
+                            {isSelected ? <span>✓</span> : null}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </Popover>
     </div>
   );
 }

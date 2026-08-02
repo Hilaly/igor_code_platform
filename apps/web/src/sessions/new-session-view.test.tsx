@@ -111,7 +111,7 @@ const show = (overrides: Partial<NewSessionViewProps> = {}) => {
 /** Раскрыть группу провайдера в ModelPicker: клик по триггеру, затем по шапке группы. */
 const expandProvider = (label: string, group: string): void => {
   fireEvent.click(screen.getByRole("combobox", { name: label }));
-  fireEvent.click(screen.getByRole("group", { name: group }).querySelector("div")!);
+  fireEvent.click(screen.getByRole("treeitem", { name: group }).querySelector("div")!);
 };
 
 const pick = (label: string, option: string): void => {
@@ -150,7 +150,7 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Базовый агент");
     expandProvider("Модель", "Anthropic");
-    fireEvent.click(screen.getByRole("option", { name: /claude-opus-4-5/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 
@@ -222,7 +222,7 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Базовый агент");
     expandProvider("Модель", "Anthropic");
-    fireEvent.click(screen.getByRole("option", { name: /claude-opus-4-5/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
 
     expect(
       screen.getByRole("combobox", { name: "Уровень размышлений" }).getAttribute("aria-disabled"),
@@ -241,7 +241,7 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Базовый агент");
     expandProvider("Модель", "Anthropic");
-    fireEvent.click(screen.getByRole("option", { name: /claude-opus-4-5/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
     fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 
     await waitFor(() => expect(screen.getByText(/the project is archived/)).not.toBeNull());
@@ -254,7 +254,7 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Базовый агент");
     expandProvider("Модель", "Anthropic");
-    fireEvent.click(screen.getByRole("option", { name: /claude-opus-4-5/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
 
     const composer = screen.getByRole("textbox", { name: "Первое сообщение" });
     fireEvent.change(composer, { target: { value: "привет, разбери баг" } });

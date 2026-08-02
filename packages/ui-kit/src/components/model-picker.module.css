@@ -13,6 +13,10 @@
   font-weight: var(--sovereign-font-weight-medium);
 }
 
+.popover {
+  width: 100%;
+}
+
 .control {
   width: 100%;
   display: flex;
@@ -66,11 +70,13 @@
   transform: rotate(180deg);
 }
 
-.dropdown {
+.popover .dropdown {
   position: absolute;
   top: calc(100% + var(--sovereign-space-1));
   left: 0;
   right: 0;
+  transform: none;
+  min-width: 0;
   z-index: var(--sovereign-z-overlay);
   background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
