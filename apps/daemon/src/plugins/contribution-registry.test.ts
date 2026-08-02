@@ -283,6 +283,7 @@ describe("createContributionRegistry", () => {
 
     for (const broken of [
       { ...base, instructions: "   ", tools: { include: ["*"] } },
+      { ...base, tools: "invalid" },
       { ...base, tools: { include: "*" } },
       { ...base, tools: { include: ["*"], exclude: [7] } },
       { ...base, tools: { include: ["*"] }, thinkingLevel: "выше крыши" },

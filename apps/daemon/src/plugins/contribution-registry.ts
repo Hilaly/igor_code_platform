@@ -260,8 +260,19 @@ function toRegistration(
     return undefined;
   }
 
-  const include = asStringArray(contribution.tools?.include ?? []);
-  const exclude = asStringArray(contribution.tools?.exclude ?? []);
+  const rawTools = contribution.tools;
+  const include =
+    rawTools === undefined
+      ? []
+      : typeof rawTools === "object" && rawTools !== null
+        ? asStringArray(rawTools.include)
+        : undefined;
+  const exclude =
+    rawTools === undefined
+      ? []
+      : typeof rawTools === "object" && rawTools !== null
+        ? asStringArray(rawTools.exclude ?? [])
+        : undefined;
 
   if (include === undefined || exclude === undefined) {
     problems.push(`the agent ${common.id} must select tools by lists of name patterns`);
