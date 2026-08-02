@@ -114,7 +114,7 @@ export function Shell({
           </span>
         ) : undefined}
       </main>
-      {layout.rightHidden || open === undefined ? undefined : (
+      {layout.rightHidden ? undefined : (
         <>
           <PanelResizer
             edge="right"
@@ -154,7 +154,11 @@ export function Shell({
                 »
               </Button>
             </div>
-            <div className="shell-tab-body">{open.content}</div>
+            {open === undefined ? (
+              <div className="shell-tab-empty">{labels.emptyTabs}</div>
+            ) : (
+              <div className="shell-tab-body">{open.content}</div>
+            )}
           </aside>
         </>
       )}

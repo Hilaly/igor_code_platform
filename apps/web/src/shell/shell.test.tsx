@@ -43,9 +43,12 @@ function show(overrides: Partial<ShellProps> = {}) {
     ...overrides,
   };
 
-  render(<Shell {...props} />);
+  const { rerender } = render(<Shell {...props} />);
 
-  return { onLayoutChange };
+  return {
+    onLayoutChange,
+    again: (layout: ShellLayout) => rerender(<Shell {...props} layout={layout} />),
+  };
 }
 
 function drag(separator: HTMLElement, startX: number, moves: number[]): void {
@@ -182,5 +185,20 @@ describe("hiding and restoring the panels", () => {
 
     expect(screen.queryByRole("separator", { name: "правая панель" })).toBeNull();
     expect(screen.getByRole("button", { name: "показать правую" })).toBeDefined();
+  });
+
+  it("restores an empty right panel with its placeholder", () => {
+    const hidden = { ...defaultLayout, rightHidden: true };
+    const { onLayoutChange, again } = show({ layout: hidden });
+
+    fireEvent.click(screen.getByRole("button", { name: "показать правую" }));
+
+    const restored = { ...hidden, rightHidden: false };
+    expect(onLayoutChange).toHaveBeenLastCalledWith(restored);
+
+    again(restored);
+
+    expect(screen.getByRole("complementary", { name: "правая панель" })).toBeDefined();
+    expect(screen.getByText("вкладок нет")).toBeDefined();
   });
 });
