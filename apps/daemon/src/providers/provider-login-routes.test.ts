@@ -25,10 +25,10 @@ import {
 } from "@sovereign/protocol";
 
 import { createCredentialStore, credentialsFileName } from "./credential-store.ts";
-import { createEventBus } from "./platform/public.ts";
-import { ensureDataDirectory } from "./platform/public.ts";
-import { createDispatcher } from "./http/public.ts";
-import { createLogger, type Logger } from "./platform/public.ts";
+import { createEventBus } from "../platform/public.ts";
+import { ensureDataDirectory } from "../platform/public.ts";
+import { createDispatcher } from "../http/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import {
   carryLoginSteps,
   providerLoginRoutes,

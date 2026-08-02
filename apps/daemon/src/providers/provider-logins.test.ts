@@ -3,7 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 
 import type { LoginAttemptState, LoginNotice, LoginPrompt, LoginStep } from "@sovereign/protocol";
 
-import { createLogger, type Logger } from "./platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import { createProviderLogins, type LoginRunner, type ProviderLogins } from "./provider-logins.ts";
 
 const quietLogger = (): Logger =>

@@ -3,7 +3,8 @@
 Как платформа входит в LLM-провайдеров и что из этого видит плагин. Что даёт рантайм — в
 [agent-runtime-contract.md](agent-runtime-contract.md), раздел «Авторизация в LLM-провайдерах».
 
-Реализовано: `packages/agent-runtime-pi` (граница Pi), `apps/daemon/src/credential-store.ts`
+Реализовано: `packages/agent-runtime-pi` (граница Pi),
+`apps/daemon/src/providers/credential-store.ts`
 (единственный писатель кредов), маршруты провайдеров и входа ([web-api.md](web-api.md)), вью
 провайдеров с интерактивным входом ([ui-kit.md](ui-kit.md), раздел «Вью провайдеров») и поверхность
 SDK для плагинов (`packages/sdk/src/providers.ts`, мост — `apps/daemon/src/plugin-providers.ts`).

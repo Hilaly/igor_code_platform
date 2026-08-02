@@ -6,8 +6,8 @@ import { after, beforeEach, describe, it } from "node:test";
 
 import type { LogRecord } from "@sovereign/protocol";
 
-import { ensureDataDirectory, workDirectoryName } from "./platform/public.ts";
-import { createLogger } from "./platform/public.ts";
+import { ensureDataDirectory, workDirectoryName } from "../platform/public.ts";
+import { createLogger } from "../platform/public.ts";
 import {
   createProjectStore,
   ephemeralProjectId,

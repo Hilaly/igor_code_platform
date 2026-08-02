@@ -16,10 +16,10 @@ import {
   type ProjectsSnapshot,
 } from "@sovereign/protocol";
 
-import { createDispatcher } from "./http/public.ts";
-import { ensureDataDirectory, workDirectoryName } from "./platform/public.ts";
-import { createEventBus } from "./platform/public.ts";
-import { createLogger, type Logger } from "./platform/public.ts";
+import { createDispatcher } from "../http/public.ts";
+import { ensureDataDirectory, workDirectoryName } from "../platform/public.ts";
+import { createEventBus } from "../platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import { createProjectPathNormalizer } from "./project-path.ts";
 import { createProjectStore, ephemeralProjectId, projectsFileName } from "./project-store.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects.ts";

@@ -15,9 +15,9 @@ import {
 } from "@sovereign/protocol";
 
 import type { CredentialStore } from "./credential-store.ts";
-import { respondWithError, respondWithJson, type Route } from "./http/public.ts";
-import type { EventBus } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
+import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
+import type { EventBus } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 import type { ProviderLogins } from "./provider-logins.ts";
 
 export type ProvidersRouteOptions = {

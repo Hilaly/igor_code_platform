@@ -37,12 +37,12 @@ import type {
 } from "@sovereign/sdk";
 
 import type { ContributingPlugin } from "./contribution-registry.ts";
-import type { CredentialStore } from "./credential-store.ts";
+import type { CredentialStore } from "./providers/public.ts";
 import type { EventBus } from "./platform/public.ts";
 import type { Logger } from "./platform/public.ts";
 import type { PluginCall } from "./plugin-supervisor.ts";
 import type { PluginLoginReply } from "./plugin-wire.ts";
-import type { ProviderLogins } from "./provider-logins.ts";
+import type { ProviderLogins } from "./providers/public.ts";
 
 /**
  * Тождество копии типа. SDK объявляет `ProviderSummary`, `ModelSummary` и остальное **своей

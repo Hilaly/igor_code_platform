@@ -17,9 +17,9 @@ import {
   type ProjectsSnapshot,
 } from "@sovereign/protocol";
 
-import { respondWithError, respondWithJson, type Route } from "./http/public.ts";
-import type { EventBus } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
+import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
+import type { EventBus } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 import type { ProjectLifecycle } from "./project-lifecycle.ts";
 import { probeProjectFolder } from "./project-availability.ts";
 import { normalizeProjectPath, type ProjectPathNormalizer } from "./project-path.ts";

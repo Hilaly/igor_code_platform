@@ -13,9 +13,9 @@ import { join } from "node:path";
 
 import type { ProjectUpdate } from "@sovereign/protocol";
 
-import { writeFileAtomically } from "./platform/public.ts";
-import { workDirectoryName } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
+import { writeFileAtomically } from "../platform/public.ts";
+import { workDirectoryName } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 import { normalizeProjectPath, type ProjectPathNormalizer } from "./project-path.ts";
 
 export const projectsFileName = "projects.json";
