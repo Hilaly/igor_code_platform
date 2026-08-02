@@ -63,6 +63,7 @@ describe("buildPluginsSnapshot", () => {
       plugins: [running, refused],
       contributions: [
         {
+          ownership: "plugin",
           id: "hello.greeting",
           declaredId: "greeting",
           kind: "custom",
@@ -144,6 +145,26 @@ describe("buildPluginsSnapshot", () => {
 
     assert.equal(before.contributions.length, 0);
     assert.equal(buildPluginsSnapshot(state).contributions.length, 1);
+  });
+
+  it("keeps project-owned declarations visible to plugin management", () => {
+    const state = sources([running]);
+
+    state.registry.applyPlugin(
+      { key: "project:p1:hello", id: "hello", source: "project:p1" },
+      [{ kind: "custom", id: "panel" }],
+      new Set(),
+    );
+    state.registry.applyPlugin(
+      { key: "project:p2:hello", id: "hello", source: "project:p2" },
+      [{ kind: "custom", id: "panel" }],
+      new Set(),
+    );
+
+    assert.deepEqual(
+      buildPluginsSnapshot(state).contributions.map((registration) => registration.source),
+      ["project:p1", "project:p2"],
+    );
   });
 });
 

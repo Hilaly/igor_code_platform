@@ -1,4 +1,10 @@
-export { createContributionRegistry } from "./contribution-registry.ts";
+export {
+  createContributionRegistry,
+  type ContributionRegistry,
+  type FileContributionInput,
+  type PluginContributionSnapshot,
+  type StandaloneContributionSnapshot,
+} from "./contribution-registry.ts";
 export { pluginPreferencesRoute } from "./plugin-preferences.ts";
 export { createPluginProviders } from "./plugin-providers.ts";
 export { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
