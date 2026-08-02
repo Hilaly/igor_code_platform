@@ -537,6 +537,7 @@ function EntryMessage(props: {
           label={t("chat.label.menu")}
           trigger="…"
           triggerLabel={t("chat.label.menu")}
+          compact
           items={[
             {
               id: "label",

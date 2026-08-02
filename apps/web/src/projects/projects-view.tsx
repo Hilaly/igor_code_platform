@@ -335,6 +335,7 @@ function ProjectRow({ project, conflicting, onUpdate, onRemove, translator }: Pr
               // читалось бы как часть имени. Имя для скринридера приходит отдельно.
               trigger="…"
               triggerLabel={t("projects.actions", { name: project.name })}
+              compact
               items={actions}
             />
           )}

@@ -159,6 +159,7 @@ export function SessionsView(props: SessionsViewProps) {
                       label={t("sessions.actions", { name: session.title ?? session.id })}
                       trigger="…"
                       triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
+                      compact
                       items={rowActions(session)}
                     />
                   }
