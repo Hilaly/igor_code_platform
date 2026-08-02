@@ -14,6 +14,7 @@ import { Code, CodeBlock } from "./code.tsx";
 import { Disclosure } from "./disclosure.tsx";
 import { Link } from "./link.tsx";
 import { List, ListRow } from "./list.tsx";
+import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
 import { Notice } from "./notice.tsx";
 import { Panel } from "./panel.tsx";
 import { Select } from "./select.tsx";
@@ -106,6 +107,52 @@ export const Controls = () => {
         ]}
         placeholder="Выберите..."
       />
+    </div>
+  );
+};
+
+const pickerGroups: ModelPickerGroup[] = [
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    options: [
+      {
+        value: "anthropic/claude-opus",
+        label: "anthropic/claude-opus",
+        description: "Claude Opus",
+      },
+      {
+        value: "anthropic/claude-sonnet",
+        label: "anthropic/claude-sonnet",
+        description: "Claude Sonnet",
+      },
+    ],
+  },
+  {
+    id: "google",
+    label: "Google",
+    options: [
+      { value: "google/gemini-pro", label: "google/gemini-pro", description: "Gemini Pro" },
+      { value: "google/gemini-flash", label: "google/gemini-flash", description: "Gemini Flash" },
+    ],
+  },
+];
+
+export const ModelPickerStory = () => {
+  const [value, setValue] = useState<string | undefined>(undefined);
+
+  return (
+    <div style={column}>
+      <ModelPicker
+        groups={pickerGroups}
+        value={value}
+        onChange={setValue}
+        label="Модель"
+        placeholder="Выберите модель"
+        emptyText="Моделей нет"
+        loadingText="Модели загружаются"
+      />
+      <Text tone="muted">Выбрано: {value ?? "—"}</Text>
     </div>
   );
 };
