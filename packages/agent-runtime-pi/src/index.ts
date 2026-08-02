@@ -1,6 +1,7 @@
 /**
  * Реализация агентного рантайма на Pi. Единственный пакет, которому разрешён импорт
- * `@earendil-works/*` (docs/architecture.md); наружу отдаются только типы `@sovereign/protocol`.
+ * `@earendil-works/*` (docs/architecture.md). Наружу отдаётся платформенный runtime API и типы
+ * `@sovereign/protocol`; типы Pi границу пакета не пересекают.
  */
 
 export * from "./agent-session.ts";
