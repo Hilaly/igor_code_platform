@@ -19,8 +19,8 @@ import {
   credentialsFileName,
   type CredentialStore,
 } from "./credential-store.ts";
-import { ensureDataDirectory } from "./data-directory.ts";
-import { createLogger } from "./logger.ts";
+import { ensureDataDirectory } from "./platform/public.ts";
+import { createLogger } from "./platform/public.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-credential-store-"));
 

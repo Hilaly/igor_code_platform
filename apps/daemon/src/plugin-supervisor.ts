@@ -20,8 +20,8 @@ import {
 } from "@sovereign/protocol";
 
 import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Logger } from "./logger.ts";
+import type { EventBus } from "./platform/public.ts";
+import type { Logger } from "./platform/public.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";

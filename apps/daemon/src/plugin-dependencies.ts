@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { manifestFileName } from "@sovereign/protocol";
 
-import type { Logger } from "./logger.ts";
+import type { Logger } from "./platform/public.ts";
 
 export const installStampFileName = ".sovereign-install.json";
 

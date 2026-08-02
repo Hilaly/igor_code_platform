@@ -14,8 +14,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeFileAtomically } from "./atomic-file.ts";
-import type { Logger } from "./logger.ts";
+import { writeFileAtomically } from "./platform/public.ts";
+import type { Logger } from "./platform/public.ts";
 
 export const credentialsFileName = "credentials.json";
 

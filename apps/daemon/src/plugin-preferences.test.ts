@@ -14,8 +14,8 @@ import {
   type PluginStatus,
 } from "@sovereign/protocol";
 
-import { createDispatcher } from "./dispatcher.ts";
-import { createLogger } from "./logger.ts";
+import { createDispatcher } from "./http/public.ts";
+import { createLogger } from "./platform/public.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
 import { createSettingsStore, type SettingsStore, type WriteOutcome } from "./settings.ts";
 

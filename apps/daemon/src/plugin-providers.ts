@@ -38,8 +38,8 @@ import type {
 
 import type { ContributingPlugin } from "./contribution-registry.ts";
 import type { CredentialStore } from "./credential-store.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Logger } from "./logger.ts";
+import type { EventBus } from "./platform/public.ts";
+import type { Logger } from "./platform/public.ts";
 import type { PluginCall } from "./plugin-supervisor.ts";
 import type { PluginLoginReply } from "./plugin-wire.ts";
 import type { ProviderLogins } from "./provider-logins.ts";

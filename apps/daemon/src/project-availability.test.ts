@@ -6,7 +6,7 @@ import { after, describe, it } from "node:test";
 
 import { coreEventTypes, type BusEvent, type ProjectAvailability } from "@sovereign/protocol";
 
-import { createEventBus } from "./event-bus.ts";
+import { createEventBus } from "./platform/public.ts";
 import { createProjectAvailabilityWatcher, probeProjectFolder } from "./project-availability.ts";
 import type { StoredProject } from "./project-store.ts";
 

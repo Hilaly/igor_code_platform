@@ -11,8 +11,8 @@ import {
   type PluginPreferencesUpdated,
 } from "@sovereign/protocol";
 
-import { respondWithError, respondWithJson, type Route } from "./dispatcher.ts";
-import type { Logger } from "./logger.ts";
+import { respondWithError, respondWithJson, type Route } from "./http/public.ts";
+import type { Logger } from "./platform/public.ts";
 import type { PluginSupervisor } from "./plugin-supervisor.ts";
 import type { SettingsStore } from "./settings.ts";
 

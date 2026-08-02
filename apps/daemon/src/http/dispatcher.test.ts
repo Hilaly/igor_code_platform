@@ -12,7 +12,7 @@ import {
   type Authentication,
   type Route,
 } from "./dispatcher.ts";
-import { createLogger } from "./logger.ts";
+import { createLogger } from "../platform/public.ts";
 
 type Answer = {
   status: number;

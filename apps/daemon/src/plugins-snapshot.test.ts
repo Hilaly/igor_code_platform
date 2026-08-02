@@ -13,8 +13,8 @@ import {
 } from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
-import { createDispatcher } from "./dispatcher.ts";
-import { createLogger } from "./logger.ts";
+import { createDispatcher } from "./http/public.ts";
+import { createLogger } from "./platform/public.ts";
 import { buildPluginsSnapshot, pluginsRoute } from "./plugins-snapshot.ts";
 
 const running: PluginStatus = {

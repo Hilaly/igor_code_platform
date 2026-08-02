@@ -10,7 +10,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import type { Logger } from "./logger.ts";
+import type { Logger } from "../platform/public.ts";
 
 export type RouteParameters = Record<string, string>;
 

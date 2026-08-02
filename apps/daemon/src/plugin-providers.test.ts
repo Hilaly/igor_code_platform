@@ -11,8 +11,8 @@ import {
 import { coreEventTypes, type BusEvent, type CustomProviderDefinition } from "@sovereign/protocol";
 import type { LoginStep } from "@sovereign/sdk";
 
-import { createEventBus } from "./event-bus.ts";
-import { createLogger, type Logger } from "./logger.ts";
+import { createEventBus } from "./platform/public.ts";
+import { createLogger, type Logger } from "./platform/public.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
 import { createProviderLogins } from "./provider-logins.ts";
 

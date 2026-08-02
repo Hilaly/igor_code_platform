@@ -14,7 +14,7 @@ import {
   type AccountStore,
   type ScryptParameters,
 } from "./account.ts";
-import { createLogger } from "./logger.ts";
+import { createLogger } from "./platform/public.ts";
 
 /** Дешёвые параметры: тест проверяет механику, а не стоимость хеша. Реальные — отдельным тестом. */
 const cheapParameters: ScryptParameters = {

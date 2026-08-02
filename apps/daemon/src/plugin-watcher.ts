@@ -12,7 +12,7 @@
 import { statSync, watch, type FSWatcher } from "node:fs";
 import { join, sep } from "node:path";
 
-import type { Logger } from "./logger.ts";
+import type { Logger } from "./platform/public.ts";
 import type { PluginRoot } from "./plugin-sources.ts";
 
 export type PluginWatcher = {

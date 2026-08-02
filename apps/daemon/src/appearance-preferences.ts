@@ -15,9 +15,9 @@ import {
   type AppearancePreferences,
 } from "@sovereign/protocol";
 
-import { respondWithError, respondWithJson, type Route } from "./dispatcher.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Logger } from "./logger.ts";
+import { respondWithError, respondWithJson, type Route } from "./http/public.ts";
+import type { EventBus } from "./platform/public.ts";
+import type { Logger } from "./platform/public.ts";
 import type { SettingsSnapshot, SettingsStore } from "./settings.ts";
 
 export type AppearancePreferencesRouteOptions = {

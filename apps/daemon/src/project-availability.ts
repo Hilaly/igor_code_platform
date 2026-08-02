@@ -7,7 +7,7 @@ import { statSync } from "node:fs";
 
 import { coreEventTypes, type ProjectAvailability } from "@sovereign/protocol";
 
-import type { EventBus } from "./event-bus.ts";
+import type { EventBus } from "./platform/public.ts";
 import type { ProjectStore, StoredProject } from "./project-store.ts";
 
 /**

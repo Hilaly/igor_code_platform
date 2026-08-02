@@ -24,8 +24,8 @@ import { createContributionRegistry } from "./contribution-registry.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
 import { carryLoginSteps } from "./provider-login-routes.ts";
 import { createProviderLogins } from "./provider-logins.ts";
-import { createEventBus, type EventBus } from "./event-bus.ts";
-import { createLogger, type Logger } from "./logger.ts";
+import { createEventBus, type EventBus } from "./platform/public.ts";
+import { createLogger, type Logger } from "./platform/public.ts";
 import {
   createPluginSupervisor,
   type CancelScheduled,

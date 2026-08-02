@@ -23,9 +23,9 @@ import {
   respondWithJson,
   type Authentication,
   type Route,
-} from "./dispatcher.ts";
+} from "./http/public.ts";
 import type { LoginSessionStore, OpenedLoginSession } from "./login-sessions.ts";
-import type { Logger } from "./logger.ts";
+import type { Logger } from "./platform/public.ts";
 
 export type AuthenticationRoutesOptions = {
   account: AccountStore;

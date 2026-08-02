@@ -12,8 +12,8 @@
 import { isPluginBusEvent } from "@sovereign/protocol";
 
 import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Logger } from "./logger.ts";
+import type { EventBus } from "./platform/public.ts";
+import type { Logger } from "./platform/public.ts";
 import type { PluginIncoming } from "./plugin-wire.ts";
 
 export type PluginEvents = {

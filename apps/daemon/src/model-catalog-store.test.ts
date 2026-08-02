@@ -6,8 +6,8 @@ import { after, describe, it } from "node:test";
 
 import type { LogRecord } from "@sovereign/protocol";
 
-import { ensureDataDirectory } from "./data-directory.ts";
-import { createLogger } from "./logger.ts";
+import { ensureDataDirectory } from "./platform/public.ts";
+import { createLogger } from "./platform/public.ts";
 import { createModelCatalogStore, modelCatalogsFileName } from "./model-catalog-store.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-model-catalogs-"));

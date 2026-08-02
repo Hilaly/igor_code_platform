@@ -10,7 +10,7 @@ import { after, describe, it } from "node:test";
 import { filesystemPath } from "@sovereign/protocol";
 
 import { createDispatcher } from "./dispatcher.ts";
-import { createLogger } from "./logger.ts";
+import { createLogger } from "../platform/public.ts";
 import { filesystemRoutes } from "./filesystem.ts";
 
 const quietLogger = createLogger({ source: "core", level: () => "debug", write: () => {} });

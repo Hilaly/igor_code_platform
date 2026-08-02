@@ -23,8 +23,8 @@ import {
 } from "@sovereign/protocol";
 
 import type { Route } from "./dispatcher.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Logger } from "./logger.ts";
+import type { EventBus } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
 
 export type EventStream = {
   route: () => Route;

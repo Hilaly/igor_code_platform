@@ -11,9 +11,9 @@ import { sessionCookieName, type LogRecord } from "@sovereign/protocol";
 
 import { accountFileName, createAccountStore, type ScryptParameters } from "./account.ts";
 import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
-import { createDispatcher, respondWithJson, type Route } from "./dispatcher.ts";
+import { createDispatcher, respondWithJson, type Route } from "./http/public.ts";
 import { createLoginSessionStore } from "./login-sessions.ts";
-import { createLogger } from "./logger.ts";
+import { createLogger } from "./platform/public.ts";
 
 /** Дешёвые параметры: стоимость хеша проверяется в account.test.ts, здесь проверяются маршруты. */
 const cheapParameters: ScryptParameters = {

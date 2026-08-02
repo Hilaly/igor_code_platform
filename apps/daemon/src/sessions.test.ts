@@ -41,10 +41,10 @@ import {
 } from "@sovereign/protocol";
 
 import { coreToolSource } from "./core-tools.ts";
-import { ensureDataDirectory } from "./data-directory.ts";
-import { createDispatcher } from "./dispatcher.ts";
-import { createEventBus } from "./event-bus.ts";
-import { createLogger, type Logger } from "./logger.ts";
+import { ensureDataDirectory } from "./platform/public.ts";
+import { createDispatcher } from "./http/public.ts";
+import { createEventBus } from "./platform/public.ts";
+import { createLogger, type Logger } from "./platform/public.ts";
 import { createProjectStore, type ProjectStore } from "./project-store.ts";
 import { createProjectLifecycle } from "./project-lifecycle.ts";
 import { projectsRoutes } from "./projects.ts";

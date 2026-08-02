@@ -20,9 +20,9 @@ import {
 } from "@sovereign/protocol";
 
 import { createDispatcher } from "./dispatcher.ts";
-import { createEventBus } from "./event-bus.ts";
+import { createEventBus } from "../platform/public.ts";
 import { createEventStream, type CreateEventStreamOptions } from "./event-stream.ts";
-import { createLogger } from "./logger.ts";
+import { createLogger } from "../platform/public.ts";
 
 const servers: Server[] = [];
 

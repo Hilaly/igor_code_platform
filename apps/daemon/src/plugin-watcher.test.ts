@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
-import { createLogger, type Logger } from "./logger.ts";
+import { createLogger, type Logger } from "./platform/public.ts";
 import { createPluginWatcher, type PluginWatcher } from "./plugin-watcher.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-plugin-watcher-"));

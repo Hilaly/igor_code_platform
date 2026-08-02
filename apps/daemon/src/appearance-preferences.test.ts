@@ -15,9 +15,9 @@ import {
 } from "@sovereign/protocol";
 
 import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
-import { createDispatcher } from "./dispatcher.ts";
-import { createEventBus } from "./event-bus.ts";
-import { createLogger, type Logger } from "./logger.ts";
+import { createDispatcher } from "./http/public.ts";
+import { createEventBus } from "./platform/public.ts";
+import { createLogger, type Logger } from "./platform/public.ts";
 import { createSettingsStore, type SettingsStore } from "./settings.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-appearance-"));

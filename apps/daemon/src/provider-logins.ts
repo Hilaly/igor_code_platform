@@ -19,7 +19,7 @@ import type {
   LoginStep,
 } from "@sovereign/protocol";
 
-import type { Logger } from "./logger.ts";
+import type { Logger } from "./platform/public.ts";
 
 /** Что реестру нужно от каталога провайдеров. Больше он о рантайме не знает ничего. */
 export type LoginRunner = {
