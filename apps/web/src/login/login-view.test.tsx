@@ -92,9 +92,9 @@ describe("LoginView", () => {
     expect(submitButton().disabled).toBe(false);
   });
 
-  it("submits the form on submit, though the kit button is never type=submit", () => {
-    // Раньше Enter ловил `onKeyDown` на поле; теперь — сама форма (`Form`). Проверять надо сабмит
-    // формы, а не синтетический KeyDown: именно так Enter в поле доходит до обработчика в браузере.
+  it("submits through the native form semantics", () => {
+    // Раньше Enter ловил `onKeyDown` на поле; теперь форма получает нативный submit от поля или
+    // submit-кнопки. Проверять надо сабмит формы, а не синтетический KeyDown.
     const { onSubmit } = show();
     const field = passwords()[0] as HTMLInputElement;
 

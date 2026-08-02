@@ -50,6 +50,35 @@ function decodePathSegment(segment: string): string | undefined {
   }
 }
 
+/**
+ * `.` и `..` браузер считает навигацией по каталогам даже в percent-кодировке. Префикс `~` не даёт
+ * сегменту стать dot-segment; точка остаётся закодированной, чтобы не спутать эти два служебных
+ * представления с обычными идентификаторами `~.` и `~..`.
+ */
+function encodeProviderId(providerId: string): string {
+  if (providerId === ".") {
+    return "~%2E";
+  }
+
+  if (providerId === "..") {
+    return "~%2E%2E";
+  }
+
+  return encodeURIComponent(providerId);
+}
+
+function decodeProviderId(segment: string): string | undefined {
+  if (segment === "~%2E") {
+    return ".";
+  }
+
+  if (segment === "~%2E%2E") {
+    return "..";
+  }
+
+  return decodePathSegment(segment);
+}
+
 export function matchPage(path: string): Page {
   const segments = path.split("/").filter((segment) => segment.length > 0);
 
@@ -72,7 +101,7 @@ export function matchPage(path: string): Page {
       return { kind: "providers" };
     }
 
-    const providerId = decodePathSegment(encodedProviderId);
+    const providerId = decodeProviderId(encodedProviderId);
 
     // Идентификатор провайдера не проверяется форматом, как `sessionId`: это внешние данные
     // рантайма, и их формат — не наш контракт. «Нет такого провайдера» говорит вью по снимку,
@@ -128,7 +157,7 @@ export function pathOf(page: Page): string {
     case "providers":
       return page.providerId === undefined
         ? providersPagePath
-        : `${providersPagePath}/${encodeURIComponent(page.providerId)}`;
+        : `${providersPagePath}/${encodeProviderId(page.providerId)}`;
     case "sessions":
       return page.sessionId === undefined
         ? sessionsPagePath
