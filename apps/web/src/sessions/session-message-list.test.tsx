@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { SessionEntry } from "@sovereign/protocol";
+import type { SessionEntry, SessionForkRequest } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +47,10 @@ const show = (
   options: {
     busy?: boolean;
     archived?: boolean;
+    onFork?: (request: SessionForkRequest) => Promise<void>;
     onSetLabel?: (entryId: string, label: string | null) => Promise<string | undefined>;
+    labelRefusal?: string;
+    onLabelRefusalChange?: (reason: string | undefined) => void;
   } = {},
 ) =>
   render(
@@ -55,8 +58,10 @@ const show = (
       open={open}
       busy={options.busy ?? false}
       archived={options.archived ?? false}
-      onFork={vi.fn()}
+      onFork={options.onFork ?? vi.fn()}
       onSetLabel={options.onSetLabel ?? vi.fn()}
+      labelRefusal={options.labelRefusal}
+      onLabelRefusalChange={options.onLabelRefusalChange ?? vi.fn()}
       translator={translator}
     />,
   );
@@ -134,9 +139,13 @@ describe("the session message list", () => {
 
   it("keeps message actions and label editing with the list", async () => {
     const onSetLabel = vi.fn().mockResolvedValue(undefined);
+    const onLabelRefusalChange = vi.fn();
     const entry = message("m1", "реплика");
 
-    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }), { onSetLabel });
+    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }), {
+      onSetLabel,
+      onLabelRefusalChange,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
@@ -146,6 +155,33 @@ describe("the session message list", () => {
     fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
 
     await waitFor(() => expect(onSetLabel).toHaveBeenCalledWith("m1", "сюда вернуться"));
+    expect(onLabelRefusalChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it("renders the controlled label refusal beside the message list", () => {
+    show(openSession(), { labelRefusal: "the session is archived" });
+
+    expect(screen.getByRole("alert").textContent).toContain("the session is archived");
+  });
+
+  it("reports fork-before for a user message and fork-at through the selected entry", () => {
+    const onFork = vi.fn().mockResolvedValue(undefined);
+    const user = message("m1", "вопрос", "user");
+    const agent = message("m2", "ответ");
+
+    show(
+      openSession({
+        entries: [user, agent],
+        branchEntryIds: new Set([user.id, agent.id]),
+      }),
+      { onFork },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Форк до этой реплики" }));
+    expect(onFork).toHaveBeenCalledWith({ entryId: "m1" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Форк по эту запись" })[1] as Element);
+    expect(onFork).toHaveBeenLastCalledWith({ entryId: "m2", position: "at" });
   });
 
   it("does not offer writing actions for archived messages", () => {

@@ -734,6 +734,28 @@ describe("the session lifecycle from the view", () => {
     expect(await screen.findByText(/the session is busy/)).not.toBeNull();
   });
 
+  it("clears an old compaction refusal after a successful mark", async () => {
+    const onCompact = vi.fn().mockResolvedValue("the compaction snapshot is stale");
+    const onSetLabel = vi.fn().mockResolvedValue(undefined);
+
+    show(withOpen([entryMessage("m1", "реплика")]), { onCompact, onSetLabel });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
+
+    expect(await screen.findByText(/the compaction snapshot is stale/)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Метка/ }), {
+      target: { value: "сюда вернуться" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
+
+    await waitFor(() => expect(onSetLabel).toHaveBeenCalledWith("m1", "сюда вернуться"));
+    await waitFor(() => expect(screen.queryByText(/the compaction snapshot is stale/)).toBeNull());
+  });
+
   it("does not offer to fold the context of an archived session at all", () => {
     // Сервер отклонит её `409`: кнопка обещала бы невозможное, а архив — состояние, а не задержка.
     show(withOpen([entryMessage("m1", "сохранено")], { archived: true }));
@@ -813,6 +835,28 @@ describe("the session lifecycle from the view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
 
     expect(await screen.findByText(/the session is archived/)).not.toBeNull();
+  });
+
+  it("clears an old mark refusal after a successful compaction", async () => {
+    const onSetLabel = vi.fn().mockResolvedValue("the label snapshot is stale");
+    const onCompact = vi.fn().mockResolvedValue(undefined);
+
+    show(withOpen([entryMessage("m1", "реплика")]), { onSetLabel, onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Метка/ }), {
+      target: { value: "тут" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
+
+    expect(await screen.findByText(/the label snapshot is stale/)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
+
+    await waitFor(() => expect(onCompact).toHaveBeenCalledWith(undefined));
+    await waitFor(() => expect(screen.queryByText(/the label snapshot is stale/)).toBeNull());
   });
 
   it("opens the tree on the branch the session works in, with the leaf picked", async () => {

@@ -45,6 +45,9 @@ export type ChatViewProps = {
   translator: ScopedTranslator;
 };
 
+/** Что именно отказались сделать: у компакции и метки разные сообщения об отказе. */
+type Refusal = { what: "compact" | "label"; reason: string };
+
 export function ChatView(props: ChatViewProps) {
   const { open, onSubmit, onSendMessage, onInterrupt, onFork, onCompact, onSetLabel, translator } =
     props;
@@ -54,10 +57,10 @@ export function ChatView(props: ChatViewProps) {
   const [compacting, setCompacting] = useState(false);
   const [instructions, setInstructions] = useState("");
   /**
-   * Отказ последней компакции. Живёт во вью, а не в состоянии сессии: это исход нажатия, а не
+   * Отказ последнего действия. Живёт во вью, а не в состоянии сессии: это исход нажатия, а не
    * свойство сессии, — так же показывает свой отказ диалог создания.
    */
-  const [compactionRefusal, setCompactionRefusal] = useState<string | undefined>(undefined);
+  const [refusal, setRefusal] = useState<Refusal | undefined>(undefined);
   const busy = isBusy(open.summary);
   const queues = open.queues;
   const waiting = [
@@ -73,7 +76,7 @@ export function ChatView(props: ChatViewProps) {
     const reason = await onCompact(asked === "" ? undefined : asked);
 
     setInstructions("");
-    setCompactionRefusal(reason);
+    setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
 
@@ -107,8 +110,8 @@ export function ChatView(props: ChatViewProps) {
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
       )}
 
-      {compactionRefusal === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.compact.refused", { reason: compactionRefusal })} />
+      {refusal?.what !== "compact" ? undefined : (
+        <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
       )}
 
       {open.degradations.map((lost, index) => (
@@ -125,6 +128,10 @@ export function ChatView(props: ChatViewProps) {
         archived={archived}
         onFork={onFork}
         onSetLabel={onSetLabel}
+        labelRefusal={refusal?.what === "label" ? refusal.reason : undefined}
+        onLabelRefusalChange={(reason) =>
+          setRefusal(reason === undefined ? undefined : { what: "label", reason })
+        }
         translator={translator}
       />
 

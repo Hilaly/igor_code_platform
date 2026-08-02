@@ -36,6 +36,8 @@ export type SessionMessageListProps = {
   archived: boolean;
   onFork: (request: SessionForkRequest) => Promise<void>;
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
+  labelRefusal: string | undefined;
+  onLabelRefusalChange: (reason: string | undefined) => void;
   translator: ScopedTranslator;
 };
 
@@ -50,14 +52,21 @@ const outcomesOf = (entries: SessionEntry[]): Map<string, ToolOutcome> =>
   );
 
 export function SessionMessageList(props: SessionMessageListProps): React.JSX.Element {
-  const { open, busy, archived, onFork, onSetLabel, translator } = props;
+  const {
+    open,
+    busy,
+    archived,
+    onFork,
+    onSetLabel,
+    labelRefusal,
+    onLabelRefusalChange,
+    translator,
+  } = props;
   const { t } = translator;
   /** Запись, которой правят метку, и черновик метки — как у переименования сессии. */
   const [labelling, setLabelling] = useState<{ entryId: string; label: string } | undefined>(
     undefined,
   );
-  /** Отказ последней метки — исход действия строки, а не свойство сессии. */
-  const [refusal, setRefusal] = useState<string | undefined>(undefined);
   const outcomes = outcomesOf(open.entries);
   const activeEntries = open.entries.filter(({ id }) => open.branchEntryIds.has(id));
   const shown = activeEntries.filter(isFeedEntry);
@@ -91,13 +100,13 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 
     const reason = await onSetLabel(entryId, next);
 
-    setRefusal(reason);
+    onLabelRefusalChange(reason);
   };
 
   return (
     <>
-      {refusal === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.label.refused", { reason: refusal })} />
+      {labelRefusal === undefined ? undefined : (
+        <Notice tone="danger" title={t("chat.label.refused", { reason: labelRefusal })} />
       )}
 
       {open.loading && empty ? (
