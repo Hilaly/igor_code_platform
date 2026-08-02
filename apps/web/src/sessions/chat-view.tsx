@@ -15,7 +15,6 @@ import type {
   SessionEntry,
   SessionForkRequest,
   SessionMessage,
-  SessionMessageMode,
   SessionNavigateRequest,
 } from "@sovereign/protocol";
 import {
@@ -33,11 +32,9 @@ import {
   MessageFeed,
   Notice,
   Progress,
-  SegmentedControl,
   Spinner,
   StreamingText,
   Text,
-  Textarea,
   ToolCall,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
@@ -45,6 +42,7 @@ import { useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
+import { MessageComposer } from "./message-composer.tsx";
 import { isBusy, isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 
 export type ChatViewProps = {
@@ -64,13 +62,6 @@ export type ChatViewProps = {
 /** Что именно отказались сделать: у компакции и метки разные сообщения об отказе. */
 type Refusal = { what: "compact" | "label"; reason: string };
 
-/**
- * Что делает кнопка отправки у занятой сессии. Турна она запустить не может — сессия занята, — и
- * выбор между тремя очередями заменяет его собой (docs/web-api.md). `append` требует простоя и
- * поэтому доступен отдельной кнопкой рядом с обычным запуском турна.
- */
-const busyModes: SessionMessageMode[] = ["steer", "follow-up", "next-turn"];
-
 /** Исход вызова инструмента из записей: результат приезжает отдельной записью, а не внутри вызова. */
 type ToolOutcome = { text: string; failed: boolean };
 
@@ -86,7 +77,6 @@ export function ChatView(props: ChatViewProps) {
     props;
   const { t } = translator;
   const [draft, setDraft] = useState("");
-  const [mode, setMode] = useState<SessionMessageMode>("steer");
   const [treeOpen, setTreeOpen] = useState(false);
   const [compacting, setCompacting] = useState(false);
   const [instructions, setInstructions] = useState("");
@@ -107,22 +97,6 @@ export function ChatView(props: ChatViewProps) {
     ...(queues?.followUp ?? []),
     ...(queues?.nextTurn ?? []),
   ];
-
-  const send = (): void => {
-    if (draft.trim() === "") {
-      return;
-    }
-
-    if (busy) {
-      // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
-      // человек выбирает сам, потому что момент доставки у них разный.
-      void onSendMessage({ text: draft, mode });
-    } else {
-      onSubmit(draft);
-    }
-
-    setDraft("");
-  };
 
   const compact = async (): Promise<void> => {
     setCompacting(false);
@@ -299,56 +273,16 @@ export function ChatView(props: ChatViewProps) {
         </div>
       )}
 
-      {!archived && busy ? (
-        <div className="sessions-modes">
-          <SegmentedControl
-            options={busyModes.map((option) => ({
-              value: option,
-              label: t(`chat.mode.${option}`),
-            }))}
-            value={mode}
-            onChange={setMode}
-            label={t("chat.mode.label")}
-          />
-        </div>
-      ) : undefined}
-
       {archived ? undefined : (
-        <div className="sessions-composer">
-          <Textarea
-            value={draft}
-            onChange={setDraft}
-            onSubmit={send}
-            placeholder={t("chat.compose.placeholder")}
-            aria-label={t("chat.compose.label")}
-            autoGrow
-            rows={2}
-            maxRows={12}
-          />
-          <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
-            {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
-          </Button>
-          {!busy ? (
-            <Button
-              onClick={() => {
-                if (draft.trim() === "") {
-                  return;
-                }
-
-                void onSendMessage({ text: draft, mode: "append" });
-                setDraft("");
-              }}
-              disabled={draft.trim() === ""}
-            >
-              {t("chat.append")}
-            </Button>
-          ) : undefined}
-          {busy ? (
-            <Button tone="danger" onClick={onInterrupt}>
-              {t("chat.stop")}
-            </Button>
-          ) : undefined}
-        </div>
+        <MessageComposer
+          draft={draft}
+          onDraftChange={setDraft}
+          busy={busy}
+          onSubmit={onSubmit}
+          onSendMessage={onSendMessage}
+          onInterrupt={onInterrupt}
+          translator={translator}
+        />
       )}
       <div className="sessions-session-actions">
         {busy ? undefined : (
