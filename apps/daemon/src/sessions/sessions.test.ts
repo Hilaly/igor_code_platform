@@ -41,13 +41,13 @@ import {
 } from "@sovereign/protocol";
 
 import { coreToolSource } from "./core-tools.ts";
-import { ensureDataDirectory } from "./platform/public.ts";
-import { createDispatcher } from "./http/public.ts";
-import { createEventBus } from "./platform/public.ts";
-import { createLogger, type Logger } from "./platform/public.ts";
-import { createProjectStore, type ProjectStore } from "./projects/public.ts";
-import { createProjectLifecycle } from "./projects/public.ts";
-import { projectsRoutes } from "./projects/public.ts";
+import { ensureDataDirectory } from "../platform/public.ts";
+import { createDispatcher } from "../http/public.ts";
+import { createEventBus } from "../platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
+import { createProjectStore, type ProjectStore } from "../projects/public.ts";
+import { createProjectLifecycle } from "../projects/public.ts";
+import { projectsRoutes } from "../projects/public.ts";
 import { createSessionService, type SessionDeltaSink } from "./sessions.ts";
 import { createToolCollector } from "./tool-collection.ts";
 import { createTurnQueue } from "./turn-queue.ts";

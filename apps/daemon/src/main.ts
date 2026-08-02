@@ -37,11 +37,13 @@ import { createProjectAvailabilityWatcher } from "./projects/public.ts";
 import { createProjectPathNormalizer } from "./projects/public.ts";
 import { createProjectStore } from "./projects/public.ts";
 import { createProjectLifecycle } from "./projects/public.ts";
-import { coreToolSource } from "./core-tools.ts";
 import { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
-import { createSessionService } from "./sessions.ts";
-import { createToolCollector } from "./tool-collection.ts";
-import { createTurnQueue } from "./turn-queue.ts";
+import {
+  coreToolSource,
+  createSessionService,
+  createToolCollector,
+  createTurnQueue,
+} from "./sessions/public.ts";
 import { projectsRoutes, publishProjectChanges } from "./projects/public.ts";
 import { filesystemRoutes } from "./http/public.ts";
 import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./providers/public.ts";

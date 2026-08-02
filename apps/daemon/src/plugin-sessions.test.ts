@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { Session, SessionEntriesPage } from "@sovereign/protocol";
 
 import { createPluginSessions, isSessionRequest } from "./plugin-sessions.ts";
-import type { CreateSessionOutcome, PromptOutcome, SessionService } from "./sessions.ts";
+import type { SessionService } from "./sessions/public.ts";
 
 const session: Session = {
   id: "0199",
@@ -55,13 +55,13 @@ function bridge(overrides: Partial<SessionService> = {}) {
 
       return [session];
     },
-    create: (draft): Promise<CreateSessionOutcome> => {
+    create: (draft) => {
       calls.push({ create: draft });
 
       return Promise.resolve({ kind: "created", session });
     },
     entries: () => Promise.resolve(page),
-    prompt: (): Promise<PromptOutcome> =>
+    prompt: () =>
       Promise.resolve({
         kind: "accepted",
         turn: { sessionId: "0199", turnId: "t1", phase: "turn" },

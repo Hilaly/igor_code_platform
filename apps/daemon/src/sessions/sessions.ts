@@ -66,12 +66,12 @@ import type {
   AgentSessionSummary,
 } from "@sovereign/agent-runtime-pi";
 
-import { respondWithError, respondWithJson, type Route } from "./http/public.ts";
-import type { EventBus } from "./platform/public.ts";
-import type { Logger } from "./platform/public.ts";
-import { probeProjectFolder } from "./projects/public.ts";
-import type { ProjectStore, StoredProject } from "./projects/public.ts";
-import type { ProjectLifecycle } from "./projects/public.ts";
+import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
+import type { EventBus } from "../platform/public.ts";
+import type { Logger } from "../platform/public.ts";
+import { probeProjectFolder } from "../projects/public.ts";
+import type { ProjectStore, StoredProject } from "../projects/public.ts";
+import type { ProjectLifecycle } from "../projects/public.ts";
 import type { ToolCollector } from "./tool-collection.ts";
 import type { TurnQueue } from "./turn-queue.ts";
 
