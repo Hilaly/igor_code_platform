@@ -1,56 +1,66 @@
 import { join } from "node:path";
 
-import { createAccountStore } from "./account.ts";
-import { appearancePreferencesRoutes, publishAppearanceChanges } from "./appearance-preferences.ts";
-import { parseArguments } from "./arguments.ts";
-import { authenticationRoutes, createSessionCheck } from "./authentication.ts";
-import { createContributionRegistry } from "./contribution-registry.ts";
-import { createCredentialStore } from "./credential-store.ts";
+import {
+  authenticationRoutes,
+  createAccountStore,
+  createLoginSessionStore,
+  createSessionCheck,
+} from "./authentication/public.ts";
+import { parseArguments } from "./platform/public.ts";
+import { createCredentialStore } from "./providers/public.ts";
 import {
   archivedSessionsDirectoryName,
   ensureDataDirectory,
   sessionsDirectoryName,
-} from "./data-directory.ts";
-import { createEventBus } from "./event-bus.ts";
+} from "./platform/public.ts";
+import { createEventBus } from "./platform/public.ts";
 import {
   createAgentSessionStore,
   createProviderCatalogue,
   processEnvironment,
 } from "@sovereign/agent-runtime-pi";
 
-import { createEventStream } from "./event-stream.ts";
-import { healthRoute } from "./health.ts";
-import { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
-import { createLoginSessionStore } from "./login-sessions.ts";
-import { createLogger } from "./logger.ts";
-import { createModelCatalogStore } from "./model-catalog-store.ts";
-import { pluginPreferencesRoute } from "./plugin-preferences.ts";
-import { createPluginProviders } from "./plugin-providers.ts";
-import { createPluginSupervisor } from "./plugin-supervisor.ts";
-import { defaultPluginRoots, discoverPlugins, projectPluginRoots } from "./plugin-sources.ts";
-import { createPluginWatcher } from "./plugin-watcher.ts";
-import type { PluginRoot } from "./plugin-sources.ts";
-import { pluginsRoute } from "./plugins-snapshot.ts";
-import { createProjectAvailabilityWatcher } from "./project-availability.ts";
-import { createProjectPathNormalizer } from "./project-path.ts";
-import { createProjectStore } from "./project-store.ts";
-import { createProjectLifecycle } from "./project-lifecycle.ts";
-import { coreToolSource } from "./core-tools.ts";
-import { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
-import { createSessionService } from "./sessions.ts";
-import { createToolCollector } from "./tool-collection.ts";
-import { createTurnQueue } from "./turn-queue.ts";
-import { projectsRoutes, publishProjectChanges } from "./projects.ts";
-import { filesystemRoutes } from "./filesystem.ts";
+import { createEventStream } from "./http/public.ts";
+import { healthRoute } from "./http/public.ts";
+import { acquireInstanceLock, InstanceLockError } from "./platform/public.ts";
+import { createLogger } from "./platform/public.ts";
+import { createModelCatalogStore } from "./providers/public.ts";
 import {
-  carryLoginSteps,
-  providerLoginRoutes,
-  publishLoginOutcomes,
-} from "./provider-login-routes.ts";
-import { createProviderLogins } from "./provider-logins.ts";
-import { providersRoutes } from "./providers.ts";
-import { createDaemonServer } from "./server.ts";
-import { createSettingsStore } from "./settings.ts";
+  createContributionRegistry,
+  createPluginProviders,
+  createPluginSessions,
+  createPluginSupervisor,
+  createPluginWatcher,
+  defaultPluginRoots,
+  discoverPlugins,
+  isSessionRequest,
+  pluginPreferencesRoute,
+  pluginsRoute,
+  projectPluginRoots,
+  type PluginRoot,
+  type PluginSessions,
+} from "./plugins/public.ts";
+import { createProjectAvailabilityWatcher } from "./projects/public.ts";
+import { createProjectPathNormalizer } from "./projects/public.ts";
+import { createProjectStore } from "./projects/public.ts";
+import { createProjectLifecycle } from "./projects/public.ts";
+import {
+  coreToolSource,
+  createSessionService,
+  createToolCollector,
+  createTurnQueue,
+} from "./sessions/public.ts";
+import { projectsRoutes, publishProjectChanges } from "./projects/public.ts";
+import { filesystemRoutes } from "./http/public.ts";
+import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./providers/public.ts";
+import { createProviderLogins } from "./providers/public.ts";
+import { providersRoutes } from "./providers/public.ts";
+import { createDaemonServer } from "./http/public.ts";
+import {
+  appearancePreferencesRoutes,
+  createSettingsStore,
+  publishAppearanceChanges,
+} from "./settings/public.ts";
 
 const parsed = parseArguments(process.argv.slice(2));
 

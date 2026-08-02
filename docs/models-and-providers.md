@@ -3,10 +3,12 @@
 Как платформа входит в LLM-провайдеров и что из этого видит плагин. Что даёт рантайм — в
 [agent-runtime-contract.md](agent-runtime-contract.md), раздел «Авторизация в LLM-провайдерах».
 
-Реализовано: `packages/agent-runtime-pi` (граница Pi), `apps/daemon/src/credential-store.ts`
+Реализовано: `packages/agent-runtime-pi` (граница Pi),
+`apps/daemon/src/providers/credential-store.ts`
 (единственный писатель кредов), маршруты провайдеров и входа ([web-api.md](web-api.md)), вью
 провайдеров с интерактивным входом ([ui-kit.md](ui-kit.md), раздел «Вью провайдеров») и поверхность
-SDK для плагинов (`packages/sdk/src/providers.ts`, мост — `apps/daemon/src/plugin-providers.ts`).
+SDK для плагинов (`packages/sdk/src/providers.ts`, мост —
+`apps/daemon/src/plugins/plugin-providers.ts`).
 
 ## Механизм берётся из Pi, хранилище — наше
 
@@ -217,7 +219,7 @@ API, иначе на плагине оказывается вся работа �
 уже решил судьбу `PluginLogLevel` ([plugins.md](plugins.md)).
 
 Цена копии — молчаливое расхождение, поэтому оно **ловится компилятором в мосте демона**
-(`apps/daemon/src/plugin-providers.ts`): там на каждый скопированный тип стоит присваивание в обе
+(`apps/daemon/src/plugins/plugin-providers.ts`): там на каждый скопированный тип стоит присваивание в обе
 стороны, и разъехавшиеся объявления перестают компилироваться. Проверка стоит именно в мосте, потому
 что мост — единственное место в системе, где оба объявления видны одновременно.
 
