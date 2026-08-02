@@ -80,8 +80,12 @@ const file = (
   diagnostics: FileResourceDiagnostic[] = [],
 ): FileContributionInput => ({ registration, path, diagnostics, kind: registration.kind });
 
-const acceptStandaloneSnapshot = (_snapshot: StandaloneContributionSnapshot): void => {};
-const acceptFileInput = (_input: FileContributionInput): void => {};
+const acceptStandaloneSnapshot = (snapshot: StandaloneContributionSnapshot): void => {
+  void snapshot;
+};
+const acceptFileInput = (input: FileContributionInput): void => {
+  void input;
+};
 
 // @ts-expect-error Project ownership is incomplete without the project identifier.
 acceptStandaloneSnapshot({

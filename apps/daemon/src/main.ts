@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 import {
   authenticationRoutes,
@@ -31,6 +32,7 @@ import {
   createPluginSessions,
   createPluginSupervisor,
   createPluginWatcher,
+  createStandaloneFileResourceService,
   type ChangedPluginDirectory,
   defaultPluginRoots,
   discoverPlugins,
@@ -38,6 +40,7 @@ import {
   pluginPreferencesRoute,
   pluginsRoute,
   projectPluginRoots,
+  standaloneResourceRoots,
   type PluginRoot,
   type PluginSessions,
 } from "./plugins/public.ts";
@@ -140,7 +143,7 @@ const providerLogins = createProviderLogins({ runner: providers, logger });
 const projectAvailability = createProjectAvailabilityWatcher({
   projects,
   bus,
-  onChange: () => applyPlugins(),
+  onChange: () => applyFileSources(),
 });
 
 // Корни перестали быть константой: папки проектов появляются и исчезают на живом демоне
@@ -151,6 +154,20 @@ const pluginRoots = (): PluginRoot[] => [
 ];
 
 const contributions = createContributionRegistry();
+
+const standaloneRoots = () =>
+  standaloneResourceRoots({
+    dataDirectory: directory,
+    homeDirectory: homedir(),
+    projects: projects.list(),
+    availability: (project) => projectAvailability.of(project.id),
+  });
+
+const standaloneResources = createStandaloneFileResourceService({
+  roots: standaloneRoots(),
+  registry: contributions,
+  logger,
+});
 
 // Мост провайдеров: единственная пара «запрос-ответ» в канале плагина
 // (docs/models-and-providers.md). Каталог тот же, что у веб-API, — иначе плагин и человек видели бы
@@ -230,6 +247,15 @@ const applyPlugins = (changedDirectories: ChangedPluginDirectory[] = []): Promis
   return applying;
 };
 
+const applyFileSources = (): void => {
+  void applyPlugins();
+  void standaloneResources.rearm(standaloneRoots()).catch((cause: unknown) => {
+    logger.error("applying standalone file resource roots failed", {
+      reason: cause instanceof Error ? cause.message : String(cause),
+    });
+  });
+};
+
 settings.subscribe((snapshot) => {
   logger.info("settings reloaded", { logLevel: snapshot.config.logLevel });
   applyPlugins();
@@ -239,7 +265,7 @@ publishAppearanceChanges({ settings, bus });
 publishProjectChanges({ projects, bus });
 
 // Список проектов меняет набор корней: созданный проект приносит источник, архивированный уносит.
-projects.subscribe(() => applyPlugins());
+projects.subscribe(() => applyFileSources());
 
 // Наблюдатель ставится до первого обхода: правка, потерянная не успевшим встать наблюдателем, при
 // таком порядке всё равно попадает в первый снимок (runtime-checks.md, проверка 14).
@@ -248,6 +274,7 @@ armedRoots = pluginRoots()
   .map((root) => root.directory)
   .join("\n");
 const initialPluginApplication = applyPlugins();
+const initialStandaloneApplication = standaloneResources.start();
 
 // Поток подписывается на шину последним из подписчиков ядра, но нумерует всё, что придёт после:
 // события до его создания рассказывать некому — клиентов ещё нет.
@@ -290,7 +317,7 @@ const sessions = createSessionService({
   compactionThreshold: () => settings.current().config.compactionThreshold,
 });
 
-await Promise.all([initialPluginApplication, sessions.refresh()]);
+await Promise.all([initialPluginApplication, initialStandaloneApplication, sessions.refresh()]);
 
 pluginSessions.answer = createPluginSessions({ sessions }).answer;
 
@@ -360,6 +387,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.closeAllConnections();
     settings.close();
     pluginWatcher.close();
+    standaloneResources.close();
     loginSessions.stop();
     projectAvailability.stop();
     void sessions.close();
