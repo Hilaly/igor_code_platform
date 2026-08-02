@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { setTimeout as wait } from "node:timers/promises";
@@ -688,6 +689,45 @@ describe("createPluginSupervisor", () => {
       recorded.records.some((record) => record.message === "hello is up"),
       false,
     );
+  });
+
+  it("ignores contributions and activated from a worker stopped during activate", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+    const plugin = only("late-activation").plugins[0];
+    assert.ok(plugin !== undefined);
+    const release = join(plugin.directory, "src", "release");
+    rmSync(release, { force: true });
+
+    try {
+      await supervisor.apply(only("late-activation"), enabled("data:late-activation"));
+      await recorded.waitFor(
+        (record) => record.message === "late activation is waiting",
+        "activate waiting",
+      );
+
+      const disabling = supervisor.apply(only("late-activation"), disabled("data:late-activation"));
+      await recorded.waitFor(reachedState("data:late-activation", "stopping"), "stop started");
+      writeFileSync(release, "continue\n");
+      await disabling;
+
+      assert.equal(recorded.records.some(reachedState("data:late-activation", "running")), false);
+      assert.deepEqual(registry.pluginContributions(), []);
+      assert.equal(registry.revision(), 0);
+      assert.equal(
+        supervisor.statuses().find((status) => status.key === "data:late-activation")?.state,
+        "disabled",
+      );
+    } finally {
+      rmSync(release, { force: true });
+    }
   });
 
   it("runs plugin code written with non-erasable typescript", async () => {

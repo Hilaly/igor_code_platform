@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -122,6 +122,39 @@ describe("createPluginWatcher", () => {
     const change = await repeatUntilSeen(nextChange, () =>
       writeFileSync(join(references, "checklist.md"), `${Date.now()}\n`),
     );
+
+    assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
+    watcher.close();
+  });
+
+  it("reports an empty sibling directory created below a skill", async () => {
+    const root = freshRoot();
+    const skill = join(root, "hello", "skills", "review");
+    mkdirSync(skill, { recursive: true });
+    const { watcher, nextChange } = started(root);
+    let attempt = 0;
+
+    const change = await repeatUntilSeen(nextChange, () => {
+      attempt += 1;
+      mkdirSync(join(skill, `references-${attempt}`));
+    });
+
+    assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
+    watcher.close();
+  });
+
+  it("reports a resource file moved in with a preserved old timestamp", async () => {
+    const root = freshRoot();
+    const references = join(root, "hello", "skills", "review", "references");
+    mkdirSync(references, { recursive: true });
+    const source = join(root, "prepared-checklist.md");
+    writeFileSync(source, "prepared earlier\n");
+    const anHourAgo = new Date(Date.now() - 3_600_000);
+    utimesSync(source, anHourAgo, anHourAgo);
+    const { watcher, nextChange } = started(root);
+
+    renameSync(source, join(references, "checklist.md"));
+    const change = await nextChange();
 
     assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
     watcher.close();

@@ -127,6 +127,7 @@ type Supervised = {
   attempt: number;
   nextAttemptAt?: number;
   worker?: Worker;
+  stoppingWorker?: Worker;
   runningSince?: number;
   /** Вклады копятся до `activated` и применяются одним снимком (docs/ui-extension-model.md). */
   pending: PluginContribution[];
@@ -341,12 +342,25 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       ({ kind: "failed", reason: "this daemon answers no requests from plugins" }) as const);
 
   const handle = (entry: Supervised, worker: Worker, message: PluginOutgoing): void => {
+    // Listener старого worker может получить уже поставленное в очередь сообщение после того, как
+    // stop/reload обнулили текущий worker. Такое сообщение не принадлежит новой попытке lifecycle.
+    const current =
+      entry.worker === worker && (entry.state === "starting" || entry.state === "running");
+    const stopping = entry.stoppingWorker === worker && entry.state === "stopping";
+
+    if (!current && !(stopping && (message.kind === "log" || message.kind === "deactivated"))) {
+      return;
+    }
+
     switch (message.kind) {
       case "log":
         entry.logger[message.level](message.message, message.fields);
 
         return;
       case "contribute":
+        if (entry.state !== "starting") {
+          return;
+        }
         entry.pending.push(message.contribution);
 
         return;
@@ -399,6 +413,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         return;
       }
       case "activated":
+        if (entry.state !== "starting") {
+          return;
+        }
         entry.contributed = entry.pending;
         entry.fileResources = entry.plugin.fileResources;
         applyContributions(entry);
@@ -520,6 +537,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
     transition(entry, "stopping");
     entry.worker = undefined;
+    entry.stoppingWorker = worker;
 
     // Выгрузка ждёт `deactivate`, но не бесконечно: зависший плагин не имеет права держать
     // остановку демона (проверка 16).
@@ -564,6 +582,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     });
 
     await worker.terminate();
+    entry.stoppingWorker = undefined;
 
     dropContributions(entry, preserveSnapshot);
     entry.runningSince = undefined;

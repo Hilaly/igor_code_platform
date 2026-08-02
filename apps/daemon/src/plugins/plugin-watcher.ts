@@ -55,7 +55,7 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
   let debounceTimer: NodeJS.Timeout | undefined;
   let armedAt = 0;
 
-  const note = (root: PluginRoot, relative: string): void => {
+  const note = (root: PluginRoot, event: string, relative: string): void => {
     const segments = relative.split(sep).filter((segment) => segment.length > 0);
 
     if (segments.some((segment) => ignoredNames.has(segment))) {
@@ -63,19 +63,27 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
     }
 
     const first = segments[0];
+    const fileResourcesChanged = segments[1] === "agents" || segments[1] === "skills";
 
     // Первое событие после постановки наблюдателя приходит пачкой на всё поддерево — со всеми
     // папками и всеми давно лежащими файлами (проверка 17). Правкой считается только то, что
     // изменилось после постановки: папка сама по себе правкой не является, файл старше наблюдателя
     // — тоже. Исчезнувший путь считается правкой: так выглядит удаление.
-    const entry = statSync(join(root.directory, relative), { throwIfNoEntry: false });
-    const edited = entry === undefined || (!entry.isDirectory() && entry.mtimeMs >= armedAt);
+    const path = join(root.directory, relative);
+    const entry = statSync(path, { throwIfNoEntry: false });
+    const parent = statSync(join(path, ".."), { throwIfNoEntry: false });
+    const edited =
+      entry === undefined ||
+      (!entry.isDirectory() && entry.mtimeMs >= armedAt) ||
+      (fileResourcesChanged &&
+        (event === "change" ||
+          entry.mtimeMs >= armedAt ||
+          (parent !== undefined && parent.mtimeMs >= armedAt)));
 
     // Событие о самой папке плагина (создание, удаление, переименование) приходит с одним
     // сегментом — там менять нечего, переобнаружение покажет и появление, и исчезновение.
     if (first !== undefined && segments.length > 1 && edited) {
       const directory = join(root.directory, first);
-      const fileResourcesChanged = segments[1] === "agents" || segments[1] === "skills";
       changed.set(directory, changed.get(directory) === true || fileResourcesChanged);
     }
 
@@ -105,8 +113,8 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
       try {
         // Событие без имени возможно: тогда известно только, что в корне что-то было, и это
         // повод переобнаружить источник, а не перезагружать плагины.
-        const watcher = watch(root.directory, { recursive: true }, (_event, name) => {
-          note(root, typeof name === "string" ? name : "");
+        const watcher = watch(root.directory, { recursive: true }, (event, name) => {
+          note(root, event, typeof name === "string" ? name : "");
         });
 
         // Ошибка наблюдателя не глушится: без него плагины молча перестают перезагружаться.
