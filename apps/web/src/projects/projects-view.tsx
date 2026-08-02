@@ -145,6 +145,13 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   const [pickerError, setPickerError] = useState<string | undefined>(undefined);
   const ready = folder.trim() !== "" && name.trim() !== "";
 
+  const navigatePicker = (directory: string): void => {
+    setCwd(directory);
+    setValue("");
+    setEntries([]);
+    setPickerError(undefined);
+  };
+
   const submit = (): void => {
     if (!ready || busy) {
       return;
@@ -217,8 +224,7 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
 
           <Button
             onClick={() => {
-              setCwd("/");
-              setValue("");
+              navigatePicker("/");
               setPickerOpen(true);
             }}
             disabled={busy}
@@ -240,9 +246,9 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
         open={pickerOpen}
         cwd={cwd}
         value={value}
-        entries={entries}
+        entries={entries.filter((entry) => entry.kind === "directory")}
         error={pickerError}
-        onNavigate={setCwd}
+        onNavigate={navigatePicker}
         onValueChange={setValue}
         onSelect={(path) => {
           // Выбранный путь — в то же поле, что и ручной ввод; `normalizeProjectPath` раскроет `~` и

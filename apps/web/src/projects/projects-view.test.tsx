@@ -273,6 +273,64 @@ describe("ProjectsView", () => {
     }
   });
 
+  it("shows only directories in the project folder picker", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          path: "/",
+          entries: [
+            { name: "code", kind: "directory" },
+            { name: "readme.md", kind: "file" },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    try {
+      show(withProjects([]));
+      fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "code" })).toBeDefined());
+
+      expect(screen.queryByRole("button", { name: "readme.md" })).toBeNull();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it("drops the previous directory entries while the next listing is loading", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const path = new URL(url, "http://localhost").searchParams.get("path");
+
+      if (path === "/") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ path: "/", entries: [{ name: "code", kind: "directory" }] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+
+      // Второй листинг намеренно не приходит: проверяем промежуточный кадр сразу после перехода.
+      return new Promise<Response>(() => undefined);
+    });
+
+    try {
+      show(withProjects([]));
+      fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
+      const code = await screen.findByRole("button", { name: "code" });
+
+      fireEvent.doubleClick(code);
+
+      expect(screen.getByText("/code")).toBeDefined();
+      expect(screen.queryByRole("button", { name: "code" })).toBeNull();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it("keeps the create button locked until both fields say something", () => {
     show(withProjects([]));
 
