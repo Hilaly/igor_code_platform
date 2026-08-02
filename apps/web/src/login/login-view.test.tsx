@@ -4,7 +4,7 @@
  * Первый тест вью на настоящем DOM (docs/backlog.md, срез 7 в docs/roadmap.md). Форма входа выбрана
  * первой не случайно: её поведение целиком в связях, которых не видно ни в разметке первого кадра,
  * ни глазами — какое поле получило фокус, какая жалоба к какому полю относится, что кнопка заперта
- * до годного пароля и что `Enter` отправляет форму, хотя кнопка кита не `type="submit"`.
+ * до годного пароля и что сабмит формы отправляет её, хотя кнопка кита не `type="submit"`.
  *
  * Тесты нашли сами себя: первая версия требовала минимальной длины и на входе, а `credentials.ts`
  * проверяет её только при регистрации — и правильно делает, иначе правило, поднятое после того, как
@@ -92,12 +92,14 @@ describe("LoginView", () => {
     expect(submitButton().disabled).toBe(false);
   });
 
-  it("submits on Enter, though the kit button is never type=submit", () => {
+  it("submits the form on submit, though the kit button is never type=submit", () => {
+    // Раньше Enter ловил `onKeyDown` на поле; теперь — сама форма (`Form`). Проверять надо сабмит
+    // формы, а не синтетический KeyDown: именно так Enter в поле доходит до обработчика в браузере.
     const { onSubmit } = show();
     const field = passwords()[0] as HTMLInputElement;
 
     type(field, long);
-    fireEvent.keyDown(field, { key: "Enter" });
+    fireEvent.submit(field.form!);
 
     expect(onSubmit).toHaveBeenCalledWith(long);
   });
@@ -107,8 +109,7 @@ describe("LoginView", () => {
     const field = passwords()[0] as HTMLInputElement;
 
     type(field, "short");
-    fireEvent.keyDown(field, { key: "Enter" });
-    fireEvent.click(submitButton());
+    fireEvent.submit(field.form!);
 
     expect(onSubmit).not.toHaveBeenCalled();
   });

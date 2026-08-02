@@ -16,6 +16,7 @@ import {
   EmptyState,
   Field,
   FilePicker,
+  Form,
   Heading,
   Input,
   List,
@@ -188,67 +189,52 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
 
   return (
     <Panel title={t("projects.new.title")}>
-      <div className="projects-new">
-        <Text tone="muted">{t("projects.new.hint")}</Text>
+      {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
+          больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
+      <Form onSubmit={submit} disabled={busy || !ready}>
+        <div className="projects-new">
+          <Text tone="muted">{t("projects.new.hint")}</Text>
 
-        {conflict === undefined ? undefined : (
-          <Notice tone="warning" title={t("projects.conflict.title")}>
-            {t("projects.conflict.hint", { name: conflict.project.name })}
-          </Notice>
-        )}
-
-        <Field label={t("projects.field.folder")} hint={t("projects.field.folder.hint")}>
-          {(control) => (
-            <Input
-              {...control}
-              value={folder}
-              onChange={(value) => {
-                onDismissComplaints();
-                setFolder(value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-              disabled={busy}
-            />
+          {conflict === undefined ? undefined : (
+            <Notice tone="warning" title={t("projects.conflict.title")}>
+              {t("projects.conflict.hint", { name: conflict.project.name })}
+            </Notice>
           )}
-        </Field>
 
-        <Button
-          onClick={() => {
-            setCwd("/");
-            setValue("");
-            setPickerOpen(true);
-          }}
-          disabled={busy}
-        >
-          {t("projects.field.folder.browse")}
-        </Button>
+          <Field label={t("projects.field.folder")} hint={t("projects.field.folder.hint")}>
+            {(control) => (
+              <Input
+                {...control}
+                value={folder}
+                onChange={(value) => {
+                  onDismissComplaints();
+                  setFolder(value);
+                }}
+                disabled={busy}
+              />
+            )}
+          </Field>
 
-        <Field label={t("projects.field.name")}>
-          {(control) => (
-            <Input
-              {...control}
-              value={name}
-              onChange={setName}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-              disabled={busy}
-            />
-          )}
-        </Field>
+          <Button
+            onClick={() => {
+              setCwd("/");
+              setValue("");
+              setPickerOpen(true);
+            }}
+            disabled={busy}
+          >
+            {t("projects.field.folder.browse")}
+          </Button>
 
-        <Button tone="accent" onClick={submit} disabled={!ready} busy={busy}>
-          {t("projects.new.submit")}
-        </Button>
-      </div>
+          <Field label={t("projects.field.name")}>
+            {(control) => <Input {...control} value={name} onChange={setName} disabled={busy} />}
+          </Field>
+
+          <Button tone="accent" onClick={submit} disabled={!ready} busy={busy}>
+            {t("projects.new.submit")}
+          </Button>
+        </div>
+      </Form>
 
       <FilePicker
         open={pickerOpen}

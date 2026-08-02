@@ -15,6 +15,7 @@ import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { FilePicker } from "./file-picker.tsx";
+import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
@@ -144,6 +145,19 @@ describe("markup of the ported primitives", () => {
         />,
       ),
     ).toBe("");
+  });
+
+  it("form renders its children and stays put without an undefined leak", () => {
+    // Форма — тонкая обёртка над `<form>`, и проверять в ней особенно нечего: ни состояний, ни ARIA.
+    // Полезно одно — что класс модуля не оказался `undefined` и дети доехали как есть.
+    const markup = renderToStaticMarkup(
+      <Form onSubmit={() => {}}>
+        <span>поле</span>
+      </Form>,
+    );
+
+    expect(markup).not.toContain("undefined");
+    expect(markup).toContain("поле");
   });
 
   it("file picker stays out of the markup without a document too", () => {

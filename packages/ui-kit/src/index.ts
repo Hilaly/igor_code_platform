@@ -24,6 +24,7 @@ export * from "./components/dialog.tsx";
 export * from "./components/disclosure.tsx";
 export * from "./components/field.tsx";
 export * from "./components/file-picker.tsx";
+export * from "./components/form.tsx";
 export * from "./components/icon.tsx";
 export * from "./components/input.tsx";
 export * from "./components/link.tsx";

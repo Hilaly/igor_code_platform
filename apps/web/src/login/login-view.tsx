@@ -11,6 +11,7 @@ import { minimumPasswordLength } from "@sovereign/protocol";
 import {
   Button,
   Field,
+  Form,
   Heading,
   Input,
   Notice,
@@ -63,79 +64,70 @@ export function LoginView({
     onSubmit(password);
   };
 
-  const submitOnEnter = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    // Кнопка кита всегда `type="button"`, поэтому неявной отправки формы браузером здесь не будет.
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submit();
-    }
-  };
-
   return (
     <main className="login">
-      <form
-        className="login-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <Panel>
-          <div className="login-body">
-            <Heading level={1}>
-              {t(registering ? "login.registration.title" : "login.title")}
-            </Heading>
-            <Text tone="muted">{t(registering ? "login.registration.hint" : "login.hint")}</Text>
+      <Form onSubmit={submit} disabled={check.kind !== "ready" || busy}>
+        {/* Раскладку держит внутренний контейнер: кит-`Form` не принимает `className`, а её
+            `display: contents` вынимает форму из потока. Кнопка кита всегда `type="button"`, поэтому
+            сабмит идёт только через Enter (его ловит форма) и через явный `onClick`. */}
+        <div className="login-form">
+          <Panel>
+            <div className="login-body">
+              <Heading level={1}>
+                {t(registering ? "login.registration.title" : "login.title")}
+              </Heading>
+              <Text tone="muted">{t(registering ? "login.registration.hint" : "login.hint")}</Text>
 
-            {expired ? <Notice tone="warning" title={t("login.expired")} /> : undefined}
-            {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
+              {expired ? <Notice tone="warning" title={t("login.expired")} /> : undefined}
+              {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
 
-            <Field
-              label={t("login.password")}
-              error={problemOf(check, "too-short", translator)}
-              hint={
-                registering ? t("login.password.hint", { count: minimumPasswordLength }) : undefined
-              }
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  ref={field}
-                  type="password"
-                  autoComplete={registering ? "new-password" : "current-password"}
-                  value={password}
-                  onChange={setPassword}
-                  onKeyDown={submitOnEnter}
-                  disabled={busy}
-                />
-              )}
-            </Field>
-
-            {registering ? (
               <Field
-                label={t("login.confirmation")}
-                error={problemOf(check, "mismatch", translator)}
+                label={t("login.password")}
+                error={problemOf(check, "too-short", translator)}
+                hint={
+                  registering
+                    ? t("login.password.hint", { count: minimumPasswordLength })
+                    : undefined
+                }
               >
                 {(control) => (
                   <Input
                     {...control}
+                    ref={field}
                     type="password"
-                    autoComplete="new-password"
-                    value={confirmation}
-                    onChange={setConfirmation}
-                    onKeyDown={submitOnEnter}
+                    autoComplete={registering ? "new-password" : "current-password"}
+                    value={password}
+                    onChange={setPassword}
                     disabled={busy}
                   />
                 )}
               </Field>
-            ) : undefined}
 
-            <Button tone="accent" onClick={submit} disabled={check.kind !== "ready"} busy={busy}>
-              {t(registering ? "login.registration.submit" : "login.submit")}
-            </Button>
-          </div>
-        </Panel>
-      </form>
+              {registering ? (
+                <Field
+                  label={t("login.confirmation")}
+                  error={problemOf(check, "mismatch", translator)}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmation}
+                      onChange={setConfirmation}
+                      disabled={busy}
+                    />
+                  )}
+                </Field>
+              ) : undefined}
+
+              <Button tone="accent" onClick={submit} disabled={check.kind !== "ready"} busy={busy}>
+                {t(registering ? "login.registration.submit" : "login.submit")}
+              </Button>
+            </div>
+          </Panel>
+        </div>
+      </Form>
     </main>
   );
 }

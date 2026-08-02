@@ -15,6 +15,7 @@ import {
   Button,
   Code,
   Field,
+  Form,
   Input,
   Link,
   Notice,
@@ -220,48 +221,47 @@ function LoginPromptForm({ prompt, onAnswer, translator }: LoginPromptFormProps)
         : undefined;
 
   return (
-    <form
-      className="providers-login-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onAnswer(prompt.stepId, value);
-      }}
-    >
-      {/* Выбор идёт без `Field`: обвязка связывает метку с контролом по `id`, а `Select`
-          идентификатора не принимает — связь получилась бы висячей. Подпись он рисует свою. */}
-      {prompt.kind === "select" ? (
-        <Select
-          value={value}
-          options={prompt.options.map((option) => ({
-            value: option.id,
-            label:
-              option.description === undefined
-                ? option.label
-                : `${option.label} — ${option.description}`,
-          }))}
-          onChange={setValue}
-          label={prompt.message}
-          placeholder={t("common.choose")}
-        />
-      ) : (
-        <Field label={prompt.message} hint={hint}>
-          {(control) => (
-            <Input
-              value={value}
-              onChange={setValue}
-              // Секрет не показывается ни при вводе, ни через плечо: это ключ API.
-              type={prompt.kind === "secret" ? "password" : "text"}
-              placeholder={prompt.placeholder}
-              id={control.id}
-              describedBy={control.describedBy}
-            />
-          )}
-        </Field>
-      )}
+    <Form onSubmit={() => onAnswer(prompt.stepId, value)}>
+      {/* Раскладка на внутреннем контейнере, а не на самой форме: кит-`Form` не принимает
+          `className` (имена модулей хешируются), и `display: contents` формы всё равно вынимает её
+          из потока. Внутренний `div` держит столбик «поле, потом кнопка». */}
+      <div className="providers-login-form">
+        {/* Выбор идёт без `Field`: обвязка связывает метку с контролом по `id`, а `Select`
+            идентификатора не принимает — связь получилась бы висячей. Подпись он рисует свою. */}
+        {prompt.kind === "select" ? (
+          <Select
+            value={value}
+            options={prompt.options.map((option) => ({
+              value: option.id,
+              label:
+                option.description === undefined
+                  ? option.label
+                  : `${option.label} — ${option.description}`,
+            }))}
+            onChange={setValue}
+            label={prompt.message}
+            placeholder={t("common.choose")}
+          />
+        ) : (
+          <Field label={prompt.message} hint={hint}>
+            {(control) => (
+              <Input
+                value={value}
+                onChange={setValue}
+                // Секрет не показывается ни при вводе, ни через плечо: это ключ API.
+                type={prompt.kind === "secret" ? "password" : "text"}
+                placeholder={prompt.placeholder}
+                id={control.id}
+                describedBy={control.describedBy}
+              />
+            )}
+          </Field>
+        )}
 
-      <Button tone="accent" onClick={() => onAnswer(prompt.stepId, value)}>
-        {t("providers.login.answer")}
-      </Button>
-    </form>
+        <Button tone="accent" onClick={() => onAnswer(prompt.stepId, value)}>
+          {t("providers.login.answer")}
+        </Button>
+      </div>
+    </Form>
   );
 }
