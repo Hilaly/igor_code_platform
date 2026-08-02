@@ -1,0 +1,11 @@
+{
+  "name": "file-resource-conflict",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "file-resource-conflict",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

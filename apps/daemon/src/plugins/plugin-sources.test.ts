@@ -76,6 +76,46 @@ describe("discoverPlugins", () => {
     assert.equal(discovery.refused.length, 0);
   });
 
+  it("discovers agents and skills only inside each plugin directory", () => {
+    const root = freshRoot();
+    const directory = writePluginFolder(root, "file-resources");
+    mkdirSync(join(directory, "agents", "helper"), { recursive: true });
+    mkdirSync(join(directory, "skills", "review"), { recursive: true });
+    writeFileSync(
+      join(directory, "agents", "helper", "AGENT.md"),
+      "---\nname: helper\ndescription: Helps with work\n---\n\nHelp carefully.\n",
+    );
+    writeFileSync(
+      join(directory, "skills", "review", "SKILL.md"),
+      "---\nname: review\ndescription: Reviews work\n---\n\nReview carefully.\n",
+    );
+
+    const plugin = discoverPlugins([{ source: "data", directory: root }]).plugins[0];
+
+    assert.ok(plugin !== undefined);
+    assert.deepEqual(
+      plugin.fileResources.definitions.map(({ kind, name, entryPath }) => ({
+        kind,
+        name,
+        entryPath,
+      })),
+      [
+        {
+          kind: "agent",
+          name: "helper",
+          entryPath: join(directory, "agents", "helper", "AGENT.md"),
+        },
+        {
+          kind: "skill",
+          name: "review",
+          entryPath: join(directory, "skills", "review", "SKILL.md"),
+        },
+      ],
+    );
+    assert.deepEqual(plugin.fileResources.invalid, []);
+    assert.deepEqual(plugin.fileResources.watchPaths, [directory]);
+  });
+
   it("takes a missing root as an empty one", () => {
     const discovery = discoverPlugins([
       { source: "builtin", directory: join(workspace, "never-created") },
@@ -179,6 +219,13 @@ describe("defaultPluginRoots", () => {
     assert.deepEqual(
       discovery.plugins.map((plugin) => plugin.key),
       ["builtin:base-agent"],
+    );
+    assert.deepEqual(
+      discovery.plugins[0]?.fileResources.definitions.map((definition) => [
+        definition.kind,
+        definition.name,
+      ]),
+      [["agent", "agent"]],
     );
     assert.deepEqual(discovery.refused, []);
   });

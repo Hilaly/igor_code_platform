@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { createLogger, type Logger } from "../platform/public.ts";
-import { createPluginWatcher, type PluginWatcher } from "./plugin-watcher.ts";
+import {
+  createPluginWatcher,
+  type ChangedPluginDirectory,
+  type PluginWatcher,
+} from "./plugin-watcher.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-plugin-watcher-"));
 const opened: PluginWatcher[] = [];
@@ -41,12 +45,12 @@ function freshRoot(): string {
 type Started = {
   watcher: PluginWatcher;
   /** Ждёт вызова onChange; отсутствие вызова — тоже результат, поэтому таймаут отдельный. */
-  nextChange: (timeoutMilliseconds?: number) => Promise<string[] | undefined>;
+  nextChange: (timeoutMilliseconds?: number) => Promise<ChangedPluginDirectory[] | undefined>;
 };
 
 function started(root: string): Started {
-  const pending: string[][] = [];
-  let waiter: ((directories: string[]) => void) | undefined;
+  const pending: ChangedPluginDirectory[][] = [];
+  let waiter: ((directories: ChangedPluginDirectory[]) => void) | undefined;
 
   const watcher = createPluginWatcher({
     roots: [{ source: "data", directory: root }],
@@ -104,8 +108,22 @@ describe("createPluginWatcher", () => {
       writeFileSync(join(root, "hello", "src", "worker.ts"), "export function activate() {}\n"),
     );
 
-    assert.deepEqual(change, [join(root, "hello")]);
+    assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: false }]);
 
+    watcher.close();
+  });
+
+  it("classifies changes anywhere below agents and skills as file-resource changes", async () => {
+    const root = freshRoot();
+    const references = join(root, "hello", "skills", "review", "references");
+    mkdirSync(references, { recursive: true });
+    const { watcher, nextChange } = started(root);
+
+    const change = await repeatUntilSeen(nextChange, () =>
+      writeFileSync(join(references, "checklist.md"), `${Date.now()}\n`),
+    );
+
+    assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
     watcher.close();
   });
 
@@ -172,7 +190,7 @@ describe("createPluginWatcher", () => {
 async function repeatUntilSeen(
   nextChange: Started["nextChange"],
   write: () => void,
-): Promise<string[]> {
+): Promise<ChangedPluginDirectory[]> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     write();
 

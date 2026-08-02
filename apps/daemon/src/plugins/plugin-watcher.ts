@@ -31,8 +31,13 @@ export type CreatePluginWatcherOptions = {
   roots: PluginRoot[];
   logger: Logger;
   /** Папки плагинов, в которых что-то изменилось. Пустой набор значит «изменился сам корень». */
-  onChange: (changedDirectories: string[]) => void;
+  onChange: (changedDirectories: ChangedPluginDirectory[]) => void;
   debounceMilliseconds?: number;
+};
+
+export type ChangedPluginDirectory = {
+  directory: string;
+  fileResourcesChanged: boolean;
 };
 
 /** Крупнее, чем у настроек: редактор пишет пачкой, а перезапуск плагина дороже перечитывания файла. */
@@ -45,7 +50,7 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
   const debounceMilliseconds = options.debounceMilliseconds ?? defaultDebounceMilliseconds;
 
   const watchers: FSWatcher[] = [];
-  const changed = new Set<string>();
+  const changed = new Map<string, boolean>();
 
   let debounceTimer: NodeJS.Timeout | undefined;
   let armedAt = 0;
@@ -69,7 +74,9 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
     // Событие о самой папке плагина (создание, удаление, переименование) приходит с одним
     // сегментом — там менять нечего, переобнаружение покажет и появление, и исчезновение.
     if (first !== undefined && segments.length > 1 && edited) {
-      changed.add(join(root.directory, first));
+      const directory = join(root.directory, first);
+      const fileResourcesChanged = segments[1] === "agents" || segments[1] === "skills";
+      changed.set(directory, changed.get(directory) === true || fileResourcesChanged);
     }
 
     if (debounceTimer !== undefined) {
@@ -77,7 +84,10 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
     }
 
     debounceTimer = setTimeout(() => {
-      const directories = [...changed];
+      const directories = [...changed].map(([directory, fileResourcesChanged]) => ({
+        directory,
+        fileResourcesChanged,
+      }));
       changed.clear();
       debounceTimer = undefined;
 

@@ -31,6 +31,7 @@ import {
   createPluginSessions,
   createPluginSupervisor,
   createPluginWatcher,
+  type ChangedPluginDirectory,
   defaultPluginRoots,
   discoverPlugins,
   isSessionRequest,
@@ -202,7 +203,7 @@ const pluginWatcher = createPluginWatcher({
 let applying = Promise.resolve();
 let armedRoots = "";
 
-const applyPlugins = (changedDirectories: string[] = []): Promise<void> => {
+const applyPlugins = (changedDirectories: ChangedPluginDirectory[] = []): Promise<void> => {
   applying = applying
     .then(async () => {
       const roots = pluginRoots();

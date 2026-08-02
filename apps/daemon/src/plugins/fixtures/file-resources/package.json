@@ -1,0 +1,11 @@
+{
+  "name": "file-resources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "file-resources",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

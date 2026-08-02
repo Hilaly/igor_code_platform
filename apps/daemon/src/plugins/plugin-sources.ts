@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   manifestFileName,
@@ -17,7 +17,11 @@ import {
   type PluginManifest,
   type PluginSource,
   type ProjectAvailability,
+  type FileResourceDiagnostic,
 } from "@sovereign/protocol";
+
+import { discoverFileResources } from "./file-resource-discovery.ts";
+import type { FileResourceDefinition } from "./file-resource-parser.ts";
 
 export type PluginRoot = {
   source: PluginSource;
@@ -33,7 +37,25 @@ export type DiscoveredPlugin = {
   manifest: PluginManifest;
   /** Абсолютный путь к воркерной точке входа: он уже проверен на существование. */
   workerEntry: string;
+  fileResources: DiscoveredPluginFileResources;
   diagnostics: string[];
+};
+
+export type DiscoveredPluginFileResourceDefinition = FileResourceDefinition & {
+  entryPath: string;
+  diagnostics: FileResourceDiagnostic[];
+};
+
+export type DiscoveredPluginInvalidFileResource = {
+  kind: FileResourceDefinition["kind"];
+  entryPath: string;
+  diagnostics: FileResourceDiagnostic[];
+};
+
+export type DiscoveredPluginFileResources = {
+  definitions: DiscoveredPluginFileResourceDefinition[];
+  invalid: DiscoveredPluginInvalidFileResource[];
+  watchPaths: string[];
 };
 
 /** Плагин объявлен, но взять его нельзя — и это не решение человека (docs/plugins.md). */
@@ -156,6 +178,12 @@ export function discoverPlugins(roots: PluginRoot[]): PluginDiscovery {
   return { plugins, refused };
 }
 
+export function rediscoverPlugin(plugin: DiscoveredPlugin): DiscoveredPlugin | undefined {
+  return discoverPlugins([
+    { source: plugin.source, directory: dirname(plugin.directory) },
+  ]).plugins.find((candidate) => candidate.directory === plugin.directory);
+}
+
 function pluginDirectories(root: string): string[] {
   let entries;
 
@@ -231,6 +259,8 @@ function readPluginFolder(
     };
   }
 
+  const fileResources = discoverPluginFileResources(directory);
+
   return {
     key: pluginKey(source, manifest.id),
     source,
@@ -238,8 +268,34 @@ function readPluginFolder(
     directory,
     manifest,
     workerEntry,
+    fileResources,
     diagnostics: result.diagnostics,
   };
+}
+
+function discoverPluginFileResources(directory: string): DiscoveredPluginFileResources {
+  const definitions: DiscoveredPluginFileResourceDefinition[] = [];
+  const invalid: DiscoveredPluginInvalidFileResource[] = [];
+
+  for (const kind of ["agent", "skill"] as const) {
+    for (const resource of discoverFileResources({ kind, root: join(directory, `${kind}s`) })) {
+      if (resource.parsed.kind === "valid") {
+        definitions.push({
+          ...resource.parsed.definition,
+          entryPath: resource.entryPath,
+          diagnostics: resource.parsed.diagnostics,
+        });
+      } else {
+        invalid.push({
+          kind,
+          entryPath: resource.entryPath,
+          diagnostics: resource.parsed.diagnostics,
+        });
+      }
+    }
+  }
+
+  return { definitions, invalid, watchPaths: [directory] };
 }
 
 /** Причина недоступности здесь не важна: и «нет», и «не читается» одинаково значат «точки входа нет». */

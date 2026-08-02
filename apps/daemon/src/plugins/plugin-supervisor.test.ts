@@ -394,7 +394,9 @@ describe("createPluginSupervisor", () => {
     await recorded.waitFor(reachedState("data:subscriber", "running"), "subscriber running");
     assert.equal(await deliverOnce("the first delivery"), 1);
 
-    await supervisor.reload([join(fixtures, "subscriber")]);
+    await supervisor.reload([
+      { directory: join(fixtures, "subscriber"), fileResourcesChanged: false },
+    ]);
     await recorded.waitFor(
       (record) =>
         record.message === "plugin lifecycle" &&
@@ -594,7 +596,7 @@ describe("createPluginSupervisor", () => {
     assert.equal(changes(), 1);
 
     // Перезагрузка — это выгрузка и возврат: провайдер уходит и регистрируется заново в `activate`.
-    await supervisor.reload([vendor.directory]);
+    await supervisor.reload([{ directory: vendor.directory, fileResourcesChanged: false }]);
     await recorded.waitFor(
       (record) =>
         recorded.records.filter((seen) => seen.message === "provider-vendor registered a provider")
@@ -724,6 +726,77 @@ describe("createPluginSupervisor", () => {
       registry.resolved().map((registration) => [registration.id, registration.pluginKey]),
       [["hello.board", "data:hello"]],
     );
+  });
+
+  it("publishes file and programmatic contributions atomically after activation", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("file-resources"), enabled("data:file-resources"));
+    assert.deepEqual(registry.pluginContributions(), []);
+    await recorded.waitFor(
+      reachedState("data:file-resources", "running"),
+      "file-resources running",
+    );
+
+    const registrations = registry.pluginContributions();
+    assert.deepEqual(
+      registrations.map((registration) => [registration.kind, registration.id]),
+      [
+        ["agent", "file-resources.helper"],
+        ["custom", "file-resources.board"],
+        ["skill", "file-resources.review"],
+      ],
+    );
+    assert.equal(registry.revision(), 1);
+
+    const status = supervisor.statuses().find((entry) => entry.key === "data:file-resources");
+    assert.match(status?.contributionProblems?.[0] ?? "", /agents\/broken\/AGENT\.md/);
+    assert.match(status?.contributionProblems?.[0] ?? "", /description is required/);
+    const resources = registry.fileResourcesForProject("any");
+    assert.equal(
+      resources.resources.some(
+        (resource) => resource.state === "invalid" && resource.path.endsWith("broken/AGENT.md"),
+      ),
+      true,
+    );
+  });
+
+  it("excludes only a file/programmatic duplicate from the plugin snapshot", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("file-resource-conflict"), enabled("data:file-resource-conflict"));
+    await recorded.waitFor(
+      reachedState("data:file-resource-conflict", "running"),
+      "file-resource-conflict running",
+    );
+
+    assert.deepEqual(
+      registry.pluginContributions().map((registration) => registration.id),
+      ["file-resource-conflict.board"],
+    );
+    const status = supervisor
+      .statuses()
+      .find((entry) => entry.key === "data:file-resource-conflict");
+    assert.match(status?.contributionProblems?.[0] ?? "", /declared 2 times/);
+    const resources = registry.fileResourcesForProject("any");
+    assert.equal(resources.resources[0]?.path.endsWith("agents/agent/AGENT.md"), true);
+    assert.match(resources.diagnostics[0]?.message ?? "", /also declared programmatically/);
   });
 
   it("carries the rejected contribution as a reason on the status of a running plugin", async () => {
@@ -1174,8 +1247,9 @@ describe("createPluginSupervisor", () => {
 
     await supervisor.apply(only("hello"), enabled("data:hello"));
     await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+    const beforeReload = registry.revision();
 
-    await supervisor.reload([hello.directory]);
+    await supervisor.reload([{ directory: hello.directory, fileResourcesChanged: false }]);
     await recorded.waitFor(reachedState("data:hello", "stopped"), "hello stopped for the reload");
     await recorded.waitFor(
       (record) =>
@@ -1192,6 +1266,35 @@ describe("createPluginSupervisor", () => {
       registry.resolved().map((registration) => registration.id),
       ["hello.board"],
     );
+    assert.equal(registry.revision(), beforeReload);
+  });
+
+  it("bumps the contribution revision once for a sibling file-resource change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+    const plugin = only("file-resources").plugins[0];
+    assert.ok(plugin !== undefined);
+
+    await supervisor.apply(only("file-resources"), enabled("data:file-resources"));
+    await recorded.waitFor(reachedState("data:file-resources", "running"), "first activation");
+    const beforeReload = registry.revision();
+
+    await supervisor.reload([{ directory: plugin.directory, fileResourcesChanged: true }]);
+    await recorded.waitFor(
+      (record) =>
+        recorded.records.filter(reachedState("data:file-resources", "running")).length === 2 &&
+        record.message === "plugin lifecycle",
+      "second activation",
+    );
+
+    assert.equal(registry.revision(), beforeReload + 1);
   });
 
   it("leaves a plugin nobody enabled alone when its sources change", async () => {
@@ -1209,7 +1312,7 @@ describe("createPluginSupervisor", () => {
     assert.ok(hello !== undefined);
 
     await supervisor.apply(only("hello"), disabled("data:hello"));
-    await supervisor.reload([hello.directory]);
+    await supervisor.reload([{ directory: hello.directory, fileResourcesChanged: false }]);
 
     assert.equal(
       recorded.records.some((record) => record.message === "hello is up"),

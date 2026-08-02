@@ -15,5 +15,5 @@ export {
   type PluginRoot,
 } from "./plugin-sources.ts";
 export { createPluginSupervisor } from "./plugin-supervisor.ts";
-export { createPluginWatcher } from "./plugin-watcher.ts";
+export { createPluginWatcher, type ChangedPluginDirectory } from "./plugin-watcher.ts";
 export { pluginsRoute } from "./plugins-snapshot.ts";
