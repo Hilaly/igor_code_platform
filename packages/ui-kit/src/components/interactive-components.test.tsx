@@ -7,6 +7,7 @@ import { Combobox } from "./combobox.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
 import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
+import { Menu } from "./menu.tsx";
 import { Popover } from "./popover.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
@@ -26,6 +27,23 @@ const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it("renders a compact menu popup in the document body", () => {
+    render(
+      <Menu
+        label="Действия"
+        trigger="…"
+        triggerLabel="Действия проекта"
+        compact
+        items={[{ id: "rename", label: "Переименовать", onSelect: () => {} }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Действия проекта" }));
+
+    const menu = screen.getByRole("menu", { name: "Действия" });
+    expect(menu.parentElement).toBe(document.body);
+  });
+
   it("lets a controlled picker render its own trigger and popup role through Popover", () => {
     const onOpenChange = vi.fn();
     render(
