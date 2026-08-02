@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+  type Stats,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -30,13 +40,17 @@ function root(directory: string, key = "data:agents"): StandaloneResourceRoot {
   };
 }
 
-function started(roots: StandaloneResourceRoot[]) {
+function started(
+  roots: StandaloneResourceRoot[],
+  inspectPath?: (path: string) => Stats | undefined,
+) {
   const pending: number[] = [];
   let waiter: (() => void) | undefined;
   const watcher = createFileResourceWatcher({
     roots,
     logger,
     debounceMilliseconds: 20,
+    ...(inspectPath === undefined ? {} : { inspectPath }),
     onChange: () => {
       if (waiter === undefined) pending.push(1);
       else {
@@ -104,6 +118,47 @@ describe("createFileResourceWatcher", () => {
     await repeatUntilSeen(nextChange, () => writeFileSync(entry, `changed ${Date.now()}\n`));
     await repeatUntilSeen(nextChange, () => writeFileSync(sibling, `sibling ${Date.now()}\n`));
     await repeatUntilSeen(nextChange, () => rmSync(entry, { force: true }));
+    watcher.close();
+  });
+
+  it("reports an old definition tree moved into an existing root", async () => {
+    const directory = join(workspace, `moved-root-${sequence++}`);
+    const prepared = join(workspace, `prepared-${sequence++}`);
+    mkdirSync(directory);
+    mkdirSync(join(prepared, "references"), { recursive: true });
+    writeFileSync(join(prepared, "AGENT.md"), "old definition\n");
+    writeFileSync(join(prepared, "references", "guide.md"), "old resource\n");
+    const anHourAgo = new Date(Date.now() - 3_600_000);
+    utimesSync(join(prepared, "AGENT.md"), anHourAgo, anHourAgo);
+    utimesSync(join(prepared, "references", "guide.md"), anHourAgo, anHourAgo);
+    utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
+    utimesSync(prepared, anHourAgo, anHourAgo);
+    const { watcher, nextChange } = started([root(directory)]);
+
+    renameSync(prepared, join(directory, "moved"));
+
+    assert.equal(await nextChange(1_000), true);
+    watcher.close();
+  });
+
+  it("rescans when filesystem inspection races with a watcher callback", async () => {
+    const directory = join(workspace, `inspection-race-${sequence++}`);
+    mkdirSync(directory);
+    let inspections = 0;
+    const { watcher, nextChange } = started([root(directory)], (path) => {
+      inspections += 1;
+      if (inspections > 1) {
+        const cause = new Error("the path became unreadable") as NodeJS.ErrnoException;
+        cause.code = "EACCES";
+        throw cause;
+      }
+      return lstatSync(path, { throwIfNoEntry: false });
+    });
+
+    writeFileSync(join(directory, "raced.md"), "changed\n");
+
+    assert.equal(await nextChange(1_000), true);
+    assert.ok(inspections > 1);
     watcher.close();
   });
 

@@ -1,4 +1,4 @@
-import { lstatSync, watch, type FSWatcher } from "node:fs";
+import { lstatSync, watch, type FSWatcher, type Stats } from "node:fs";
 import { basename, dirname, join, parse, relative, sep } from "node:path";
 
 import type { Logger } from "../platform/public.ts";
@@ -15,6 +15,7 @@ export type CreateFileResourceWatcherOptions = {
   logger: Logger;
   onChange: () => void;
   debounceMilliseconds?: number;
+  inspectPath?: (path: string) => Stats | undefined;
 };
 
 const defaultDebounceMilliseconds = 75;
@@ -29,6 +30,8 @@ export function createFileResourceWatcher(
   let timer: NodeJS.Timeout | undefined;
   const watchers: FSWatcher[] = [];
   const debounceMilliseconds = options.debounceMilliseconds ?? defaultDebounceMilliseconds;
+  const inspectPath =
+    options.inspectPath ?? ((path: string) => lstatSync(path, { throwIfNoEntry: false }));
 
   const disarm = (): void => {
     generation += 1;
@@ -71,19 +74,26 @@ export function createFileResourceWatcher(
   };
 
   const armRoot = (root: StandaloneResourceRoot): void => {
-    const armedAt = Date.now();
-    const rootStat = lstatSync(root.directory, { throwIfNoEntry: false });
+    const rootStat = inspectPath(root.directory);
     if (rootStat?.isDirectory() === true && !rootStat.isSymbolicLink()) {
-      watchDirectory(root.directory, true, generation, (event, name) => {
+      watchDirectory(root.directory, true, generation, (_event, name) => {
         if (name === "" || name === ".") return false;
-        if (name === basename(root.directory)) {
-          const namedChild = lstatSync(join(root.directory, name), { throwIfNoEntry: false });
-          if (namedChild === undefined) {
-            return lstatSync(root.directory, { throwIfNoEntry: false }) === undefined;
+        try {
+          if (name === basename(root.directory)) {
+            const namedChild = inspectPath(join(root.directory, name));
+            if (namedChild === undefined) {
+              return inspectPath(root.directory) === undefined;
+            }
           }
+          inspectPath(join(root.directory, name));
+        } catch (cause) {
+          options.logger.error("inspecting a standalone file resource change failed", {
+            directory: root.directory,
+            path: join(root.directory, name),
+            reason: cause instanceof Error ? cause.message : String(cause),
+          });
         }
-        const stat = lstatSync(join(root.directory, name), { throwIfNoEntry: false });
-        return stat === undefined || event === "change" || stat.mtimeMs >= armedAt;
+        return true;
       });
       return;
     }
@@ -92,7 +102,7 @@ export function createFileResourceWatcher(
     const filesystemRoot = parse(candidate).root;
     while (candidate !== filesystemRoot) {
       candidate = dirname(candidate);
-      const stat = lstatSync(candidate, { throwIfNoEntry: false });
+      const stat = inspectPath(candidate);
       if (stat === undefined) continue;
       if (stat.isDirectory() && !stat.isSymbolicLink()) {
         const nextSegment = relative(candidate, root.directory).split(sep)[0];
