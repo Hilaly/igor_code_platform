@@ -98,6 +98,22 @@ describe("matchPage", () => {
 });
 
 describe("pathOf", () => {
+  it("round-trips an opaque provider identifier through one URL segment", () => {
+    const page = { kind: "providers", providerId: "vendor/модель с пробелом" } as const;
+
+    const path = pathOf(page);
+
+    expect(path).toBe(
+      "/providers/vendor%2F%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C%20%D1%81%20%D0%BF%D1%80%D0%BE%D0%B1%D0%B5%D0%BB%D0%BE%D0%BC",
+    );
+    expect(matchPage(path)).toEqual(page);
+  });
+
+  it("takes malformed percent encoding for an unknown address", () => {
+    expect(() => matchPage("/providers/%")).not.toThrow();
+    expect(matchPage("/providers/%")).toEqual({ kind: "unknown", path: "/providers/%" });
+  });
+
   it("survives a round trip", () => {
     for (const path of [
       "/",

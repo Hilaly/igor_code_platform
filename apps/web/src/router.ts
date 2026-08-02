@@ -38,6 +38,18 @@ export type Page =
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
 
+function decodePathSegment(segment: string): string | undefined {
+  try {
+    return decodeURIComponent(segment);
+  } catch (cause) {
+    if (cause instanceof URIError) {
+      return undefined;
+    }
+
+    throw cause;
+  }
+}
+
 export function matchPage(path: string): Page {
   const segments = path.split("/").filter((segment) => segment.length > 0);
 
@@ -54,16 +66,18 @@ export function matchPage(path: string): Page {
   }
 
   if (`/${segments[0]}` === providersPagePath && segments.length <= 2) {
-    const providerId = segments[1];
+    const encodedProviderId = segments[1];
 
-    if (providerId === undefined) {
+    if (encodedProviderId === undefined) {
       return { kind: "providers" };
     }
+
+    const providerId = decodePathSegment(encodedProviderId);
 
     // Идентификатор провайдера не проверяется форматом, как `sessionId`: это внешние данные
     // рантайма, и их формат — не наш контракт. «Нет такого провайдера» говорит вью по снимку,
     // а маршрут только разбирает адрес.
-    return { kind: "providers", providerId };
+    return providerId === undefined ? { kind: "unknown", path } : { kind: "providers", providerId };
   }
 
   if (`/${segments[0]}` === sessionsPagePath && segments.length <= 2) {
@@ -114,7 +128,7 @@ export function pathOf(page: Page): string {
     case "providers":
       return page.providerId === undefined
         ? providersPagePath
-        : `${providersPagePath}/${page.providerId}`;
+        : `${providersPagePath}/${encodeURIComponent(page.providerId)}`;
     case "sessions":
       return page.sessionId === undefined
         ? sessionsPagePath
