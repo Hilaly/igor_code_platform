@@ -27,3 +27,4 @@ glm_review_*.html
 
 # Coding agents
 .zcode/
+.worktrees/
