@@ -14,10 +14,10 @@ import {
   type PluginStatus,
 } from "@sovereign/protocol";
 
-import { createDispatcher } from "./http/public.ts";
-import { createLogger } from "./platform/public.ts";
+import { createDispatcher } from "../http/public.ts";
+import { createLogger } from "../platform/public.ts";
 import { pluginPreferencesRoute } from "./plugin-preferences.ts";
-import { createSettingsStore, type SettingsStore } from "./settings/public.ts";
+import { createSettingsStore, type SettingsStore } from "../settings/public.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-preferences-"));
 const servers: Server[] = [];

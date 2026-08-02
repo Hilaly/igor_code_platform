@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { Session, SessionEntriesPage } from "@sovereign/protocol";
 
 import { createPluginSessions, isSessionRequest } from "./plugin-sessions.ts";
-import type { SessionService } from "./sessions/public.ts";
+import type { SessionService } from "../sessions/public.ts";
 
 const session: Session = {
   id: "0199",

@@ -13,7 +13,7 @@
 
 - **Внутренние subpath SDK неотличимы от публичных.** `@sovereign/sdk` экспортирует `./host` и
   `./events` наравне с легитимным `./testing`, но их собственные комментарии говорят: «автору
-  плагина не нужно». Единственный потребитель — `apps/daemon/src/plugin-worker.ts`. Любой
+  плагина не нужно». Единственный потребитель — `apps/daemon/src/plugins/plugin-worker.ts`. Любой
   внешний плагин может сделать `import { installPluginHost } from "@sovereign/sdk/host"` — и
   убрать subpath уже ломающее изменение. Варианты: переименовать в `./internal/host`,
   `./internal/events` (рекомендуется — синтаксически различимо, один потребитель); импорт

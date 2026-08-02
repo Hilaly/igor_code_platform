@@ -45,7 +45,7 @@ import type {
 } from "@sovereign/protocol";
 
 import type { PluginRequest } from "./plugin-wire.ts";
-import type { SessionService } from "./sessions/public.ts";
+import type { SessionService } from "../sessions/public.ts";
 
 /**
  * Копии типов в SDK обязаны совпадать с протоколом до поля, и ловится это здесь: присваивание идёт

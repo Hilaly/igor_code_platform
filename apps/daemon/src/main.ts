@@ -7,7 +7,6 @@ import {
   createSessionCheck,
 } from "./authentication/public.ts";
 import { parseArguments } from "./platform/public.ts";
-import { createContributionRegistry } from "./contribution-registry.ts";
 import { createCredentialStore } from "./providers/public.ts";
 import {
   archivedSessionsDirectoryName,
@@ -26,18 +25,25 @@ import { healthRoute } from "./http/public.ts";
 import { acquireInstanceLock, InstanceLockError } from "./platform/public.ts";
 import { createLogger } from "./platform/public.ts";
 import { createModelCatalogStore } from "./providers/public.ts";
-import { pluginPreferencesRoute } from "./plugin-preferences.ts";
-import { createPluginProviders } from "./plugin-providers.ts";
-import { createPluginSupervisor } from "./plugin-supervisor.ts";
-import { defaultPluginRoots, discoverPlugins, projectPluginRoots } from "./plugin-sources.ts";
-import { createPluginWatcher } from "./plugin-watcher.ts";
-import type { PluginRoot } from "./plugin-sources.ts";
-import { pluginsRoute } from "./plugins-snapshot.ts";
+import {
+  createContributionRegistry,
+  createPluginProviders,
+  createPluginSessions,
+  createPluginSupervisor,
+  createPluginWatcher,
+  defaultPluginRoots,
+  discoverPlugins,
+  isSessionRequest,
+  pluginPreferencesRoute,
+  pluginsRoute,
+  projectPluginRoots,
+  type PluginRoot,
+  type PluginSessions,
+} from "./plugins/public.ts";
 import { createProjectAvailabilityWatcher } from "./projects/public.ts";
 import { createProjectPathNormalizer } from "./projects/public.ts";
 import { createProjectStore } from "./projects/public.ts";
 import { createProjectLifecycle } from "./projects/public.ts";
-import { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
 import {
   coreToolSource,
   createSessionService,

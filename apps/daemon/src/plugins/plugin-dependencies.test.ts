@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
-import { createLogger, type Logger } from "./platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import {
   ensurePluginDependencies,
   installStampFileName,

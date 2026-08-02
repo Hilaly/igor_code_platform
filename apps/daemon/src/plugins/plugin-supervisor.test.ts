@@ -22,10 +22,10 @@ import {
 
 import { createContributionRegistry } from "./contribution-registry.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
-import { carryLoginSteps } from "./providers/public.ts";
-import { createProviderLogins } from "./providers/public.ts";
-import { createEventBus, type EventBus } from "./platform/public.ts";
-import { createLogger, type Logger } from "./platform/public.ts";
+import { carryLoginSteps } from "../providers/public.ts";
+import { createProviderLogins } from "../providers/public.ts";
+import { createEventBus, type EventBus } from "../platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import {
   createPluginSupervisor,
   type CancelScheduled,
@@ -34,7 +34,7 @@ import {
 } from "./plugin-supervisor.ts";
 import { discoverPlugins, type PluginDiscovery } from "./plugin-sources.ts";
 
-const fixtures = join(import.meta.dirname, "plugin-fixtures");
+const fixtures = join(import.meta.dirname, "fixtures");
 const discovered = discoverPlugins([{ source: "data", directory: fixtures }]);
 
 /** Фикстуры лежат вместе, а тесту нужны по одной: остальные только мешали бы читать журнал. */

@@ -61,7 +61,10 @@ export function pluginKey(source: PluginSource, id: string): string {
  */
 export function defaultPluginRoots(dataDirectory: string): PluginRoot[] {
   return [
-    { source: "builtin", directory: join(import.meta.dirname, "..", "..", "..", "plugins") },
+    {
+      source: "builtin",
+      directory: join(import.meta.dirname, "..", "..", "..", "..", "plugins"),
+    },
     { source: "data", directory: join(dataDirectory, "plugins") },
   ];
 }

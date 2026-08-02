@@ -10,8 +10,8 @@ import {
 import type { PluginContribution } from "@sovereign/sdk";
 
 import { createContributionRegistry, type ContributingPlugin } from "./contribution-registry.ts";
-import { createEventBus } from "./platform/public.ts";
-import { createLogger } from "./platform/public.ts";
+import { createEventBus } from "../platform/public.ts";
+import { createLogger } from "../platform/public.ts";
 import { createPluginEvents } from "./plugin-events.ts";
 import type { PluginIncoming } from "./plugin-wire.ts";
 

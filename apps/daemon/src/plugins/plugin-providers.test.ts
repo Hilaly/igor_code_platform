@@ -11,10 +11,10 @@ import {
 import { coreEventTypes, type BusEvent, type CustomProviderDefinition } from "@sovereign/protocol";
 import type { LoginStep } from "@sovereign/sdk";
 
-import { createEventBus } from "./platform/public.ts";
-import { createLogger, type Logger } from "./platform/public.ts";
+import { createEventBus } from "../platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
-import { createProviderLogins } from "./providers/public.ts";
+import { createProviderLogins } from "../providers/public.ts";
 
 const quietLogger = (): Logger =>
   createLogger({ source: "core", level: () => "debug", write: () => {} });
