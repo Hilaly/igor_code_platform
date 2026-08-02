@@ -32,6 +32,75 @@ const noAgentRuntimeImports = {
     "Импорт Pi разрешён только внутри packages/agent-runtime-pi (docs/architecture.md): наружу выходят типы протокола, а не типы рантайма.",
 };
 
+const daemonAreas = [
+  "platform",
+  "http",
+  "authentication",
+  "settings",
+  "projects",
+  "providers",
+  "sessions",
+  "plugins",
+];
+
+const daemonAreaDependencies = {
+  platform: [],
+  http: ["platform"],
+  authentication: ["http", "platform"],
+  settings: ["http", "platform"],
+  projects: ["http", "platform"],
+  providers: ["http", "platform"],
+  sessions: ["projects", "http", "platform"],
+  plugins: ["settings", "providers", "sessions", "http", "platform"],
+};
+
+function daemonAreaBoundary(area, allowedAreas) {
+  const forbiddenAreaFacades = daemonAreas
+    .filter((candidate) => candidate !== area && !allowedAreas.includes(candidate))
+    .map((candidate) => `../${candidate}/public.ts`);
+  const patterns = [
+    noApplicationImports,
+    noAgentRuntimeImports,
+    {
+      regex: String.raw`^\.\./[^/]+/(?!public\.ts$).+`,
+      message: "Области демона обращаются к соседям только через public.ts.",
+    },
+  ];
+
+  if (forbiddenAreaFacades.length > 0) {
+    patterns.push({
+      group: forbiddenAreaFacades,
+      message: "Направление зависимостей областей задано в docs/repository-structure.md.",
+    });
+  }
+
+  return {
+    files: [`apps/daemon/src/${area}/**/*.ts`],
+    rules: {
+      "no-restricted-imports": ["error", { patterns }],
+    },
+  };
+}
+
+const daemonCompositionRootUsesFacades = {
+  files: ["apps/daemon/src/main.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          noApplicationImports,
+          noAgentRuntimeImports,
+          {
+            regex: String.raw`^\./[^/]+/(?!public\.ts$).+`,
+            message: "Точка композиции демона обращается к областям только через public.ts.",
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const appsMustNotImportApps = {
   files: ["apps/**/*.{ts,tsx}"],
   rules: {
@@ -145,6 +214,10 @@ export default tseslint.config(
   packagesMustNotImportApps,
   pluginsMustNotImportAppsOrRuntime,
   agentRuntimeMayImportPi,
+  ...Object.entries(daemonAreaDependencies).map(([area, dependencies]) =>
+    daemonAreaBoundary(area, dependencies),
+  ),
+  daemonCompositionRootUsesFacades,
   daemonAndPackagesLogThroughTheLogger,
   colorsComeFromTokensOnly,
   prettier,

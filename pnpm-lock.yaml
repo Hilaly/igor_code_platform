@@ -44,6 +44,10 @@ importers:
       cookie:
         specifier: ^2.0.1
         version: 2.0.1
+    devDependencies:
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.5(supports-color@7.2.0)
 
   apps/web:
     dependencies:
