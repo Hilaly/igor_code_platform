@@ -4,8 +4,11 @@
  */
 
 import {
+  filesystemPath,
+  filesystemQueryParameter,
   projectPath,
   projectsPath,
+  type FilesystemListing,
   type Project,
   type ProjectDeleted,
   type ProjectDraft,
@@ -21,6 +24,25 @@ export async function fetchProjectsSnapshot(signal?: AbortSignal): Promise<Proje
   }
 
   return (await response.json()) as ProjectsSnapshot;
+}
+
+/**
+ * Листинг каталога для проводника выбора папки. Не выбрасывает: ошибка чтения (нет доступа, нет
+ * такого пути) возвращается текстом, и пикер показывает её внутри себя, не закрываясь — человек
+ * выбирает другую папку, не открывая пикер заново.
+ */
+export async function fetchFilesystemListing(
+  path: string,
+  signal?: AbortSignal,
+): Promise<FilesystemListing> {
+  const query = `${filesystemPath}?${filesystemQueryParameter}=${encodeURIComponent(path)}`;
+  const response = await fetch(query, signal === undefined ? {} : { signal });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as FilesystemListing;
 }
 
 export type CreateProjectOutcome =

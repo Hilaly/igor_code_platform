@@ -244,7 +244,13 @@ export const coreEnglish: CatalogRegistration = {
     "projects.field.folder": "Folder",
     "projects.field.folder.hint":
       "An absolute path or a path from `~`. It need not exist: the project waits for it to appear.",
+    "projects.field.folder.browse": "Browse…",
     "projects.field.name": "Name",
+    "projects.folder.picker.title": "Pick the project folder",
+    "projects.folder.picker.up": "Up",
+    "projects.folder.picker.empty": "The folder is empty",
+    "projects.folder.picker.confirm": "Choose",
+    "projects.folder.picker.cancel": "Cancel",
     "projects.new.title": "New project",
     "projects.new.hint": "The folder is set once and does not change afterwards.",
     "projects.new.submit": "Create the project",

@@ -233,6 +233,46 @@ describe("ProjectsView", () => {
     expect(onCreate).toHaveBeenCalled();
   });
 
+  it("puts the folder picked in the browser into the folder field", async () => {
+    // Пикер зовёт демон за листингом; в тесте ответы подменены. Выбранный путь уезжает в то же поле,
+    // что и ручной ввод, — отдельного источника правды для папки нет.
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      // Относительный путь запроса разбираем как строку: в jsdom у `new Request` нет базы, и
+      // `URL` бросается на about:blank. Параметр `path` кодирован, поэтому декодируем его.
+      const url = typeof input === "string" ? input : input.toString();
+      const match = /[?&]path=([^&]+)/.exec(url);
+      const path = match?.[1] === undefined ? "" : decodeURIComponent(match[1]);
+      const body =
+        path === "/"
+          ? { path: "/", entries: [{ name: "code", kind: "directory" }] }
+          : { path, entries: [] };
+
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+
+    try {
+      show(withProjects([]));
+
+      fireEvent.click(screen.getByRole("button", { name: "Обзор…" }));
+
+      // Листинг корня приехал — папка `code` видна.
+      await waitFor(() => expect(screen.getByRole("button", { name: "code" })).toBeDefined());
+
+      // Один клик выделяет, «Выбрать» подтверждает — путь лежит в поле папки.
+      fireEvent.click(screen.getByRole("button", { name: "code" }));
+      fireEvent.click(screen.getByRole("button", { name: "Выбрать" }));
+
+      expect((screen.getByLabelText("Папка") as HTMLInputElement).value).toBe("/code");
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it("keeps the create button locked until both fields say something", () => {
     show(withProjects([]));
 

@@ -240,7 +240,13 @@ export const coreRussian: CatalogRegistration = {
     "projects.field.folder": "Папка",
     "projects.field.folder.hint":
       "Абсолютный путь или путь от `~`. Она не обязана существовать: проект подождёт её появления.",
+    "projects.field.folder.browse": "Обзор…",
     "projects.field.name": "Имя",
+    "projects.folder.picker.title": "Выбрать папку проекта",
+    "projects.folder.picker.up": "Наверх",
+    "projects.folder.picker.empty": "Папка пуста",
+    "projects.folder.picker.confirm": "Выбрать",
+    "projects.folder.picker.cancel": "Отмена",
     "projects.new.title": "Новый проект",
     "projects.new.hint": "Папка задаётся один раз и потом не меняется.",
     "projects.new.submit": "Создать проект",

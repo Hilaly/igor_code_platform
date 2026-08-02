@@ -6,7 +6,7 @@
  * сети — той же дисциплины держится вью плагинов.
  */
 
-import type { Project, ProjectDraft, ProjectUpdate } from "@sovereign/protocol";
+import type { FilesystemEntry, Project, ProjectDraft, ProjectUpdate } from "@sovereign/protocol";
 import {
   Badge,
   Button,
@@ -15,6 +15,7 @@ import {
   Disclosure,
   EmptyState,
   Field,
+  FilePicker,
   Heading,
   Input,
   List,
@@ -26,8 +27,9 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { fetchFilesystemListing } from "./api.ts";
 import type { ProjectsState } from "./state.ts";
 
 export type ProjectsViewProps = {
@@ -133,6 +135,13 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   const [folder, setFolder] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Пикер выбора папки. `cwd` — открытый каталог, `entries`/`pickerError` — его листинг, `value` —
+  // выделенная строка. Всё приезжает с демона; пикер только рисует и сообщает клики.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [cwd, setCwd] = useState("/");
+  const [value, setValue] = useState("");
+  const [entries, setEntries] = useState<FilesystemEntry[]>([]);
+  const [pickerError, setPickerError] = useState<string | undefined>(undefined);
   const ready = folder.trim() !== "" && name.trim() !== "";
 
   const submit = (): void => {
@@ -152,6 +161,30 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
       }
     });
   };
+
+  // Листинг читается при каждом переходе и при первом открытии. Отмена — через AbortController, чтобы
+  // быстрая навигация по папкам не складывала ответы в чужие каталоги.
+  useEffect(() => {
+    if (!pickerOpen) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setPickerError(undefined);
+    void fetchFilesystemListing(cwd, controller.signal)
+      .then((listing) => setEntries(listing.entries))
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setEntries([]);
+        setPickerError(cause instanceof Error ? cause.message : String(cause));
+      });
+
+    return () => controller.abort();
+  }, [pickerOpen, cwd]);
 
   return (
     <Panel title={t("projects.new.title")}>
@@ -184,6 +217,17 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
           )}
         </Field>
 
+        <Button
+          onClick={() => {
+            setCwd("/");
+            setValue("");
+            setPickerOpen(true);
+          }}
+          disabled={busy}
+        >
+          {t("projects.field.folder.browse")}
+        </Button>
+
         <Field label={t("projects.field.name")}>
           {(control) => (
             <Input
@@ -205,6 +249,30 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
           {t("projects.new.submit")}
         </Button>
       </div>
+
+      <FilePicker
+        open={pickerOpen}
+        cwd={cwd}
+        value={value}
+        entries={entries}
+        error={pickerError}
+        onNavigate={setCwd}
+        onValueChange={setValue}
+        onSelect={(path) => {
+          // Выбранный путь — в то же поле, что и ручной ввод; `normalizeProjectPath` раскроет `~` и
+          // симлинки уже при создании.
+          onDismissComplaints();
+          setFolder(path);
+          setValue("");
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+        title={t("projects.folder.picker.title")}
+        upLabel={t("projects.folder.picker.up")}
+        emptyLabel={t("projects.folder.picker.empty")}
+        confirmLabel={t("projects.folder.picker.confirm")}
+        cancelLabel={t("projects.folder.picker.cancel")}
+      />
     </Panel>
   );
 }
