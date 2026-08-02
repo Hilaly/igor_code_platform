@@ -300,6 +300,18 @@ Follow the review checklist.
     );
   });
 
+  it("requires metadata keys to be YAML strings", () => {
+    assertInvalid(
+      parseSkillFile({
+        path: "/skills/review/SKILL.md",
+        directoryName: "review",
+        text: "---\nname: review\ndescription: Review\nmetadata:\n  1: one\n---\nChecklist\n",
+      }),
+      "invalid-metadata",
+      "/skills/review/SKILL.md",
+    );
+  });
+
   it("requires allowed-tools to be a string", () => {
     assertInvalid(
       parseSkillFile({

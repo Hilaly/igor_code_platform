@@ -4,7 +4,7 @@ import {
   type NamePatternSelection,
   type ThinkingLevel,
 } from "@sovereign/protocol";
-import { parseDocument } from "yaml";
+import { isMap, isScalar, parseDocument } from "yaml";
 
 export type AgentFileDefinition = {
   kind: "agent";
@@ -163,7 +163,10 @@ export function parseSkillFile(input: FileResourceInput): ParsedFileResource<Ski
   }
 
   const metadata = parseMetadata(split.frontmatter.metadata);
-  if (split.frontmatter.metadata !== undefined && metadata === undefined) {
+  if (
+    split.frontmatter.metadata !== undefined &&
+    (metadata === undefined || split.metadataIsStringMap !== true)
+  ) {
     return invalid(
       diagnostic("invalid-metadata", "metadata must map strings to strings", input.path),
     );
@@ -214,7 +217,14 @@ export function parseSkillFile(input: FileResourceInput): ParsedFileResource<Ski
 function splitFrontmatter(
   text: string,
   path: string,
-): { kind: "valid"; frontmatter: Frontmatter; body: string } | InvalidFileResource {
+):
+  | {
+      kind: "valid";
+      frontmatter: Frontmatter;
+      body: string;
+      metadataIsStringMap: boolean | undefined;
+    }
+  | InvalidFileResource {
   const match = /^(?:\uFEFF)?---[\t ]*\r?\n([\s\S]*?)\r?\n---[\t ]*(?:\r?\n|$)([\s\S]*)$/u.exec(
     text,
   );
@@ -234,6 +244,22 @@ function splitFrontmatter(
     );
   }
 
+  const metadataNode = isMap(document.contents)
+    ? document.contents.items.find((pair) => isScalar(pair.key) && pair.key.value === "metadata")
+        ?.value
+    : undefined;
+  const metadataIsStringMap =
+    metadataNode === undefined
+      ? undefined
+      : isMap(metadataNode) &&
+        metadataNode.items.every(
+          (pair) =>
+            isScalar(pair.key) &&
+            typeof pair.key.value === "string" &&
+            isScalar(pair.value) &&
+            typeof pair.value.value === "string",
+        );
+
   let parsed: unknown;
   try {
     parsed = document.toJS();
@@ -251,7 +277,12 @@ function splitFrontmatter(
     return invalid(diagnostic("invalid-frontmatter", "YAML frontmatter must be a mapping", path));
   }
 
-  return { kind: "valid", frontmatter: parsed, body: match[2] ?? "" };
+  return {
+    kind: "valid",
+    frontmatter: parsed,
+    body: match[2] ?? "",
+    metadataIsStringMap,
+  };
 }
 
 function parseSelection(
