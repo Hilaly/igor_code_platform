@@ -50,7 +50,7 @@ export function MessageComposer(props: MessageComposerProps): React.JSX.Element;
 
 - `ChatView` remains responsible for hiding the component when the session is archived and passes its `draft`/`setDraft` pair directly.
 
-- [ ] **Step 1: Write the failing direct component tests**
+- [x] **Step 1: Write the failing direct component tests**
 
 Create `message-composer.test.tsx` with a stateful harness that renders `MessageComposer`. Prove these component-boundary behaviors through the DOM:
 
@@ -72,7 +72,7 @@ it("offers append only while idle and interrupt only while busy", () => {
 });
 ```
 
-- [ ] **Step 2: Run the direct test and verify RED**
+- [x] **Step 2: Run the direct test and verify RED**
 
 Run:
 
@@ -82,11 +82,11 @@ pnpm --filter @sovereign/web test -- src/sessions/message-composer.test.tsx
 
 Expected: FAIL because `./message-composer.tsx` does not exist. Do not add production code before recording this failure in the task report.
 
-- [ ] **Step 3: Implement the minimal controlled component**
+- [x] **Step 3: Implement the minimal controlled component**
 
 Move `busyModes`, delivery-mode state, the mode selector, textarea, send/append decisions, draft clearing, and interrupt button from `ChatView` into `message-composer.tsx`. Use `props.onDraftChange("")` after a non-empty send or append. Keep raw draft text on submission and use `trim()` only to reject/disable empty input, matching current behavior.
 
-- [ ] **Step 4: Integrate it into `ChatView`**
+- [x] **Step 4: Integrate it into `ChatView`**
 
 Remove the moved UI-kit imports and inline composer code. Render:
 
@@ -108,7 +108,7 @@ Remove the moved UI-kit imports and inline composer code. Render:
 
 Keep `<EntryTreeDrawer onEditorText={setDraft} />` unchanged so navigation still fills the same controlled draft.
 
-- [ ] **Step 5: Verify GREEN and integration**
+- [x] **Step 5: Verify GREEN and integration**
 
 Run:
 
@@ -119,7 +119,7 @@ pnpm --filter @sovereign/web typecheck
 
 Expected: both test files pass and typechecking exits 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/sessions/message-composer.tsx apps/web/src/sessions/message-composer.test.tsx apps/web/src/sessions/chat-view.tsx
@@ -155,7 +155,7 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 - Owns its label-editor dialog and label-refusal notice because both originate from message-row actions.
 - Leaves turn-failure/degradation notices, stats, context, queue badges, tree, session fork, and compaction in `ChatView`.
 
-- [ ] **Step 1: Write the failing direct component tests**
+- [x] **Step 1: Write the failing direct component tests**
 
 Create `session-message-list.test.tsx` using a minimal `OpenSession` fixture. Prove these component-boundary behaviors through the DOM:
 
@@ -177,7 +177,7 @@ it("does not offer writing actions for archived messages", () => {
 });
 ```
 
-- [ ] **Step 2: Run the direct test and verify RED**
+- [x] **Step 2: Run the direct test and verify RED**
 
 Run:
 
@@ -187,7 +187,7 @@ pnpm --filter @sovereign/web test -- src/sessions/session-message-list.test.tsx
 
 Expected: FAIL because `./session-message-list.tsx` does not exist. Do not add production code before recording this failure in the task report.
 
-- [ ] **Step 3: Implement the minimal list component**
+- [x] **Step 3: Implement the minimal list component**
 
 Move from `ChatView` into `session-message-list.tsx`:
 
@@ -200,7 +200,7 @@ Move from `ChatView` into `session-message-list.tsx`:
 
 Preserve existing comments that explain non-obvious ordering, streaming markdown, archive behavior, and fork positions.
 
-- [ ] **Step 4: Integrate it into `ChatView`**
+- [x] **Step 4: Integrate it into `ChatView`**
 
 Replace the inline feed and label dialog with:
 
@@ -217,7 +217,7 @@ Replace the inline feed and label dialog with:
 
 Remove only imports, state, helpers, and refusal handling now owned by the list. Keep compaction refusal local to `ChatView` and preserve its translated notice.
 
-- [ ] **Step 5: Verify GREEN and integration**
+- [x] **Step 5: Verify GREEN and integration**
 
 Run:
 
@@ -228,7 +228,7 @@ pnpm --filter @sovereign/web typecheck
 
 Expected: all three test files pass and typechecking exits 0.
 
-- [ ] **Step 6: Run feature-wide verification**
+- [x] **Step 6: Run feature-wide verification**
 
 Run:
 
@@ -240,7 +240,7 @@ pnpm exec prettier --check apps/web/src/sessions
 
 Expected: the whole web suite passes, ESLint exits 0, and Prettier reports all matched files formatted.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/web/src/sessions/session-message-list.tsx apps/web/src/sessions/session-message-list.test.tsx apps/web/src/sessions/chat-view.tsx
@@ -258,7 +258,7 @@ git commit -m "refactor(web): extract the session message list" -m "Co-Authored-
 - Consumes: the two extracted components integrated by `ChatView`.
 - Produces: a branch whose complete repository checks and web production build pass.
 
-- [ ] **Step 1: Run the full repository check**
+- [x] **Step 1: Run the full repository check**
 
 ```bash
 make check
@@ -266,7 +266,7 @@ make check
 
 Expected: typechecking, ESLint, Prettier, and every package test exit 0.
 
-- [ ] **Step 2: Run the production build**
+- [x] **Step 2: Run the production build**
 
 ```bash
 make build
@@ -274,6 +274,6 @@ make build
 
 Expected: every package with a build script succeeds and the web Vite production bundle is emitted without errors.
 
-- [ ] **Step 3: Record verification**
+- [x] **Step 3: Record verification**
 
 If no code changes were needed, do not create an empty commit. Record commands, exit codes, and test counts in the task report and SDD ledger. If an in-scope regression required a change, first add a failing regression test, observe RED, implement the minimal fix, repeat both commands, and commit atomically with the required co-author trailer.
