@@ -8,6 +8,7 @@
 
 import type { PluginSource } from "./plugin.ts";
 import type { SettingsParseResult } from "./settings.ts";
+import type { AgentSkillSelection } from "./tool-pattern.ts";
 
 export const sessionsPath = "/api/sessions";
 
@@ -485,12 +486,13 @@ export type AgentSummary = {
   id: string;
   title?: string;
   description?: string;
-  pluginKey: string;
-  source: PluginSource;
+  /** У standalone-агента нет плагинового владельца. */
+  pluginKey?: string;
+  source: PluginSource | string;
   /** Модель по умолчанию. Её может не быть: тогда модель называют при создании сессии. */
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: string[];
+  skills: AgentSkillSelection;
 };
 
 /** Ноль агентов — законный ответ, а не отказ: единственный плагин с агентом могли выключить. */

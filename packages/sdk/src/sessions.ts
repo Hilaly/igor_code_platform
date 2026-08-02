@@ -9,7 +9,7 @@
  * тождеством в мосте демона (`apps/daemon/src/plugin-sessions.ts`).
  */
 
-import { currentPluginHost, type ThinkingLevel } from "./host.ts";
+import { currentPluginHost, type AgentSkillSelection, type ThinkingLevel } from "./host.ts";
 
 /**
  * Состояние сессии. Список наш, а не рантайма: фаза у него приватная, а `queued` он не знает вовсе
@@ -111,11 +111,11 @@ export type AgentSummary = {
   id: string;
   title?: string;
   description?: string;
-  pluginKey: string;
+  pluginKey?: string;
   source: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: string[];
+  skills: AgentSkillSelection;
 };
 
 export type SessionDraft = {

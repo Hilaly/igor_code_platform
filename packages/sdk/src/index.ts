@@ -21,6 +21,7 @@ export { thinkingLevels } from "./host.ts";
 
 export type {
   AgentContribution,
+  AgentSkillSelection,
   AgentToolSelection,
   CustomContribution,
   EventContribution,

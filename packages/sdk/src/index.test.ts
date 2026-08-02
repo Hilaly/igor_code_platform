@@ -82,7 +82,7 @@ describe("the session surface", () => {
       id: "base-agent.agent",
       pluginKey: "builtin:base-agent",
       source: "builtin",
-      skills: [],
+      skills: { include: [], exclude: [] },
     };
 
     host.answerSessions(() => ({ kind: "agent-list", agents: [agent] }));
@@ -409,10 +409,14 @@ describe("the testing seam", () => {
     const host = installTestHost();
 
     await contribute.agent({
-      id: "agent",
-      title: "Base agent",
-      instructions: "делай, что просят",
-      tools: { include: ["*"] },
+      id: "safe",
+      instructions: "work",
+    });
+    await contribute.agent({
+      id: "full",
+      instructions: "work",
+      tools: { include: ["*"], exclude: ["bash"] },
+      skills: { include: ["review-*"], exclude: ["*-unsafe"] },
     });
 
     // Умолчаний SDK не подставляет: ни пустого exclude, ни пустых скилов. Их ставит ядро, и вторая
@@ -420,10 +424,15 @@ describe("the testing seam", () => {
     assert.deepEqual(host.contributions, [
       {
         kind: "agent",
-        id: "agent",
-        title: "Base agent",
-        instructions: "делай, что просят",
-        tools: { include: ["*"] },
+        id: "safe",
+        instructions: "work",
+      },
+      {
+        kind: "agent",
+        id: "full",
+        instructions: "work",
+        tools: { include: ["*"], exclude: ["bash"] },
+        skills: { include: ["review-*"], exclude: ["*-unsafe"] },
       },
     ]);
   });

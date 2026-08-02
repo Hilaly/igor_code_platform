@@ -12,10 +12,15 @@ export const projectsPath = "/api/projects";
 
 /** Шаблон для таблицы маршрутов демона: `:id` — идентификатор записи, не папка. */
 export const projectPathPattern = `${projectsPath}/:id`;
+export const projectAgentsPathPattern = `${projectsPath}/:id/agents`;
+export const projectFileResourcesPathPattern = `${projectsPath}/:id/file-resources`;
 
 export function projectPath(id: string): string {
   return `${projectsPath}/${encodeURIComponent(id)}`;
 }
+
+export const projectAgentsPath = (id: string): string => `${projectPath(id)}/agents`;
+export const projectFileResourcesPath = (id: string): string => `${projectPath(id)}/file-resources`;
 
 /**
  * Доступность папки — не ошибка, а состояние проекта (docs/sessions-and-projects.md): папку могли
