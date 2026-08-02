@@ -1,7 +1,6 @@
 # IDE
 .idea/
 .vscode/
-.claude/
 
 # Dependencies
 node_modules/
@@ -23,6 +22,7 @@ build/
 .DS_Store
 
 # Coding agents
+.claude/
 .zcode/
 .worktrees/
 .superpowers/
