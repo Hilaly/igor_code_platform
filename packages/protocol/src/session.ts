@@ -481,19 +481,32 @@ export type SessionDelta =
   | { kind: "turn-failed"; reason: string }
   | { kind: "queues"; queues: SessionQueues };
 
-/** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
-export type AgentSummary = {
+type AgentSummaryCommon = {
   id: string;
   title?: string;
   description?: string;
-  /** У standalone-агента нет плагинового владельца. */
-  pluginKey?: string;
-  source: PluginSource | string;
   /** Модель по умолчанию. Её может не быть: тогда модель называют при создании сессии. */
   model?: string;
   thinkingLevel?: ThinkingLevel;
   skills: AgentSkillSelection;
 };
+
+/** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
+export type AgentSummary = AgentSummaryCommon &
+  (
+    | {
+        ownership: "plugin";
+        pluginKey: string;
+        source: PluginSource;
+      }
+    | {
+        ownership: "standalone";
+        pluginKey?: never;
+        source: string;
+        scope: "user" | "project";
+        projectId?: string;
+      }
+  );
 
 /** Ноль агентов — законный ответ, а не отказ: единственный плагин с агентом могли выключить. */
 export type AgentsSnapshot = { agents: AgentSummary[] };

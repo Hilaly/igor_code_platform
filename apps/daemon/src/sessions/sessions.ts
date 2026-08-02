@@ -232,16 +232,34 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           registration.kind === "agent",
       );
 
-  const describeAgent = (agent: AgentContributionRegistration): AgentSummary => ({
-    id: agent.id,
-    ...(agent.title === undefined ? {} : { title: agent.title }),
-    ...(agent.description === undefined ? {} : { description: agent.description }),
-    pluginKey: agent.pluginKey,
-    source: agent.source,
-    ...(agent.model === undefined ? {} : { model: agent.model }),
-    ...(agent.thinkingLevel === undefined ? {} : { thinkingLevel: agent.thinkingLevel }),
-    skills: [...agent.skills],
-  });
+  const describeAgent = (agent: AgentContributionRegistration): AgentSummary => {
+    const common = {
+      id: agent.id,
+      ...(agent.title === undefined ? {} : { title: agent.title }),
+      ...(agent.description === undefined ? {} : { description: agent.description }),
+      ...(agent.model === undefined ? {} : { model: agent.model }),
+      ...(agent.thinkingLevel === undefined ? {} : { thinkingLevel: agent.thinkingLevel }),
+      skills: {
+        include: [...agent.skills.include],
+        exclude: [...agent.skills.exclude],
+      },
+    };
+
+    return agent.ownership === "plugin"
+      ? {
+          ...common,
+          ownership: "plugin",
+          pluginKey: agent.pluginKey,
+          source: agent.source,
+        }
+      : {
+          ...common,
+          ownership: "standalone",
+          source: agent.source,
+          scope: agent.scope,
+          ...(agent.projectId === undefined ? {} : { projectId: agent.projectId }),
+        };
+  };
 
   const describeSession = (summary: AgentSessionSummary): Session => ({
     id: summary.id,

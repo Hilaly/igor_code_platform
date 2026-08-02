@@ -83,7 +83,7 @@ SDK передаёт объявление без подстановки умол
 [plugins.md](plugins.md).
 
 Файловый скил попадает в реестр отдельным видом вклада. Он хранит `name`, `location`,
-необязательные `license`, `compatibility`, `metadata`, нормализованный `allowedTools: string[]`
+необязательные `license`, `compatibility`, `metadata`, нормализованный `allowedTools?: string[]`
 и обязательный `disableModelInvocation`. Plugin-owned-вклад всегда несёт `pluginKey`, `pluginId` и
 `source`. Standalone-вклад вместо фиктивного плагина несёт точный `source`, `scope` и, для
 проектного корня, `projectId`. Поэтому `AgentSummary.pluginKey` у standalone-агента отсутствует.

@@ -9,7 +9,7 @@
  * тождеством в мосте демона (`apps/daemon/src/plugin-sessions.ts`).
  */
 
-import { currentPluginHost, type AgentSkillSelection, type ThinkingLevel } from "./host.ts";
+import { currentPluginHost, type ThinkingLevel } from "./host.ts";
 
 /**
  * Состояние сессии. Список наш, а не рантайма: фаза у него приватная, а `queued` он не знает вовсе
@@ -107,16 +107,39 @@ export type SessionEntriesPage = {
   seen: number;
 };
 
-export type AgentSummary = {
+/** Нормализованный selector в ответе ядра; в отличие от SDK-объявления оба списка уже существуют. */
+export type NormalizedAgentSkillSelection = {
+  include: string[];
+  exclude: string[];
+};
+
+type AgentSummaryCommon = {
   id: string;
   title?: string;
   description?: string;
-  pluginKey?: string;
-  source: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: AgentSkillSelection;
+  skills: NormalizedAgentSkillSelection;
 };
+
+/** Копия `PluginSource` из протокола: SDK не тянет внутренний пакет. */
+export type AgentPluginSource = "builtin" | "data" | `project:${string}`;
+
+export type AgentSummary = AgentSummaryCommon &
+  (
+    | {
+        ownership: "plugin";
+        pluginKey: string;
+        source: AgentPluginSource;
+      }
+    | {
+        ownership: "standalone";
+        pluginKey?: never;
+        source: string;
+        scope: "user" | "project";
+        projectId?: string;
+      }
+  );
 
 export type SessionDraft = {
   projectId: string;

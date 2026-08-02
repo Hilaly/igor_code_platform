@@ -18,11 +18,13 @@ import {
 } from "@sovereign/protocol";
 import type { PluginContribution } from "@sovereign/sdk";
 
+type PluginContributionRegistration = Extract<ContributionRegistration, { ownership: "plugin" }>;
+
 /** Точки в идентификаторе разрешены: они дают плагину свою иерархию внутри своего неймспейса. */
 const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 
 export type ContributionApplyOutcome = {
-  registered: ContributionRegistration[];
+  registered: PluginContributionRegistration[];
   /** Кривой вклад — событие жизненного цикла плагина, а не исключение (docs/plugins.md). */
   problems: string[];
 };
@@ -47,35 +49,37 @@ export type ContributionRegistry = {
     disabledContributions: ReadonlySet<string>,
   ) => ContributionApplyOutcome;
   remove: (pluginKey: string) => void;
-  resolved: () => ContributionRegistration[];
+  resolved: () => PluginContributionRegistration[];
   /**
    * Объявленное, но выключенное человеком. Реестр помнит его целиком, а не только применённое:
    * иначе выключенный вклад исчезал бы из интерфейса вместе с возможностью включить его обратно
    * (docs/plugins.md).
    */
-  switchedOff: () => ContributionRegistration[];
+  switchedOff: () => PluginContributionRegistration[];
   conflicts: () => ContributionConflict[];
 };
 
 /** Что плагин объявил и что из этого действует. Разница между ними — решение человека. */
 type PluginContributions = {
-  declared: ContributionRegistration[];
-  registered: ContributionRegistration[];
+  declared: PluginContributionRegistration[];
+  registered: PluginContributionRegistration[];
   disabled: ReadonlySet<string>;
 };
 
-const byIdentifier = (left: ContributionRegistration, right: ContributionRegistration): number =>
-  left.id < right.id ? -1 : 1;
+const byIdentifier = (
+  left: PluginContributionRegistration,
+  right: PluginContributionRegistration,
+): number => (left.id < right.id ? -1 : 1);
 
 export function createContributionRegistry(): ContributionRegistry {
   const byPlugin = new Map<string, PluginContributions>();
 
   let revision = 0;
-  let resolved: ContributionRegistration[] = [];
+  let resolved: PluginContributionRegistration[] = [];
   let conflicts: ContributionConflict[] = [];
 
   const resolve = (): void => {
-    const claims = new Map<string, ContributionRegistration[]>();
+    const claims = new Map<string, PluginContributionRegistration[]>();
 
     for (const contributions of byPlugin.values()) {
       for (const registration of contributions.registered) {
@@ -83,12 +87,12 @@ export function createContributionRegistry(): ContributionRegistry {
       }
     }
 
-    const nextResolved: ContributionRegistration[] = [];
+    const nextResolved: PluginContributionRegistration[] = [];
     const nextConflicts: ContributionConflict[] = [];
 
     for (const [id, claimants] of [...claims].sort(([left], [right]) => (left < right ? -1 : 1))) {
       // Более специфичный источник перекрывает менее специфичный (docs/plugins.md).
-      const rank = (registration: ContributionRegistration): number =>
+      const rank = (registration: PluginContributionRegistration): number =>
         pluginSourceRank(registration.source);
       const best = Math.max(...claimants.map(rank));
       const winners = claimants.filter((registration) => rank(registration) === best);
@@ -123,10 +127,10 @@ export function createContributionRegistry(): ContributionRegistry {
   return {
     revision: () => revision,
     apply: (plugin, contributions, disabledContributions) => {
-      const declared: ContributionRegistration[] = [];
-      const registered: ContributionRegistration[] = [];
+      const declared: PluginContributionRegistration[] = [];
+      const registered: PluginContributionRegistration[] = [];
       const problems: string[] = [];
-      const claimed = new Map<string, ContributionRegistration[]>();
+      const claimed = new Map<string, PluginContributionRegistration[]>();
 
       for (const contribution of contributions) {
         if (!declaredIdPattern.test(contribution.id)) {
@@ -150,6 +154,7 @@ export function createContributionRegistry(): ContributionRegistry {
         }
 
         const common = {
+          ownership: "plugin" as const,
           id,
           declaredId: contribution.id,
           pluginKey: plugin.key,
@@ -215,6 +220,7 @@ export function createContributionRegistry(): ContributionRegistry {
 
 /** Общие поля записи: их считает вызывающий, здесь дописывается только то, что зависит от вида. */
 type RegistrationCommon = {
+  ownership: "plugin";
   id: string;
   declaredId: string;
   pluginKey: string;
@@ -232,7 +238,7 @@ function toRegistration(
   common: RegistrationCommon,
   contribution: PluginContribution,
   problems: string[],
-): ContributionRegistration | undefined {
+): PluginContributionRegistration | undefined {
   if (contribution.kind === "event") {
     return { ...common, kind: "event", payloadSchema: contribution.payloadSchema };
   }
@@ -254,7 +260,7 @@ function toRegistration(
     return undefined;
   }
 
-  const include = asStringArray(contribution.tools?.include);
+  const include = asStringArray(contribution.tools?.include ?? []);
   const exclude = asStringArray(contribution.tools?.exclude ?? []);
 
   if (include === undefined || exclude === undefined) {
@@ -271,10 +277,22 @@ function toRegistration(
     return undefined;
   }
 
-  const skills = asStringArray(contribution.skills ?? []);
+  const rawSkills = contribution.skills;
+  const skillInclude =
+    rawSkills === undefined
+      ? []
+      : typeof rawSkills === "object" && rawSkills !== null
+        ? asStringArray(rawSkills.include)
+        : undefined;
+  const skillExclude =
+    rawSkills === undefined
+      ? []
+      : typeof rawSkills === "object" && rawSkills !== null
+        ? asStringArray(rawSkills.exclude ?? [])
+        : undefined;
 
-  if (skills === undefined) {
-    problems.push(`the agent ${common.id} must name its skills by a list of identifiers`);
+  if (skillInclude === undefined || skillExclude === undefined) {
+    problems.push(`the agent ${common.id} must select skills by lists of name patterns`);
 
     return undefined;
   }
@@ -288,7 +306,7 @@ function toRegistration(
     ...(contribution.thinkingLevel === undefined
       ? {}
       : { thinkingLevel: contribution.thinkingLevel }),
-    skills,
+    skills: { include: skillInclude, exclude: skillExclude },
   };
 }
 

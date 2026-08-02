@@ -40,7 +40,9 @@ export { providers } from "./providers.ts";
 export { foldEntryLabels, sessions } from "./sessions.ts";
 
 export type {
+  AgentPluginSource,
   AgentSummary,
+  NormalizedAgentSkillSelection,
   Session,
   SessionBranch,
   SessionCompactAccepted,

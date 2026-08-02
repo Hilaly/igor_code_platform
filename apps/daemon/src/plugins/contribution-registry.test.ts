@@ -262,6 +262,7 @@ describe("createContributionRegistry", () => {
     assert.deepEqual(outcome.registered, [
       {
         kind: "agent",
+        ownership: "plugin",
         id: "hello.agent",
         declaredId: "agent",
         pluginKey: "data:hello",
@@ -271,7 +272,7 @@ describe("createContributionRegistry", () => {
         tools: { include: ["*"], exclude: ["bash"] },
         model: "anthropic/claude",
         thinkingLevel: "high",
-        skills: [],
+        skills: { include: [], exclude: [] },
       },
     ]);
   });
