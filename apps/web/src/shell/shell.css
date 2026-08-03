@@ -172,6 +172,21 @@
   gap: var(--sovereign-space-1);
 }
 
+.sidebar-project-actions {
+  min-height: var(--sovereign-row-height-compact);
+  padding-inline-end: var(--sovereign-space-1);
+}
+
+.shell-account {
+  min-height: var(--sovereign-row-height-compact);
+}
+
+.shell-account-status {
+  display: inline-flex;
+  flex: none;
+  padding-inline-start: var(--sovereign-space-2);
+}
+
 .shell-account > :last-child {
   min-width: 0;
   flex: 1;

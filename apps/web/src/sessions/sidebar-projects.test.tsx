@@ -44,6 +44,21 @@ const session: Session = {
   createdAt: "2026-08-01T00:00:00.000Z",
 };
 
+const longProjectName =
+  "A project name long enough to be truncated without losing its complete meaning";
+const longSessionTitle =
+  "A session title long enough to be truncated without losing its complete meaning";
+
+const longProject: Project = {
+  ...project,
+  name: longProjectName,
+};
+
+const longSession: Session = {
+  ...session,
+  title: longSessionTitle,
+};
+
 const values = new Map<string, string>();
 const storage = {
   getItem: (key: string) => values.get(key) ?? null,
@@ -99,6 +114,33 @@ it("creates a session in a project without selecting the row", () => {
   const { onNewSession, onOpenSession } = show();
   fireEvent.click(screen.getByRole("button", { name: "Новая сессия в Alpha" }));
   expect(onNewSession).toHaveBeenCalledWith("alpha");
+  expect(onOpenSession).not.toHaveBeenCalled();
+});
+
+it("keeps truncated project and session names available to people and actions", () => {
+  values.clear();
+  const { onOpenSession, onNewSession } = show({
+    projects: [longProject],
+    sessions: [longSession],
+  });
+
+  const projectItem = screen.getByRole("treeitem", { name: longProjectName });
+  expect(projectItem.getAttribute("title")).toBe(longProjectName);
+  expect(screen.getByRole("button", { name: `Новая сессия в ${longProjectName}` })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: `Действия над проектом ${longProjectName}` }),
+  ).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: `Действия над проектом ${longProjectName}` }));
+  expect(screen.queryByRole("treeitem", { name: longSessionTitle })).toBeNull();
+  expect(onOpenSession).not.toHaveBeenCalled();
+  expect(onNewSession).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: `Развернуть ${longProjectName}` }));
+  const sessionItem = screen.getByRole("treeitem", { name: longSessionTitle });
+  expect(sessionItem.getAttribute("title")).toBe(longSessionTitle);
+
+  fireEvent.click(screen.getByRole("button", { name: `Действия над сессией ${longSessionTitle}` }));
   expect(onOpenSession).not.toHaveBeenCalled();
 });
 

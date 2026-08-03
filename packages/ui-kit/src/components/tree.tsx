@@ -41,6 +41,8 @@ export type TreeNodeBadge = {
 export type TreeNode = {
   id: string;
   label: string;
+  /** Полная подпись в нативной подсказке, когда компактная геометрия обрезает видимый текст. */
+  title?: string;
   /** Значок перед подписью. Декоративный: в имя узла для скринридера он не попадает. */
   icon?: ReactNode;
   /** Метка рядом с подписью — состояние записи, число вложенных, что угодно ещё. */
@@ -260,6 +262,7 @@ export function Tree({
               }
             }}
             role="treeitem"
+            title={node.title}
             aria-level={level + 1}
             aria-expanded={hasChildren ? isExpanded : undefined}
             aria-selected={isSelected}

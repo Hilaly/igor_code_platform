@@ -29,6 +29,7 @@ it("shows one small daemon indicator next to the account menu", () => {
   );
   expect(screen.getAllByRole("status")).toHaveLength(1);
   expect(screen.getByRole("status", { name: "На связи" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Учётная запись" })).toHaveLength(1);
 });
 
 it("opens archived sessions from the account menu", () => {

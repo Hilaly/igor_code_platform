@@ -64,6 +64,23 @@ describe("interactive components", () => {
     ).toBe(false);
   });
 
+  it("keeps a complete Tree item label available when the visible label is truncated", () => {
+    const completeLabel =
+      "A tree item label long enough to be truncated without losing its complete meaning";
+
+    render(
+      <Tree
+        label="Проекты"
+        toggleLabel={treeToggleLabel}
+        nodes={[{ id: "project", label: completeLabel, title: completeLabel }]}
+      />,
+    );
+
+    expect(screen.getByRole("treeitem", { name: completeLabel }).getAttribute("title")).toBe(
+      completeLabel,
+    );
+  });
+
   it("renders a compact menu popup in the document body", () => {
     render(
       <Menu

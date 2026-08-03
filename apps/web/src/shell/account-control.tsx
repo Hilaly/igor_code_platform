@@ -25,7 +25,9 @@ export function AccountControl({
 
   return (
     <div className="shell-account">
-      <StatusDot tone={tone} label={label} />
+      <span className="shell-account-status">
+        <StatusDot tone={tone} label={label} />
+      </span>
       <Menu
         label={translator.t("account.menu")}
         trigger={translator.t("account.menu")}

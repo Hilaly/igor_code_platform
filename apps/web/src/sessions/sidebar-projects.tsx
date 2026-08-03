@@ -189,6 +189,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
   const nodes: TreeNode[] = activeProjects.map((project) => ({
     id: `project:${project.id}`,
     label: project.ephemeral ? t("projects.ephemeral") : project.name,
+    title: project.ephemeral ? t("projects.ephemeral") : project.name,
     ...(project.availability === "missing"
       ? { badge: { tone: "warning" as const, text: t("projects.availability.missing") } }
       : {}),
@@ -198,6 +199,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
       .map((session) => ({
         id: `session:${session.id}`,
         label: session.title ?? t("sessions.untitled"),
+        title: session.title ?? t("sessions.untitled"),
         actions: sessionActions(session),
       })),
   }));
