@@ -9,7 +9,7 @@ import { isSessionId } from "@sovereign/protocol";
 
 export const pluginPagePrefix = "p";
 
-/** Вью базовой поставки живут в ядре и своего адреса не теряют (docs/architecture.md). */
+/** Канонические адреса рабочих вью; старые системные адреса разбираются ниже для замены. */
 export const pluginsPagePath = "/plugins";
 export const projectsPagePath = "/projects";
 export const providersPagePath = "/providers";
@@ -17,29 +17,30 @@ export const sessionsPagePath = "/sessions";
 export const settingsPagePath = "/settings";
 
 /** Разделы вью настроек. Список закрыт: раздел, который ядро не знает, не превращается в запрос. */
-export const settingsSections = ["appearance", "daemon", "diagnostics"] as const;
+export const settingsSections = [
+  "appearance",
+  "providers",
+  "plugins",
+  "daemon",
+  "diagnostics",
+] as const;
 
 export type SettingsSection = (typeof settingsSections)[number];
 
 export type Page =
   | { kind: "home" }
-  | { kind: "plugins" }
   | { kind: "projects" }
   | { kind: "project"; projectId: string }
-  /**
-   * Список провайдеров, а с идентификатором — страница одного: вход и модели живут там, а не в
-   * раскрывающейся панели списка (docs/models-and-providers.md).
-   */
-  | { kind: "providers"; providerId?: string }
-  /** Мастер-деталь: список сессий, а с идентификатором — ещё и открытый чат. */
-  | { kind: "sessions"; sessionId?: string }
+  /** Адрес конкретного разговора; каталога сессий в центральной области больше нет. */
+  | { kind: "session"; sessionId: string }
+  | { kind: "session-archive" }
   /**
    * Создание сессии — отдельный адресуемый экран, а не модал: у модала фиксированная ширина, и
    * список моделей в нём не помещается. Адрес даёт ещё и рабочую кнопку «назад» и перезагрузку.
    */
   | { kind: "new-session" }
   /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
-  | { kind: "settings"; section?: SettingsSection }
+  | { kind: "settings"; section?: SettingsSection; providerId?: string }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -93,7 +94,7 @@ export function matchPage(path: string): Page {
   }
 
   if (segments.length === 1 && `/${segments[0]}` === pluginsPagePath) {
-    return { kind: "plugins" };
+    return { kind: "settings", section: "plugins" };
   }
 
   if (segments.length === 1 && `/${segments[0]}` === projectsPagePath) {
@@ -111,7 +112,7 @@ export function matchPage(path: string): Page {
     const encodedProviderId = segments[1];
 
     if (encodedProviderId === undefined) {
-      return { kind: "providers" };
+      return { kind: "settings", section: "providers" };
     }
 
     const providerId = decodeProviderId(encodedProviderId);
@@ -119,14 +120,16 @@ export function matchPage(path: string): Page {
     // Идентификатор провайдера не проверяется форматом, как `sessionId`: это внешние данные
     // рантайма, и их формат — не наш контракт. «Нет такого провайдера» говорит вью по снимку,
     // а маршрут только разбирает адрес.
-    return providerId === undefined ? { kind: "unknown", path } : { kind: "providers", providerId };
+    return providerId === undefined
+      ? { kind: "unknown", path }
+      : { kind: "settings", section: "providers", providerId };
   }
 
   if (`/${segments[0]}` === sessionsPagePath && segments.length <= 2) {
     const sessionId = segments[1];
 
     if (sessionId === undefined) {
-      return { kind: "sessions" };
+      return { kind: "home" };
     }
 
     // Строка "new" проходит регекс `isSessionId`, но означает экран создания, а не идентификатор.
@@ -135,20 +138,40 @@ export function matchPage(path: string): Page {
       return { kind: "new-session" };
     }
 
+    if (sessionId === "archive") {
+      return { kind: "session-archive" };
+    }
+
     // Мусор в адресе не превращается в запрос, который вернёт 404: проверка та же, что у демона.
-    return isSessionId(sessionId) ? { kind: "sessions", sessionId } : { kind: "unknown", path };
+    return isSessionId(sessionId) ? { kind: "session", sessionId } : { kind: "unknown", path };
   }
 
-  if (`/${segments[0]}` === settingsPagePath && segments.length <= 2) {
+  if (`/${segments[0]}` === settingsPagePath && segments.length <= 3) {
     const section = segments[1];
 
     if (section === undefined) {
       return { kind: "settings" };
     }
 
-    return settingsSections.includes(section as SettingsSection)
-      ? { kind: "settings", section: section as SettingsSection }
-      : { kind: "unknown", path };
+    if (!settingsSections.includes(section as SettingsSection)) {
+      return { kind: "unknown", path };
+    }
+
+    const providerSegment = segments[2];
+
+    if (providerSegment === undefined) {
+      return { kind: "settings", section: section as SettingsSection };
+    }
+
+    if (section !== "providers") {
+      return { kind: "unknown", path };
+    }
+
+    const providerId = decodeProviderId(providerSegment);
+
+    return providerId === undefined
+      ? { kind: "unknown", path }
+      : { kind: "settings", section: "providers", providerId };
   }
 
   if (segments[0] === pluginPagePrefix) {
@@ -169,24 +192,24 @@ export function pathOf(page: Page): string {
   switch (page.kind) {
     case "home":
       return "/";
-    case "plugins":
-      return pluginsPagePath;
     case "projects":
       return projectsPagePath;
     case "project":
       return `${projectsPagePath}/${encodeURIComponent(page.projectId)}`;
-    case "providers":
-      return page.providerId === undefined
-        ? providersPagePath
-        : `${providersPagePath}/${encodeProviderId(page.providerId)}`;
-    case "sessions":
-      return page.sessionId === undefined
-        ? sessionsPagePath
-        : `${sessionsPagePath}/${page.sessionId}`;
+    case "session":
+      return `${sessionsPagePath}/${page.sessionId}`;
+    case "session-archive":
+      return `${sessionsPagePath}/archive`;
     case "new-session":
       return `${sessionsPagePath}/new`;
     case "settings":
-      return page.section === undefined ? settingsPagePath : `${settingsPagePath}/${page.section}`;
+      if (page.section === undefined) {
+        return settingsPagePath;
+      }
+
+      return page.section === "providers" && page.providerId !== undefined
+        ? `${settingsPagePath}/providers/${encodeProviderId(page.providerId)}`
+        : `${settingsPagePath}/${page.section}`;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":
@@ -203,8 +226,18 @@ export type Navigation = {
 
 export function createNavigation(target: Window = window): Navigation {
   const listeners = new Set<(page: Page) => void>();
-  const announce = (): void => {
+  const readCurrent = (): Page => {
     const page = matchPage(target.location.pathname);
+    const canonicalPath = pathOf(page);
+
+    if (canonicalPath !== target.location.pathname) {
+      target.history.replaceState(undefined, "", canonicalPath);
+    }
+
+    return page;
+  };
+  const announce = (): void => {
+    const page = readCurrent();
 
     for (const listener of [...listeners]) {
       listener(page);
@@ -214,7 +247,7 @@ export function createNavigation(target: Window = window): Navigation {
   target.addEventListener("popstate", announce);
 
   return {
-    current: () => matchPage(target.location.pathname),
+    current: readCurrent,
     navigate: (page) => {
       const path = pathOf(page);
 
