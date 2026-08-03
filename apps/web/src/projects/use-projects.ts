@@ -33,8 +33,8 @@ export type ProjectsController = {
   state: ProjectsState;
   /** Ответ нужен вызывающему: форма закрывается только после успеха. */
   create: (draft: ProjectDraft) => Promise<boolean>;
-  update: (id: string, update: ProjectUpdate) => void;
-  remove: (id: string) => void;
+  update: (id: string, update: ProjectUpdate) => Promise<string | undefined>;
+  remove: (id: string) => Promise<string | undefined>;
   dismissComplaints: () => void;
 };
 
@@ -136,55 +136,59 @@ export function useProjects(options: UseProjectsOptions): ProjectsController {
   );
 
   const update = useCallback(
-    (id: string, next: ProjectUpdate) => {
+    async (id: string, next: ProjectUpdate): Promise<string | undefined> => {
       // Переименование и архивация — сразу: человек видит результат, а ответ переприменит то же.
       apply((current) => applyLocalUpdate(current, id, next));
 
       const seq = (writeSeq.current.get(id) ?? 0) + 1;
       writeSeq.current.set(id, seq);
 
-      void updateProject(id, next)
-        .then((project) => {
-          if ((writeSeq.current.get(id) ?? 0) !== seq) {
-            return;
-          }
+      try {
+        const project = await updateProject(id, next);
+        if ((writeSeq.current.get(id) ?? 0) !== seq) {
+          return undefined;
+        }
 
-          apply((current) =>
-            applyLocalUpdate(current, project.id, {
-              name: project.name,
-              archived: project.archived,
-            }),
-          );
-        })
-        .catch((cause: unknown) => {
-          if ((writeSeq.current.get(id) ?? 0) !== seq) {
-            return;
-          }
+        apply((current) =>
+          applyLocalUpdate(current, project.id, {
+            name: project.name,
+            archived: project.archived,
+          }),
+        );
+        return undefined;
+      } catch (cause: unknown) {
+        if ((writeSeq.current.get(id) ?? 0) !== seq) {
+          return undefined;
+        }
 
-          const reason = reasonOf(cause);
+        const reason = reasonOf(cause);
 
-          onDiagnostic(`the project could not be changed: ${reason}`);
-          apply((current) => applyFailure(current, reason));
-          // Оптимистичное изменение откатывается снимком, а не своей копией прежнего значения:
-          // за время запроса запись мог изменить кто-то ещё.
-          reload();
-        });
+        onDiagnostic(`the project could not be changed: ${reason}`);
+        apply((current) => applyFailure(current, reason));
+        // Оптимистичное изменение откатывается снимком, а не своей копией прежнего значения:
+        // за время запроса запись мог изменить кто-то ещё.
+        reload();
+        return reason;
+      }
     },
     [apply, onDiagnostic, reload],
   );
 
   const remove = useCallback(
-    (id: string) => {
+    async (id: string): Promise<string | undefined> => {
       apply(clearComplaints);
 
-      void deleteProject(id)
-        .then(() => reload())
-        .catch((cause: unknown) => {
-          const reason = reasonOf(cause);
+      try {
+        await deleteProject(id);
+        reload();
+        return undefined;
+      } catch (cause: unknown) {
+        const reason = reasonOf(cause);
 
-          onDiagnostic(`the project could not be removed: ${reason}`);
-          apply((current) => applyFailure(current, reason));
-        });
+        onDiagnostic(`the project could not be removed: ${reason}`);
+        apply((current) => applyFailure(current, reason));
+        return reason;
+      }
     },
     [apply, onDiagnostic, reload],
   );

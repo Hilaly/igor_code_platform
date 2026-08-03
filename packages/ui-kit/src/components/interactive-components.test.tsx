@@ -57,6 +57,11 @@ describe("interactive components", () => {
 
     fireEvent.keyDown(screen.getByRole("button", { name: "Создать сессию" }), { key: "Enter" });
     expect(onSelect).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByRole("treeitem", { name: "Alpha" })
+        .contains(screen.getByRole("button", { name: "Создать сессию" })),
+    ).toBe(false);
   });
 
   it("renders a compact menu popup in the document body", () => {

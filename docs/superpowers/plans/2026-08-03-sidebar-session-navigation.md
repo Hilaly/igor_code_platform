@@ -8,6 +8,8 @@
 
 **Tech Stack:** React 19, TypeScript, Vitest, Testing Library, CSS Modules, Ladle, pnpm workspace.
 
+**Implementation status:** Completed on `feat/sidebar-session-navigation`; automated verification and authenticated browser checks recorded in the handoff. The checkbox steps below remain the original execution checklist.
+
 ## Global Constraints
 
 - Work only in `.claude/worktrees/feat-sidebar-session-navigation` on `feat/sidebar-session-navigation`.

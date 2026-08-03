@@ -92,6 +92,13 @@
   gap: var(--sovereign-space-3);
 }
 
+.archive-sessions-groups,
+.archive-sessions-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
 .new-session-field {
   display: flex;
   flex-direction: column;

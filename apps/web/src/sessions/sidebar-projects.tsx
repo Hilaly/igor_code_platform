@@ -6,6 +6,8 @@ import {
   Field,
   Input,
   Menu,
+  Notice,
+  Spinner,
   Text,
   Tree,
   type ScopedTranslator,
@@ -18,12 +20,16 @@ const expandedProjectsKey = "sovereign.sidebar.expanded-projects";
 export type SidebarProjectsProps = {
   projects: Project[] | undefined;
   sessions: Session[] | undefined;
+  projectsLoading?: boolean;
+  projectsFailure?: string;
+  sessionsLoading?: boolean;
+  sessionsFailure?: string;
   selectedSessionId?: string;
   storage: Pick<Storage, "getItem" | "setItem">;
   onOpenSession: (sessionId: string) => void;
   onNewSession: (projectId: string) => void;
-  onUpdateProject: (projectId: string, update: ProjectUpdate) => void;
-  onRemoveProject: (projectId: string) => void;
+  onUpdateProject: (projectId: string, update: ProjectUpdate) => Promise<string | undefined>;
+  onRemoveProject: (projectId: string) => Promise<string | undefined>;
   onUpdateSession: (sessionId: string, update: SessionUpdate) => Promise<string | undefined>;
   onRemoveSession: (sessionId: string) => Promise<string | undefined>;
   translator: ScopedTranslator;
@@ -51,6 +57,8 @@ export function SidebarProjects(props: SidebarProjectsProps) {
   const [renaming, setRenaming] = useState<RenameTarget | undefined>();
   const [removing, setRemoving] = useState<RemoveTarget | undefined>();
   const [name, setName] = useState("");
+  const [pendingAction, setPendingAction] = useState<string | undefined>();
+  const [actionFailure, setActionFailure] = useState<string | undefined>();
   const activeProjects = useMemo(
     () => (props.projects ?? []).filter((project) => !project.archived),
     [props.projects],
@@ -77,6 +85,21 @@ export function SidebarProjects(props: SidebarProjectsProps) {
   const beginRename = (target: RenameTarget) => {
     setRenaming(target);
     setName(target.kind === "project" ? target.value.name : (target.value.title ?? ""));
+  };
+
+  const runAction = async (
+    key: string,
+    action: () => Promise<string | undefined>,
+  ): Promise<string | undefined> => {
+    setPendingAction(key);
+    setActionFailure(undefined);
+    try {
+      const reason = await action();
+      if (reason !== undefined) setActionFailure(reason);
+      return reason;
+    } finally {
+      setPendingAction(undefined);
+    }
   };
 
   const projectActions = (project: Project) => (
@@ -106,13 +129,17 @@ export function SidebarProjects(props: SidebarProjectsProps) {
             {
               id: "archive",
               label: t("projects.action.archive"),
+              disabled: pendingAction !== undefined,
               onSelect: () =>
-                props.onUpdateProject(project.id, { name: project.name, archived: true }),
+                void runAction(`archive-project:${project.id}`, () =>
+                  props.onUpdateProject(project.id, { name: project.name, archived: true }),
+                ),
             },
             {
               id: "remove",
               label: t("projects.action.remove"),
               tone: "danger",
+              disabled: pendingAction !== undefined,
               onSelect: () => setRemoving({ kind: "project", value: project }),
             },
           ]}
@@ -140,7 +167,9 @@ export function SidebarProjects(props: SidebarProjectsProps) {
             label: t("sessions.action.archive"),
             disabled: session.phase !== "idle",
             onSelect: () =>
-              void props.onUpdateSession(session.id, { ...sessionTitle(session), archived: true }),
+              void runAction(`archive-session:${session.id}`, () =>
+                props.onUpdateSession(session.id, { ...sessionTitle(session), archived: true }),
+              ),
           },
           {
             id: "remove",
@@ -172,6 +201,20 @@ export function SidebarProjects(props: SidebarProjectsProps) {
 
   return (
     <>
+      {actionFailure === undefined ||
+      actionFailure === props.projectsFailure ||
+      actionFailure === props.sessionsFailure ? undefined : (
+        <Notice tone="danger" title={t("projects.write.failed", { reason: actionFailure })} />
+      )}
+      {props.projectsFailure === undefined ? undefined : (
+        <Notice tone="danger" title={t("projects.failed", { reason: props.projectsFailure })} />
+      )}
+      {props.sessionsFailure === undefined ? undefined : (
+        <Notice tone="danger" title={t("sessions.failed", { reason: props.sessionsFailure })} />
+      )}
+      {props.projectsLoading || props.sessionsLoading ? (
+        <Spinner label={t("state.loading")} />
+      ) : null}
       <Tree
         label={t("sidebar.projects")}
         nodes={nodes}
@@ -213,15 +256,21 @@ export function SidebarProjects(props: SidebarProjectsProps) {
               tone="accent"
               onClick={() => {
                 if (renaming?.kind === "project") {
-                  props.onUpdateProject(renaming.value.id, {
-                    name: name.trim(),
-                    archived: renaming.value.archived,
-                  });
+                  const target = renaming;
+                  void runAction(`rename-project:${target.value.id}`, () =>
+                    props.onUpdateProject(target.value.id, {
+                      name: name.trim(),
+                      archived: target.value.archived,
+                    }),
+                  );
                 } else if (renaming?.kind === "session") {
-                  void props.onUpdateSession(renaming.value.id, {
-                    archived: renaming.value.archived,
-                    ...(name.trim() === "" ? {} : { title: name.trim() }),
-                  });
+                  const target = renaming;
+                  void runAction(`rename-session:${target.value.id}`, () =>
+                    props.onUpdateSession(target.value.id, {
+                      archived: target.value.archived,
+                      ...(name.trim() === "" ? {} : { title: name.trim() }),
+                    }),
+                  );
                 }
                 setRenaming(undefined);
               }}
@@ -263,10 +312,20 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         cancelLabel={t("common.cancel")}
         destructive
         onConfirm={() => {
-          if (removing?.kind === "project") props.onRemoveProject(removing.value.id);
-          if (removing?.kind === "session") void props.onRemoveSession(removing.value.id);
-          setRemoving(undefined);
+          if (removing?.kind === "project") {
+            const target = removing;
+            void runAction(`remove-project:${target.value.id}`, () =>
+              props.onRemoveProject(target.value.id),
+            ).then(() => setRemoving(undefined));
+          }
+          if (removing?.kind === "session") {
+            const target = removing;
+            void runAction(`remove-session:${target.value.id}`, () =>
+              props.onRemoveSession(target.value.id),
+            ).then(() => setRemoving(undefined));
+          }
         }}
+        pending={pendingAction !== undefined}
       >
         {removing?.kind === "project" ? (
           <Text tone="muted">{t("projects.remove.folder")}</Text>

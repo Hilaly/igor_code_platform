@@ -2,7 +2,7 @@
 
 import type { Project, Session } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { SidebarProjects } from "./sidebar-projects.tsx";
@@ -54,8 +54,8 @@ function show(overrides: Partial<React.ComponentProps<typeof SidebarProjects>> =
   const handlers = {
     onOpenSession: vi.fn(),
     onNewSession: vi.fn(),
-    onUpdateProject: vi.fn(),
-    onRemoveProject: vi.fn(),
+    onUpdateProject: vi.fn().mockResolvedValue(undefined),
+    onRemoveProject: vi.fn().mockResolvedValue(undefined),
     onUpdateSession: vi.fn().mockResolvedValue(undefined),
     onRemoveSession: vi.fn().mockResolvedValue(undefined),
   };
@@ -100,4 +100,49 @@ it("creates a session in a project without selecting the row", () => {
   fireEvent.click(screen.getByRole("button", { name: "Новая сессия в Alpha" }));
   expect(onNewSession).toHaveBeenCalledWith("alpha");
   expect(onOpenSession).not.toHaveBeenCalled();
+});
+
+it("shows loading and refresh failures without hiding a stale tree", () => {
+  show({
+    projectsLoading: true,
+    sessionsFailure: "offline",
+  });
+
+  expect(screen.getByRole("status")).toBeTruthy();
+  expect(screen.getByText(/offline/)).toBeTruthy();
+  expect(screen.getByRole("treeitem", { name: "Alpha" })).toBeTruthy();
+});
+
+it("shows a refused session action", async () => {
+  values.clear();
+  show({ onUpdateSession: vi.fn().mockResolvedValue("session is busy") });
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "В архив" }));
+
+  await waitFor(() => expect(screen.getByText(/session is busy/)).toBeTruthy());
+});
+
+it("renames, archives, and removes a project through row actions", async () => {
+  values.clear();
+  const { onUpdateProject, onRemoveProject } = show();
+
+  fireEvent.click(screen.getByRole("button", { name: "Действия над проектом Alpha" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Переименовать" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Имя" }), { target: { value: "Beta" } });
+  fireEvent.click(screen.getByRole("button", { name: "Переименовать" }));
+  await waitFor(() =>
+    expect(onUpdateProject).toHaveBeenCalledWith("alpha", { name: "Beta", archived: false }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Действия над проектом Alpha" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "В архив" }));
+  await waitFor(() =>
+    expect(onUpdateProject).toHaveBeenCalledWith("alpha", { name: "Alpha", archived: true }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Действия над проектом Alpha" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Удалить/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Удалить безвозвратно" }));
+  await waitFor(() => expect(onRemoveProject).toHaveBeenCalledWith("alpha"));
 });

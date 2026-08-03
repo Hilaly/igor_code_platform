@@ -2,7 +2,7 @@
 
 import type { Project, Session } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { ArchiveSessionsView } from "./archive-sessions-view.tsx";
@@ -63,7 +63,7 @@ it("groups archived sessions by project and opens their history", () => {
   expect(onOpen).toHaveBeenCalledWith("0199");
 });
 
-it("restores and permanently removes an archived session", () => {
+it("restores and permanently removes an archived session", async () => {
   const onRestore = vi.fn().mockResolvedValue(undefined);
   const onRemove = vi.fn().mockResolvedValue(undefined);
   render(
@@ -81,6 +81,7 @@ it("restores and permanently removes an archived session", () => {
   fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Вернуть из архива" }));
   expect(onRestore).toHaveBeenCalledWith(session);
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 
   fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Удалить безвозвратно" }));
@@ -89,4 +90,23 @@ it("restores and permanently removes an archived session", () => {
     within(screen.getByRole("dialog")).getByRole("button", { name: "Удалить безвозвратно" }),
   );
   expect(onRemove).toHaveBeenCalledWith("0199");
+});
+
+it("shows a refusal when restoring an archived session fails", async () => {
+  render(
+    <ArchiveSessionsView
+      sessions={[session]}
+      projects={[project]}
+      loaded
+      onOpen={vi.fn()}
+      onRestore={vi.fn().mockResolvedValue("session is busy")}
+      onRemove={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Вернуть из архива" }));
+
+  await waitFor(() => expect(screen.getByText(/session is busy/)).toBeTruthy());
 });

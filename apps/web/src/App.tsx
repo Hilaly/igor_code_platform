@@ -52,6 +52,7 @@ import { NewSessionView } from "./sessions/new-session-view.tsx";
 import { ArchiveSessionsView } from "./sessions/archive-sessions-view.tsx";
 import { ChatView } from "./sessions/chat-view.tsx";
 import { SidebarProjects } from "./sessions/sidebar-projects.tsx";
+import { SessionRouteView } from "./sessions/session-route-view.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
@@ -423,6 +424,14 @@ export function App() {
             <SidebarProjects
               projects={projects.state.snapshot?.projects}
               sessions={sessions.state.sessions}
+              projectsLoading={
+                projects.state.snapshot === undefined && projects.state.failure === undefined
+              }
+              projectsFailure={projects.state.failure}
+              sessionsLoading={
+                sessions.state.sessions === undefined && sessions.state.failure === undefined
+              }
+              sessionsFailure={sessions.state.failure}
               selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
               storage={localStorage}
               onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
@@ -493,24 +502,30 @@ export function App() {
           />
         }
         session={
-          sessions.state.open === undefined ? undefined : (
-            <ChatView
-              open={sessions.state.open}
-              onSubmit={sessions.submitTurn}
-              onSendMessage={sessions.sendMessage}
-              onInterrupt={sessions.interrupt}
-              onFork={async (request) => {
-                const outcome = await sessions.forkSession(request);
-                if (outcome.kind === "done") {
-                  navigation.navigate({ kind: "session", sessionId: outcome.session.id });
-                }
-              }}
-              onCompact={sessions.compact}
-              onSetLabel={sessions.setEntryLabel}
-              onNavigate={sessions.navigate}
-              translator={translator}
-            />
-          )
+          <SessionRouteView
+            sessionId={page.kind === "session" ? page.sessionId : ""}
+            open={sessions.state.open}
+            translator={translator}
+          >
+            {sessions.state.open === undefined ? null : (
+              <ChatView
+                open={sessions.state.open}
+                onSubmit={sessions.submitTurn}
+                onSendMessage={sessions.sendMessage}
+                onInterrupt={sessions.interrupt}
+                onFork={async (request) => {
+                  const outcome = await sessions.forkSession(request);
+                  if (outcome.kind === "done") {
+                    navigation.navigate({ kind: "session", sessionId: outcome.session.id });
+                  }
+                }}
+                onCompact={sessions.compact}
+                onSetLabel={sessions.setEntryLabel}
+                onNavigate={sessions.navigate}
+                translator={translator}
+              />
+            )}
+          </SessionRouteView>
         }
         sessionArchive={
           <ArchiveSessionsView
@@ -524,13 +539,13 @@ export function App() {
             failure={archivedSessions.state.failure}
             onOpen={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
             onRestore={async (session) => {
-              await archivedSessions.updateSession(session.id, {
+              return archivedSessions.updateSession(session.id, {
                 ...(session.title === undefined ? {} : { title: session.title }),
                 archived: false,
               });
             }}
             onRemove={async (sessionId) => {
-              await archivedSessions.removeSession(sessionId);
+              return archivedSessions.removeSession(sessionId);
             }}
             translator={translator}
           />

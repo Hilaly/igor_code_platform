@@ -9,11 +9,20 @@
 
 .item {
   display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.node {
+  display: flex;
+  flex: 1;
+  min-width: 0;
   flex-direction: column;
 }
 
 .row {
   display: inline-flex;
+  width: 100%;
   align-items: center;
   gap: var(--sovereign-space-2);
   padding: var(--sovereign-space-1) var(--sovereign-space-2);
@@ -31,7 +40,7 @@
  * Кольцо показывает настоящий фокус, а не право на `Tab`: узел, помнящий, куда вернётся `Tab`, есть
  * всегда, и подсвеченным он выглядел бы фокусом в дереве, из которого человек давно ушёл.
  */
-.item:focus-visible > .row {
+.node:focus-visible > .row {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
   outline-offset: -1px;
 }
@@ -89,6 +98,7 @@
   align-items: center;
   gap: var(--sovereign-space-1);
   margin-left: auto;
+  flex: none;
 }
 
 .children {

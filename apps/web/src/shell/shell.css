@@ -177,13 +177,6 @@
   flex: 1;
 }
 
-.archive-sessions-groups,
-.archive-sessions-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-}
-
 /* Вью плагинов: панель на плагин, в панели — строки вкладов. Геометрия здесь, вид — в ките. */
 .plugins,
 .plugins-plugin {

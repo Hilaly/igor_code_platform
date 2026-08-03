@@ -19,8 +19,8 @@ export type ArchiveSessionsViewProps = {
   loaded: boolean;
   failure?: string;
   onOpen: (sessionId: string) => void;
-  onRestore: (session: Session) => void | Promise<void>;
-  onRemove: (sessionId: string) => void | Promise<void>;
+  onRestore: (session: Session) => Promise<string | undefined>;
+  onRemove: (sessionId: string) => Promise<string | undefined>;
   translator: ScopedTranslator;
 };
 
@@ -36,6 +36,8 @@ export function ArchiveSessionsView({
 }: ArchiveSessionsViewProps) {
   const { t } = translator;
   const [removing, setRemoving] = useState<Session | undefined>();
+  const [pendingAction, setPendingAction] = useState<string | undefined>();
+  const [actionFailure, setActionFailure] = useState<string | undefined>();
   const projectNames = useMemo(
     () => new Map((projects ?? []).map((project) => [project.id, project.name])),
     [projects],
@@ -52,9 +54,29 @@ export function ArchiveSessionsView({
     return [...groups.entries()];
   }, [sessions]);
 
+  const runAction = async (
+    key: string,
+    action: () => Promise<string | undefined>,
+  ): Promise<void> => {
+    setPendingAction(key);
+    setActionFailure(undefined);
+
+    try {
+      const reason = await action();
+      if (reason !== undefined) {
+        setActionFailure(reason);
+      }
+    } finally {
+      setPendingAction(undefined);
+    }
+  };
+
   return (
     <div className="sessions archive-sessions">
       <Heading level={1}>{t("sessions.archive.title")}</Heading>
+      {actionFailure === undefined ? undefined : (
+        <Notice tone="danger" title={t("sessions.failed", { reason: actionFailure })} />
+      )}
       {failure === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.failed", { reason: failure })} />
       )}
@@ -82,12 +104,15 @@ export function ArchiveSessionsView({
                           {
                             id: "restore",
                             label: t("sessions.action.restore"),
-                            onSelect: () => void onRestore(session),
+                            disabled: pendingAction !== undefined,
+                            onSelect: () =>
+                              void runAction(`restore:${session.id}`, () => onRestore(session)),
                           },
                           {
                             id: "remove",
                             label: t("sessions.action.remove"),
                             tone: "danger",
+                            disabled: pendingAction !== undefined,
                             onSelect: () => setRemoving(session),
                           },
                         ]}
@@ -117,10 +142,13 @@ export function ArchiveSessionsView({
         destructive
         onConfirm={() => {
           if (removing !== undefined) {
-            void onRemove(removing.id);
+            const target = removing;
+            void runAction(`remove:${target.id}`, () => onRemove(target.id)).then(() =>
+              setRemoving(undefined),
+            );
           }
-          setRemoving(undefined);
         }}
+        pending={pendingAction === (removing === undefined ? undefined : `remove:${removing.id}`)}
       />
     </div>
   );
