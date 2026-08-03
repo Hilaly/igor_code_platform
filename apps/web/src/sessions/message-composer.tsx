@@ -6,6 +6,7 @@ export type MessageComposerProps = {
   draft: string;
   onDraftChange: (draft: string) => void;
   busy: boolean;
+  disabled?: boolean;
   onSubmit: (text: string) => void;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
@@ -23,6 +24,7 @@ export function MessageComposer({
   draft,
   onDraftChange,
   busy,
+  disabled = false,
   onSubmit,
   onSendMessage,
   onInterrupt,
@@ -32,7 +34,7 @@ export function MessageComposer({
   const [mode, setMode] = useState<SessionMessageMode>("steer");
 
   const send = (): void => {
-    if (draft.trim() === "") {
+    if (disabled || draft.trim() === "") {
       return;
     }
 
@@ -59,6 +61,7 @@ export function MessageComposer({
             value={mode}
             onChange={setMode}
             label={t("chat.mode.label")}
+            disabled={disabled}
           />
         </div>
       ) : undefined}
@@ -73,8 +76,9 @@ export function MessageComposer({
           autoGrow
           rows={2}
           maxRows={12}
+          disabled={disabled}
         />
-        <Button tone="accent" onClick={send} disabled={draft.trim() === ""}>
+        <Button tone="accent" onClick={send} disabled={disabled || draft.trim() === ""}>
           {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
         </Button>
         {!busy ? (
@@ -87,7 +91,7 @@ export function MessageComposer({
               void onSendMessage({ text: draft, mode: "append" });
               onDraftChange("");
             }}
-            disabled={draft.trim() === ""}
+            disabled={disabled || draft.trim() === ""}
           >
             {t("chat.append")}
           </Button>

@@ -79,6 +79,7 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
+  const agentAvailable = open.summary?.agentAvailable !== false;
 
   return (
     <div className="sessions-chat">
@@ -100,6 +101,7 @@ export function ChatView(props: ChatViewProps) {
         {...(open.leafId === undefined ? {} : { leafId: open.leafId })}
         busy={busy}
         archived={archived}
+        harnessAvailable={agentAvailable}
         onNavigate={props.onNavigate}
         onSetLabel={onSetLabel}
         onEditorText={setDraft}
@@ -108,6 +110,13 @@ export function ChatView(props: ChatViewProps) {
 
       {open.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
+      )}
+
+      {agentAvailable ? undefined : (
+        <Notice
+          tone="warning"
+          title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
+        />
       )}
 
       {refusal?.what !== "compact" ? undefined : (
@@ -165,6 +174,7 @@ export function ChatView(props: ChatViewProps) {
           draft={draft}
           onDraftChange={setDraft}
           busy={busy}
+          disabled={!agentAvailable}
           onSubmit={onSubmit}
           onSendMessage={onSendMessage}
           onInterrupt={onInterrupt}
@@ -183,7 +193,7 @@ export function ChatView(props: ChatViewProps) {
         {archived ? undefined : (
           <Button
             onClick={() => setCompacting(true)}
-            disabled={busy}
+            disabled={busy || !agentAvailable}
             {...(busy ? { title: t("chat.busy.hint") } : {})}
           >
             {t("chat.compact")}

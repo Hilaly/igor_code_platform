@@ -36,6 +36,7 @@ describe("ProjectDetailView", () => {
       <ProjectDetailView
         project={project}
         loaded
+        fileResources={<div>Файловые ресурсы проекта</div>}
         sessions={<div>Список сессий проекта</div>}
         onBack={vi.fn()}
         onNewSession={vi.fn()}
@@ -47,6 +48,7 @@ describe("ProjectDetailView", () => {
     expect(screen.getByText("/code/alpha")).toBeDefined();
     expect(screen.getByText("Сессий: 3")).toBeDefined();
     expect(screen.getByText("Список сессий проекта")).toBeDefined();
+    expect(screen.getByText("Файловые ресурсы проекта")).toBeDefined();
   });
 
   it("navigates back and starts a new session", () => {

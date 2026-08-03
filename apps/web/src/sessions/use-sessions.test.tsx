@@ -533,6 +533,27 @@ describe("useSessions", () => {
     expect(view.result.current.state.open?.summary).toBeUndefined();
   });
 
+  it("refreshes an open missing-agent session when contributions change", async () => {
+    sessions = [session({ agentAvailable: false })];
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() =>
+      expect(view.result.current.state.open?.summary?.agentAvailable).toBe(false),
+    );
+
+    sessions = [session({ agentAvailable: true })];
+    act(() =>
+      view.bus.publish({
+        index: 9,
+        time: "2026-08-03T00:00:00.000Z",
+        type: coreEventTypes.contributionsChanged,
+        payload: { revision: 4 },
+      }),
+    );
+
+    await waitFor(() => expect(view.result.current.state.open?.summary?.agentAvailable).toBe(true));
+  });
+
   it("ignores a delta that belongs to another session", async () => {
     // Кадры демон рассылает всем клиентам без фильтра: подписки на уровне протокола нет.
     const view = connect({ sessionId: "0199" });

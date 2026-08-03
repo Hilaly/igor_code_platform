@@ -46,7 +46,9 @@ import { PluginsView } from "./plugins/plugins-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { ProjectDetailView } from "./projects/project-detail-view.tsx";
+import { FileResourcesPanel } from "./projects/file-resources-panel.tsx";
 import { useProjects } from "./projects/use-projects.ts";
+import { useFileResources } from "./projects/use-file-resources.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
 import { NewSessionView } from "./sessions/new-session-view.tsx";
@@ -266,6 +268,12 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
+  const fileResources = useFileResources(
+    page.kind === "project" ? page.projectId : undefined,
+    bus,
+    stream,
+    diagnostics.record,
+  );
   const providers = useProviders({
     bus,
     stream,
@@ -500,6 +508,7 @@ export function App() {
             }
             loaded={projects.state.snapshot !== undefined}
             failure={projects.state.failure}
+            fileResources={<FileResourcesPanel state={fileResources} translator={translator} />}
             onBack={() => navigation.navigate({ kind: "projects" })}
             onNewSession={() => {
               if (page.kind === "project") {

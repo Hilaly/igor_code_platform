@@ -6,9 +6,11 @@
 import {
   filesystemPath,
   filesystemQueryParameter,
+  projectFileResourcesPath,
   projectPath,
   projectsPath,
   type FilesystemListing,
+  type FileResourcesSnapshot,
   type Project,
   type ProjectDeleted,
   type ProjectDraft,
@@ -24,6 +26,22 @@ export async function fetchProjectsSnapshot(signal?: AbortSignal): Promise<Proje
   }
 
   return (await response.json()) as ProjectsSnapshot;
+}
+
+export async function fetchProjectFileResources(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<FileResourcesSnapshot> {
+  const response = await fetch(
+    projectFileResourcesPath(projectId),
+    signal === undefined ? {} : { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as FileResourcesSnapshot;
 }
 
 /**

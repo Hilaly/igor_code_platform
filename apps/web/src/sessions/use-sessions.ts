@@ -360,6 +360,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         reloadOpen();
       }
 
+      if (event.type === coreEventTypes.contributionsChanged) {
+        reloadOpen();
+      }
+
       if (
         event.type === coreEventTypes.contributionsChanged &&
         selectedProject.current !== undefined

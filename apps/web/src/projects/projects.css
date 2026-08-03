@@ -59,6 +59,27 @@
   min-width: 0;
 }
 
+.project-resources-panel,
+.project-resource-problem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+.project-resources-counts,
+.project-resource-problem-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.project-resource-problem-head code {
+  overflow-wrap: anywhere;
+}
+
 /*
  * В строке ровно двое: сведения о проекте и его пометки с действиями. Действия держатся правого
  * края распором между ними, а не селектором по классу примитива: имена классов кита хешируются
