@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+  type FSWatcher,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -8,6 +17,7 @@ import { createLogger, type Logger } from "../platform/public.ts";
 import {
   createPluginWatcher,
   type ChangedPluginDirectory,
+  type CreatePluginWatcherOptions,
   type PluginWatcher,
 } from "./plugin-watcher.ts";
 
@@ -133,7 +143,108 @@ function started(root: string): Started {
   };
 }
 
+function injectedWatcher(root: string) {
+  const listeners: Array<(event: string, name: string | Buffer | null) => void> = [];
+  const scheduled: Array<{ callback: () => void; canceled: boolean; unref: () => void }> = [];
+  const closed: boolean[] = [];
+  const changes: ChangedPluginDirectory[][] = [];
+  let errorListeners = 0;
+  const watcher = createPluginWatcher({
+    roots: [{ source: "data", directory: root }],
+    logger: silent,
+    now: () => 10_000,
+    inspectPath: (path) => lstatSync(path, { throwIfNoEntry: false }),
+    watchDirectory: (_directory, _recursive, listener) => {
+      const watcherIndex = listeners.push(listener) - 1;
+      closed.push(false);
+      const fakeWatcher = {
+        on: (event: string) => {
+          if (event === "error") errorListeners += 1;
+          return fakeWatcher;
+        },
+        close: () => {
+          closed[watcherIndex] = true;
+        },
+      };
+      return fakeWatcher as unknown as FSWatcher;
+    },
+    scheduleDebounce: (callback) => {
+      const scheduledEntry = { callback, canceled: false, unref: () => undefined };
+      scheduled.push(scheduledEntry);
+      return scheduledEntry as unknown as NodeJS.Timeout;
+    },
+    cancelDebounce: (timer) => {
+      (timer as unknown as { canceled: boolean }).canceled = true;
+    },
+    onChange: (directories) => changes.push(directories),
+  } satisfies CreatePluginWatcherOptions);
+  watcher.start();
+  opened.push(watcher);
+
+  return {
+    watcher,
+    changes,
+    listeners,
+    closed,
+    get errorListeners() {
+      return errorListeners;
+    },
+    emit: (generation: number, event: string, name: string) => {
+      const listener = listeners[generation];
+      if (listener === undefined) throw new Error(`watcher generation ${generation} is not armed`);
+      listener(event, name);
+    },
+    flush: () => {
+      const entry = scheduled.shift();
+      if (entry === undefined) throw new Error("no plugin watcher callback is scheduled");
+      if (!entry.canceled) entry.callback();
+    },
+    pendingCallbacks: () => scheduled.filter((entry) => !entry.canceled).length,
+  };
+}
+
 describe("createPluginWatcher", () => {
+  it("attributes callbacks to the active watcher generation", () => {
+    const root = freshRoot();
+    const source = join(root, "hello", "src", "watcher-ready.ts");
+    const resource = join(root, "hello", "skills", "review", "SKILL.md");
+    mkdirSync(join(root, "hello", "skills", "review"), { recursive: true });
+    const startedWatcher = injectedWatcher(root);
+    assert.equal(startedWatcher.listeners.length, 1);
+    assert.equal(startedWatcher.errorListeners, 1);
+
+    writeFileSync(source, "export const stage = 'source-ready';\n");
+    startedWatcher.emit(0, "change", "hello/src/watcher-ready.ts");
+    startedWatcher.flush();
+    assert.deepEqual(startedWatcher.changes, [
+      [{ directory: join(root, "hello"), fileResourcesChanged: false }],
+    ]);
+
+    writeFileSync(source, "export const stage = 'pending-before-rearm';\n");
+    startedWatcher.emit(0, "change", "hello/src/watcher-ready.ts");
+    assert.equal(startedWatcher.pendingCallbacks(), 1);
+    startedWatcher.watcher.rearm([{ source: "data", directory: root }]);
+    assert.deepEqual(startedWatcher.closed, [true, false]);
+    assert.equal(startedWatcher.listeners.length, 2);
+    assert.equal(startedWatcher.pendingCallbacks(), 0);
+    startedWatcher.flush();
+    assert.equal(startedWatcher.changes.length, 1);
+
+    writeFileSync(source, "export const stage = 'stale-generation';\n");
+    startedWatcher.emit(0, "change", "hello/src/watcher-ready.ts");
+    assert.equal(startedWatcher.pendingCallbacks(), 0);
+
+    writeFileSync(resource, "---\nname: review\ndescription: active generation\n---\n");
+    startedWatcher.emit(1, "rename", "hello/skills/review/SKILL.md");
+    assert.equal(startedWatcher.pendingCallbacks(), 1);
+    startedWatcher.flush();
+    assert.deepEqual(startedWatcher.changes, [
+      [{ directory: join(root, "hello"), fileResourcesChanged: false }],
+      [{ directory: join(root, "hello"), fileResourcesChanged: true }],
+    ]);
+    startedWatcher.watcher.close();
+  });
+
   it("reports the plugin folder whose sources changed", async () => {
     const root = freshRoot();
     const startedWatcher = started(root);
@@ -184,8 +295,6 @@ describe("createPluginWatcher", () => {
 
   it("reports a resource file moved in with a preserved old timestamp", async () => {
     const root = freshRoot();
-    const references = join(root, "hello", "skills", "review", "references");
-    mkdirSync(references, { recursive: true });
     const source = join(root, "prepared-checklist.md");
     writeFileSync(source, "prepared earlier\n");
     const anHourAgo = new Date(Date.now() - 3_600_000);
@@ -194,24 +303,40 @@ describe("createPluginWatcher", () => {
     const { watcher, waitForChangeCount } = startedWatcher;
 
     const readyBaseline = startedWatcher.changeCount;
-    writeFileSync(join(references, "watcher-ready.md"), "ready\n");
-    await waitForChangeCount(readyBaseline + 1);
+    const references = join(root, "hello", "skills", "review", "references");
+    const readyFile = join(root, "hello", "src", "watcher-ready.ts");
+    let readyAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, readyBaseline + 1, () => {
+      readyAttempt += 1;
+      writeFileSync(readyFile, `export const readyStage = ${readyAttempt};\n`);
+    });
     const readyCallbackCount = startedWatcher.changeCount;
     assert.equal(readyCallbackCount, readyBaseline + 1);
     assert.deepEqual(startedWatcher.changes[readyBaseline], [
+      { directory: join(root, "hello"), fileResourcesChanged: false },
+    ]);
+
+    mkdirSync(references, { recursive: true });
+    await waitForChangeCount(readyCallbackCount + 1);
+    const resourceDirectoryCallbackCount = startedWatcher.changeCount;
+    assert.equal(resourceDirectoryCallbackCount, readyCallbackCount + 1);
+    assert.deepEqual(startedWatcher.changes[readyCallbackCount], [
       { directory: join(root, "hello"), fileResourcesChanged: true },
     ]);
 
     const checklist = join(references, "checklist.md");
     renameSync(source, checklist);
-    await waitForChangeCount(readyCallbackCount + 1);
-    assert.deepEqual(startedWatcher.changes[readyCallbackCount], [
+    await waitForChangeCount(resourceDirectoryCallbackCount + 1);
+    assert.deepEqual(startedWatcher.changes[resourceDirectoryCallbackCount], [
       { directory: join(root, "hello"), fileResourcesChanged: true },
     ]);
     const renameCallbackCount = startedWatcher.changeCount;
-    assert.equal(renameCallbackCount, readyCallbackCount + 1);
-    writeFileSync(checklist, `prepared earlier ${Date.now()}\n`);
-    await waitForChangeCount(renameCallbackCount + 1);
+    assert.equal(renameCallbackCount, resourceDirectoryCallbackCount + 1);
+    let movedMutationAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, renameCallbackCount + 1, () => {
+      movedMutationAttempt += 1;
+      writeFileSync(checklist, `post-rename-stage ${movedMutationAttempt}\n`);
+    });
 
     assert.deepEqual(startedWatcher.changes[renameCallbackCount], [
       { directory: join(root, "hello"), fileResourcesChanged: true },
@@ -295,4 +420,24 @@ async function repeatUntilSeen(
   }
 
   throw new Error("the watcher never reported the change");
+}
+
+async function repeatUntilChangeCount(
+  startedWatcher: Pick<Started, "waitForChangeCount">,
+  target: number,
+  write: () => void,
+): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    write();
+    try {
+      await startedWatcher.waitForChangeCount(target, 200);
+      return;
+    } catch (cause) {
+      if (!(cause instanceof Error) || !cause.message.startsWith("watcher callback count stayed")) {
+        throw cause;
+      }
+    }
+  }
+
+  throw new Error(`watcher callback count stayed below ${target}`);
 }

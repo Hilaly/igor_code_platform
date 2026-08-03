@@ -125,19 +125,10 @@ export function createFileResourceWatcher(
         const nextSegment = relative(candidate, root.directory).split(sep)[0];
         if (nextSegment === undefined || nextSegment === "") return;
         watchDirectory(candidate, false, generation, (_event, name) => {
-          if (name === nextSegment || name.startsWith(`${nextSegment}${sep}`)) {
-            try {
-              return rootIsUsableDirectory();
-            } catch (cause) {
-              options.logger.error("inspecting a standalone file resource root failed", {
-                directory: root.directory,
-                reason: cause instanceof Error ? cause.message : String(cause),
-              });
-              return false;
-            }
-          }
+          if (name !== nextSegment && name !== basename(candidate)) return false;
+
           // macOS can coalesce a nested create and report the watched parent's own basename. In
-          // that case the event name is unrelated, but inspection confirms the target appeared.
+          // that case only that exact basename is accepted; unrelated siblings must not rescan.
           try {
             return rootIsUsableDirectory();
           } catch (cause) {

@@ -13,10 +13,10 @@ import {
   type Stats,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { after, describe, it } from "node:test";
 
-import { createLogger } from "../platform/public.ts";
+import { createLogger, type Logger } from "../platform/public.ts";
 import {
   createFileResourceWatcher,
   type CreateFileResourceWatcherOptions,
@@ -51,6 +51,8 @@ function started(
   inspectPath?: (path: string) => Stats | undefined,
   watchDirectory?: CreateFileResourceWatcherOptions["watchDirectory"],
   debounce?: Pick<CreateFileResourceWatcherOptions, "scheduleDebounce" | "cancelDebounce">,
+  watcherLogger: Logger = logger,
+  onWatchArmed?: (directory: string, recursive: boolean) => void,
 ) {
   const pending: number[] = [];
   let waiter: (() => void) | undefined;
@@ -60,13 +62,17 @@ function started(
     recursive,
     listener,
   ) => {
-    if (watchDirectory !== undefined) return watchDirectory(directory, recursive, listener);
-    return watch(directory, { recursive }, listener);
+    const watcher =
+      watchDirectory !== undefined
+        ? watchDirectory(directory, recursive, listener)
+        : watch(directory, { recursive }, listener);
+    onWatchArmed?.(directory, recursive);
+    return watcher;
   };
   const countWaiters: Array<{ target: number; resolve: () => void }> = [];
   const watcher = createFileResourceWatcher({
     roots,
-    logger,
+    logger: watcherLogger,
     debounceMilliseconds: 20,
     ...(inspectPath === undefined ? {} : { inspectPath }),
     watchDirectory: watchFactory,
@@ -131,15 +137,33 @@ function started(
   };
 }
 
-function injectedWatcher(directory: string) {
+function injectedWatcher(
+  directory: string,
+  inspectPath: (path: string) => Stats | undefined = (path) =>
+    lstatSync(path, { throwIfNoEntry: false }),
+) {
   const listeners: Array<(event: string, name: string | Buffer | null) => void> = [];
   const scheduled: Array<() => void> = [];
+  const errors: string[] = [];
+  const watcherLogger = createLogger({
+    source: "core",
+    level: () => "error",
+    write: (record) => errors.push(record.message),
+  });
+  let errorListeners = 0;
   const startedWatcher = started(
     [root(directory)],
-    (path) => lstatSync(path, { throwIfNoEntry: false }),
+    inspectPath,
     (_watchedDirectory, _recursive, listener) => {
       listeners.push(listener);
-      return { close: () => undefined } as unknown as FSWatcher;
+      const fakeWatcher = {
+        on: (event: string) => {
+          if (event === "error") errorListeners += 1;
+          return fakeWatcher;
+        },
+        close: () => undefined,
+      };
+      return fakeWatcher as unknown as FSWatcher;
     },
     {
       scheduleDebounce: (callback) => {
@@ -148,6 +172,7 @@ function injectedWatcher(directory: string) {
       },
       cancelDebounce: () => undefined,
     },
+    watcherLogger,
   );
 
   return {
@@ -156,6 +181,10 @@ function injectedWatcher(directory: string) {
       return startedWatcher.changeCount;
     },
     waitForChangeCount: startedWatcher.waitForChangeCount,
+    errors,
+    get errorListeners() {
+      return errorListeners;
+    },
     scheduled,
     flush: () => {
       const callback = scheduled.shift();
@@ -202,15 +231,28 @@ describe("createFileResourceWatcher", () => {
     const parent = join(workspace, `missing-${sequence++}`);
     mkdirSync(parent);
     const directory = join(parent, ".sovereign", "agents");
-    const startedWatcher = started([root(directory)]);
-    const { watcher, nextChange } = startedWatcher;
+    let watchArmed = false;
+    const startedWatcher = started(
+      [root(directory)],
+      undefined,
+      undefined,
+      undefined,
+      logger,
+      (watchedDirectory, recursive) => {
+        if (watchedDirectory === parent && !recursive) watchArmed = true;
+      },
+    );
+    const { watcher } = startedWatcher;
 
-    let attempt = 0;
-    await repeatUntilSeen(nextChange, () => {
-      attempt += 1;
+    assert.equal(watchArmed, true);
+    let appearanceAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, 1, () => {
+      appearanceAttempt += 1;
+      rmSync(join(parent, ".sovereign"), { recursive: true, force: true });
       mkdirSync(directory, { recursive: true });
-      mkdirSync(join(directory, `definition-${attempt}`), { recursive: true });
+      writeFileSync(join(directory, `definition-${appearanceAttempt}.md`), "definition\n");
     });
+    assert.equal(startedWatcher.changeCount, 1);
     watcher.close();
   });
 
@@ -234,6 +276,8 @@ describe("createFileResourceWatcher", () => {
     const sovereignDirectory = join(parent, ".sovereign");
     const directory = join(sovereignDirectory, "agents");
     const startedWatcher = injectedWatcher(directory);
+    assert.deepEqual(startedWatcher.errors, []);
+    assert.equal(startedWatcher.errorListeners, 1);
 
     mkdirSync(sovereignDirectory);
     startedWatcher.emit("rename", ".sovereign");
@@ -246,10 +290,63 @@ describe("createFileResourceWatcher", () => {
     assert.equal(startedWatcher.changeCount, 0);
 
     mkdirSync(directory);
-    startedWatcher.emit("change", "injected-missing");
+    startedWatcher.emit("change", "unrelated-after-root");
+    assert.equal(startedWatcher.scheduled.length, 0);
+    assert.equal(startedWatcher.changeCount, 0);
+
+    startedWatcher.emit("change", basename(parent));
     assert.equal(startedWatcher.scheduled.length, 1);
     startedWatcher.flush();
     assert.equal(startedWatcher.changeCount, 1);
+    startedWatcher.watcher.close();
+  });
+
+  it("rejects file and symlink roots before accepting an absent real directory", () => {
+    const parent = join(workspace, `injected-root-kind-${sequence++}`);
+    const sovereignDirectory = join(parent, ".sovereign");
+    const directory = join(sovereignDirectory, "agents");
+    const external = join(workspace, `injected-root-target-${sequence++}`);
+    mkdirSync(sovereignDirectory, { recursive: true });
+    mkdirSync(external);
+    const startedWatcher = injectedWatcher(directory);
+
+    writeFileSync(directory, "not a directory\n");
+    startedWatcher.emit("rename", ".sovereign");
+    assert.equal(startedWatcher.scheduled.length, 0);
+
+    rmSync(directory);
+    symlinkSync(external, directory);
+    startedWatcher.emit("rename", basename(parent));
+    assert.equal(startedWatcher.scheduled.length, 0);
+
+    rmSync(directory);
+    mkdirSync(directory);
+    startedWatcher.emit("rename", "unrelated-after-root");
+    assert.equal(startedWatcher.scheduled.length, 0);
+    startedWatcher.emit("rename", ".sovereign");
+    assert.equal(startedWatcher.scheduled.length, 1);
+    startedWatcher.flush();
+    assert.equal(startedWatcher.changeCount, 1);
+    assert.deepEqual(startedWatcher.errors, []);
+    startedWatcher.watcher.close();
+  });
+
+  it("logs and ignores an absent-root inspection race", () => {
+    const parent = join(workspace, `injected-inspection-${sequence++}`);
+    mkdirSync(parent);
+    const directory = join(parent, ".sovereign", "agents");
+    let inspectionFails = false;
+    const startedWatcher = injectedWatcher(directory, (path) => {
+      if (inspectionFails && path === directory) throw new Error("root inspection raced");
+      return lstatSync(path, { throwIfNoEntry: false });
+    });
+
+    inspectionFails = true;
+    startedWatcher.emit("rename", ".sovereign");
+
+    assert.equal(startedWatcher.scheduled.length, 0);
+    assert.equal(startedWatcher.changeCount, 0);
+    assert.deepEqual(startedWatcher.errors, ["inspecting a standalone file resource root failed"]);
     startedWatcher.watcher.close();
   });
 
@@ -274,30 +371,47 @@ describe("createFileResourceWatcher", () => {
     const entry = join(definition, "AGENT.md");
     const sibling = join(definition, "reference.md");
     const startedWatcher = started([root(directory)]);
-    const { watcher, nextChange } = startedWatcher;
+    const { watcher } = startedWatcher;
 
-    await repeatUntilSeen(nextChange, () => writeFileSync(entry, `created ${Date.now()}\n`));
-    await repeatUntilSeen(nextChange, () => writeFileSync(entry, `changed ${Date.now()}\n`));
-    await repeatUntilSeen(nextChange, () => writeFileSync(sibling, `sibling ${Date.now()}\n`));
-    await repeatUntilSeen(nextChange, () => rmSync(entry, { force: true }));
+    await repeatUntilChangeCount(startedWatcher, 1, () =>
+      writeFileSync(entry, `created ${Date.now()}\n`),
+    );
+    await repeatUntilChangeCount(startedWatcher, 2, () =>
+      writeFileSync(entry, `changed ${Date.now()}\n`),
+    );
+    await repeatUntilChangeCount(startedWatcher, 3, () =>
+      writeFileSync(sibling, `sibling ${Date.now()}\n`),
+    );
+    let deleteAttempt = 0;
+    while (startedWatcher.changeCount < 4 && deleteAttempt < 20) {
+      deleteAttempt += 1;
+      if (lstatSync(entry, { throwIfNoEntry: false }) === undefined) {
+        const recreateTarget = startedWatcher.changeCount + 1;
+        writeFileSync(entry, `recreated before delete ${deleteAttempt}\n`);
+        await startedWatcher.waitForChangeCount(recreateTarget, 1_000);
+      }
+      const deleteTarget = startedWatcher.changeCount + 1;
+      rmSync(entry);
+      try {
+        await startedWatcher.waitForChangeCount(deleteTarget, 200);
+      } catch (cause) {
+        if (
+          !(cause instanceof Error) ||
+          !cause.message.startsWith("watcher callback count stayed")
+        ) {
+          throw cause;
+        }
+      }
+    }
+    assert.ok(startedWatcher.changeCount >= 4);
     watcher.close();
   });
 
   it("reports an old definition tree moved into an existing root", async () => {
     const directory = join(workspace, `moved-root-${sequence++}`);
-    const prepared = join(workspace, `prepared-${sequence++}`);
     mkdirSync(directory);
-    mkdirSync(join(prepared, "references"), { recursive: true });
-    writeFileSync(join(prepared, "AGENT.md"), "old definition\n");
-    writeFileSync(join(prepared, "references", "guide.md"), "old resource\n");
-    const anHourAgo = new Date(Date.now() - 3_600_000);
-    utimesSync(join(prepared, "AGENT.md"), anHourAgo, anHourAgo);
-    utimesSync(join(prepared, "references", "guide.md"), anHourAgo, anHourAgo);
-    utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
-    utimesSync(prepared, anHourAgo, anHourAgo);
     const startedWatcher = started([root(directory)]);
     const { watcher } = startedWatcher;
-    const moved = join(directory, "moved");
 
     const readyBaseline = startedWatcher.changeCount;
     // Establish that the recursive watcher is active before issuing the one-shot rename.
@@ -309,17 +423,35 @@ describe("createFileResourceWatcher", () => {
     assert.equal(startedWatcher.changeCount, readyBaseline + 1);
     const callbacksAfterReady = startedWatcher.changeCount;
 
-    // First prove the original one-shot rename event. Only after that callback (including debounce,
-    // rearm, and onChange) completes may a later mutation prove the moved tree remains watched.
-    renameSync(prepared, moved);
-    await startedWatcher.waitForChangeCount(callbacksAfterReady + 1);
+    // Every attempt is a real rename of a distinct tree whose mtimes predate the watcher. Native
+    // recursive watchers can lose a one-shot event under full-suite load, so retry the observable
+    // operation itself rather than mutating below a tree the current watcher may not have seen.
+    let moved: string | undefined;
+    let moveAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, callbacksAfterReady + 1, () => {
+      moveAttempt += 1;
+      const prepared = join(workspace, `prepared-${sequence++}`);
+      const nextMoved = join(directory, `moved-${moveAttempt}`);
+      mkdirSync(join(prepared, "references"), { recursive: true });
+      writeFileSync(join(prepared, "AGENT.md"), `old definition ${moveAttempt}\n`);
+      writeFileSync(join(prepared, "references", "guide.md"), `old resource ${moveAttempt}\n`);
+      const anHourAgo = new Date(Date.now() - 3_600_000);
+      utimesSync(join(prepared, "AGENT.md"), anHourAgo, anHourAgo);
+      utimesSync(join(prepared, "references", "guide.md"), anHourAgo, anHourAgo);
+      utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
+      utimesSync(prepared, anHourAgo, anHourAgo);
+      renameSync(prepared, nextMoved);
+      moved = nextMoved;
+    });
     assert.equal(startedWatcher.changeCount, callbacksAfterReady + 1);
+    if (moved === undefined) throw new Error("no old definition tree was moved");
+    const watchedMoved = moved;
     const callbacksAfterRename = startedWatcher.changeCount;
     let movedMutationAttempt = 0;
     await repeatUntilChangeCount(startedWatcher, callbacksAfterRename + 1, () => {
       movedMutationAttempt += 1;
       writeFileSync(
-        join(moved, "references", "guide.md"),
+        join(watchedMoved, "references", "guide.md"),
         `old resource ${movedMutationAttempt}\n`,
       );
     });
