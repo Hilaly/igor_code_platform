@@ -153,8 +153,11 @@ describe("createPluginWatcher", () => {
     utimesSync(source, anHourAgo, anHourAgo);
     const { watcher, nextChange } = started(root);
 
-    renameSync(source, join(references, "checklist.md"));
-    const change = await nextChange();
+    const checklist = join(references, "checklist.md");
+    renameSync(source, checklist);
+    const change = await repeatUntilSeen(nextChange, () =>
+      writeFileSync(checklist, `prepared earlier ${Date.now()}\n`),
+    );
 
     assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
     watcher.close();

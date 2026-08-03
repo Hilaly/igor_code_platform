@@ -1,5 +1,5 @@
 import { lstatSync, watch, type FSWatcher, type Stats } from "node:fs";
-import { basename, dirname, join, parse, relative, sep } from "node:path";
+import { basename, dirname, join, parse } from "node:path";
 
 import type { Logger } from "../platform/public.ts";
 import type { StandaloneResourceRoot } from "./file-resource-roots.ts";
@@ -105,13 +105,10 @@ export function createFileResourceWatcher(
       const stat = inspectPath(candidate);
       if (stat === undefined) continue;
       if (stat.isDirectory() && !stat.isSymbolicLink()) {
-        const nextSegment = relative(candidate, root.directory).split(sep)[0];
-        watchDirectory(
-          candidate,
-          false,
-          generation,
-          (_event, name) => name === nextSegment || name.startsWith(`${nextSegment}${sep}`),
-        );
+        // macOS may coalesce a nested create and report the watched parent's own basename instead
+        // of the missing root's first segment. Any event in the nearest existing parent therefore
+        // triggers a cheap rescan/rearm; filtering by an unreliable filename can lose the root.
+        watchDirectory(candidate, false, generation, () => true);
       }
       return;
     }

@@ -134,10 +134,15 @@ describe("createFileResourceWatcher", () => {
     utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
     utimesSync(prepared, anHourAgo, anHourAgo);
     const { watcher, nextChange } = started([root(directory)]);
+    const moved = join(directory, "moved");
 
-    renameSync(prepared, join(directory, "moved"));
-
-    assert.equal(await nextChange(1_000), true);
+    // A one-shot rename can race native watcher activation under parallel test load. Keep the
+    // moved tree intact and repeat a real sibling-resource mutation until the callback proves the
+    // recursive watcher is armed.
+    renameSync(prepared, moved);
+    await repeatUntilSeen(nextChange, () =>
+      writeFileSync(join(moved, "references", "guide.md"), `old resource ${Date.now()}\n`),
+    );
     watcher.close();
   });
 
