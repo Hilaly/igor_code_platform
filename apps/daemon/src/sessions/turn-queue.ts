@@ -199,7 +199,9 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
           cancelled: false,
         };
 
-        if (running.size < options.limit()) {
+        drain();
+
+        if (waiting.length === 0 && running.size < options.limit()) {
           start(place.job, turnId, false);
         } else {
           waiting.push(place);
