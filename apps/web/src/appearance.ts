@@ -9,7 +9,7 @@
 import {
   applyRoles,
   applyScale,
-  baseScheme,
+  imperiumScheme,
   resolveScheme,
   shippedSchemes,
   type ColorScheme,
@@ -110,7 +110,7 @@ export function applyAppearance(options: ApplyAppearanceOptions): void {
   }
 
   const variant = resolveVariant(options.preferences.appearance.variant, options.prefersDark);
-  const resolved = resolveScheme(found ?? baseScheme, variant);
+  const resolved = resolveScheme(found ?? imperiumScheme, variant);
 
   if (resolved.kind === "rejected") {
     for (const diagnostic of resolved.diagnostics) {
@@ -118,7 +118,7 @@ export function applyAppearance(options: ApplyAppearanceOptions): void {
     }
 
     // Отказ схемы не оставляет интерфейс без цветов: встроенная схема всегда совпадает с китом.
-    const fallback = resolveScheme(baseScheme, variant);
+    const fallback = resolveScheme(imperiumScheme, variant);
 
     if (fallback.kind === "resolved") {
       applyRoles(fallback.roles, options.target);
