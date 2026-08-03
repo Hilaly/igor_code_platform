@@ -39,6 +39,8 @@ export type Page =
    * список моделей в нём не помещается. Адрес даёт ещё и рабочую кнопку «назад» и перезагрузку.
    */
   | { kind: "new-session" }
+  | { kind: "new-provider" }
+  | { kind: "edit-provider"; providerId: string }
   /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
   | { kind: "settings"; section?: SettingsSection; providerId?: string }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
@@ -108,6 +110,17 @@ export function matchPage(path: string): Page {
     return projectId === undefined ? { kind: "unknown", path } : { kind: "project", projectId };
   }
 
+  if (`/${segments[0]}` === providersPagePath && segments[1] === "new" && segments.length === 2) {
+    return { kind: "new-provider" };
+  }
+
+  if (`/${segments[0]}` === providersPagePath && segments[2] === "edit" && segments.length === 3) {
+    const providerId = segments[1] === undefined ? undefined : decodeProviderId(segments[1]);
+    return providerId === undefined
+      ? { kind: "unknown", path }
+      : { kind: "edit-provider", providerId };
+  }
+
   if (`/${segments[0]}` === providersPagePath && segments.length <= 2) {
     const encodedProviderId = segments[1];
 
@@ -144,6 +157,27 @@ export function matchPage(path: string): Page {
 
     // Мусор в адресе не превращается в запрос, который вернёт 404: проверка та же, что у демона.
     return isSessionId(sessionId) ? { kind: "session", sessionId } : { kind: "unknown", path };
+  }
+
+  if (
+    `/${segments[0]}` === settingsPagePath &&
+    segments[1] === "providers" &&
+    segments[2] === "new" &&
+    segments.length === 3
+  ) {
+    return { kind: "new-provider" };
+  }
+
+  if (
+    `/${segments[0]}` === settingsPagePath &&
+    segments[1] === "providers" &&
+    segments[3] === "edit" &&
+    segments.length === 4
+  ) {
+    const providerId = segments[2] === undefined ? undefined : decodeProviderId(segments[2]);
+    return providerId === undefined
+      ? { kind: "unknown", path }
+      : { kind: "edit-provider", providerId };
   }
 
   if (`/${segments[0]}` === settingsPagePath && segments.length <= 3) {
@@ -202,6 +236,10 @@ export function pathOf(page: Page): string {
       return `${sessionsPagePath}/archive`;
     case "new-session":
       return `${sessionsPagePath}/new`;
+    case "new-provider":
+      return `${settingsPagePath}/providers/new`;
+    case "edit-provider":
+      return `${settingsPagePath}/providers/${encodeProviderId(page.providerId)}/edit`;
     case "settings":
       if (page.section === undefined) {
         return settingsPagePath;

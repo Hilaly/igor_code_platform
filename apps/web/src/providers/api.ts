@@ -17,6 +17,9 @@ import {
   providerLoginsPath,
   providerModelsPath,
   providersPath,
+  userProviderPath,
+  userProviderRefreshPath,
+  userProvidersPath,
   type LoginAnswer,
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
@@ -24,6 +27,10 @@ import {
   type ProviderModels,
   type ProviderSummary,
   type ProvidersSnapshot,
+  type UserProviderDeleted,
+  type UserProviderDetails,
+  type UserProviderDraft,
+  type UserProvidersSnapshot,
 } from "@sovereign/protocol";
 
 export async function fetchProvidersSnapshot(signal?: AbortSignal): Promise<ProvidersSnapshot> {
@@ -52,6 +59,64 @@ export async function fetchProviderModels(
   }
 
   return (await response.json()) as ProviderModels;
+}
+
+export async function fetchUserProviders(signal?: AbortSignal): Promise<UserProvidersSnapshot> {
+  const response = await fetch(userProvidersPath, signal === undefined ? {} : { signal });
+  if (!response.ok) throw new Error(await reasonOf(response));
+  return (await response.json()) as UserProvidersSnapshot;
+}
+
+export async function fetchUserProvider(
+  id: string,
+  signal?: AbortSignal,
+): Promise<UserProviderDetails> {
+  const response = await fetch(userProviderPath(id), signal === undefined ? {} : { signal });
+  if (!response.ok) throw new Error(await reasonOf(response));
+  return (await response.json()) as UserProviderDetails;
+}
+
+export async function createUserProvider(draft: UserProviderDraft): Promise<UserProviderDetails> {
+  return writeUserProvider(userProvidersPath, "POST", draft);
+}
+
+export async function updateUserProvider(
+  id: string,
+  draft: UserProviderDraft,
+): Promise<UserProviderDetails> {
+  return writeUserProvider(userProviderPath(id), "PUT", draft);
+}
+
+export async function deleteUserProvider(id: string): Promise<UserProviderDeleted> {
+  const response = await fetch(userProviderPath(id), {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+  });
+  if (!response.ok) throw new Error(await reasonOf(response));
+  return (await response.json()) as UserProviderDeleted;
+}
+
+export async function refreshUserProvider(id: string): Promise<UserProviderDetails> {
+  const response = await fetch(userProviderRefreshPath(id), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+  if (!response.ok) throw new Error(await reasonOf(response));
+  return (await response.json()) as UserProviderDetails;
+}
+
+async function writeUserProvider(
+  path: string,
+  method: "POST" | "PUT",
+  draft: UserProviderDraft,
+): Promise<UserProviderDetails> {
+  const response = await fetch(path, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(draft),
+  });
+  if (!response.ok) throw new Error(await reasonOf(response));
+  return (await response.json()) as UserProviderDetails;
 }
 
 /**

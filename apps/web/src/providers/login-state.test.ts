@@ -60,6 +60,7 @@ const provider = (auth: ProviderSummary["auth"]): ProviderSummary => ({
   auth,
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 2,
 });
 

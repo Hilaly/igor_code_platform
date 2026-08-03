@@ -47,6 +47,14 @@ import { FileResourcesPanel } from "./projects/file-resources-panel.tsx";
 import { useProjects } from "./projects/use-projects.ts";
 import { useFileResources } from "./projects/use-file-resources.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
+import { UserProviderForm } from "./providers/user-provider-form.tsx";
+import {
+  createUserProvider,
+  deleteUserProvider,
+  fetchUserProvider,
+  refreshUserProvider,
+  updateUserProvider,
+} from "./providers/api.ts";
 import { useProviders } from "./providers/use-providers.ts";
 import { NewSessionView } from "./sessions/new-session-view.tsx";
 import { ArchiveSessionsView } from "./sessions/archive-sessions-view.tsx";
@@ -280,6 +288,25 @@ export function App() {
     onDiagnostic: diagnostics.record,
     providerId: page.kind === "settings" ? page.providerId : undefined,
   });
+  const [editingProvider, setEditingProvider] = useState<
+    import("@sovereign/protocol").UserProviderDefinition | undefined
+  >(undefined);
+  const [providerFormFailure, setProviderFormFailure] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (page.kind !== "edit-provider") {
+      setEditingProvider(undefined);
+      setProviderFormFailure(undefined);
+      return;
+    }
+    const controller = new AbortController();
+    void fetchUserProvider(page.providerId, controller.signal)
+      .then((details) => setEditingProvider(details.definition))
+      .catch((cause: unknown) =>
+        setProviderFormFailure(cause instanceof Error ? cause.message : String(cause)),
+      );
+    return () => controller.abort();
+  }, [page]);
   const sessions = useSessions({
     bus,
     stream,
@@ -578,6 +605,60 @@ export function App() {
             translator={translator}
           />
         }
+        newProvider={
+          <UserProviderForm
+            mode="create"
+            onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
+            failure={providerFormFailure}
+            onSubmit={async (definition) => {
+              try {
+                await createUserProvider(definition);
+                setProviderFormFailure(undefined);
+                navigation.navigate({
+                  kind: "settings",
+                  section: "providers",
+                  providerId: definition.id,
+                });
+              } catch (cause) {
+                setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+              }
+            }}
+            translator={translator}
+          />
+        }
+        editProvider={
+          <UserProviderForm
+            mode="edit"
+            initial={editingProvider}
+            loading={
+              page.kind === "edit-provider" &&
+              editingProvider === undefined &&
+              providerFormFailure === undefined
+            }
+            failure={providerFormFailure}
+            onBack={() =>
+              navigation.navigate({
+                kind: "settings",
+                section: "providers",
+                providerId: page.kind === "edit-provider" ? page.providerId : undefined,
+              })
+            }
+            onSubmit={async (definition) => {
+              try {
+                await updateUserProvider(definition.id, definition);
+                setProviderFormFailure(undefined);
+                navigation.navigate({
+                  kind: "settings",
+                  section: "providers",
+                  providerId: definition.id,
+                });
+              } catch (cause) {
+                setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+              }
+            }}
+            translator={translator}
+          />
+        }
         settings={
           <SettingsView
             section={page.kind === "settings" ? page.section : undefined}
@@ -599,6 +680,27 @@ export function App() {
                 onOpen={(providerId) =>
                   navigation.navigate({ kind: "settings", section: "providers", providerId })
                 }
+                onCreate={() => navigation.navigate({ kind: "new-provider" })}
+                onEdit={(providerId) => navigation.navigate({ kind: "edit-provider", providerId })}
+                onDelete={async (providerId) => {
+                  try {
+                    await deleteUserProvider(providerId);
+                    setProviderFormFailure(undefined);
+                    navigation.navigate({ kind: "settings", section: "providers" });
+                  } catch (cause) {
+                    setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+                    throw cause;
+                  }
+                }}
+                onRefresh={async (providerId) => {
+                  try {
+                    await refreshUserProvider(providerId);
+                    setProviderFormFailure(undefined);
+                  } catch (cause) {
+                    setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+                    throw cause;
+                  }
+                }}
                 onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
                 onLogIn={providers.logIn}
                 onAnswer={providers.answer}

@@ -71,7 +71,11 @@ export function applyStreamEvent(state: ProvidersState, event: BusStreamEvent): 
     event.type === coreEventTypes.providerLogout ||
     event.type === coreEventTypes.providersChanged;
 
-  return { state, providers: changed, logins: false };
+  return {
+    state: event.type === coreEventTypes.providersChanged ? { ...state, models: {} } : state,
+    providers: changed,
+    logins: false,
+  };
 }
 
 /**

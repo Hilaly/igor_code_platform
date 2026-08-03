@@ -27,6 +27,7 @@ const provider = (id: string, overrides: Partial<ProviderSummary> = {}): Provide
   auth: { kind: "unconfigured" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 2,
   ...overrides,
 });
@@ -190,6 +191,13 @@ describe("applyStreamEvent", () => {
       expect(outcome.providers, type).toBe(true);
       expect(outcome.logins, type).toBe(false);
     }
+  });
+
+  it("forgets cached models when a provider catalogue changes", () => {
+    const ready = applyModels(initialProvidersState, "vendor", [model("one")]);
+    const outcome = applyStreamEvent(ready, event(coreEventTypes.providersChanged));
+
+    expect(outcome.state.models).toEqual({});
   });
 
   it("asks for the running logins too when part of the stream was missed", () => {

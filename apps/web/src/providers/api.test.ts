@@ -5,9 +5,13 @@ import {
   providerLoginsPath,
   providerModelsPath,
   providersPath,
+  userProviderPath,
+  userProviderRefreshPath,
+  userProvidersPath,
   type LoginAttemptState,
   type ModelSummary,
   type ProviderSummary,
+  type UserProviderDefinition,
 } from "@sovereign/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,9 +21,33 @@ import {
   fetchLoginAttempts,
   fetchProviderModels,
   fetchProvidersSnapshot,
+  createUserProvider,
+  deleteUserProvider,
+  fetchUserProvider,
+  fetchUserProviders,
+  refreshUserProvider,
+  updateUserProvider,
   logOutProvider,
   startProviderLogin,
 } from "./api.ts";
+
+const userProvider: UserProviderDefinition = {
+  id: "vendor",
+  name: "Vendor",
+  baseUrl: "https://vendor.test/v1",
+  api: "openai-responses",
+  modelsEndpoint: { kind: "default" },
+  modelDefaults: {
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0 },
+  },
+  manualModels: [],
+  modelOverrides: {},
+  disabledModelIds: [],
+};
 
 type Answer = { status: number; body: unknown };
 
@@ -87,6 +115,29 @@ describe("fetchProvidersSnapshot", () => {
   });
 });
 
+describe("user provider requests", () => {
+  it("uses the dedicated collection and item routes", async () => {
+    const details = { definition: userProvider };
+    const calls = daemon({ status: 200, body: details });
+
+    await fetchUserProviders();
+    await fetchUserProvider("vendor");
+    await createUserProvider(userProvider);
+    await updateUserProvider("vendor", userProvider);
+    await refreshUserProvider("vendor");
+    await deleteUserProvider("vendor");
+
+    expect(calls.map((call) => [call.url, call.init?.method])).toEqual([
+      [userProvidersPath, undefined],
+      [userProviderPath("vendor"), undefined],
+      [userProvidersPath, "POST"],
+      [userProviderPath("vendor"), "PUT"],
+      [userProviderRefreshPath("vendor"), "POST"],
+      [userProviderPath("vendor"), "DELETE"],
+    ]);
+  });
+});
+
 const attempt: LoginAttemptState = {
   attemptId: "a1b2",
   providerId: "anthropic",
@@ -104,6 +155,7 @@ const summary: ProviderSummary = {
   auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 2,
 };
 

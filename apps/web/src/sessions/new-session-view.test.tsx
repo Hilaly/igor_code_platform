@@ -59,6 +59,7 @@ const provider: ProviderSummary = {
   auth: { kind: "configured", type: "api_key" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 1,
 };
 

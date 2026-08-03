@@ -39,6 +39,7 @@ const provider: ProviderSummary = {
   auth: { kind: "unconfigured" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 2,
 };
 

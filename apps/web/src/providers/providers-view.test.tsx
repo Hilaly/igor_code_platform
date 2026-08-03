@@ -63,6 +63,7 @@ const provider = (id: string, overrides: Partial<ProviderSummary> = {}): Provide
   auth: { kind: "unconfigured" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 2,
   ...overrides,
 });
@@ -88,6 +89,10 @@ function show(state: ProvidersState, providerId?: string) {
     onCancelLogin: vi.fn(),
     onCloseLogin: vi.fn(),
     onLogOut: vi.fn(),
+    onCreate: vi.fn(),
+    onEdit: vi.fn(),
+    onDelete: vi.fn(async () => undefined),
+    onRefresh: vi.fn(async () => undefined),
   };
 
   const { rerender } = render(

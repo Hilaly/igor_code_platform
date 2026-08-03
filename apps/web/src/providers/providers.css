@@ -146,3 +146,15 @@
   align-items: flex-end;
   text-align: right;
 }
+
+.providers-actions {
+  display: flex;
+  gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
+}
+
+.provider-form-page form {
+  display: grid;
+  gap: var(--sovereign-space-4);
+  max-width: 48rem;
+}

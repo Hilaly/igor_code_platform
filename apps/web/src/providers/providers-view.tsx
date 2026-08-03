@@ -25,6 +25,7 @@ import {
   Button,
   Code,
   CodeBlock,
+  ConfirmDialog,
   EmptyState,
   Heading,
   List,
@@ -35,6 +36,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
+import { useState } from "react";
 
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
@@ -45,6 +47,10 @@ export type ProvidersViewProps = {
   providerId: string | undefined;
   /** Клик по карточке в списке — переход на страницу провайдера. */
   onOpen: (providerId: string) => void;
+  onCreate: () => void;
+  onEdit: (providerId: string) => void;
+  onDelete: (providerId: string) => Promise<void>;
+  onRefresh: (providerId: string) => Promise<void>;
   /** «← все провайдера» со страницы деталей — назад к списку. */
   onBack: () => void;
   onLogIn: (providerId: string, method: ProviderAuthType) => void;
@@ -59,6 +65,10 @@ export function ProvidersView({
   state,
   providerId,
   onOpen,
+  onCreate,
+  onEdit,
+  onDelete,
+  onRefresh,
   onBack,
   onLogIn,
   onAnswer,
@@ -138,6 +148,15 @@ export function ProvidersView({
         <Heading level={1}>{provider.name}</Heading>
         {logins}
         <ProviderHeader provider={provider} translator={translator} />
+        {provider.origin === "user" ? (
+          <UserProviderActions
+            provider={provider}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onRefresh={onRefresh}
+            translator={translator}
+          />
+        ) : undefined}
         <ProviderAccess
           provider={provider}
           stubborn={state.logins.stubborn[provider.id]}
@@ -158,6 +177,9 @@ export function ProvidersView({
   return (
     <div className="providers">
       <Heading level={1}>{t("page.providers.title")}</Heading>
+      <Button tone="accent" onClick={onCreate}>
+        + {t("providers.user.new")}
+      </Button>
 
       {/* Беда с файлом кредов — не отказ маршрута: список приезжает всё равно, а статус у всех
           становится «сказать нечем» (docs/web-api.md). */}
@@ -202,6 +224,59 @@ export function ProvidersView({
   );
 }
 
+function UserProviderActions({
+  provider,
+  onEdit,
+  onDelete,
+  onRefresh,
+  translator,
+}: {
+  provider: ProviderSummary;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
+  onRefresh: (id: string) => Promise<void>;
+  translator: ScopedTranslator;
+}) {
+  const { t } = translator;
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="providers-actions">
+      <Button onClick={() => onEdit(provider.id)}>{t("providers.user.edit.action")}</Button>
+      {provider.dynamic ? (
+        <Button
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void onRefresh(provider.id).finally(() => setBusy(false));
+          }}
+        >
+          {t("providers.user.refresh")}
+        </Button>
+      ) : undefined}
+      <Button tone="danger" onClick={() => setConfirming(true)}>
+        {t("providers.user.delete")}
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title={t("providers.user.delete.title", { name: provider.name })}
+        description={t("providers.user.delete.hint")}
+        confirmLabel={t("providers.user.delete")}
+        cancelLabel={t("providers.user.cancel")}
+        destructive
+        pending={busy}
+        onConfirm={() => {
+          setBusy(true);
+          void onDelete(provider.id)
+            .then(() => setConfirming(false))
+            .finally(() => setBusy(false));
+        }}
+      />
+    </div>
+  );
+}
+
 type ProviderHeaderProps = {
   provider: ProviderSummary;
   translator: ScopedTranslator;
@@ -228,6 +303,9 @@ function ProviderHeader({ provider, translator }: ProviderHeaderProps) {
         <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
         {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
         {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
+        {provider.origin === "user" ? (
+          <Badge tone="neutral">{t("providers.user.badge")}</Badge>
+        ) : undefined}
       </div>
     </div>
   );

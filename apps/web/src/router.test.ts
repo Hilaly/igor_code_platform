@@ -44,6 +44,23 @@ describe("matchPage", () => {
     });
   });
 
+  it("gives user provider creation and editing separate canonical pages", () => {
+    expect(matchPage("/settings/providers/new")).toEqual({ kind: "new-provider" });
+    expect(matchPage("/settings/providers/vendor-local/edit")).toEqual({
+      kind: "edit-provider",
+      providerId: "vendor-local",
+    });
+    expect(matchPage("/providers/new")).toEqual({ kind: "new-provider" });
+    expect(matchPage("/providers/vendor-local/edit")).toEqual({
+      kind: "edit-provider",
+      providerId: "vendor-local",
+    });
+    expect(pathOf({ kind: "new-provider" })).toBe("/settings/providers/new");
+    expect(pathOf({ kind: "edit-provider", providerId: "vendor-local" })).toBe(
+      "/settings/providers/vendor-local/edit",
+    );
+  });
+
   it("keeps a single session on an address of its own", () => {
     expect(matchPage("/sessions")).toEqual({ kind: "home" });
     expect(matchPage("/sessions/0199abcd-ef01")).toEqual({
