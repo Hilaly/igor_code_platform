@@ -300,11 +300,18 @@ export function App() {
       return;
     }
     const controller = new AbortController();
+    setEditingProvider(undefined);
+    setProviderFormFailure(undefined);
     void fetchUserProvider(page.providerId, controller.signal)
-      .then((details) => setEditingProvider(details.definition))
-      .catch((cause: unknown) =>
-        setProviderFormFailure(cause instanceof Error ? cause.message : String(cause)),
-      );
+      .then((details) => {
+        if (controller.signal.aborted) return;
+        setEditingProvider(details.definition);
+        setProviderFormFailure(undefined);
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted)
+          setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+      });
     return () => controller.abort();
   }, [page]);
   const sessions = useSessions({

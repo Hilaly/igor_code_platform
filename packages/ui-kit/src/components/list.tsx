@@ -39,7 +39,12 @@ export function ListRow({
   const className = `${styles.row}${selected ? ` ${styles.selected}` : ""}`;
 
   if (onSelect === undefined) {
-    return <li className={className}>{children}</li>;
+    return (
+      <li className={className}>
+        {children}
+        {actions === undefined ? undefined : <span className={styles.actions}>{actions}</span>}
+      </li>
+    );
   }
 
   return (

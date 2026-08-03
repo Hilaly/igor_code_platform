@@ -77,7 +77,13 @@ async function fetchCatalogPage(
 ): Promise<CatalogPage> {
   const timeout = AbortSignal.timeout(requestTimeoutMs);
   const signal = parentSignal === undefined ? timeout : AbortSignal.any([parentSignal, timeout]);
-  const response = await fetch(url, { headers: catalogHeaders(api, apiKey), signal });
+  // Никогда не переносим секреты вслед за ответом сервера. Даже если стандартный Authorization
+  // браузер снимет на другом origin, нестандартные Anthropic/Google заголовки Node сохраняет.
+  const response = await fetch(url, {
+    headers: catalogHeaders(api, apiKey),
+    signal,
+    redirect: "error",
+  });
 
   if (!response.ok) throw new Error(`model catalog returned HTTP ${response.status}`);
   const raw = await readBoundedJson(response);
@@ -130,12 +136,10 @@ function parsePage(raw: unknown, api: CustomProviderApi, requestUrl: string): Ca
     const models = fields?.["models"];
     if (!Array.isArray(models))
       throw new Error("model catalog returned an invalid Google envelope");
-    const ids = models.map((entry) => {
+    const ids = models.flatMap((entry) => {
       const name = objectOf(entry)?.["name"];
-      if (typeof name !== "string" || name.trim() === "") {
-        throw new Error("model catalog returned an invalid model entry");
-      }
-      return name.startsWith("models/") ? name.slice("models/".length) : name;
+      if (typeof name !== "string" || name.trim() === "") return [];
+      return [name.startsWith("models/") ? name.slice("models/".length) : name];
     });
     const token = fields?.["nextPageToken"];
     return {
@@ -148,12 +152,9 @@ function parsePage(raw: unknown, api: CustomProviderApi, requestUrl: string): Ca
 
   const data = fields?.["data"];
   if (!Array.isArray(data)) throw new Error("model catalog returned an invalid data envelope");
-  const ids = data.map((entry) => {
+  const ids = data.flatMap((entry) => {
     const id = objectOf(entry)?.["id"];
-    if (typeof id !== "string" || id.trim() === "") {
-      throw new Error("model catalog returned an invalid model entry");
-    }
-    return id;
+    return typeof id === "string" && id.trim() !== "" ? [id] : [];
   });
   const hasMore = fields?.["has_more"];
   if (hasMore !== true) return { ids };

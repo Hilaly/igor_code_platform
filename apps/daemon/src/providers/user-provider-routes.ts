@@ -42,16 +42,21 @@ export function userProviderRoutes(options: {
       method: "GET",
       path: userProvidersPath,
       handle: ({ response }) =>
-        respondWithJson(response, 200, { providers: options.providers.list() }),
+        respondWithJson(response, 200, {
+          providers: options.providers.list(),
+          ...(options.providers.problem() === undefined
+            ? {}
+            : { problem: options.providers.problem() }),
+        }),
     },
     {
       method: "POST",
       path: userProvidersPath,
-      handle: ({ response, body }) => {
+      handle: async ({ response, body }) => {
         const parsed = parseUserProviderDraft(body);
         if (parsed.kind === "rejected")
           return respondWithError(response, 400, parsed.diagnostics.join("; "));
-        mutate(response, options.providers.create(parsed.value));
+        mutate(response, await options.providers.create(parsed.value));
       },
     },
     {
@@ -69,11 +74,14 @@ export function userProviderRoutes(options: {
     {
       method: "PUT",
       path: userProviderPathPattern,
-      handle: ({ response, parameters, body }) => {
+      handle: async ({ response, parameters, body }) => {
         const parsed = parseUserProviderDraft(body);
         if (parsed.kind === "rejected")
           return respondWithError(response, 400, parsed.diagnostics.join("; "));
-        mutate(response, options.providers.replace(parameters["providerId"] ?? "", parsed.value));
+        mutate(
+          response,
+          await options.providers.replace(parameters["providerId"] ?? "", parsed.value),
+        );
       },
     },
     {

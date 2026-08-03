@@ -14,6 +14,7 @@ import {
   type ModelSummary,
   type ProviderSummary,
   type ProvidersSnapshot,
+  type UserProvidersSnapshot,
 } from "@sovereign/protocol";
 
 import { initialLoginsState, type LoginsState } from "./login-state.ts";
@@ -29,6 +30,7 @@ export type ProviderModelsEntry =
 
 export type ProvidersState = {
   snapshot?: ProvidersSnapshot;
+  userProviders?: UserProvidersSnapshot;
   /** Почему список провайдеров не прочитан. Беда с файлом кредов сюда не попадает: она в снимке. */
   failure?: string;
   /**
@@ -101,6 +103,13 @@ export function applySnapshot(state: ProvidersState, snapshot: ProvidersSnapshot
     snapshot: { ...snapshot, providers: orderProviders(snapshot.providers) },
     failure: undefined,
   };
+}
+
+export function applyUserProvidersSnapshot(
+  state: ProvidersState,
+  snapshot: UserProvidersSnapshot,
+): ProvidersState {
+  return { ...state, userProviders: snapshot };
 }
 
 export function applyFailure(state: ProvidersState, reason: string): ProvidersState {

@@ -81,6 +81,12 @@ export function ProvidersView({
 }: ProvidersViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
+  const conflictingUserProviders =
+    state.userProviders?.providers.filter(
+      (details) =>
+        details.conflict !== undefined &&
+        !snapshot?.providers.some((provider) => provider.id === details.definition.id),
+    ) ?? [];
   const dialogs = Object.entries(state.logins.dialogs);
   /** Имя провайдера из снимка; провайдера может там и не быть — тогда говорит идентификатор. */
   const nameOf = (providerId: string): string =>
@@ -192,6 +198,11 @@ export function ProvidersView({
           <CodeBlock>{snapshot.problem}</CodeBlock>
         </Notice>
       )}
+      {state.userProviders?.problem === undefined ? undefined : (
+        <Notice tone="warning" title={t("providers.user.problem.title")}>
+          <CodeBlock>{state.userProviders.problem}</CodeBlock>
+        </Notice>
+      )}
 
       {state.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("providers.failed", { reason: state.failure })} />
@@ -209,7 +220,7 @@ export function ProvidersView({
       <Text tone="muted">{t("providers.hint")}</Text>
 
       <Panel>
-        {snapshot.providers.length === 0 ? (
+        {snapshot.providers.length === 0 && conflictingUserProviders.length === 0 ? (
           <EmptyState title={t("providers.empty")} />
         ) : (
           <List>
@@ -221,10 +232,68 @@ export function ProvidersView({
                 onSelect={() => onOpen(provider.id)}
               />
             ))}
+            {conflictingUserProviders.map((details) => (
+              <ConflictingUserProviderRow
+                key={details.definition.id}
+                details={details}
+                onDelete={onDelete}
+                translator={translator}
+              />
+            ))}
           </List>
         )}
       </Panel>
     </div>
+  );
+}
+
+function ConflictingUserProviderRow({
+  details,
+  onDelete,
+  translator,
+}: {
+  details: import("@sovereign/protocol").UserProviderDetails;
+  onDelete: (id: string) => Promise<void>;
+  translator: ScopedTranslator;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <>
+      <ListRow
+        actions={
+          <Button tone="danger" disabled={busy} onClick={() => setConfirming(true)}>
+            {translator.t("providers.user.delete")}
+          </Button>
+        }
+      >
+        <span className="providers-row">
+          <span className="providers-row-facts">
+            <Text>{details.definition.name}</Text>
+            <Code>{details.definition.id}</Code>
+            <Text tone="muted">{details.conflict}</Text>
+          </span>
+          <Badge tone="warning">{translator.t("providers.user.conflict")}</Badge>
+        </span>
+      </ListRow>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title={translator.t("providers.user.delete.title", { name: details.definition.name })}
+        description={translator.t("providers.user.delete.hint")}
+        confirmLabel={translator.t("providers.user.delete")}
+        cancelLabel={translator.t("providers.user.cancel")}
+        destructive
+        pending={busy}
+        onConfirm={() => {
+          setBusy(true);
+          void onDelete(details.definition.id)
+            .then(() => setConfirming(false))
+            .catch(() => undefined)
+            .finally(() => setBusy(false));
+        }}
+      />
+    </>
   );
 }
 

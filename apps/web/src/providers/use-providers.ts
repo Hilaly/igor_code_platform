@@ -21,6 +21,7 @@ import {
   fetchLoginAttempts,
   fetchProviderModels,
   fetchProvidersSnapshot,
+  fetchUserProviders,
   logOutProvider,
   startProviderLogin,
 } from "./api.ts";
@@ -43,6 +44,7 @@ import {
   applyModelsFailure,
   applySnapshot,
   applyStreamEvent,
+  applyUserProvidersSnapshot,
   initialProvidersState,
   markModelsLoading,
   shouldFetchModels,
@@ -108,8 +110,15 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     const controller = new AbortController();
     pendingSnapshot.current = controller;
 
-    void fetchProvidersSnapshot(controller.signal)
-      .then((snapshot) => apply((current) => applySnapshot(current, snapshot)))
+    void Promise.all([
+      fetchProvidersSnapshot(controller.signal),
+      fetchUserProviders(controller.signal),
+    ])
+      .then(([snapshot, userProviders]) =>
+        apply((current) =>
+          applyUserProvidersSnapshot(applySnapshot(current, snapshot), userProviders),
+        ),
+      )
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
           return;

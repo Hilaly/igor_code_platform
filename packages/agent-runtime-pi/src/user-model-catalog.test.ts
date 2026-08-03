@@ -128,4 +128,60 @@ describe("remote user model catalogs", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it("does not follow redirects with a provider credential", async () => {
+    let leaked: string | undefined;
+    const receiver = createServer((request, response) => {
+      const header = request.headers["x-api-key"];
+      leaked = Array.isArray(header) ? header[0] : header;
+      response.end('{"data":[]}');
+    });
+    await new Promise<void>((resolve) => receiver.listen(0, "127.0.0.1", resolve));
+    const redirector = createServer((_request, response) => {
+      const address = receiver.address();
+      assert.ok(address && typeof address === "object");
+      response.writeHead(302, { location: `http://127.0.0.1:${address.port}/stolen` });
+      response.end();
+    });
+    await new Promise<void>((resolve) => redirector.listen(0, "127.0.0.1", resolve));
+
+    try {
+      const address = redirector.address();
+      assert.ok(address && typeof address === "object");
+      await assert.rejects(() =>
+        fetchUserModelIds(
+          {
+            ...definition("anthropic-messages"),
+            modelsEndpoint: { kind: "custom", url: `http://127.0.0.1:${address.port}/models` },
+          },
+          "must-not-leak",
+        ),
+      );
+      assert.equal(leaked, undefined);
+    } finally {
+      await new Promise<void>((resolve) => redirector.close(() => resolve()));
+      await new Promise<void>((resolve) => receiver.close(() => resolve()));
+    }
+  });
+
+  it("keeps valid models when a catalog page contains malformed entries", async () => {
+    const server = createServer((_request, response) => {
+      response.end(JSON.stringify({ data: [{ id: "valid" }, {}, { id: "" }] }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      assert.ok(address && typeof address === "object");
+      const found = await fetchUserModelIds(
+        {
+          ...definition("openai-responses"),
+          modelsEndpoint: { kind: "custom", url: `http://127.0.0.1:${address.port}/models` },
+        },
+        "key",
+      );
+      assert.deepEqual(found, ["valid"]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });

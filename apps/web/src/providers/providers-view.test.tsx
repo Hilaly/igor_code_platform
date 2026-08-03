@@ -19,7 +19,7 @@ import type {
   ProviderSummary,
 } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -677,5 +677,44 @@ describe("logging out of a provider", () => {
 
     expect(screen.getByText("Выход ничего не изменил")).toBeDefined();
     expect(screen.getByText(/провайдер остался настроенным/)).toBeDefined();
+  });
+});
+
+describe("conflicting user providers", () => {
+  it("asks for confirmation before deleting a definition missing from runtime", async () => {
+    const state: ProvidersState = {
+      ...withProviders([]),
+      userProviders: {
+        providers: [
+          {
+            definition: {
+              id: "openai",
+              name: "Saved OpenAI",
+              baseUrl: "https://example.test/v1",
+              api: "openai-responses",
+              modelsEndpoint: { kind: "disabled" },
+              modelDefaults: {
+                contextWindow: 128_000,
+                maxTokens: 8_192,
+                reasoning: false,
+                input: ["text"],
+                cost: { input: 0, output: 0 },
+              },
+              manualModels: [],
+              modelOverrides: {},
+              disabledModelIds: [],
+            },
+            conflict: "provider identifier is already taken",
+          },
+        ],
+      },
+    };
+    const { onDelete } = show(state);
+
+    fireEvent.click(screen.getByRole("button", { name: "Удалить" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeDefined();
+    fireEvent.click(screen.getAllByRole("button", { name: "Удалить" })[1]!);
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("openai"));
   });
 });

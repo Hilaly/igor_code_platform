@@ -67,6 +67,7 @@ async function serve() {
     catalogue,
     credentials,
     catalogs,
+    logins: { runningFor: () => undefined, cancel: () => false },
     hasActiveSession: () => false,
   });
   const server = createServer(
@@ -126,5 +127,34 @@ describe("the user provider HTTP API", () => {
       (await call("POST", userProvidersPath, { ...definition(), id: "Bad ID" })).status,
       400,
     );
+  });
+
+  it("returns the store problem in the collection snapshot", async () => {
+    const directory = ensureDataDirectory(mkdtempSync(join(workspace, "broken-")));
+    const logger = createLogger({ source: "core", level: () => "debug", write: () => undefined });
+    const credentials = createCredentialStore({ directory, logger });
+    const catalogs = createModelCatalogStore({ directory, logger });
+    const catalogue = createProviderCatalogue({
+      credentials,
+      catalogs,
+      environment: emptyEnvironment(),
+    });
+    const providers = createUserProviders({
+      store: {
+        list: () => [],
+        find: () => undefined,
+        create: () => ({ kind: "refused", reason: "broken" }),
+        replace: () => ({ kind: "refused", reason: "broken" }),
+        remove: () => ({ kind: "refused", reason: "broken" }),
+        problem: () => "user-providers.json is not valid json",
+        subscribe: () => () => undefined,
+      },
+      catalogue,
+      credentials,
+      catalogs,
+      logins: { runningFor: () => undefined, cancel: () => false },
+      hasActiveSession: () => false,
+    });
+    assert.equal(providers.problem(), "user-providers.json is not valid json");
   });
 });

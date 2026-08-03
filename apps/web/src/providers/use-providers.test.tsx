@@ -16,6 +16,7 @@ import {
   providerLoginAnswerPath,
   providerLoginsPath,
   providersPath,
+  userProvidersPath,
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
   type LoginStepFrame,
@@ -59,6 +60,7 @@ type Call = { url: string; method: string; body?: string };
 let calls: Call[] = [];
 let providers: ProvidersSnapshot = { providers: [provider] };
 let running: LoginAttemptsSnapshot = { attempts: [] };
+let userProviders = { providers: [] };
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -73,6 +75,7 @@ beforeEach(() => {
   calls = [];
   providers = { providers: [provider] };
   running = { attempts: [] };
+  userProviders = { providers: [] };
   refusals = {};
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
@@ -89,6 +92,8 @@ beforeEach(() => {
     if (url === providersPath) {
       return answer(providers);
     }
+
+    if (url === userProvidersPath) return answer(userProviders);
 
     if (url === providerLoginsPath && method === "GET") {
       return answer(running);

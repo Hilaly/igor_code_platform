@@ -3,6 +3,7 @@ import {
   defaultUserModelDefinition,
   parseUserProviderDraft,
   type CustomProviderApi,
+  type CustomModelDefinition,
   type UserProviderDefinition,
 } from "@sovereign/protocol";
 import {
@@ -47,8 +48,8 @@ export function UserProviderForm(props: UserProviderFormProps) {
   const [customModelsUrl, setCustomModelsUrl] = useState(
     props.initial?.modelsEndpoint.kind === "custom" ? props.initial.modelsEndpoint.url : "",
   );
-  const [manualModels, setManualModels] = useState(
-    props.initial?.manualModels.map((model) => model.id).join("\n") ?? "",
+  const [manualModels, setManualModels] = useState<CustomModelDefinition[]>(
+    props.initial?.manualModels ?? [],
   );
   const [contextWindow, setContextWindow] = useState(
     String(props.initial?.modelDefaults.contextWindow ?? defaultUserModelDefinition.contextWindow),
@@ -88,7 +89,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
     setCustomModelsUrl(
       props.initial.modelsEndpoint.kind === "custom" ? props.initial.modelsEndpoint.url : "",
     );
-    setManualModels(props.initial.manualModels.map((model) => model.id).join("\n"));
+    setManualModels(props.initial.manualModels);
     setContextWindow(String(props.initial.modelDefaults.contextWindow));
     setMaxTokens(String(props.initial.modelDefaults.maxTokens));
     setReasoning(props.initial.modelDefaults.reasoning);
@@ -106,6 +107,13 @@ export function UserProviderForm(props: UserProviderFormProps) {
       return "";
     }
   })();
+  const defaults = {
+    contextWindow: Number(contextWindow),
+    maxTokens: Number(maxTokens),
+    reasoning,
+    input: imageInput ? (["text", "image"] as const) : (["text"] as const),
+    cost: { input: Number(inputCost), output: Number(outputCost) },
+  };
 
   const submit = () => {
     let parsedOverrides: unknown;
@@ -115,13 +123,6 @@ export function UserProviderForm(props: UserProviderFormProps) {
       setDiagnostics([t("providers.user.overrides.invalid")]);
       return;
     }
-    const defaults = {
-      contextWindow: Number(contextWindow),
-      maxTokens: Number(maxTokens),
-      reasoning,
-      input: imageInput ? (["text", "image"] as const) : (["text"] as const),
-      cost: { input: Number(inputCost), output: Number(outputCost) },
-    };
     const candidate = {
       id,
       name,
@@ -133,18 +134,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
           ? ({ kind: "default" } as const)
           : ({ kind: "custom", url: customModelsUrl } as const),
       modelDefaults: defaults,
-      manualModels: manualModels
-        .split(/[,\n]/)
-        .map((modelId) => modelId.trim())
-        .filter(Boolean)
-        .map(
-          (modelId) =>
-            props.initial?.manualModels.find((model) => model.id === modelId) ?? {
-              id: modelId,
-              name: modelId,
-              ...defaults,
-            },
-        ),
+      manualModels,
       modelOverrides: parsedOverrides,
       disabledModelIds: disabledModels
         .split(/[,\n]/)
@@ -211,14 +201,12 @@ export function UserProviderForm(props: UserProviderFormProps) {
               )}
             </Field>
           ) : undefined}
-          <Field
-            label={t("providers.user.models.manual")}
-            hint={t("providers.user.models.manual.hint")}
-          >
-            {(control) => (
-              <Textarea {...control} value={manualModels} onChange={setManualModels} rows={5} />
-            )}
-          </Field>
+          <ManualModelsEditor
+            models={manualModels}
+            defaults={defaults}
+            onChange={setManualModels}
+            translator={props.translator}
+          />
           <Heading level={2}>{t("providers.user.defaults")}</Heading>
           <Field label={t("providers.user.context")}>
             {(control) => <Input {...control} value={contextWindow} onChange={setContextWindow} />}
@@ -261,5 +249,124 @@ export function UserProviderForm(props: UserProviderFormProps) {
         </Form>
       </Panel>
     </div>
+  );
+}
+
+function ManualModelsEditor({
+  models,
+  defaults,
+  onChange,
+  translator,
+}: {
+  models: CustomModelDefinition[];
+  defaults: {
+    contextWindow: number;
+    maxTokens: number;
+    reasoning: boolean;
+    input: readonly ("text" | "image")[];
+    cost: { input: number; output: number };
+  };
+  onChange: (models: CustomModelDefinition[]) => void;
+  translator: ScopedTranslator;
+}) {
+  const { t } = translator;
+  const update = (index: number, patch: Partial<CustomModelDefinition>) =>
+    onChange(
+      models.map((model, position) => (position === index ? { ...model, ...patch } : model)),
+    );
+
+  return (
+    <section>
+      <Heading level={2}>{t("providers.user.models.manual")}</Heading>
+      <Text tone="muted">{t("providers.user.models.manual.hint")}</Text>
+      {models.map((model, index) => (
+        <Panel key={index} title={model.name || model.id || t("providers.user.models.unnamed")}>
+          <Field label={t("providers.user.model.id")}>
+            {(control) => (
+              <Input {...control} value={model.id} onChange={(id) => update(index, { id })} />
+            )}
+          </Field>
+          <Field label={t("providers.user.model.name")}>
+            {(control) => (
+              <Input {...control} value={model.name} onChange={(name) => update(index, { name })} />
+            )}
+          </Field>
+          <Field label={t("providers.user.context")}>
+            {(control) => (
+              <Input
+                {...control}
+                value={String(model.contextWindow)}
+                onChange={(value) => update(index, { contextWindow: Number(value) })}
+              />
+            )}
+          </Field>
+          <Field label={t("providers.user.maxTokens")}>
+            {(control) => (
+              <Input
+                {...control}
+                value={String(model.maxTokens)}
+                onChange={(value) => update(index, { maxTokens: Number(value) })}
+              />
+            )}
+          </Field>
+          <Toggle
+            checked={model.reasoning ?? false}
+            onChange={(reasoning) => update(index, { reasoning })}
+            label={t("providers.user.reasoning")}
+          />
+          <Toggle
+            checked={(model.input ?? ["text"]).includes("image")}
+            onChange={(image) => update(index, { input: image ? ["text", "image"] : ["text"] })}
+            label={t("providers.user.images")}
+          />
+          <Field label={t("providers.user.cost.input")}>
+            {(control) => (
+              <Input
+                {...control}
+                value={String(model.cost?.input ?? 0)}
+                onChange={(value) =>
+                  update(index, { cost: { input: Number(value), output: model.cost?.output ?? 0 } })
+                }
+              />
+            )}
+          </Field>
+          <Field label={t("providers.user.cost.output")}>
+            {(control) => (
+              <Input
+                {...control}
+                value={String(model.cost?.output ?? 0)}
+                onChange={(value) =>
+                  update(index, { cost: { input: model.cost?.input ?? 0, output: Number(value) } })
+                }
+              />
+            )}
+          </Field>
+          <Button
+            tone="danger"
+            onClick={() => onChange(models.filter((_, position) => position !== index))}
+          >
+            {t("providers.user.model.remove")}
+          </Button>
+        </Panel>
+      ))}
+      <Button
+        onClick={() =>
+          onChange([
+            ...models,
+            {
+              id: "",
+              name: "",
+              contextWindow: defaults.contextWindow,
+              maxTokens: defaults.maxTokens,
+              reasoning: defaults.reasoning,
+              input: [...defaults.input],
+              cost: { ...defaults.cost },
+            },
+          ])
+        }
+      >
+        + {t("providers.user.model.add")}
+      </Button>
+    </section>
   );
 }

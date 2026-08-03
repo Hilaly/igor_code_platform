@@ -141,6 +141,10 @@ const providers = createProviderCatalogue({
   environment: processEnvironment(),
 });
 
+// Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
+// пережить не может (docs/models-and-providers.md).
+const providerLogins = createProviderLogins({ runner: providers, logger });
+
 const userProviderStore = createUserProviderStore({ directory, logger });
 let hasActiveProviderSession: (providerId: string) => boolean = () => false;
 const userProviders = createUserProviders({
@@ -148,12 +152,10 @@ const userProviders = createUserProviders({
   catalogue: providers,
   credentials,
   catalogs: modelCatalogs,
+  logins: providerLogins,
   hasActiveSession: (providerId) => hasActiveProviderSession(providerId),
 });
-
-// Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
-// пережить не может (docs/models-and-providers.md).
-const providerLogins = createProviderLogins({ runner: providers, logger });
+await userProviders.ready();
 
 // Доступность папок считается по таймеру, а не `fs.watch`: наблюдатель на папке молчит и об
 // отмонтировании тома, и о его возврате (runtime-checks.md, проверка 27).

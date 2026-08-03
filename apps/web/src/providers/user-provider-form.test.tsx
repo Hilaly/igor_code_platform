@@ -42,9 +42,17 @@ describe("UserProviderForm", () => {
     fireEvent.change(screen.getByLabelText("Базовый URL API"), {
       target: { value: "https://api.acme.example/v1" },
     });
-    fireEvent.change(screen.getByLabelText("Модели вручную"), {
-      target: { value: "acme-large\nacme-fast" },
+    fireEvent.click(screen.getByRole("button", { name: /Добавить ручную модель/ }));
+    fireEvent.change(screen.getByLabelText("Идентификатор модели"), {
+      target: { value: "acme-large" },
     });
+    fireEvent.change(screen.getByLabelText("Название модели"), {
+      target: { value: "Acme Large" },
+    });
+    const contexts = screen.getAllByLabelText("Контекстное окно");
+    fireEvent.change(contexts[0]!, { target: { value: "256000" } });
+    const reasoning = screen.getAllByLabelText("Модели поддерживают reasoning");
+    fireEvent.click(reasoning[0]!);
 
     fireEvent.click(screen.getByRole("button", { name: "Сохранить провайдер" }));
 
@@ -57,8 +65,12 @@ describe("UserProviderForm", () => {
         api: "openai-responses",
         modelsEndpoint: { kind: "default" },
         manualModels: [
-          expect.objectContaining({ id: "acme-large", contextWindow: 128_000 }),
-          expect.objectContaining({ id: "acme-fast", contextWindow: 128_000 }),
+          expect.objectContaining({
+            id: "acme-large",
+            name: "Acme Large",
+            contextWindow: 256_000,
+            reasoning: true,
+          }),
         ],
       }),
     );

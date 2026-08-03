@@ -27,6 +27,7 @@ import { describeModels, describeProvider } from "./describe.ts";
 import { processEnvironment, toRuntimeAuthContext, type Environment } from "./environment.ts";
 import { toRuntimeInteraction, type LoginDialogue } from "./interaction.ts";
 import { toRuntimeModelsStore, type ModelCatalogVault } from "./model-catalogs.ts";
+import { mergeDiscoveredModels } from "./user-model-catalog.ts";
 
 export type ProviderCatalogue = {
   /**
@@ -82,7 +83,12 @@ export type ProviderCatalogue = {
   refreshProvider: (
     providerId: string,
     signal?: AbortSignal,
+    origin?: "plugin" | "user",
   ) => Promise<RefreshOutcome | undefined>;
+  /** Восстановить сохранённый динамический список без сети. */
+  restoreProvider: (providerId: string, origin: "plugin" | "user") => Promise<boolean>;
+  /** Источник записи, если она добавлена поверх встроенного каталога. */
+  customProviderOrigin: (providerId: string) => "plugin" | "user" | undefined;
 };
 
 export type LoginRequest = {
@@ -128,6 +134,7 @@ export function createProviderCatalogue(
    * кастомный провайдер исчезнет вместе с плагином, и человек должен видеть это заранее.
    */
   const custom = new Map<string, "plugin" | "user">();
+  const userDefinitions = new Map<string, UserProviderDefinition>();
 
   const originOf = (providerId: string): ProviderOrigin => custom.get(providerId) ?? "builtin";
   const setCustom = (
@@ -140,6 +147,7 @@ export function createProviderCatalogue(
         : toRuntimeProvider(definition as CustomProviderDefinition),
     );
     custom.set(definition.id, origin);
+    if (origin === "user") userDefinitions.set(definition.id, definition as UserProviderDefinition);
   };
 
   return {
@@ -199,15 +207,22 @@ export function createProviderCatalogue(
 
       return { refreshed, aborted: result.aborted };
     },
-    refreshProvider: async (providerId, signal) => {
+    refreshProvider: async (providerId, signal, origin) => {
+      if (origin !== undefined && custom.get(providerId) !== origin) return undefined;
       const provider = models.getProvider(providerId);
       if (provider === undefined || provider.refreshModels === undefined) return undefined;
 
       try {
         const credential = await credentialStore.read(providerId);
-        if (credential === undefined) {
+        // Кэш читается независимо от наличия ключа: после рестарта провайдер должен быть полезен
+        // офлайн. Сеть без credential всё равно не разрешаем.
+        await provider.refreshModels({
+          store: scopedStore(modelsStore, providerId),
+          allowNetwork: false,
+          signal,
+        });
+        if (credential === undefined)
           return { providerId, modelCount: describeModels(provider).length };
-        }
         await provider.refreshModels({
           credential,
           store: scopedStore(modelsStore, providerId),
@@ -233,6 +248,28 @@ export function createProviderCatalogue(
         };
       }
     },
+    restoreProvider: async (providerId, origin) => {
+      if (custom.get(providerId) !== origin) return false;
+      const provider = models.getProvider(providerId);
+      if (provider?.refreshModels === undefined) return true;
+      const definition = userDefinitions.get(providerId);
+      const cached = await modelsStore?.read(providerId);
+      if (definition !== undefined && cached !== undefined) {
+        await modelsStore?.write(providerId, {
+          ...cached,
+          models: mergeDiscoveredModels(
+            definition,
+            cached.models.map((model) => model.id),
+          ),
+        });
+      }
+      await provider.refreshModels({
+        store: scopedStore(modelsStore, providerId),
+        allowNetwork: false,
+      });
+      return true;
+    },
+    customProviderOrigin: (providerId) => custom.get(providerId),
     login: async (input) => {
       await models.login(
         input.providerId,
@@ -272,6 +309,7 @@ export function createProviderCatalogue(
       if (custom.get(providerId) !== origin) return false;
       models.deleteProvider(providerId);
       custom.delete(providerId);
+      userDefinitions.delete(providerId);
       return true;
     },
   };
