@@ -11,10 +11,11 @@
   align-items: center;
   justify-content: center;
   gap: var(--sovereign-space-2);
-  height: var(--sovereign-control-height-md);
-  padding-inline: var(--sovereign-space-4);
+  height: var(--sovereign-control-height-sm);
+  min-height: 1.75rem;
+  padding-inline: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid transparent;
-  border-radius: var(--sovereign-radius-md);
+  border-radius: var(--sovereign-radius-sm);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);
@@ -32,9 +33,18 @@
 
 /* Меньший размер — для тесных мест: шапка панели, строка действий. Шкала та же, что у вкладок и меню. */
 .sm {
-  height: var(--sovereign-control-height-sm);
-  padding-inline: var(--sovereign-space-3);
+  position: relative;
+  height: var(--sovereign-row-height-compact);
+  padding-inline: var(--sovereign-space-2);
   font-size: var(--sovereign-font-size-xs);
+}
+
+/* Компактный вид не уменьшает область указателя ниже доступной: прозрачная часть едет с масштабом. */
+.sm::before {
+  position: absolute;
+  inset-block: calc(var(--sovereign-space-1) * -1);
+  inset-inline: calc(var(--sovereign-space-1) * -1);
+  content: "";
 }
 
 /*
@@ -43,14 +53,15 @@
  * даёт `aria-label`, а подсказку — `title`; подпись в `children` — это сам значок.
  */
 .iconOnly {
-  width: var(--sovereign-control-height-md);
+  width: var(--sovereign-control-height-sm);
+  min-width: 1.75rem;
   padding: 0;
   font-size: var(--sovereign-font-size-md);
   line-height: 1;
 }
 
 .sm.iconOnly {
-  width: var(--sovereign-control-height-sm);
+  width: var(--sovereign-row-height-compact);
 }
 
 .normal {

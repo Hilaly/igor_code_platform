@@ -7,7 +7,7 @@
   width: 100%;
   padding-inline: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  border-radius: var(--sovereign-radius-md);
+  border-radius: var(--sovereign-radius-sm);
   background: var(--sovereign-sunken-surface);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
@@ -50,7 +50,8 @@
 }
 
 .input {
-  height: var(--sovereign-control-height-md);
+  height: var(--sovereign-control-height-sm);
+  min-height: 1.75rem;
 }
 
 .textarea {

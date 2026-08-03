@@ -23,10 +23,13 @@
 .row {
   display: inline-flex;
   width: 100%;
+  min-height: var(--sovereign-row-height-compact);
   align-items: center;
   gap: var(--sovereign-space-2);
-  padding: var(--sovereign-space-1) var(--sovereign-space-2);
-  border-radius: var(--sovereign-radius-sm);
+  padding-inline: var(--sovereign-space-2);
+  padding-block: var(--sovereign-space-1);
+  box-sizing: content-box;
+  border-radius: var(--sovereign-radius-xs);
   color: var(--sovereign-text);
   cursor: pointer;
   background: transparent;

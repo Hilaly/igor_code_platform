@@ -16,8 +16,11 @@
 
 .row {
   position: relative;
+  display: flex;
+  min-height: var(--sovereign-row-height-compact);
+  align-items: center;
   border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  border-radius: var(--sovereign-radius-sm);
+  border-radius: var(--sovereign-radius-xs);
   color: var(--sovereign-text);
 }
 
@@ -32,16 +35,31 @@
 .select {
   display: block;
   width: 100%;
-  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  height: var(--sovereign-row-height-compact);
+  min-width: 0;
+  padding-inline: var(--sovereign-space-3);
+  padding-block: var(--sovereign-space-1);
+  box-sizing: content-box;
   border: none;
   /* Скругление наследуется от строки: иначе подсветка при наведении вылезает за её углы. */
   border-radius: inherit;
   background: none;
   color: inherit;
   font: inherit;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+/* Составная строка сохраняет естественную высоту: компактная ступень для неё только минимум. */
+.select:has(> *) {
+  height: auto;
+  min-height: var(--sovereign-row-height-compact);
+  overflow: visible;
+  white-space: normal;
 }
 
 .select:hover {

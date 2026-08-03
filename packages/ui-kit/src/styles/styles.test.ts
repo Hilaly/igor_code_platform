@@ -86,6 +86,38 @@ describe("stylesheets of the kit", () => {
     expect(effects.match(/--sovereign-elevation-/g)).toHaveLength(3);
   });
 
+  it("keeps shared primitive geometry compact without shrinking row hit areas", () => {
+    const buttonCss = readFileSync(join(kitRoot, "components", "button.module.css"), "utf8");
+    const inputCss = readFileSync(join(kitRoot, "components", "input.module.css"), "utf8");
+    const listCss = readFileSync(join(kitRoot, "components", "list.module.css"), "utf8");
+    const panelCss = readFileSync(join(kitRoot, "components", "panel.module.css"), "utf8");
+    const textCss = readFileSync(join(kitRoot, "components", "text.module.css"), "utf8");
+    const treeCss = readFileSync(join(kitRoot, "components", "tree.module.css"), "utf8");
+
+    expect(buttonCss).toContain("height: var(--sovereign-row-height-compact)");
+    expect(buttonCss).toContain("border-radius: var(--sovereign-radius-sm)");
+    expect(buttonCss).toContain("inset-block: calc(var(--sovereign-space-1) * -1)");
+    expect(inputCss).toContain("height: var(--sovereign-control-height-sm)");
+    expect(inputCss).toContain("min-height: 1.75rem");
+    expect(inputCss).toContain("border-radius: var(--sovereign-radius-sm)");
+    expect(listCss).toContain("height: var(--sovereign-row-height-compact)");
+    expect(listCss).toContain("width: 100%");
+    expect(listCss).toContain("padding-inline: var(--sovereign-space-3)");
+    expect(listCss).toContain("padding-block: var(--sovereign-space-1)");
+    expect(listCss).toContain("box-sizing: content-box");
+    expect(listCss).toContain(".select:has(> *)");
+    expect(treeCss).toContain("min-height: var(--sovereign-row-height-compact)");
+    expect(treeCss).toContain("width: 100%");
+    expect(treeCss).toContain("padding-inline: var(--sovereign-space-2)");
+    expect(treeCss).toContain("padding-block: var(--sovereign-space-1)");
+    expect(treeCss).toContain("box-sizing: content-box");
+    expect(textCss).toContain("font-family: var(--sovereign-font-family-display)");
+    expect(panelCss).toContain("border-radius: var(--sovereign-radius-sm)");
+    expect(panelCss).toContain("background: var(--sovereign-panel-surface)");
+    expect(panelCss).toContain("box-shadow: var(--sovereign-elevation-1)");
+    expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
+  });
+
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
   });
@@ -147,7 +179,7 @@ describe("stylesheets of the kit", () => {
     const elevatedSurfaces = new Map([
       ["components/dialog.module.css", "--sovereign-elevation-3"],
       ["components/menu.module.css", "--sovereign-elevation-2"],
-      ["components/panel.module.css", "--sovereign-elevation-2"],
+      ["components/panel.module.css", "--sovereign-elevation-1"],
       ["components/popover.module.css", "--sovereign-elevation-2"],
     ]);
 

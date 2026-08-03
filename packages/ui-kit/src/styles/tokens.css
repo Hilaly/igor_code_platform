@@ -11,8 +11,7 @@
 
 :root {
   --sovereign-font-family-display: "Source Serif 4 Variable", Georgia, serif;
-  --sovereign-font-family-body:
-    "Manrope Variable", -apple-system, "Segoe UI", sans-serif;
+  --sovereign-font-family-body: "Manrope Variable", -apple-system, "Segoe UI", sans-serif;
   --sovereign-font-family-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
 
   --sovereign-icon-xs: 0.75rem;
@@ -49,7 +48,6 @@
   --sovereign-radius-xs: 0.4rem;
   --sovereign-radius-sm: 0.65rem;
   --sovereign-radius-md: 0.9rem;
-  --sovereign-radius-lg: 1.2rem;
   --sovereign-radius-xl: 1.6rem;
   --sovereign-radius-full: 999px;
 

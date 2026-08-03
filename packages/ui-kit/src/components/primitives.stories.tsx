@@ -6,12 +6,13 @@
  * пользователю, а компонентам строки по-прежнему приходят пропсами уже переведёнными (docs/ui-kit.md).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "./badge.tsx";
 import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { Disclosure } from "./disclosure.tsx";
+import { Input } from "./input.tsx";
 import { Link } from "./link.tsx";
 import { List, ListRow } from "./list.tsx";
 import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
@@ -173,6 +174,41 @@ export const Surfaces = () => (
     </List>
   </div>
 );
+
+export const VisualFoundation = () => {
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchInput.current?.focus();
+  }, []);
+
+  return (
+    <Panel title="Appearance">
+      <div style={column}>
+        <Heading level={2}>Interface</Heading>
+        <List>
+          <ListRow selected onSelect={() => {}}>
+            Imperium
+          </ListRow>
+          <ListRow onSelect={() => {}}>Nord</ListRow>
+          <ListRow onSelect={() => {}}>
+            Sage — a deliberately long appearance label for compact-row truncation
+          </ListRow>
+        </List>
+        <Input
+          ref={searchInput}
+          aria-label="Search"
+          value=""
+          onChange={() => {}}
+          placeholder="Search appearances"
+        />
+        <Button onClick={() => {}} disabled>
+          Apply appearance
+        </Button>
+      </div>
+    </Panel>
+  );
+};
 
 export const Links = () => (
   <div style={column}>
