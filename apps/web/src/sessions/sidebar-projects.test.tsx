@@ -171,3 +171,28 @@ it("keeps a project delete confirmation open when deletion is refused", async ()
   await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
   expect(screen.getByText(/project is busy/)).toBeTruthy();
 });
+
+it("keeps a session rename dialog open when the write is refused", async () => {
+  values.clear();
+  show({ onUpdateSession: vi.fn().mockResolvedValue("session is busy") });
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Переименовать" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Имя" }), { target: { value: "Beta" } });
+  fireEvent.click(screen.getByRole("button", { name: "Переименовать" }));
+
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+  expect(screen.getByText(/session is busy/)).toBeTruthy();
+});
+
+it("keeps a session delete confirmation open when deletion is refused", async () => {
+  values.clear();
+  show({ onRemoveSession: vi.fn().mockResolvedValue("session is busy") });
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Удалить безвозвратно" }));
+  fireEvent.click(screen.getByRole("button", { name: "Удалить безвозвратно" }));
+
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+  expect(screen.getByText(/session is busy/)).toBeTruthy();
+});

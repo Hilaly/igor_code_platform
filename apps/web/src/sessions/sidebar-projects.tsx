@@ -91,6 +91,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
     key: string,
     action: () => Promise<string | undefined>,
   ): Promise<string | undefined> => {
+    if (pendingAction !== undefined) return undefined;
     setPendingAction(key);
     setActionFailure(undefined);
     try {
@@ -124,6 +125,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
             {
               id: "rename",
               label: t("projects.action.rename"),
+              disabled: pendingAction !== undefined,
               onSelect: () => beginRename({ kind: "project", value: project }),
             },
             {
@@ -160,12 +162,13 @@ export function SidebarProjects(props: SidebarProjectsProps) {
           {
             id: "rename",
             label: t("sessions.action.rename"),
+            disabled: pendingAction !== undefined,
             onSelect: () => beginRename({ kind: "session", value: session }),
           },
           {
             id: "archive",
             label: t("sessions.action.archive"),
-            disabled: session.phase !== "idle",
+            disabled: session.phase !== "idle" || pendingAction !== undefined,
             onSelect: () =>
               void runAction(`archive-session:${session.id}`, () =>
                 props.onUpdateSession(session.id, { ...sessionTitle(session), archived: true }),
@@ -175,7 +178,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
             id: "remove",
             label: t("sessions.action.remove"),
             tone: "danger",
-            disabled: session.phase !== "idle",
+            disabled: session.phase !== "idle" || pendingAction !== undefined,
             onSelect: () => setRemoving({ kind: "session", value: session }),
           },
         ]}
@@ -201,12 +204,11 @@ export function SidebarProjects(props: SidebarProjectsProps) {
 
   return (
     <>
-      {actionFailure === undefined ||
-      actionFailure === props.projectsFailure ||
-      actionFailure === props.sessionsFailure ? undefined : (
+      {actionFailure === undefined ? undefined : (
         <Notice tone="danger" title={t("projects.write.failed", { reason: actionFailure })} />
       )}
-      {props.projectsFailure === undefined ? undefined : (
+      {props.projectsFailure === undefined ||
+      props.projectsFailure === actionFailure ? undefined : (
         <Notice tone="danger" title={t("projects.failed", { reason: props.projectsFailure })} />
       )}
       {props.sessionsFailure === undefined ? undefined : (
