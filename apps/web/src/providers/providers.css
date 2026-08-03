@@ -8,7 +8,7 @@
 .providers {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  gap: var(--sovereign-space-2);
 }
 
 /*
@@ -71,6 +71,18 @@
   align-items: center;
   gap: var(--sovereign-space-2);
   flex-wrap: wrap;
+}
+
+/*
+ * На странице одного провайдера вход и модели — разделы одного объекта, а не самостоятельные
+ * карточки. Заголовок и тонкий разделитель сохраняют иерархию без вложенных поднятых поверхностей.
+ */
+.providers-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 /*

@@ -156,8 +156,22 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
     });
   };
 
+  const pluginToggle = (
+    <Toggle
+      checked={preferences?.enabled ?? false}
+      disabled={preferences === undefined}
+      onChange={(on) =>
+        preferences === undefined
+          ? undefined
+          : onSwitch(status.key, { ...preferences, enabled: on })
+      }
+      label={t("plugins.toggle.plugin")}
+      {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
+    />
+  );
+
   return (
-    <Panel title={status.id ?? status.key}>
+    <Panel title={status.id ?? status.key} actions={pluginToggle}>
       <div className="plugins-plugin">
         <div className="plugins-plugin-head">
           <div className="plugins-plugin-facts">
@@ -167,22 +181,10 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
               <Text tone="muted">{t("plugins.attempt", { count: status.attempt })}</Text>
             )}
           </div>
-          <Toggle
-            checked={preferences?.enabled ?? false}
-            disabled={preferences === undefined}
-            onChange={(on) =>
-              preferences === undefined
-                ? undefined
-                : onSwitch(status.key, { ...preferences, enabled: on })
-            }
-            label={t("plugins.toggle.plugin")}
-            {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
-          />
+          <Text tone="muted">
+            {t("plugins.directory")}: {status.directory}
+          </Text>
         </div>
-
-        <Text tone="muted">
-          {t("plugins.directory")}: {status.directory}
-        </Text>
 
         {status.reason === undefined ? undefined : (
           <Notice
@@ -206,7 +208,7 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
         {declared.length === 0 ? (
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (
-          <>
+          <div className="plugins-contributions">
             <Text tone="muted">{t("plugins.contributions.count", { count: declared.length })}</Text>
             <List>
               {declared.map(({ registration, off }) => (
@@ -236,7 +238,7 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
                 </ListRow>
               ))}
             </List>
-          </>
+          </div>
         )}
 
         {forgotten.length === 0 ? undefined : (

@@ -31,7 +31,6 @@ import {
   List,
   ListRow,
   Notice,
-  Panel,
   Spinner,
   Text,
   type ScopedTranslator,
@@ -222,30 +221,28 @@ export function ProvidersView({
       </Text>
       <Text tone="muted">{t("providers.hint")}</Text>
 
-      <Panel>
-        {snapshot.providers.length === 0 && conflictingUserProviders.length === 0 ? (
-          <EmptyState title={t("providers.empty")} />
-        ) : (
-          <List>
-            {snapshot.providers.map((provider) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                translator={translator}
-                onSelect={() => onOpen(provider.id)}
-              />
-            ))}
-            {conflictingUserProviders.map((details) => (
-              <ConflictingUserProviderRow
-                key={details.definition.id}
-                details={details}
-                onDelete={onDelete}
-                translator={translator}
-              />
-            ))}
-          </List>
-        )}
-      </Panel>
+      {snapshot.providers.length === 0 && conflictingUserProviders.length === 0 ? (
+        <EmptyState title={t("providers.empty")} />
+      ) : (
+        <List>
+          {snapshot.providers.map((provider) => (
+            <ProviderRow
+              key={provider.id}
+              provider={provider}
+              translator={translator}
+              onSelect={() => onOpen(provider.id)}
+            />
+          ))}
+          {conflictingUserProviders.map((details) => (
+            <ConflictingUserProviderRow
+              key={details.definition.id}
+              details={details}
+              onDelete={onDelete}
+              translator={translator}
+            />
+          ))}
+        </List>
+      )}
     </div>
   );
 }
@@ -416,7 +413,8 @@ function ProviderAccess({
   const { t } = translator;
 
   return (
-    <Panel title={t("providers.access.title", { name: provider.name })}>
+    <section className="providers-section">
+      <Heading level={3}>{t("providers.access.title", { name: provider.name })}</Heading>
       <div className="providers-access">
         {provider.logins.length === 0 ? (
           <Text tone="muted">{t("providers.logins.none")}</Text>
@@ -451,7 +449,7 @@ function ProviderAccess({
           </Text>
         </Notice>
       )}
-    </Panel>
+    </section>
   );
 }
 
@@ -534,7 +532,8 @@ function ProviderModels({ provider, entry, translator }: ProviderModelsProps) {
   const { t } = translator;
 
   return (
-    <Panel title={t("providers.models.title", { name: provider.name })}>
+    <section className="providers-section">
+      <Heading level={3}>{t("providers.models.title", { name: provider.name })}</Heading>
       {entry === undefined || entry.kind === "loading" ? (
         <Spinner label={t("state.loading")} />
       ) : entry.kind === "failed" ? (
@@ -548,7 +547,7 @@ function ProviderModels({ provider, entry, translator }: ProviderModelsProps) {
           ))}
         </List>
       )}
-    </Panel>
+    </section>
   );
 }
 

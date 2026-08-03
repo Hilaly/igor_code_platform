@@ -192,15 +192,11 @@
   flex: 1;
 }
 
-/* Вью плагинов: панель на плагин, в панели — строки вкладов. Геометрия здесь, вид — в ките. */
+/* Вью плагинов: панель на плагин, в панели — плотные сведения и строки вкладов. */
 .plugins,
 .plugins-plugin {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
-}
-
-.plugins-plugin {
   gap: var(--sovereign-space-2);
 }
 
@@ -214,16 +210,25 @@
 }
 
 /*
- * В шапке ровно двое: сведения о плагине и его переключатель. Переключатель держится правого края
- * распором между ними, а не селектором по классу примитива: имена классов кита хешируются модулями,
- * и цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
+ * Переключатель плагина живёт в шапке `Panel`; первая строка тела собирает состояние и путь. Так
+ * управление самостоятельным объектом остаётся у его имени, а сведения не образуют вторую панель.
  */
 .plugins-plugin-head {
+  min-height: var(--sovereign-row-height-compact);
   justify-content: space-between;
 }
 
+.plugins-contributions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  padding-block-start: var(--sovereign-space-2);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
 .plugins-contribution {
-  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  min-height: var(--sovereign-row-height-compact);
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
 }
 
 .plugins-reasons {

@@ -167,4 +167,18 @@ describe("the style sheets of the application", () => {
       /\.settings[^{]*\{[^}]*(?:box-shadow:\s*var\(--sovereign-elevation-|border-radius:\s*var\(--sovereign-radius-(?:sm|md|lg|xl))/s,
     );
   });
+
+  it("keeps plugin facts and contributions compact and divided", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.plugins-plugin-head\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+    );
+    expect(shell).toMatch(
+      /\.plugins-contributions\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
+    );
+    expect(shell).toMatch(
+      /\.plugins-contribution\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);[^}]*padding:\s*var\(--sovereign-space-1\)\s+var\(--sovereign-space-2\);/s,
+    );
+  });
 });

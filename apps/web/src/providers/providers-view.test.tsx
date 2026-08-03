@@ -254,12 +254,34 @@ describe("ProvidersView", () => {
   });
 
   it("opens the page of the provider the human picked", () => {
-    // Карточка в списке кликабельна целиком и уводит на страницу провайдера — это задача вью.
+    // Вся строка, а не только имя, остаётся одной кнопкой перехода. Вложенные кнопки здесь
+    // недопустимы: браузер перестраивает такую разметку, а клавиатурная навигация распадается.
     const { onOpen } = show(withProviders([provider("anthropic"), provider("openai")]));
+    const list = screen.getByRole("list");
+    const rows = within(list).getAllByRole("listitem");
+
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).getAllByRole("button")).toHaveLength(1);
+    expect(within(rows[1]!).getAllByRole("button")).toHaveLength(1);
 
     fireEvent.click(within(rowOf("Openai")).getByRole("button"));
 
     expect(onOpen).toHaveBeenCalledWith("openai");
+  });
+
+  it("keeps provider detail actions outside the selectable list rows", () => {
+    show(
+      withProviders([provider("acme", { origin: "user", custom: true, dynamic: true })]),
+      "acme",
+    );
+
+    const edit = screen.getByRole("button", { name: "Редактировать" });
+    const refresh = screen.getByRole("button", { name: "Обновить модели" });
+    const remove = screen.getByRole("button", { name: "Удалить" });
+
+    expect(edit.closest("li")).toBeNull();
+    expect(refresh.closest("li")).toBeNull();
+    expect(remove.closest("li")).toBeNull();
   });
 
   it("shows the models of the open provider with the window and the price", () => {
