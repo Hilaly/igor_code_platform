@@ -4,6 +4,10 @@ import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sove
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
+import { PluginsView } from "../plugins/plugins-view.tsx";
+import { initialPluginsState } from "../plugins/state.ts";
+import { ProvidersView } from "../providers/providers-view.tsx";
+import { initialProvidersState } from "../providers/state.ts";
 import { SettingsView } from "./settings-view.tsx";
 
 afterEach(cleanup);
@@ -47,3 +51,61 @@ it("shows one selected settings section and only its content", () => {
   fireEvent.click(screen.getByRole("button", { name: "Плагины" }));
   expect(onSectionChange).toHaveBeenCalledWith("plugins");
 });
+
+it.each([
+  {
+    section: "providers" as const,
+    heading: "Провайдеры",
+    content: (
+      <ProvidersView
+        headingLevel={2}
+        state={initialProvidersState}
+        providerId={undefined}
+        onOpen={vi.fn()}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn(async () => undefined)}
+        onRefresh={vi.fn(async () => undefined)}
+        onBack={vi.fn()}
+        onLogIn={vi.fn()}
+        onAnswer={vi.fn()}
+        onCancelLogin={vi.fn()}
+        onCloseLogin={vi.fn()}
+        onLogOut={vi.fn()}
+        translator={translator}
+      />
+    ),
+  },
+  {
+    section: "plugins" as const,
+    heading: "Плагины",
+    content: (
+      <PluginsView
+        headingLevel={2}
+        state={initialPluginsState}
+        onSwitch={vi.fn()}
+        translator={translator}
+      />
+    ),
+  },
+])(
+  "keeps one page heading when real $section content is embedded",
+  ({ section, heading, content }) => {
+    render(
+      <SettingsView
+        section={section}
+        onSectionChange={vi.fn()}
+        appearance={<div>appearance content</div>}
+        providers={section === "providers" ? content : <div>provider content</div>}
+        plugins={section === "plugins" ? content : <div>plugin content</div>}
+        daemon={<div>daemon</div>}
+        diagnostics={<div>diagnostics</div>}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: heading })).toBeTruthy();
+  },
+);

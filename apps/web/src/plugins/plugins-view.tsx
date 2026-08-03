@@ -35,6 +35,8 @@ import {
 import type { PluginsState } from "./state.ts";
 
 export type PluginsViewProps = {
+  /** Внутри страницы настроек заголовок раздела уже `h1`; самостоятельное вью по умолчанию владеет им. */
+  headingLevel?: 1 | 2;
   state: PluginsState;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
   translator: ScopedTranslator;
@@ -53,14 +55,14 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   failed: "danger",
 };
 
-export function PluginsView({ state, onSwitch, translator }: PluginsViewProps) {
+export function PluginsView({ headingLevel = 1, state, onSwitch, translator }: PluginsViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
 
   if (snapshot === undefined) {
     return (
       <div className="plugins">
-        <Heading level={1}>{t("page.plugins.title")}</Heading>
+        <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -72,7 +74,7 @@ export function PluginsView({ state, onSwitch, translator }: PluginsViewProps) {
 
   return (
     <div className="plugins">
-      <Heading level={1}>{t("page.plugins.title")}</Heading>
+      <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
 
       {state.stale ? (
         <Notice tone="warning" title={t("plugins.stale.title")}>

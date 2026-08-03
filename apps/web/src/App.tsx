@@ -683,6 +683,7 @@ export function App() {
             }
             providers={
               <ProvidersView
+                headingLevel={2}
                 state={providers.state}
                 providerId={page.kind === "settings" ? page.providerId : undefined}
                 onOpen={(providerId) =>
@@ -721,6 +722,7 @@ export function App() {
             }
             plugins={
               <PluginsView
+                headingLevel={2}
                 state={plugins.state}
                 onSwitch={plugins.switchPlugin}
                 translator={translator}
