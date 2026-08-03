@@ -79,7 +79,7 @@ export type Appearance = {
 };
 
 /** Идентификатор встроенной схемы. Она есть всегда: заменить её нечем, пока плагинов нет. */
-export const baseColorScheme = "base";
+export const builtInColorScheme = "imperium";
 
 /** Базовая локаль английская, русская идёт в поставке (docs/ui-kit.md). */
 export const baseLocale = "en";
@@ -107,7 +107,7 @@ export const defaultConfig: Config = {
   compactionKeepRecentTokens: 20000,
 };
 export const defaultAppearance: Appearance = {
-  colorScheme: baseColorScheme,
+  colorScheme: builtInColorScheme,
   variant: "system",
   scale: "default",
 };
