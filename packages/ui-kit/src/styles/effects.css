@@ -19,5 +19,4 @@
     0 12px 24px color-mix(in srgb, var(--sovereign-shadow) 34%, transparent),
     0 30px 60px color-mix(in srgb, var(--sovereign-shadow) 44%, transparent),
     0 60px 120px color-mix(in srgb, var(--sovereign-shadow) 32%, transparent);
-
 }
