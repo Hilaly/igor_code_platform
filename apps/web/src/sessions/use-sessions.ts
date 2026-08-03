@@ -141,6 +141,8 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   }, []);
 
   const pendingSessions = useRef<AbortController | undefined>(undefined);
+  const pendingDraftProjects = useRef<AbortController | undefined>(undefined);
+  const draftProjectsSequence = useRef(0);
   const pendingAgents = useRef<AbortController | undefined>(undefined);
   const projectAgentsSequence = useRef(0);
   const selectedProject = useRef<string | undefined>(undefined);
@@ -214,8 +216,19 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   const reloadDraftProjects = useCallback(() => {
-    void fetchProjectsSnapshot()
+    pendingDraftProjects.current?.abort();
+
+    const controller = new AbortController();
+    pendingDraftProjects.current = controller;
+    const sequence = draftProjectsSequence.current + 1;
+    draftProjectsSequence.current = sequence;
+
+    void fetchProjectsSnapshot(controller.signal)
       .then((snapshot) => {
+        if (controller.signal.aborted || draftProjectsSequence.current !== sequence) {
+          return;
+        }
+
         apply((current) => applyProjects(current, snapshot.projects));
 
         const selected = selectedProject.current;
@@ -226,9 +239,13 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
           selectProject("");
         }
       })
-      .catch((cause: unknown) =>
-        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`),
-      );
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted || draftProjectsSequence.current !== sequence) {
+          return;
+        }
+
+        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`);
+      });
   }, [apply, onDiagnostic, selectProject]);
 
   /**
@@ -361,6 +378,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   useEffect(
     () => () => {
       pendingSessions.current?.abort();
+      pendingDraftProjects.current?.abort();
       pendingAgents.current?.abort();
       pendingOpen.current?.abort();
     },

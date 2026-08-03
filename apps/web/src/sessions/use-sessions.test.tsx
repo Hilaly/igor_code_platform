@@ -86,6 +86,7 @@ let delayedBranches: Promise<Response>[] | undefined;
 let delayedEntries: Promise<Response> | undefined;
 let projectAgents: Record<string, unknown[]> = {};
 let delayedProjectAgents: Record<string, Promise<Response>> = {};
+let delayedProjects: Promise<Response>[] = [];
 let projects: Project[] = [];
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
@@ -108,6 +109,7 @@ beforeEach(() => {
   delayedEntries = undefined;
   projectAgents = {};
   delayedProjectAgents = {};
+  delayedProjects = [];
   projects = [];
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
@@ -135,6 +137,11 @@ beforeEach(() => {
     }
 
     if (url === projectsPath) {
+      const delayed = delayedProjects.shift();
+      if (delayed !== undefined) {
+        return delayed;
+      }
+
       return answer({ projects, archived: [] });
     }
 
@@ -336,6 +343,108 @@ describe("useSessions", () => {
     resolveP1(await answer({ agents: [{ id: "stale" }] }));
     await act(async () => Promise.resolve());
     expect(view.result.current.projectAgents).toEqual({ loading: false });
+  });
+
+  it("keeps a newer selectable project snapshot when an older request finishes last", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    const p2: Project = { ...p1, id: "p2", name: "Two", folder: "/two", folderKey: "/two" };
+    projects = [p1];
+    projectAgents = { p2: [{ id: "p2-agent" }] };
+    const view = connect();
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+
+    let resolveOlder!: (response: Response) => void;
+    let resolveNewer!: (response: Response) => void;
+    delayedProjects = [
+      new Promise((resolve) => {
+        resolveOlder = resolve;
+      }),
+      new Promise((resolve) => {
+        resolveNewer = resolve;
+      }),
+    ];
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(2));
+    const older = asked(projectsPath)[1];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(3));
+
+    resolveNewer(await answer({ projects: [p1, p2], archived: [] }));
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1, p2]));
+    act(() => view.result.current.selectProject("p2"));
+    await waitFor(() => expect(view.result.current.projectAgents.projectId).toBe("p2"));
+
+    expect(older?.signal?.aborted).toBe(true);
+    resolveOlder(await answer({ projects: [p1], archived: [] }));
+    await act(async () => Promise.resolve());
+
+    expect(view.result.current.state.projects).toEqual([p1, p2]);
+    expect(view.result.current.projectAgents.projectId).toBe("p2");
+  });
+
+  it("ignores an older project snapshot failure after a newer refresh succeeds", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    projects = [p1];
+    const view = connect();
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+
+    let resolveOlder!: (response: Response) => void;
+    let resolveNewer!: (response: Response) => void;
+    delayedProjects = [
+      new Promise((resolve) => {
+        resolveOlder = resolve;
+      }),
+      new Promise((resolve) => {
+        resolveNewer = resolve;
+      }),
+    ];
+    act(() => view.result.current.prepareDraft());
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(3));
+
+    resolveNewer(await answer({ projects: [p1], archived: [] }));
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+    resolveOlder(await answer({ error: "stale project failure" }, 503));
+    await act(async () => Promise.resolve());
+
+    expect(view.diagnostics).not.toContain("the projects could not be read: stale project failure");
+    expect(view.result.current.state.projects).toEqual([p1]);
   });
 
   it("filters the sessions snapshot by the project from the address", async () => {
