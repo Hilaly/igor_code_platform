@@ -135,6 +135,7 @@ async function serve(
     modelChangeGate?: ReturnType<typeof gate>;
     openGate?: ReturnType<typeof gate>;
     createGate?: ReturnType<typeof gate>;
+    operationGate?: ReturnType<typeof gate> | (() => ReturnType<typeof gate> | undefined);
     coldSession?: boolean;
     compactionThreshold?: number;
   } = {},
@@ -184,6 +185,14 @@ async function serve(
   const appliedToolNames: string[][] = [];
   const harnessCalls: string[] = [];
   const toolContexts: unknown[] = [];
+  const operationGate = (): ReturnType<typeof gate> | undefined =>
+    typeof options.operationGate === "function" ? options.operationGate() : options.operationGate;
+  const waitForOperation = async (): Promise<void> => {
+    const current = operationGate();
+
+    current?.entered();
+    await current?.wait;
+  };
   const observeSession = (session: AgentSession): AgentSession => ({
     ...session,
     setInstructions: (instructions) => {
@@ -206,6 +215,28 @@ async function serve(
 
       return session.message(text, mode);
     },
+    ...(options.operationGate === undefined
+      ? {}
+      : {
+          prompt: async (text: string, turnId: string) => {
+            harnessCalls.push("prompt");
+            await waitForOperation();
+
+            return session.prompt(text, turnId);
+          },
+          compact: async (instructions?: string) => {
+            harnessCalls.push("compact");
+            await waitForOperation();
+
+            return session.compact(instructions);
+          },
+          navigate: async (request: Parameters<AgentSession["navigate"]>[0]) => {
+            harnessCalls.push("navigate");
+            await waitForOperation();
+
+            return session.navigate(request);
+          },
+        }),
   });
   const delayModelChange = (session: AgentSession): AgentSession => ({
     ...observeSession(session),
@@ -379,6 +410,23 @@ async function untilIdle(
   }
 
   throw new Error("сессия так и не вернулась в простой");
+}
+
+async function untilQueued(
+  call: (method: string, path: string) => Promise<Answer>,
+  sessionId: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const answer = await call("GET", sessionPath(sessionId));
+
+    if (answer.body["phase"] === "queued") {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error("сессия так и не встала в очередь");
 }
 
 describe("GET /api/agents", () => {
@@ -869,6 +917,65 @@ describe("running a turn over http", () => {
     await running;
     await untilIdle(call, first);
     await untilIdle(call, second);
+  });
+
+  it("re-resolves definitions when a queued turn actually starts", async () => {
+    const blocker = gate();
+    let currentOperationGate: ReturnType<typeof gate> | undefined = blocker;
+    let contributions: ContributionRegistration[] = [
+      {
+        ...baseAgent,
+        instructions: "admission instructions",
+        tools: { include: ["read"], exclude: [] },
+        skills: { include: ["admission-skill"], exclude: [] },
+      },
+      skill("admission-skill"),
+    ];
+    const { call, start, appliedInstructions, appliedSkills, appliedToolNames, harnessCalls } =
+      await serve({
+        limit: 1,
+        turns: [{ text: "занял" }, { text: "исполнил" }],
+        contributions: { base: () => [baseAgent], forProject: () => contributions },
+        operationGate: () => currentOperationGate,
+      });
+    const occupyingSessionId = String((await start()).body["id"]);
+    const queuedSessionId = String((await start()).body["id"]);
+    const occupying = call("POST", sessionTurnsPath(occupyingSessionId), { text: "займи слот" });
+
+    await blocker.entry;
+
+    const accepted = await call("POST", sessionTurnsPath(queuedSessionId), { text: "в очередь" });
+
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body["phase"], "queued");
+
+    contributions = [
+      {
+        ...baseAgent,
+        instructions: "execution instructions",
+        tools: { include: ["bash", "write"], exclude: ["write"] },
+        skills: { include: ["execution-skill"], exclude: [] },
+      },
+      skill("execution-skill"),
+    ];
+    currentOperationGate = undefined;
+    blocker.open();
+
+    await occupying;
+    await untilIdle(call, queuedSessionId);
+
+    assert.deepEqual(harnessCalls.slice(-4), [
+      "set-tools",
+      "set-instructions",
+      "set-skills",
+      "prompt",
+    ]);
+    assert.equal(appliedInstructions.at(-1), "execution instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["execution-skill"],
+    );
   });
 
   it("takes a queued turn out of the queue on interruption", async () => {
@@ -1530,6 +1637,68 @@ describe("reading the branch and the context over http", () => {
 });
 
 describe("compacting a session over http", () => {
+  it("re-resolves definitions when a queued compaction actually starts", async () => {
+    const blocker = gate();
+    let currentOperationGate: ReturnType<typeof gate> | undefined;
+    let contributions: ContributionRegistration[] = [
+      {
+        ...baseAgent,
+        instructions: "admission instructions",
+        tools: { include: ["read"], exclude: [] },
+        skills: { include: ["admission-skill"], exclude: [] },
+      },
+      skill("admission-skill"),
+    ];
+    const { call, start, appliedInstructions, appliedSkills, appliedToolNames, harnessCalls } =
+      await serve({
+        limit: 1,
+        turns: [{ text: "target" }, { text: "occupying" }, { text: "summary" }],
+        contributions: { base: () => [baseAgent], forProject: () => contributions },
+        operationGate: () => currentOperationGate,
+      });
+    const occupyingSessionId = String((await start()).body["id"]);
+    const compactingSessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(compactingSessionId), { text: "prepare compact" });
+    await untilIdle(call, compactingSessionId);
+
+    currentOperationGate = blocker;
+    const occupying = call("POST", sessionTurnsPath(occupyingSessionId), { text: "occupy slot" });
+    await blocker.entry;
+
+    const accepted = await call("POST", sessionCompactPath(compactingSessionId), {});
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.body["phase"], "queued");
+
+    contributions = [
+      {
+        ...baseAgent,
+        instructions: "execution instructions",
+        tools: { include: ["bash", "write"], exclude: ["write"] },
+        skills: { include: ["execution-skill"], exclude: [] },
+      },
+      skill("execution-skill"),
+    ];
+    currentOperationGate = undefined;
+    blocker.open();
+
+    await occupying;
+    await untilIdle(call, compactingSessionId);
+
+    assert.deepEqual(harnessCalls.slice(-4), [
+      "set-tools",
+      "set-instructions",
+      "set-skills",
+      "compact",
+    ]);
+    assert.equal(appliedInstructions.at(-1), "execution instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["execution-skill"],
+    );
+  });
+
   it("takes the compaction like a turn and writes it into the tree", async () => {
     const { call, start, events } = await serve({
       turns: [{ text: "готово" }, { text: "вот пересказ" }],
@@ -1582,6 +1751,77 @@ describe("compacting a session over http", () => {
 });
 
 describe("navigating the tree over http", () => {
+  it("re-resolves definitions when a queued branch summary actually starts", async () => {
+    const blocker = gate();
+    let currentOperationGate: ReturnType<typeof gate> | undefined;
+    let contributions: ContributionRegistration[] = [
+      {
+        ...baseAgent,
+        instructions: "admission instructions",
+        tools: { include: ["read"], exclude: [] },
+        skills: { include: ["admission-skill"], exclude: [] },
+      },
+      skill("admission-skill"),
+    ];
+    const { call, start, appliedInstructions, appliedSkills, appliedToolNames, harnessCalls } =
+      await serve({
+        limit: 1,
+        turns: [{ text: "first" }, { text: "second" }, { text: "occupying" }, { text: "summary" }],
+        contributions: { base: () => [baseAgent], forProject: () => contributions },
+        operationGate: () => currentOperationGate,
+      });
+    const occupyingSessionId = String((await start()).body["id"]);
+    const navigatingSessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(navigatingSessionId), { text: "first question" });
+    await untilIdle(call, navigatingSessionId);
+    await call("POST", sessionTurnsPath(navigatingSessionId), { text: "second question" });
+    await untilIdle(call, navigatingSessionId);
+    const branch = (await call("GET", sessionBranchPath(navigatingSessionId)))
+      .body as unknown as SessionBranch;
+    const target = branch.entries.filter(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    )[1];
+    assert.ok(target);
+
+    currentOperationGate = blocker;
+    const occupying = call("POST", sessionTurnsPath(occupyingSessionId), { text: "occupy slot" });
+    await blocker.entry;
+    const moving = call("POST", sessionNavigatePath(navigatingSessionId), {
+      entryId: target.id,
+      summarize: true,
+    });
+    await untilQueued(call, navigatingSessionId);
+
+    contributions = [
+      {
+        ...baseAgent,
+        instructions: "execution instructions",
+        tools: { include: ["bash", "write"], exclude: ["write"] },
+        skills: { include: ["execution-skill"], exclude: [] },
+      },
+      skill("execution-skill"),
+    ];
+    currentOperationGate = undefined;
+    blocker.open();
+
+    await occupying;
+    assert.equal((await moving).status, 200);
+
+    assert.deepEqual(harnessCalls.slice(-4), [
+      "set-tools",
+      "set-instructions",
+      "set-skills",
+      "navigate",
+    ]);
+    assert.equal(appliedInstructions.at(-1), "execution instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["execution-skill"],
+    );
+  });
+
   it("answers with the new leaf and the text to ask again", async () => {
     const { call, start } = await serve({ turns: [{ text: "первый" }, { text: "второй" }] });
     const sessionId = String((await start()).body["id"]);

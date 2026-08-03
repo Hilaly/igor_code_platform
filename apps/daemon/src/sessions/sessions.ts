@@ -807,8 +807,28 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const started = place.start({
       kind: "compaction",
-      run: async () => {
+      run: async (turnId, queued) => {
         try {
+          if (queued) {
+            const prepared = await prepareForModel(ready.session, ready.session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              options.emitDelta({
+                sessionId,
+                turnId,
+                delta: {
+                  kind: "turn-failed",
+                  reason: `the agent ${prepared.agentId} is not available`,
+                },
+              });
+              options.logger.warn("a queued compaction lost its agent", {
+                session: sessionId,
+                agent: prepared.agentId,
+              });
+              return;
+            }
+          }
+
           const outcome = await ready.session.compact(request.instructions);
 
           if (outcome.kind !== "done") {
@@ -891,8 +911,20 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const started = place.start({
       kind: "branch-summary",
-      run: async () => {
+      run: async (_turnId, queued) => {
         try {
+          if (queued) {
+            const prepared = await prepareForModel(session, session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              settle({
+                kind: "failed",
+                reason: `the agent ${prepared.agentId} is not available`,
+              });
+              return;
+            }
+          }
+
           settle(await session.navigate(request));
         } catch (cause) {
           // Ждущий обязан получить ответ даже на сбое: иначе запрос повис бы навсегда.
@@ -1242,8 +1274,24 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const started = place.start({
       kind: "turn",
-      run: async (turnId) => {
+      run: async (turnId, queued) => {
         try {
+          if (queued) {
+            const prepared = await prepareForModel(session, session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              options.emitDelta({
+                sessionId,
+                turnId,
+                delta: {
+                  kind: "turn-failed",
+                  reason: `the agent ${prepared.agentId} is not available`,
+                },
+              });
+              return;
+            }
+          }
+
           const outcome = await session.prompt(request.text, turnId);
 
           if (outcome.kind === "failed") {
