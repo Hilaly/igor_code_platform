@@ -213,6 +213,24 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [reloadProjectAgents],
   );
 
+  const reloadDraftProjects = useCallback(() => {
+    void fetchProjectsSnapshot()
+      .then((snapshot) => {
+        apply((current) => applyProjects(current, snapshot.projects));
+
+        const selected = selectedProject.current;
+        if (
+          selected !== undefined &&
+          !latest.current.projects?.some((project) => project.id === selected)
+        ) {
+          selectProject("");
+        }
+      })
+      .catch((cause: unknown) =>
+        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`),
+      );
+  }, [apply, onDiagnostic, selectProject]);
+
   /**
    * Снимок открытой сессии, её записи, счёт и заполнение контекста. Спрашиваются вместе и под одной
    * отменой на всех: порознь они разошлись бы — фаза из одного ответа, записи из другого. Контекст
@@ -331,10 +349,14 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       ) {
         reloadProjectAgents(selectedProject.current);
       }
+
+      if (event.type === coreEventTypes.projectsChanged && latest.current.projects !== undefined) {
+        reloadDraftProjects();
+      }
     });
 
     return unsubscribe;
-  }, [apply, bus, reloadOpen, reloadProjectAgents, reloadSessions]);
+  }, [apply, bus, reloadDraftProjects, reloadOpen, reloadProjectAgents, reloadSessions]);
 
   useEffect(
     () => () => {
@@ -346,18 +368,14 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   const prepareDraft = useCallback(() => {
-    void fetchProjectsSnapshot()
-      .then((snapshot) => apply((current) => applyProjects(current, snapshot.projects)))
-      .catch((cause: unknown) =>
-        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`),
-      );
+    reloadDraftProjects();
 
     void fetchProvidersSnapshot()
       .then((snapshot) => apply((current) => applyProviders(current, snapshot.providers)))
       .catch((cause: unknown) =>
         onDiagnostic(`the providers could not be read: ${reasonOf(cause)}`),
       );
-  }, [apply, onDiagnostic]);
+  }, [apply, onDiagnostic, reloadDraftProjects]);
 
   const loadModels = useCallback(
     (providerId: string) => {

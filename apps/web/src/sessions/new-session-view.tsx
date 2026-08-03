@@ -88,6 +88,7 @@ export function NewSessionView(props: NewSessionViewProps) {
     projectAgents.projectId === projectId && !projectAgents.loading
       ? projectAgents.agents
       : undefined;
+  const project = projects?.find((candidate) => candidate.id === projectId);
 
   const pickProject = (id: string): void => {
     setProjectId(id);
@@ -99,6 +100,20 @@ export function NewSessionView(props: NewSessionViewProps) {
   };
 
   const agent = agents?.find((candidate) => candidate.id === agentId);
+
+  // Снимок проектов меняется на живой системе: архивный, удалённый или ставший недоступным проект
+  // исчезает из вариантов. Сбрасываем его через тот же путь, что ручную смену, чтобы контроллер
+  // отменил проектный запрос, а зависимые поля не сохранили устаревший черновик.
+  useEffect(() => {
+    if (projects !== undefined && projectId !== "" && project === undefined) {
+      setProjectId("");
+      setAgentId("");
+      setModelRef(undefined);
+      setThinkingLevel("medium");
+      setRefusal(undefined);
+      props.onSelectProject("");
+    }
+  }, [project, projectId, projects, props.onSelectProject]);
 
   // Hot reload вклада может убрать выбранного агента без смены проекта. Зависимые значения тогда
   // уже не принадлежат действующему выбору и не должны оставить черновик готовым к отправке.
@@ -166,7 +181,7 @@ export function NewSessionView(props: NewSessionViewProps) {
 
   // Готовность — проект и агент. Модель НЕ обязательна: у агента может быть дефолт, и тогда демон
   // возьмёт её сам. Первый текст необязателен тоже: создать пустую сессию — законное действие.
-  const ready = projectId !== "" && agent !== undefined;
+  const ready = project !== undefined && agent !== undefined;
 
   const create = (): void => {
     setBusy(true);

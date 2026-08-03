@@ -277,6 +277,49 @@ describe("the screen that creates a session", () => {
     );
   });
 
+  it("clears the project and every dependent field when the selectable projects drop it", async () => {
+    const agentWithDefaults: AgentSummary = {
+      ...baseAgent,
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "high",
+    };
+    const view = show({
+      projectAgents: { projectId: "b7Kq", agents: [agentWithDefaults], loading: false },
+      models: ready,
+    });
+    pick("Проект", "Платформа — /code/platform");
+    pick("Агент", "Базовый агент");
+
+    view.rerender(
+      <NewSessionView
+        projects={[]}
+        projectAgents={{ projectId: "b7Kq", agents: [agentWithDefaults], loading: false }}
+        providers={[provider]}
+        models={ready}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Выберите"),
+    );
+    expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
+      "Средний",
+    );
+    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    expect(view.onCreate).not.toHaveBeenCalled();
+    expect(view.onSelectProject).toHaveBeenLastCalledWith("");
+  });
+
   it("asks for the models of a provider when its group is expanded", () => {
     const view = show();
 

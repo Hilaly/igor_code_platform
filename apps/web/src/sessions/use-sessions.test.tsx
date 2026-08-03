@@ -13,6 +13,8 @@ import {
   agentsPath,
   coreEventTypes,
   projectAgentsPath,
+  projectsPath,
+  providersPath,
   sessionBranchPath,
   sessionCompactPath,
   sessionContextPath,
@@ -30,6 +32,7 @@ import {
   type SessionDeltaFrame,
   type SessionEntriesPage,
   type SessionEntry,
+  type Project,
 } from "@sovereign/protocol";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +86,7 @@ let delayedBranches: Promise<Response>[] | undefined;
 let delayedEntries: Promise<Response> | undefined;
 let projectAgents: Record<string, unknown[]> = {};
 let delayedProjectAgents: Record<string, Promise<Response>> = {};
+let projects: Project[] = [];
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -104,6 +108,7 @@ beforeEach(() => {
   delayedEntries = undefined;
   projectAgents = {};
   delayedProjectAgents = {};
+  projects = [];
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -127,6 +132,14 @@ beforeEach(() => {
 
     if (url === agentsPath) {
       return answer({ agents: [] });
+    }
+
+    if (url === projectsPath) {
+      return answer({ projects, archived: [] });
+    }
+
+    if (url === providersPath) {
+      return answer({ providers: [] });
     }
 
     for (const [projectId, agents] of Object.entries(projectAgents)) {
@@ -278,6 +291,51 @@ describe("useSessions", () => {
       expect(view.result.current.projectAgents.agents).toEqual([{ id: "after" }]),
     );
     expect(asked(projectAgentsPath("p1"))).toHaveLength(2);
+  });
+
+  it("clears a selected project and aborts its agents when the selectable snapshot drops it", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    projects = [p1];
+    projectAgents = { p1: [] };
+    let resolveP1!: (response: Response) => void;
+    delayedProjectAgents.p1 = new Promise((resolve) => {
+      resolveP1 = resolve;
+    });
+    const view = connect();
+
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() => expect(asked(projectAgentsPath("p1"))).toHaveLength(1));
+    const request = asked(projectAgentsPath("p1"))[0];
+
+    projects = [];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([]));
+    expect(request?.signal?.aborted).toBe(true);
+    expect(view.result.current.projectAgents).toEqual({ loading: false });
+
+    resolveP1(await answer({ agents: [{ id: "stale" }] }));
+    await act(async () => Promise.resolve());
+    expect(view.result.current.projectAgents).toEqual({ loading: false });
   });
 
   it("filters the sessions snapshot by the project from the address", async () => {
