@@ -19,6 +19,7 @@ import { Notice } from "./notice.tsx";
 import { Panel } from "./panel.tsx";
 import { Select } from "./select.tsx";
 import { EmptyState, Spinner } from "./state.tsx";
+import { StatusDot } from "./status-dot.tsx";
 import { Heading, Text } from "./text.tsx";
 import { Toggle } from "./toggle.tsx";
 
@@ -209,6 +210,11 @@ export const Messages = () => (
 
 export const States = () => (
   <div style={column}>
+    <div style={row}>
+      <StatusDot tone="positive" label="Подключено" />
+      <StatusDot tone="pending" label="Подключение" />
+      <StatusDot tone="danger" label="Соединение потеряно" />
+    </div>
     <EmptyState title="Плагинов нет" hint="Положите папку плагина в plugins/ директории данных" />
     <Spinner label="Снимок состояния запрашивается" />
   </div>

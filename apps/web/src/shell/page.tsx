@@ -12,11 +12,10 @@ import type { Page } from "../router.ts";
 export type PageViewProps = {
   page: Page;
   /** Вью приходят собранными: страница не знает ни про шину, ни про запросы. */
-  plugins: ReactNode;
   projects: ReactNode;
   project: ReactNode;
-  providers: ReactNode;
-  sessions: ReactNode;
+  session: ReactNode;
+  sessionArchive: ReactNode;
   /** Создание сессии — отдельный адресуемый экран, не часть мастер-детали. */
   newSession: ReactNode;
   settings: ReactNode;
@@ -25,20 +24,15 @@ export type PageViewProps = {
 
 export function PageView({
   page,
-  plugins,
   projects,
   project,
-  providers,
-  sessions,
+  session,
+  sessionArchive,
   newSession,
   settings,
   translator,
 }: PageViewProps) {
   const { t } = translator;
-
-  if (page.kind === "plugins") {
-    return plugins;
-  }
 
   if (page.kind === "projects") {
     return projects;
@@ -48,12 +42,12 @@ export function PageView({
     return project;
   }
 
-  if (page.kind === "providers") {
-    return providers;
+  if (page.kind === "session") {
+    return session;
   }
 
-  if (page.kind === "sessions") {
-    return sessions;
+  if (page.kind === "session-archive") {
+    return sessionArchive;
   }
 
   if (page.kind === "new-session") {

@@ -17,42 +17,6 @@
   container-type: inline-size;
 }
 
-.sessions-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-3);
-  flex-wrap: wrap;
-}
-
-/*
- * Мастер-деталь. Список фиксированной доли, чат — всё остальное; на узком экране они встают в
- * колонку: требование вижна, а не среза.
- */
-.sessions-split {
-  display: grid;
-  grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
-  gap: var(--sovereign-space-3);
-  min-height: 0;
-  min-width: 0;
-  flex: 1;
-}
-
-.sessions-split > * {
-  min-width: 0;
-}
-
-@container (width < 60rem) {
-  .sessions-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.sessions-list {
-  overflow-y: auto;
-  min-height: 0;
-}
-
 .sessions-row {
   display: flex;
   align-items: center;
@@ -123,6 +87,13 @@
 }
 
 .new-session-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+}
+
+.archive-sessions-groups,
+.archive-sessions-group {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-3);
@@ -201,10 +172,4 @@
 .sessions-tree-label > :first-child {
   flex: 1;
   min-width: var(--sovereign-space-8);
-}
-
-.sessions-head-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sovereign-space-3);
 }

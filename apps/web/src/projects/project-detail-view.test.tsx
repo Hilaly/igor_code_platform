@@ -31,13 +31,12 @@ const project: Project = {
 };
 
 describe("ProjectDetailView", () => {
-  it("shows the project summary and its sessions", () => {
+  it("shows the project summary and resources without a duplicated session list", () => {
     render(
       <ProjectDetailView
         project={project}
         loaded
         fileResources={<div>Файловые ресурсы проекта</div>}
-        sessions={<div>Список сессий проекта</div>}
         onBack={vi.fn()}
         onNewSession={vi.fn()}
         translator={translator}
@@ -47,7 +46,7 @@ describe("ProjectDetailView", () => {
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeDefined();
     expect(screen.getByText("/code/alpha")).toBeDefined();
     expect(screen.getByText("Сессий: 3")).toBeDefined();
-    expect(screen.getByText("Список сессий проекта")).toBeDefined();
+    expect(screen.queryByText("Список сессий проекта")).toBeNull();
     expect(screen.getByText("Файловые ресурсы проекта")).toBeDefined();
   });
 
@@ -59,7 +58,6 @@ describe("ProjectDetailView", () => {
       <ProjectDetailView
         project={project}
         loaded
-        sessions={undefined}
         onBack={onBack}
         onNewSession={onNewSession}
         translator={translator}
@@ -75,13 +73,7 @@ describe("ProjectDetailView", () => {
 
   it("shows a stable empty state for a missing project", () => {
     render(
-      <ProjectDetailView
-        loaded
-        sessions={undefined}
-        onBack={vi.fn()}
-        onNewSession={vi.fn()}
-        translator={translator}
-      />,
+      <ProjectDetailView loaded onBack={vi.fn()} onNewSession={vi.fn()} translator={translator} />,
     );
 
     expect(screen.getByText("Проект не найден")).toBeDefined();

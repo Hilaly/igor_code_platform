@@ -14,9 +14,26 @@ describe("provider navigation in a browser", () => {
     (providerId) => {
       const navigation = createNavigation(window);
 
-      navigation.navigate({ kind: "providers", providerId });
+      navigation.navigate({ kind: "settings", section: "providers", providerId });
 
-      expect(navigation.current()).toEqual({ kind: "providers", providerId });
+      expect(navigation.current()).toEqual({ kind: "settings", section: "providers", providerId });
     },
   );
+
+  it.each([
+    ["/sessions", "/", { kind: "home" }],
+    ["/plugins", "/settings/plugins", { kind: "settings", section: "plugins" }],
+    ["/providers", "/settings/providers", { kind: "settings", section: "providers" }],
+    [
+      "/providers/anthropic",
+      "/settings/providers/anthropic",
+      { kind: "settings", section: "providers", providerId: "anthropic" },
+    ],
+  ] as const)("replaces legacy address %s with %s", (legacy, canonical, page) => {
+    window.history.replaceState(undefined, "", legacy);
+    const navigation = createNavigation(window);
+
+    expect(navigation.current()).toEqual(page);
+    expect(window.location.pathname).toBe(canonical);
+  });
 });

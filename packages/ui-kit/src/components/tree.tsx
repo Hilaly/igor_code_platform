@@ -45,6 +45,8 @@ export type TreeNode = {
   icon?: ReactNode;
   /** Метка рядом с подписью — состояние записи, число вложенных, что угодно ещё. */
   badge?: TreeNodeBadge;
+  /** Независимые действия рядом со строкой: они не выбирают и не раскрывают узел. */
+  actions?: ReactNode;
   children?: TreeNode[];
 };
 
@@ -247,64 +249,74 @@ export function Tree({
       const badgeElementId = `${nodeElementId}-badge`;
 
       return (
-        <div
-          key={node.id}
-          id={nodeElementId}
-          ref={(element) => {
-            if (element) {
-              itemElements.current.set(node.id, element);
-            } else {
-              itemElements.current.delete(node.id);
-            }
-          }}
-          role="treeitem"
-          aria-level={level + 1}
-          aria-expanded={hasChildren ? isExpanded : undefined}
-          aria-selected={isSelected}
-          // Имя узла — его подпись с меткой, а не всё содержимое: иначе в него уезжают и подписи
-          // раскрытых детей, и имя кнопки раскрытия. Метка названа вторым идентификатором, а не
-          // вложена в подпись: перечисленные части имени разделяются пробелом, склеенные — нет.
-          aria-labelledby={node.badge ? `${labelElementId} ${badgeElementId}` : labelElementId}
-          tabIndex={node.id === rovingId ? 0 : -1}
-          className={styles.item}
-          onKeyDown={(event) => handleKeyDown(event, node.id)}
-          onClick={(event) => handleItemClick(event, node)}
-        >
-          <div className={`${styles.row}${isSelected ? ` ${styles.selected}` : ""}`}>
-            {hasChildren ? (
-              <button
-                type="button"
-                className={`${styles.toggle}${isExpanded ? ` ${styles.expanded}` : ""}`}
-                aria-label={toggleLabel(node, isExpanded)}
-                // Состояние раскрытия объявляет сам узел; второе объявление на кнопке скринридер
-                // прочитал бы дважды. Из обхода `Tab` кнопка исключена: единственная точка входа в
-                // дерево — узел, а раскрытие с клавиатуры живёт на стрелках.
-                tabIndex={-1}
-                onClick={(event) => handleToggleClick(event, node)}
-              >
-                ▶
-              </button>
-            ) : (
-              <span className={styles.togglePlaceholder} aria-hidden="true" />
-            )}
-            {node.icon ? (
-              <span className={styles.icon} aria-hidden="true">
-                {node.icon}
+        <div key={node.id} role="none" className={styles.item}>
+          <div
+            id={nodeElementId}
+            ref={(element) => {
+              if (element) {
+                itemElements.current.set(node.id, element);
+              } else {
+                itemElements.current.delete(node.id);
+              }
+            }}
+            role="treeitem"
+            aria-level={level + 1}
+            aria-expanded={hasChildren ? isExpanded : undefined}
+            aria-selected={isSelected}
+            // Имя узла — его подпись с меткой, а не всё содержимое: иначе в него уезжают и подписи
+            // раскрытых детей, и имя кнопки раскрытия. Метка названа вторым идентификатором, а не
+            // вложена в подпись: перечисленные части имени разделяются пробелом, склеенные — нет.
+            aria-labelledby={node.badge ? `${labelElementId} ${badgeElementId}` : labelElementId}
+            tabIndex={node.id === rovingId ? 0 : -1}
+            className={styles.node}
+            onKeyDown={(event) => handleKeyDown(event, node.id)}
+            onClick={(event) => handleItemClick(event, node)}
+          >
+            <div className={`${styles.row}${isSelected ? ` ${styles.selected}` : ""}`}>
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className={`${styles.toggle}${isExpanded ? ` ${styles.expanded}` : ""}`}
+                  aria-label={toggleLabel(node, isExpanded)}
+                  // Состояние раскрытия объявляет сам узел; второе объявление на кнопке скринридер
+                  // прочитал бы дважды. Из обхода `Tab` кнопка исключена: единственная точка входа в
+                  // дерево — узел, а раскрытие с клавиатуры живёт на стрелках.
+                  tabIndex={-1}
+                  onClick={(event) => handleToggleClick(event, node)}
+                >
+                  ▶
+                </button>
+              ) : (
+                <span className={styles.togglePlaceholder} aria-hidden="true" />
+              )}
+              {node.icon ? (
+                <span className={styles.icon} aria-hidden="true">
+                  {node.icon}
+                </span>
+              ) : null}
+              <span id={labelElementId} className={styles.label}>
+                {node.label}
               </span>
-            ) : null}
-            <span id={labelElementId} className={styles.label}>
-              {node.label}
-            </span>
-            {node.badge ? (
-              <span id={badgeElementId}>
-                <Badge tone={node.badge.tone}>{node.badge.text}</Badge>
-              </span>
+              {node.badge ? (
+                <span id={badgeElementId}>
+                  <Badge tone={node.badge.tone}>{node.badge.text}</Badge>
+                </span>
+              ) : null}
+            </div>
+            {hasChildren && isExpanded && node.children ? (
+              <div role="group" className={styles.children}>
+                {renderNodes(node.children, level + 1)}
+              </div>
             ) : null}
           </div>
-          {hasChildren && isExpanded && node.children ? (
-            <div role="group" className={styles.children}>
-              {renderNodes(node.children, level + 1)}
-            </div>
+          {node.actions ? (
+            <span
+              className={styles.actions}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              {node.actions}
+            </span>
           ) : null}
         </div>
       );

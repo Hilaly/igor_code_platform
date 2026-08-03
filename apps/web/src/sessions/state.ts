@@ -183,7 +183,12 @@ export function applySummary(
 
   return {
     ...state,
-    open: { ...open, summary, pending, ...(summary === undefined ? { loading: false } : {}) },
+    open: {
+      ...open,
+      summary,
+      pending,
+      ...(summary === undefined ? { loading: false, failure: undefined } : {}),
+    },
   };
 }
 

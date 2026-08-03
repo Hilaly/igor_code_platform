@@ -148,11 +148,33 @@
 }
 
 .shell-nav,
-.shell-home,
-.shell-daemon {
+.shell-home {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
+}
+
+.shell-nav {
+  min-height: 0;
+  flex: 1;
+}
+
+.shell-projects {
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sidebar-project-actions,
+.shell-account {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+}
+
+.shell-account > :last-child {
+  min-width: 0;
+  flex: 1;
 }
 
 /* Вью плагинов: панель на плагин, в панели — строки вкладов. Геометрия здесь, вид — в ките. */
@@ -192,11 +214,4 @@
 .plugins-reasons {
   margin: 0;
   padding-left: var(--sovereign-space-5);
-}
-
-.shell-daemon-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-2);
 }

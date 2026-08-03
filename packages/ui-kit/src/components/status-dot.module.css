@@ -1,0 +1,20 @@
+.dot {
+  display: inline-block;
+  flex: none;
+  width: var(--sovereign-space-2);
+  height: var(--sovereign-space-2);
+  border-radius: var(--sovereign-radius-full);
+  background: currentColor;
+}
+
+.positive {
+  color: var(--sovereign-success);
+}
+
+.pending {
+  color: var(--sovereign-warning);
+}
+
+.danger {
+  color: var(--sovereign-danger);
+}

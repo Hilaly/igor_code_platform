@@ -99,22 +99,22 @@ describe("the style sheets of the application", () => {
     expect(styles).not.toMatch(/\.sv-/);
   });
 
-  it("allows the shell page and session tracks to shrink below their content width", () => {
+  it("allows the shell page, sidebar tree, and direct chat to shrink or scroll", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
-    expect(sessions).toMatch(/\.sessions-split\s*>\s*\*\s*\{[^}]*min-width:\s*0;/s);
+    expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-width:\s*0;/s);
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });
 
-  it("stacks the session split by its available width rather than the viewport", () => {
+  it("keeps direct session content sized by its available container", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
     expect(sessions).toMatch(/\.sessions\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(sessions).toMatch(
-      /@container\s*\(width\s*<\s*60rem\)\s*\{[^}]*\.sessions-split\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
-    );
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-height:\s*0;/s);
+    expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });
 });

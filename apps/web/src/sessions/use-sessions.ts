@@ -81,6 +81,8 @@ export type UseSessionsOptions = {
   sessionId?: string;
   /** На странице проекта список ограничен его идентификатором; адрес открытой сессии остаётся отдельным. */
   projectId?: string;
+  /** Фиксированный набор для постоянной панели или отдельного архива. */
+  archived?: boolean;
   onDiagnostic: (diagnostic: string) => void;
 };
 
@@ -128,7 +130,7 @@ const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
 export function useSessions(options: UseSessionsOptions): SessionsController {
-  const { bus, stream, sessionId, projectId, onDiagnostic } = options;
+  const { bus, stream, sessionId, projectId, archived, onDiagnostic } = options;
   const [state, setState] = useState<SessionsState>(initialSessionsState);
   const [projectAgents, setProjectAgents] = useState<ProjectAgentsState>({ loading: false });
 
@@ -154,7 +156,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     const controller = new AbortController();
     pendingSessions.current = controller;
 
-    void fetchSessions(projectId, latest.current.showArchived, controller.signal)
+    void fetchSessions(
+      projectId,
+      archived === undefined ? latest.current.showArchived : archived,
+      controller.signal,
+    )
       .then((snapshot) => apply((current) => applySessions(current, snapshot)))
       .catch((cause: unknown) => {
         if (controller.signal.aborted) {
@@ -166,7 +172,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         onDiagnostic(`the sessions could not be read: ${reason}`);
         apply((current) => applyFailure(current, reason));
       });
-  }, [apply, onDiagnostic, projectId]);
+  }, [apply, archived, onDiagnostic, projectId]);
 
   const reloadProjectAgents = useCallback(
     (selected: string) => {

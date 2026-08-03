@@ -195,7 +195,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function connect(props: { stream?: StreamStatus; sessionId?: string; projectId?: string } = {}) {
+function connect(
+  props: { stream?: StreamStatus; sessionId?: string; projectId?: string; archived?: boolean } = {},
+) {
   const bus = createFrontendBus({
     onListenerError: (cause) => {
       throw cause;
@@ -206,19 +208,33 @@ function connect(props: { stream?: StreamStatus; sessionId?: string; projectId?:
     diagnostics.push(diagnostic);
   };
   const view = renderHook(
-    (current: { stream: StreamStatus; sessionId?: string; projectId?: string }) =>
+    (current: {
+      stream: StreamStatus;
+      sessionId?: string;
+      projectId?: string;
+      archived?: boolean;
+    }) =>
       useSessions({
         bus,
         stream: current.stream,
         onDiagnostic: record,
         ...(current.sessionId === undefined ? {} : { sessionId: current.sessionId }),
         ...(current.projectId === undefined ? {} : { projectId: current.projectId }),
+        ...(current.archived === undefined ? {} : { archived: current.archived }),
       }),
     { initialProps: { stream: props.stream ?? "open", ...props } },
   );
 
   return { ...view, bus, diagnostics };
 }
+
+it("loads archived sessions when the controller is fixed to the archive dataset", async () => {
+  connect({ archived: true });
+
+  await waitFor(() => {
+    expect(calls.some(({ url }) => url === `${sessionsPath}?archived=true`)).toBe(true);
+  });
+});
 
 const asked = (url: string, method = "GET"): Call[] =>
   calls.filter((call) => call.url === url && call.method === method);

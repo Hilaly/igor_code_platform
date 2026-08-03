@@ -44,6 +44,7 @@ export * from "./components/select.tsx";
 export * from "./components/skeleton.tsx";
 export * from "./components/slider.tsx";
 export * from "./components/state.tsx";
+export * from "./components/status-dot.tsx";
 export * from "./components/streaming-text.tsx";
 export * from "./components/tabs.tsx";
 export * from "./components/text.tsx";

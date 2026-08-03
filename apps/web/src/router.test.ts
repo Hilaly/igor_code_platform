@@ -8,8 +8,9 @@ describe("matchPage", () => {
     expect(matchPage("")).toEqual({ kind: "home" });
   });
 
-  it("keeps the plugin management on its own address", () => {
-    expect(matchPage("/plugins")).toEqual({ kind: "plugins" });
+  it("moves plugin management into settings", () => {
+    expect(matchPage("/plugins")).toEqual({ kind: "settings", section: "plugins" });
+    expect(matchPage("/settings/plugins")).toEqual({ kind: "settings", section: "plugins" });
     // Вложенного у вью плагинов нет: адрес глубже — не она.
     expect(matchPage("/plugins/hello")).toEqual({ kind: "unknown", path: "/plugins/hello" });
   });
@@ -22,26 +23,37 @@ describe("matchPage", () => {
     });
   });
 
-  it("keeps the providers on their own address, with an optional provider page", () => {
-    expect(matchPage("/providers")).toEqual({ kind: "providers" });
+  it("moves providers and provider details into settings", () => {
+    expect(matchPage("/providers")).toEqual({ kind: "settings", section: "providers" });
     // Страница одного провайдера: вход и модели живут здесь, а не в раскрывающейся панели списка.
     expect(matchPage("/providers/anthropic")).toEqual({
-      kind: "providers",
+      kind: "settings",
+      section: "providers",
       providerId: "anthropic",
     });
     // Идентификатор не проверяется форматом — «нет такого» скажет вью по снимку, а не маршрут.
     expect(matchPage("/providers/нет-такого")).toEqual({
-      kind: "providers",
+      kind: "settings",
+      section: "providers",
       providerId: "нет-такого",
+    });
+    expect(matchPage("/settings/providers/anthropic")).toEqual({
+      kind: "settings",
+      section: "providers",
+      providerId: "anthropic",
     });
   });
 
   it("keeps a single session on an address of its own", () => {
-    expect(matchPage("/sessions")).toEqual({ kind: "sessions" });
+    expect(matchPage("/sessions")).toEqual({ kind: "home" });
     expect(matchPage("/sessions/0199abcd-ef01")).toEqual({
-      kind: "sessions",
+      kind: "session",
       sessionId: "0199abcd-ef01",
     });
+  });
+
+  it("routes archived sessions before the identifier check", () => {
+    expect(matchPage("/sessions/archive")).toEqual({ kind: "session-archive" });
   });
 
   it("routes the session creation to its own address before the identifier check", () => {
@@ -108,12 +120,16 @@ describe("matchPage", () => {
 
 describe("pathOf", () => {
   it("round-trips an opaque provider identifier through one URL segment", () => {
-    const page = { kind: "providers", providerId: "vendor/модель с пробелом" } as const;
+    const page = {
+      kind: "settings",
+      section: "providers",
+      providerId: "vendor/модель с пробелом",
+    } as const;
 
     const path = pathOf(page);
 
     expect(path).toBe(
-      "/providers/vendor%2F%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C%20%D1%81%20%D0%BF%D1%80%D0%BE%D0%B1%D0%B5%D0%BB%D0%BE%D0%BC",
+      "/settings/providers/vendor%2F%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C%20%D1%81%20%D0%BF%D1%80%D0%BE%D0%B1%D0%B5%D0%BB%D0%BE%D0%BC",
     );
     expect(matchPage(path)).toEqual(page);
   });
@@ -126,16 +142,16 @@ describe("pathOf", () => {
   it("survives a round trip", () => {
     for (const path of [
       "/",
-      "/plugins",
       "/projects",
       "/projects/b7Kq3xv9pQdT",
-      "/providers",
-      "/providers/anthropic",
-      "/sessions",
       "/sessions/new",
+      "/sessions/archive",
       "/sessions/0199abcd-ef01",
       "/settings",
       "/settings/appearance",
+      "/settings/providers",
+      "/settings/providers/anthropic",
+      "/settings/plugins",
       "/p/tracker/board",
       "/p/tracker/board/15/edit",
       "/nowhere",
