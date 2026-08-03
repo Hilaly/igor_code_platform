@@ -428,6 +428,8 @@ describe("file resources end to end", () => {
         "Review changes",
       );
 
+      const historyBeforeInvalid = await sessions.entries(sessionId);
+      assert.ok(historyBeforeInvalid !== undefined);
       const invalidRevision = registry.revision();
       await changeAndWait(bus, invalidRevision, () => writeFileSync(skillPath, malformedSkill));
       assert.equal(
@@ -447,8 +449,6 @@ describe("file resources end to end", () => {
         invalidResources.find((resource) => resource.path === skillPath)?.state,
         "invalid",
       );
-      const historyBeforeInvalid = await sessions.entries(sessionId);
-      assert.ok(historyBeforeInvalid !== undefined);
       const agentsAfterInvalid = (await requestJson(port, "GET", projectAgentsPath(project.id)))
         .body.agents as Array<{ id: string }>;
       assert.equal(
