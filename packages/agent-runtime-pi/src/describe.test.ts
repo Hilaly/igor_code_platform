@@ -19,7 +19,7 @@ describe("describeProvider", () => {
   it("lists both ways in of a provider that has both", () => {
     const summary = describeProvider(providerNamed("anthropic"), {
       auth: { kind: "unconfigured" },
-      custom: false,
+      origin: "builtin",
     });
 
     assert.equal(summary.id, "anthropic");
@@ -38,7 +38,7 @@ describe("describeProvider", () => {
     // У openai-codex вообще нет apiKey — вход только через подписку.
     const summary = describeProvider(providerNamed("openai-codex"), {
       auth: { kind: "unconfigured" },
-      custom: false,
+      origin: "builtin",
     });
 
     assert.deepEqual(
@@ -53,7 +53,7 @@ describe("describeProvider", () => {
 
     assert.ok(oauth?.loginLabel, "у xai пропал loginLabel — тест проверяет не то, что задуман");
     assert.equal(
-      describeProvider(provider, { auth: { kind: "unconfigured" }, custom: false }).logins.find(
+      describeProvider(provider, { auth: { kind: "unconfigured" }, origin: "builtin" }).logins.find(
         (login) => login.type === "oauth",
       )?.label,
       oauth.loginLabel,
@@ -63,7 +63,7 @@ describe("describeProvider", () => {
   it("marks a provider whose model list arrives from the network", () => {
     const summary = describeProvider(providerNamed("radius"), {
       auth: { kind: "unconfigured" },
-      custom: false,
+      origin: "builtin",
     });
 
     assert.equal(summary.dynamic, true);
@@ -71,10 +71,10 @@ describe("describeProvider", () => {
     assert.equal(summary.modelCount, 0);
   });
 
-  it("carries the auth state and the custom flag through untouched", () => {
+  it("carries the auth state and derives the custom flag from origin", () => {
     const summary = describeProvider(providerNamed("anthropic"), {
       auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
-      custom: true,
+      origin: "plugin",
     });
 
     assert.deepEqual(summary.auth, {
@@ -96,7 +96,7 @@ describe("describeProvider", () => {
     };
 
     assert.equal(
-      describeProvider(broken, { auth: { kind: "unknown" }, custom: true }).modelCount,
+      describeProvider(broken, { auth: { kind: "unknown" }, origin: "plugin" }).modelCount,
       0,
     );
   });

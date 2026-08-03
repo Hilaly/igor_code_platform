@@ -21,7 +21,10 @@ import type {
   CustomModelDefinition,
   CustomProviderApi,
   CustomProviderDefinition,
+  UserProviderDefinition,
 } from "@sovereign/protocol";
+
+import { fetchUserModelIds, mergeDiscoveredModels } from "./user-model-catalog.ts";
 
 /**
  * Реализации протоколов API. Перечень закрыт именно здесь: имя из определения — это ключ таблицы, а
@@ -51,8 +54,33 @@ export function toRuntimeProvider(definition: CustomProviderDefinition): Provide
   });
 }
 
+export function toRuntimeUserProvider(definition: UserProviderDefinition): Provider {
+  return createProvider({
+    id: definition.id,
+    name: definition.name,
+    baseUrl: definition.baseUrl,
+    auth: { apiKey: envApiKeyAuth(`${definition.name} API key`, []) },
+    models: definition.manualModels.map((model) => toRuntimeModel(definition, model)),
+    ...(definition.modelsEndpoint.kind === "disabled"
+      ? {}
+      : {
+          fetchModels: async (context) => {
+            const credential = context.credential;
+            if (credential?.type !== "api_key" || credential.key === undefined) {
+              throw new Error("the provider API key is not configured");
+            }
+            return mergeDiscoveredModels(
+              definition,
+              await fetchUserModelIds(definition, credential.key, context.signal),
+            );
+          },
+        }),
+    api: apiImplementations[definition.api](),
+  });
+}
+
 function toRuntimeModel(
-  provider: CustomProviderDefinition,
+  provider: Pick<CustomProviderDefinition, "id" | "api" | "baseUrl">,
   model: CustomModelDefinition,
 ): Model<Api> {
   return {

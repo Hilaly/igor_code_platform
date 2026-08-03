@@ -12,4 +12,5 @@ export * from "./describe.ts";
 export * from "./environment.ts";
 export * from "./interaction.ts";
 export * from "./model-catalogs.ts";
+export * from "./user-model-catalog.ts";
 export * from "./skills.ts";

@@ -8,12 +8,13 @@ import type {
   ModelSummary,
   ProviderAuthState,
   ProviderLoginMethod,
+  ProviderOrigin,
   ProviderSummary,
 } from "@sovereign/protocol";
 
 export type ProviderFacts = {
   auth: ProviderAuthState;
-  custom: boolean;
+  origin: ProviderOrigin;
 };
 
 export function describeProvider(provider: Provider, facts: ProviderFacts): ProviderSummary {
@@ -24,7 +25,8 @@ export function describeProvider(provider: Provider, facts: ProviderFacts): Prov
     logins: loginMethods(provider),
     auth: facts.auth,
     dynamic: typeof provider.refreshModels === "function",
-    custom: facts.custom,
+    custom: facts.origin === "plugin",
+    origin: facts.origin,
     modelCount: knownModels(provider).length,
   };
 }

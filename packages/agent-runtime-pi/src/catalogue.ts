@@ -6,7 +6,7 @@
  * который всё равно случится (docs/runtime-checks.md, проверка 28).
  */
 
-import type { MutableModels, Provider } from "@earendil-works/pi-ai";
+import type { MutableModels, Provider, ProviderModelsStore } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type {
   CustomProviderDefinition,
@@ -15,11 +15,14 @@ import type {
   ProviderAuthState,
   ProvidersSnapshot,
   ProviderSummary,
+  ProviderOrigin,
+  RefreshOutcome,
   RefreshReport,
+  UserProviderDefinition,
 } from "@sovereign/protocol";
 
 import { toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
-import { toRuntimeProvider } from "./custom-provider.ts";
+import { toRuntimeProvider, toRuntimeUserProvider } from "./custom-provider.ts";
 import { describeModels, describeProvider } from "./describe.ts";
 import { processEnvironment, toRuntimeAuthContext, type Environment } from "./environment.ts";
 import { toRuntimeInteraction, type LoginDialogue } from "./interaction.ts";
@@ -59,12 +62,27 @@ export type ProviderCatalogue = {
    * Добавить провайдера из данных (docs/models-and-providers.md). Занятый идентификатор —
    * отказ: `setProvider` у рантайма перезаписывает по `id`, и встроенный подменился бы молча.
    */
-  setCustomProvider: (definition: CustomProviderDefinition) => CustomProviderOutcome;
+  setCustomProvider: (
+    definition: CustomProviderDefinition | UserProviderDefinition,
+    origin?: "plugin" | "user",
+  ) => CustomProviderOutcome;
+  /** Заменить провайдера, только если текущая запись принадлежит тому же источнику. */
+  replaceCustomProvider: (
+    definition: CustomProviderDefinition | UserProviderDefinition,
+    origin: "plugin" | "user",
+  ) => boolean;
   /**
    * Убрать добавленного. `false` — такого кастомного провайдера нет; встроенного этим не удалить,
    * и это главное: удаление по чужому идентификатору обеднило бы каталог навсегда.
    */
   deleteCustomProvider: (providerId: string) => boolean;
+  /** Источник-aware вариант удаления для постоянных пользовательских записей. */
+  removeCustomProvider: (providerId: string, origin: "plugin" | "user") => boolean;
+  /** Обновить каталог только одного динамического провайдера. */
+  refreshProvider: (
+    providerId: string,
+    signal?: AbortSignal,
+  ) => Promise<RefreshOutcome | undefined>;
 };
 
 export type LoginRequest = {
@@ -91,12 +109,14 @@ export type CreateProviderCatalogueOptions = {
 export function createProviderCatalogue(
   options: CreateProviderCatalogueOptions,
 ): ProviderCatalogue {
+  const credentialStore = toRuntimeCredentialStore(options.credentials);
+  const modelsStore =
+    options.catalogs === undefined ? undefined : toRuntimeModelsStore(options.catalogs);
+  const authContext = toRuntimeAuthContext(options.environment ?? processEnvironment());
   const models: MutableModels = builtinModels({
-    credentials: toRuntimeCredentialStore(options.credentials),
-    authContext: toRuntimeAuthContext(options.environment ?? processEnvironment()),
-    ...(options.catalogs === undefined
-      ? {}
-      : { modelsStore: toRuntimeModelsStore(options.catalogs) }),
+    credentials: credentialStore,
+    authContext,
+    ...(options.catalogs === undefined ? {} : { modelsStore }),
   });
 
   for (const provider of options.additionalProviders ?? []) {
@@ -107,7 +127,20 @@ export function createProviderCatalogue(
    * Чьи провайдеры добавлены поверх встроенных. Рантайм такого различия не делает, а снимок обязан:
    * кастомный провайдер исчезнет вместе с плагином, и человек должен видеть это заранее.
    */
-  const custom = new Set<string>();
+  const custom = new Map<string, "plugin" | "user">();
+
+  const originOf = (providerId: string): ProviderOrigin => custom.get(providerId) ?? "builtin";
+  const setCustom = (
+    definition: CustomProviderDefinition | UserProviderDefinition,
+    origin: "plugin" | "user",
+  ): void => {
+    models.setProvider(
+      origin === "user"
+        ? toRuntimeUserProvider(definition as UserProviderDefinition)
+        : toRuntimeProvider(definition as CustomProviderDefinition),
+    );
+    custom.set(definition.id, origin);
+  };
 
   return {
     models,
@@ -126,7 +159,7 @@ export function createProviderCatalogue(
               ? await authStateOf(models, provider.id)
               : ({ kind: "unknown" } as const);
 
-          return describeProvider(provider, { auth, custom: custom.has(provider.id) });
+          return describeProvider(provider, { auth, origin: originOf(provider.id) });
         }),
       );
 
@@ -166,6 +199,40 @@ export function createProviderCatalogue(
 
       return { refreshed, aborted: result.aborted };
     },
+    refreshProvider: async (providerId, signal) => {
+      const provider = models.getProvider(providerId);
+      if (provider === undefined || provider.refreshModels === undefined) return undefined;
+
+      try {
+        const credential = await credentialStore.read(providerId);
+        if (credential === undefined) {
+          return { providerId, modelCount: describeModels(provider).length };
+        }
+        await provider.refreshModels({
+          credential,
+          store: scopedStore(modelsStore, providerId),
+          allowNetwork: true,
+          force: true,
+          signal,
+        });
+        return { providerId, modelCount: describeModels(provider).length };
+      } catch (error) {
+        try {
+          await provider.refreshModels({
+            store: scopedStore(modelsStore, providerId),
+            allowNetwork: false,
+            signal,
+          });
+        } catch {
+          // Исходный отказ важнее возможного отказа восстановления кэша.
+        }
+        return {
+          providerId,
+          modelCount: describeModels(provider).length,
+          error: error instanceof Error ? error.message : "model refresh failed",
+        };
+      }
+    },
     login: async (input) => {
       await models.login(
         input.providerId,
@@ -174,20 +241,24 @@ export function createProviderCatalogue(
       );
     },
     logout: (providerId) => models.logout(providerId),
-    setCustomProvider: (definition) => {
+    setCustomProvider: (definition, origin = "plugin") => {
       // Занятость проверяется по всей коллекции, а не только по добавленным: спорят они за один и
       // тот же ключ, и встроенный проигрывать не должен.
       if (models.getProvider(definition.id) !== undefined) {
         return { kind: "taken" };
       }
 
-      models.setProvider(toRuntimeProvider(definition));
-      custom.add(definition.id);
+      setCustom(definition, origin);
 
       return { kind: "registered" };
     },
+    replaceCustomProvider: (definition, origin) => {
+      if (custom.get(definition.id) !== origin) return false;
+      setCustom(definition, origin);
+      return true;
+    },
     deleteCustomProvider: (providerId) => {
-      if (!custom.has(providerId)) {
+      if (custom.get(providerId) !== "plugin") {
         return false;
       }
 
@@ -197,6 +268,23 @@ export function createProviderCatalogue(
       // Кред остаётся в хранилище: он переживает плагина (docs/models-and-providers.md).
       return true;
     },
+    removeCustomProvider: (providerId, origin) => {
+      if (custom.get(providerId) !== origin) return false;
+      models.deleteProvider(providerId);
+      custom.delete(providerId);
+      return true;
+    },
+  };
+}
+
+function scopedStore(
+  store: ReturnType<typeof toRuntimeModelsStore> | undefined,
+  providerId: string,
+): ProviderModelsStore {
+  return {
+    read: () => store?.read(providerId) ?? Promise.resolve(undefined),
+    write: (entry) => store?.write(providerId, entry) ?? Promise.resolve(),
+    delete: () => store?.delete(providerId) ?? Promise.resolve(),
   };
 }
 

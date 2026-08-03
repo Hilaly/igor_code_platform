@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { CustomProviderDefinition } from "@sovereign/protocol";
+import type { CustomProviderDefinition, UserProviderDefinition } from "@sovereign/protocol";
 
 import { createProviderCatalogue } from "./catalogue.ts";
 import type { CredentialVault } from "./credentials.ts";
@@ -24,6 +24,7 @@ describe("the provider catalogue", () => {
     assert.equal(snapshot.problem, undefined);
     assert.ok(snapshot.providers.every((provider) => provider.auth.kind === "unconfigured"));
     assert.ok(snapshot.providers.every((provider) => !provider.custom));
+    assert.ok(snapshot.providers.every((provider) => provider.origin === "builtin"));
   });
 
   it("keeps providers in a stable order so the view does not jump", async () => {
@@ -167,6 +168,7 @@ describe("a custom provider", () => {
     const registered = snapshot.providers.find((provider) => provider.id === vendor.id);
 
     assert.equal(registered?.custom, true);
+    assert.equal(registered?.origin, "plugin");
     assert.equal(registered?.name, "Vendor Local");
     assert.equal(registered?.modelCount, 1);
     assert.deepEqual(registered?.logins, [{ type: "api_key", label: "Vendor key" }]);
@@ -240,5 +242,57 @@ describe("a custom provider", () => {
       source: "stored credential",
     });
     assert.deepEqual(credentials.list(), [vendor.id]);
+  });
+});
+
+const userVendor: UserProviderDefinition = {
+  id: "user-vendor",
+  name: "User Vendor",
+  baseUrl: "http://127.0.0.1:11434/v1",
+  api: "openai-responses",
+  modelsEndpoint: { kind: "disabled" },
+  modelDefaults: {
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0 },
+  },
+  manualModels: [
+    {
+      id: "vendor-model",
+      name: "Vendor Model",
+      contextWindow: 32_000,
+      maxTokens: 4_096,
+    },
+  ],
+  modelOverrides: {},
+  disabledModelIds: [],
+};
+
+describe("a user provider", () => {
+  it("keeps builtin, plugin, and user origins distinct", async () => {
+    const one = catalogue();
+
+    assert.deepEqual(one.setCustomProvider(userVendor, "user"), { kind: "registered" });
+
+    const saved = (await one.snapshot()).providers.find(
+      (provider) => provider.id === userVendor.id,
+    );
+    assert.equal(saved?.origin, "user");
+    assert.equal(saved?.custom, false);
+  });
+
+  it("replaces and removes only a provider owned by the named source", () => {
+    const one = catalogue();
+
+    one.setCustomProvider(userVendor, "user");
+    assert.equal(
+      one.replaceCustomProvider({ ...userVendor, name: "Renamed Vendor" }, "user"),
+      true,
+    );
+    assert.equal(one.modelsOf(userVendor.id)?.[0]?.name, "Vendor Model");
+    assert.equal(one.removeCustomProvider(userVendor.id, "plugin"), false);
+    assert.equal(one.removeCustomProvider(userVendor.id, "user"), true);
   });
 });
