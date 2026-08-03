@@ -75,6 +75,17 @@ describe("stylesheets of the kit", () => {
     expect(catalogue).not.toContain("baseScheme");
   });
 
+  it("defines contextual density and no decorative effect tokens", () => {
+    const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");
+    const effects = readFileSync(join(kitRoot, "styles", "effects.css"), "utf8");
+
+    expect(tokens).toContain("--sovereign-row-height-compact:");
+    expect(tokens).toContain("--sovereign-reading-width:");
+    expect(tokens).toContain("--sovereign-line-height-reading:");
+    expect(effects).not.toMatch(/gradient|glow|glass|backdrop-blur|hairline/);
+    expect(effects.match(/--sovereign-elevation-/g)).toHaveLength(3);
+  });
+
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
   });
@@ -121,10 +132,7 @@ describe("stylesheets of the kit", () => {
    * но каждая обязана быть названа, иначе правило перестаёт что-либо проверять.
    */
   it("declares no token without a consumer", () => {
-    const usedOutsideTheKit = new Set([
-      // Фоновая заливка страницы: применяет её оболочка, apps/web/src/shell/shell.css.
-      "--sovereign-gradient-backdrop",
-    ]);
+    const usedOutsideTheKit = new Set<string>();
     const used = new Set(files.flatMap(({ source }) => usedNames(withoutComments(source))));
     const dead = [
       ...new Set(files.flatMap(({ source }) => declaredNames(withoutComments(source)))),
@@ -135,19 +143,19 @@ describe("stylesheets of the kit", () => {
     expect(dead).toEqual([]);
   });
 
-  it("gives every elevated surface the shared glass treatment", () => {
-    const elevatedSurfaces = [
-      "components/dialog.module.css",
-      "components/menu.module.css",
-      "components/panel.module.css",
-      "components/popover.module.css",
-    ];
+  it("gives every elevated surface a semantic surface and appropriate elevation", () => {
+    const elevatedSurfaces = new Map([
+      ["components/dialog.module.css", "--sovereign-elevation-3"],
+      ["components/menu.module.css", "--sovereign-elevation-2"],
+      ["components/panel.module.css", "--sovereign-elevation-2"],
+      ["components/popover.module.css", "--sovereign-elevation-2"],
+    ]);
 
-    for (const relativePath of elevatedSurfaces) {
+    for (const [relativePath, elevation] of elevatedSurfaces) {
       const source = readFileSync(join(kitRoot, relativePath), "utf8");
 
       expect(usedNames(withoutComments(source)), relativePath).toEqual(
-        expect.arrayContaining(["--sovereign-backdrop-blur", "--sovereign-glass-surface"]),
+        expect.arrayContaining(["--sovereign-panel-surface", elevation]),
       );
     }
   });

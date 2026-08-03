@@ -24,7 +24,6 @@
   max-height: 14rem;
   overflow-y: auto;
   padding: var(--sovereign-space-1);
-  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 .option {

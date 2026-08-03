@@ -28,10 +28,9 @@
   padding: var(--sovereign-space-6);
   overflow: hidden;
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
+  background: var(--sovereign-panel-surface);
   color: var(--sovereign-text);
-  box-shadow: var(--sovereign-elevation-3), var(--sovereign-hairline-secondary);
-  backdrop-filter: var(--sovereign-backdrop-blur);
+  box-shadow: var(--sovereign-elevation-3);
 }
 
 /*
@@ -85,11 +84,12 @@
  */
 .content {
   min-height: 0;
+  max-width: var(--sovereign-reading-width);
   overflow: auto;
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-md);
-  line-height: var(--sovereign-line-height-normal);
+  line-height: var(--sovereign-line-height-reading);
 }
 
 .footer {

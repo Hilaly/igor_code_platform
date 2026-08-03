@@ -85,9 +85,8 @@
   padding: var(--sovereign-space-1);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-sm);
-  background: var(--sovereign-glass-surface), var(--sovereign-gradient-surface);
+  background: var(--sovereign-panel-surface);
   box-shadow: var(--sovereign-elevation-2);
-  backdrop-filter: var(--sovereign-backdrop-blur);
 }
 
 /* Кнопка внизу панели раскрывается вверх: вниз ей раскрываться некуда, там край окна. */
@@ -113,7 +112,7 @@
 .item {
   display: flex;
   align-items: center;
-  min-height: var(--sovereign-control-height-sm);
+  min-height: var(--sovereign-row-height-compact);
   padding-inline: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid transparent;
   border-radius: var(--sovereign-radius-2xs);

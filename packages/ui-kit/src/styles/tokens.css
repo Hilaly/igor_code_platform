@@ -38,6 +38,7 @@
   --sovereign-line-height-tight: 1.2;
   --sovereign-line-height-snug: 1.35;
   --sovereign-line-height-normal: 1.6;
+  --sovereign-line-height-reading: 1.68;
 
   --sovereign-letter-spacing-display: -0.025em;
   --sovereign-letter-spacing-tight: -0.02em;
@@ -66,6 +67,8 @@
 
   --sovereign-control-height-sm: calc(var(--sovereign-control-height-md) - 0.5rem);
   --sovereign-control-height-lg: calc(var(--sovereign-control-height-md) + 0.5rem);
+  --sovereign-row-height-compact: calc(var(--sovereign-control-height-md) - 0.75rem);
+  --sovereign-reading-width: 46rem;
 
   --sovereign-stroke-thin: 1px;
   --sovereign-stroke-emphasis: 2px;

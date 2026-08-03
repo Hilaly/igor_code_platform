@@ -11,7 +11,7 @@
   justify-content: center;
   min-height: 100vh;
   padding: var(--sovereign-space-5);
-  background: var(--sovereign-gradient-backdrop);
+  background: var(--sovereign-page-surface);
 }
 
 /* Узкий экран — требование вижна, а не среза: форма входа обязана работать с телефона. */

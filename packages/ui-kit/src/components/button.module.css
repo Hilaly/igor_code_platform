@@ -64,14 +64,13 @@
 }
 
 .accent {
-  background: var(--sovereign-gradient-accent);
+  background: var(--sovereign-accent);
   color: var(--sovereign-text-on-accent);
   box-shadow: var(--sovereign-elevation-1);
 }
 
-/* Наведение на главное действие добавляет свечение, а не меняет заливку: градиент один. */
 .accent:hover:not(:disabled, [aria-pressed="true"]) {
-  box-shadow: var(--sovereign-elevation-1), var(--sovereign-glow-accent);
+  background: var(--sovereign-accent-hover);
 }
 
 .danger {

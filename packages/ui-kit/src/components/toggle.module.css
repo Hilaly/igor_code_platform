@@ -52,7 +52,7 @@
 
 .input:checked + .box {
   border-color: transparent;
-  background: var(--sovereign-gradient-accent);
+  background: var(--sovereign-accent);
 }
 
 .input:checked + .box::after {
