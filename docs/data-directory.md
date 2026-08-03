@@ -17,6 +17,7 @@
 | `projects.json`       | платформа | записи проектов ([sessions-and-projects.md](sessions-and-projects.md))                |
 | `credentials.json`    | платформа | креды LLM-провайдеров ([models-and-providers.md](models-and-providers.md))            |
 | `model-catalogs.json` | платформа | кэш динамических списков моделей ([models-and-providers.md](models-and-providers.md)) |
+| `user-providers.json` | платформа | постоянные определения пользовательских LLM-провайдеров                               |
 | `sessions/`           | платформа | записи сессий агента ([sessions-and-projects.md](sessions-and-projects.md))           |
 | `sessions-archived/`  | платформа | те же записи, убранные с глаз; раскладка внутри та же                                 |
 | `plugins/`            | человек   | папка на плагин; сюда кладут внешние плагины ([plugins.md](plugins.md))               |
@@ -365,6 +366,14 @@ sessions/
 Встроенный провайдер с динамическим списком сегодня ровно один
 ([runtime-checks.md](runtime-checks.md), проверка 31) — по-настоящему файл оправдывают кастомные
 провайдеры плагинов.
+
+## Пользовательские провайдеры
+
+`user-providers.json` хранит `{ "providers": [...] }` с определениями, созданными в UI. Ключей API
+в нём нет: они лежат отдельно в `credentials.json`. Файл пишется атомарно с правами `0600`;
+негодный JSON или одна негодная запись блокируют изменения и не перезаписываются пустым списком.
+Удаление провайдера согласованно очищает его записи из `credentials.json` и
+`model-catalogs.json`.
 
 ## Ручное восстановление
 
