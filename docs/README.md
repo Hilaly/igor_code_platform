@@ -92,10 +92,11 @@
 - [Визуальный язык Sovereign](superpowers/specs/2026-08-03-sovereign-visual-language-design.md) —
   согласованные контекстная плотность, Refined Imperium, типографические роли и перенос языка с
   агентской сессии на системные и прикладные вью.
+- [Визуальное основание Sovereign](superpowers/plans/2026-08-03-sovereign-visual-foundation.md) —
+  первый срез внедрения: локальные шрифты, контекстная плотность, поверхности, эффекты и Refined
+  Imperium в UI Kit.
 - [Порядок внедрения визуального языка](superpowers/plans/2026-08-03-sovereign-visual-language-rollout.md) —
   четыре последовательных проверяемых среза от основания UI kit до выравнивания всего приложения.
-- [Визуальное основание Sovereign](superpowers/plans/2026-08-03-sovereign-visual-foundation.md) —
-  первый срез: локальные шрифты, контекстная плотность, поверхности, эффекты и Refined Imperium.
 - [Оболочка и системные вью Sovereign](superpowers/plans/2026-08-03-sovereign-shell-system-views.md) —
   второй срез: сайдбар, настройки, провайдеры и плагины.
 - [Агентская сессия Sovereign](superpowers/plans/2026-08-03-sovereign-agent-session.md) —
