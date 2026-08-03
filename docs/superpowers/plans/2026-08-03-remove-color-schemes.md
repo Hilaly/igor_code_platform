@@ -188,9 +188,9 @@ Expected: all tests pass.
 
 - [ ] **Step 2: Run repository checks**
 
-Run: `pnpm -r typecheck && pnpm eslint . && pnpm prettier --check . && pnpm --filter @sovereign/web build && git diff --check`
+Run: `pnpm -r typecheck && pnpm eslint . && pnpm prettier --check . && pnpm --filter @sovereign/ui-kit exec ladle build && pnpm --filter @sovereign/web build && git diff --check`
 
-Expected: typecheck, lint, formatting, build, and whitespace checks exit 0. Existing non-blocking lint warnings may remain, but no new errors are allowed.
+Expected: typecheck, lint, formatting, UI Kit catalogue build, web build, and whitespace checks exit 0. Existing non-blocking lint warnings may remain, but no new errors are allowed.
 
 - [ ] **Step 3: Confirm removed identifiers are gone**
 
