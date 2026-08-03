@@ -153,4 +153,18 @@ describe("the style sheets of the application", () => {
     expect(settings).toMatch(/\.settings-nav\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;/s);
     expect(settings).not.toMatch(/\.settings-split/);
   });
+
+  it("keeps settings compact, divided, and flat", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
+
+    expect(settings).toMatch(
+      /\.settings-nav\s*>\s*ul\s*>\s*li\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+    );
+    expect(settings).toMatch(
+      /\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*[^{]*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
+    );
+    expect(settings).not.toMatch(
+      /\.settings[^{]*\{[^}]*(?:box-shadow:\s*var\(--sovereign-elevation-|border-radius:\s*var\(--sovereign-radius-(?:sm|md|lg|xl))/s,
+    );
+  });
 });

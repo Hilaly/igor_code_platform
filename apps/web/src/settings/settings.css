@@ -15,7 +15,7 @@
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -44,7 +44,13 @@
   min-height: 0;
 }
 
+.settings-nav > ul > li {
+  min-height: var(--sovereign-row-height-compact);
+}
+
 .settings-content-body {
+  width: 100%;
+  max-width: 52rem;
   min-height: 0;
   overflow-y: auto;
 }
@@ -85,7 +91,12 @@
 .settings-daemon {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-2);
+}
+
+.settings-appearance > * + *,
+.settings-daemon > * + * {
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .settings-daemon-line {

@@ -1,8 +1,8 @@
 /**
  * Страница настроек: локальная навигация разделов слева, содержимое раздела справа. Это одна
  * поверхность центрального вью с границей между областями, а не две вложенные карточки: настройки
- * уже находятся внутри оболочки приложения. Под-навигация собрана из того же `List`/`ListRow`, что и
- * навигация оболочки.
+ * уже находятся внутри оболочки приложения. Единственный заголовок страницы называет активный
+ * раздел, а под-навигация собрана из того же `List`/`ListRow`, что и навигация оболочки.
  *
  * Адрес раздела (`/settings/<section>`) переживает перезагрузку и является единственным источником
  * выбранного состояния: голый `/settings` маршрутизатор заменяет на `/settings/appearance`.
@@ -52,7 +52,6 @@ export function SettingsView({
     <div className="settings">
       <div className="settings-layout">
         <aside className="settings-sidebar">
-          <Heading level={1}>{t("settings.title")}</Heading>
           <nav className="settings-nav" aria-label={t("settings.sections")}>
             <List>
               {settingsSections.map((candidate) => (

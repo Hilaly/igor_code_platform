@@ -34,9 +34,9 @@ it("shows one selected settings section and only its content", () => {
   );
 
   expect(screen.getByRole("navigation", { name: "Разделы настроек" })).toBeTruthy();
-  expect(screen.getAllByRole("heading")).toHaveLength(2);
-  expect(screen.getByRole("heading", { name: "Настройки" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Провайдеры" })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  expect(screen.getByRole("heading", { level: 1, name: "Провайдеры" })).toBeTruthy();
+  expect(screen.getAllByRole("region", { name: "Провайдеры" })).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Провайдеры" }).getAttribute("aria-current")).toBe(
     "true",
   );
