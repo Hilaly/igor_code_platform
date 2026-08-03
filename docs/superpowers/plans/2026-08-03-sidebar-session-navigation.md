@@ -39,6 +39,7 @@
 ### Task 1: UI-kit status and tree actions
 
 **Files:**
+
 - Create: `packages/ui-kit/src/components/status-dot.tsx`
 - Create: `packages/ui-kit/src/components/status-dot.module.css`
 - Modify: `packages/ui-kit/src/components/tree.tsx`
@@ -48,6 +49,7 @@
 - Modify: `packages/ui-kit/src/index.ts`
 
 **Interfaces:**
+
 - Produces: `StatusDot({ tone: "positive" | "pending" | "danger", label: string })`.
 - Produces: `TreeNode.actions?: ReactNode` rendered beside its row and isolated from tree selection.
 
@@ -61,8 +63,14 @@ it("names a status dot without exposing its color", () => {
 
 it("keeps Tree actions independent from row selection", () => {
   const onSelect = vi.fn();
-  render(<Tree label="Проекты" toggleLabel={treeToggleLabel} onSelect={onSelect}
-    nodes={[{ id: "project", label: "Alpha", actions: <button>Создать сессию</button> }]} />);
+  render(
+    <Tree
+      label="Проекты"
+      toggleLabel={treeToggleLabel}
+      onSelect={onSelect}
+      nodes={[{ id: "project", label: "Alpha", actions: <button>Создать сессию</button> }]}
+    />,
+  );
   fireEvent.click(screen.getByRole("button", { name: "Создать сессию" }));
   expect(onSelect).not.toHaveBeenCalled();
 });
@@ -78,14 +86,27 @@ Expected: FAIL because `StatusDot` and `TreeNode.actions` do not exist.
 
 ```tsx
 export function StatusDot({ tone, label }: StatusDotProps) {
-  return <span className={`${styles.dot} ${styles[tone]}`} role="status" aria-label={label} title={label} />;
+  return (
+    <span
+      className={`${styles.dot} ${styles[tone]}`}
+      role="status"
+      aria-label={label}
+      title={label}
+    />
+  );
 }
 
-{node.actions ? (
-  <span className={styles.actions} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-    {node.actions}
-  </span>
-) : null}
+{
+  node.actions ? (
+    <span
+      className={styles.actions}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {node.actions}
+    </span>
+  ) : null;
+}
 ```
 
 - [ ] **Step 4: Run UI-kit tests and typecheck**
@@ -104,11 +125,13 @@ git commit -m "feat(ui-kit): add status dot and tree actions"
 ### Task 2: Canonical navigation routes
 
 **Files:**
+
 - Modify: `apps/web/src/router.ts`
 - Modify: `apps/web/src/router.test.ts`
 - Modify: `apps/web/src/router-navigation.test.ts`
 
 **Interfaces:**
+
 - Produces: page kinds `session`, `session-archive`, and `settings` with sections `appearance | providers | plugins | daemon | diagnostics` plus optional `providerId`.
 - Produces: canonical paths `/sessions/:id`, `/sessions/new`, `/sessions/archive`, `/settings/providers/:providerId`, and legacy replacements for `/sessions`, `/providers/*`, `/plugins`.
 
@@ -118,7 +141,9 @@ git commit -m "feat(ui-kit): add status dot and tree actions"
 expect(matchPage("/sessions/archive")).toEqual({ kind: "session-archive" });
 expect(matchPage("/sessions/s-1")).toEqual({ kind: "session", sessionId: "s-1" });
 expect(matchPage("/settings/providers/openai")).toEqual({
-  kind: "settings", section: "providers", providerId: "openai",
+  kind: "settings",
+  section: "providers",
+  providerId: "openai",
 });
 expect(canonicalPage(matchPage("/providers/openai"))).toEqual({
   page: { kind: "settings", section: "providers", providerId: "openai" },
@@ -152,12 +177,14 @@ git commit -m "refactor(web): move system routes into settings"
 ### Task 3: Separate active and archived session datasets
 
 **Files:**
+
 - Modify: `apps/web/src/sessions/use-sessions.ts`
 - Modify: `apps/web/src/sessions/use-sessions.test.tsx`
 - Create: `apps/web/src/sessions/archive-sessions-view.tsx`
 - Create: `apps/web/src/sessions/archive-sessions-view.test.tsx`
 
 **Interfaces:**
+
 - Consumes: existing `fetchSessions({ archived, projectId })`, `updateSession`, and `deleteSession` APIs.
 - Produces: `useSessions({ ..., archived?: boolean, sessionId?: string })` whose snapshot filter is fixed per controller.
 - Produces: `ArchiveSessionsView({ sessions, projects, loaded, failure, onOpen, onRestore, onRemove, translator })`.
@@ -166,7 +193,12 @@ git commit -m "refactor(web): move system routes into settings"
 
 ```tsx
 renderHook(() => useSessions({ bus, stream: "open", archived: true, onDiagnostic }));
-await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("archived=true"), expect.anything()));
+await waitFor(() =>
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining("archived=true"),
+    expect.anything(),
+  ),
+);
 ```
 
 - [ ] **Step 2: Run the controller test and verify RED**
@@ -206,6 +238,7 @@ git commit -m "feat(web): add archived sessions view"
 ### Task 4: Project/session sidebar
 
 **Files:**
+
 - Create: `apps/web/src/sessions/sidebar-projects.tsx`
 - Create: `apps/web/src/sessions/sidebar-projects.test.tsx`
 - Modify: `apps/web/src/shell/shell.css`
@@ -213,6 +246,7 @@ git commit -m "feat(web): add archived sessions view"
 - Modify: `packages/ui-kit/src/i18n/messages/ru.ts`
 
 **Interfaces:**
+
 - Consumes: active `Project[]`, active `Session[]`, selected session id, project/session mutation callbacks, and `Tree`, `Button`, `Menu`, `ConfirmDialog`.
 - Produces: `SidebarProjects` with controlled expanded ids stored under `sovereign.sidebar.expanded-projects`.
 
@@ -255,6 +289,7 @@ git commit -m "feat(web): add project session sidebar"
 ### Task 5: Account control and settings sections
 
 **Files:**
+
 - Create: `apps/web/src/shell/account-control.tsx`
 - Create: `apps/web/src/shell/account-control.test.tsx`
 - Modify: `apps/web/src/settings/settings-view.tsx`
@@ -262,6 +297,7 @@ git commit -m "feat(web): add project session sidebar"
 - Create: `apps/web/src/settings/settings-view.test.tsx`
 
 **Interfaces:**
+
 - Consumes: stream/failure, translator, logout/archive/settings navigation callbacks, and existing provider/plugin view nodes.
 - Produces: `AccountControl` with exactly one `StatusDot` and account menu items.
 - Produces: `SettingsView` props `providers` and `plugins` and the five-section navigation order.
@@ -302,6 +338,7 @@ git commit -m "feat(web): move system views into settings"
 ### Task 6: App integration and direct chat rendering
 
 **Files:**
+
 - Modify: `apps/web/src/App.tsx`
 - Modify: `apps/web/src/shell/page.tsx`
 - Modify: `apps/web/src/projects/project-detail-view.tsx`
@@ -310,6 +347,7 @@ git commit -m "feat(web): move system views into settings"
 - Delete: `apps/web/src/shell/daemon-status.tsx`
 
 **Interfaces:**
+
 - Consumes: `SidebarProjects`, `AccountControl`, `ArchiveSessionsView`, and existing `ChatView`.
 - Produces: one active sessions controller for sidebar/session/new-session and one archive controller only on the archive page.
 
@@ -343,11 +381,13 @@ git commit -m "refactor(web): make sessions sidebar-first"
 ### Task 7: Documentation and full verification
 
 **Files:**
+
 - Modify: `docs/README.md`
 - Modify: `docs/web-api.md` only if it describes the removed client navigation.
 - Modify: `docs/superpowers/specs/2026-08-03-sidebar-session-navigation-design.md` to clarify that the project detail keeps its project content but drops the duplicate sessions block.
 
 **Interfaces:**
+
 - Produces: documentation matching the shipped client behavior.
 
 - [ ] **Step 1: Update relevant documentation and plan checkboxes**

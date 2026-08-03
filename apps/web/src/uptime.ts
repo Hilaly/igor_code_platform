@@ -25,3 +25,27 @@ export function formatUptime(totalSeconds: number, units: DurationUnits): string
   // Секунды на этом масштабе не сообщают ничего, кроме дребезга при каждой перерисовке.
   return `${units.hours(Math.floor(minutes / 60))} ${units.minutes(minutes % 60)}`;
 }
+import type { Health } from "@sovereign/protocol";
+import { useEffect, useState } from "react";
+
+const tickMilliseconds = 10_000;
+
+/** Живое время работы для подробного раздела демона; компактный sidebar его не показывает. */
+export function useUptimeSeconds(health: Health | undefined): number | undefined {
+  const [seconds, setSeconds] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (health === undefined) {
+      setSeconds(undefined);
+      return;
+    }
+
+    const started = new Date(health.startedAt).getTime();
+    const recount = (): void => setSeconds(Math.floor((Date.now() - started) / 1000));
+    recount();
+    const timer = setInterval(recount, tickMilliseconds);
+    return () => clearInterval(timer);
+  }, [health]);
+
+  return seconds;
+}

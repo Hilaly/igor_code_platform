@@ -8,7 +8,7 @@ import type { Health } from "@sovereign/protocol";
 import { Badge, Text, type BadgeTone, type ScopedTranslator } from "@sovereign/ui-kit";
 
 import type { StreamStatus } from "../events/stream.ts";
-import { useUptimeSeconds } from "../shell/daemon-status.tsx";
+import { useUptimeSeconds } from "../uptime.ts";
 import { formatUptime } from "../uptime.ts";
 
 const tones: Record<StreamStatus, BadgeTone> = {

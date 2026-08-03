@@ -17,6 +17,8 @@ export type SettingsViewProps = {
   section: SettingsSection | undefined;
   onSectionChange: (section: SettingsSection) => void;
   appearance: ReactNode;
+  providers: ReactNode;
+  plugins: ReactNode;
   daemon: ReactNode;
   diagnostics: ReactNode;
   translator: ScopedTranslator;
@@ -26,6 +28,8 @@ export function SettingsView({
   section,
   onSectionChange,
   appearance,
+  providers,
+  plugins,
   daemon,
   diagnostics,
   translator,
@@ -35,7 +39,16 @@ export function SettingsView({
   // в истории смотрится как будто его открывали.
   const active = section ?? settingsSections[0];
 
-  const content = active === "appearance" ? appearance : active === "daemon" ? daemon : diagnostics;
+  const content =
+    active === "appearance"
+      ? appearance
+      : active === "providers"
+        ? providers
+        : active === "plugins"
+          ? plugins
+          : active === "daemon"
+            ? daemon
+            : diagnostics;
 
   return (
     <div className="settings">

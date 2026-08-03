@@ -18,7 +18,6 @@ export type ProjectDetailViewProps = {
   failure?: string;
   loaded: boolean;
   fileResources?: ReactNode;
-  sessions: ReactNode;
   onBack: () => void;
   onNewSession: () => void;
   translator: ScopedTranslator;
@@ -28,7 +27,6 @@ export function ProjectDetailView({
   project,
   failure,
   fileResources,
-  sessions,
   loaded,
   onBack,
   onNewSession,
@@ -81,7 +79,6 @@ export function ProjectDetailView({
         </div>
       </Panel>
       {fileResources}
-      {sessions}
     </div>
   );
 }

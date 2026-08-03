@@ -16,16 +16,13 @@ import {
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
 import {
+  Button,
   coreEnglish,
   coreNamespace,
   coreRussian,
   createTranslator,
   Heading,
-  List,
-  ListRow,
-  Menu,
   Spinner,
-  Text,
 } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -52,7 +49,9 @@ import { useFileResources } from "./projects/use-file-resources.ts";
 import { ProvidersView } from "./providers/providers-view.tsx";
 import { useProviders } from "./providers/use-providers.ts";
 import { NewSessionView } from "./sessions/new-session-view.tsx";
-import { SessionsView } from "./sessions/sessions-view.tsx";
+import { ArchiveSessionsView } from "./sessions/archive-sessions-view.tsx";
+import { ChatView } from "./sessions/chat-view.tsx";
+import { SidebarProjects } from "./sessions/sidebar-projects.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
 import { createNavigation, type Page } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
@@ -60,7 +59,7 @@ import { AppearanceSection } from "./settings/appearance-section.tsx";
 import { DaemonSection } from "./settings/daemon-section.tsx";
 import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
 import { SettingsView } from "./settings/settings-view.tsx";
-import { DaemonStatus } from "./shell/daemon-status.tsx";
+import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { PageView } from "./shell/page.tsx";
 import { Shell } from "./shell/shell.tsx";
@@ -278,16 +277,19 @@ export function App() {
     bus,
     stream,
     onDiagnostic: diagnostics.record,
-    providerId: page.kind === "providers" ? page.providerId : undefined,
+    providerId: page.kind === "settings" ? page.providerId : undefined,
   });
   const sessions = useSessions({
     bus,
     stream,
     onDiagnostic: diagnostics.record,
-    ...(page.kind === "sessions" && page.sessionId !== undefined
-      ? { sessionId: page.sessionId }
-      : {}),
-    ...(page.kind === "project" ? { projectId: page.projectId } : {}),
+    ...(page.kind === "session" ? { sessionId: page.sessionId } : {}),
+  });
+  const archivedSessions = useSessions({
+    bus,
+    stream: page.kind === "session-archive" ? stream : "connecting",
+    onDiagnostic: diagnostics.record,
+    archived: true,
   });
 
   // Обработчик кадра берётся у вью провайдеров, а соединение живёт своей жизнью: связывает их
@@ -408,84 +410,55 @@ export function App() {
       }}
       navigation={
         <div className="shell-nav">
-          <Heading level={3}>{translator.t("nav.title")}</Heading>
-          <List>
-            <ListRow
-              selected={page.kind === "home"}
-              onSelect={() => navigation.navigate({ kind: "home" })}
-            >
-              <Text>{translator.t("nav.home")}</Text>
-            </ListRow>
-            <ListRow
-              selected={page.kind === "projects" || page.kind === "project"}
-              onSelect={() => navigation.navigate({ kind: "projects" })}
-            >
-              <Text>{translator.t("nav.projects")}</Text>
-            </ListRow>
-            <ListRow
-              selected={page.kind === "providers"}
-              onSelect={() => navigation.navigate({ kind: "providers" })}
-            >
-              <Text>{translator.t("nav.providers")}</Text>
-            </ListRow>
-            <ListRow
-              selected={page.kind === "sessions"}
-              onSelect={() => navigation.navigate({ kind: "sessions" })}
-            >
-              <Text>{translator.t("nav.sessions")}</Text>
-            </ListRow>
-            <ListRow
-              selected={page.kind === "plugins"}
-              onSelect={() => navigation.navigate({ kind: "plugins" })}
-            >
-              <Text>{translator.t("nav.plugins")}</Text>
-            </ListRow>
-          </List>
+          <Heading level={3}>Sovereign</Heading>
+          <Button
+            onClick={() => {
+              setDraftProjectId(undefined);
+              navigation.navigate({ kind: "new-session" });
+            }}
+          >
+            + {translator.t("sessions.new")}
+          </Button>
+          <div className="shell-projects">
+            <SidebarProjects
+              projects={projects.state.snapshot?.projects}
+              sessions={sessions.state.sessions}
+              selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
+              storage={localStorage}
+              onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+              onNewSession={(projectId) => {
+                setDraftProjectId(projectId);
+                navigation.navigate({ kind: "new-session" });
+              }}
+              onUpdateProject={projects.update}
+              onRemoveProject={projects.remove}
+              onUpdateSession={sessions.updateSession}
+              onRemoveSession={sessions.removeSession}
+              translator={translator}
+            />
+          </div>
         </div>
       }
       status={
-        <div className="shell-status">
-          <DaemonStatus stream={stream} health={health} failure={failure} translator={translator} />
-          <Menu
-            label={translator.t("account.menu")}
-            trigger={translator.t("account.menu")}
-            placement="above"
-            block
-            items={[
-              {
-                id: "settings",
-                label: translator.t("settings.title"),
-                onSelect: () => navigation.navigate({ kind: "settings" }),
-              },
-              {
-                id: "log-out",
-                label: translator.t("logout"),
-                tone: "danger",
-                onSelect: () => {
-                  // Выход закрывает серверную запись сессии, поэтому обрывает и живой поток
-                  // (docs/authentication.md); вкладка возвращается к форме, не дожидаясь этого.
-                  void logOut().then(() => {
-                    setExpired(false);
-                    setLoginRefusal(undefined);
-                    setAccess("unauthenticated");
-                  });
-                },
-              },
-            ]}
-          />
-        </div>
+        <AccountControl
+          stream={stream}
+          failure={failure}
+          onOpenArchive={() => navigation.navigate({ kind: "session-archive" })}
+          onOpenSettings={() => navigation.navigate({ kind: "settings" })}
+          onLogOut={() => {
+            void logOut().then(() => {
+              setExpired(false);
+              setLoginRefusal(undefined);
+              setAccess("unauthenticated");
+            });
+          }}
+          translator={translator}
+        />
       }
       tabs={[]}
     >
       <PageView
         page={page}
-        plugins={
-          <PluginsView
-            state={plugins.state}
-            onSwitch={plugins.switchPlugin}
-            translator={translator}
-          />
-        }
         projects={
           <ProjectsView
             state={projects.state}
@@ -516,84 +489,49 @@ export function App() {
               }
               navigation.navigate({ kind: "new-session" });
             }}
-            sessions={
-              <SessionsView
-                state={sessions.state}
-                onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
-                onStartCreating={() => {
-                  if (page.kind === "project") {
-                    setDraftProjectId(page.projectId);
-                  }
-                  navigation.navigate({ kind: "new-session" });
-                }}
-                onSubmit={sessions.submitTurn}
-                onSendMessage={sessions.sendMessage}
-                onInterrupt={sessions.interrupt}
-                onUpdate={sessions.updateSession}
-                onRemove={async (sessionId) => sessions.removeSession(sessionId)}
-                onFork={async (request) => {
-                  const outcome = await sessions.forkSession(request);
-                  if (outcome.kind === "done")
-                    navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
-                }}
-                onCompact={sessions.compact}
-                onSetLabel={sessions.setEntryLabel}
-                onNavigate={sessions.navigate}
-                onShowArchived={sessions.setShowArchived}
-                translator={translator}
-              />
+            translator={translator}
+          />
+        }
+        session={
+          sessions.state.open === undefined ? undefined : (
+            <ChatView
+              open={sessions.state.open}
+              onSubmit={sessions.submitTurn}
+              onSendMessage={sessions.sendMessage}
+              onInterrupt={sessions.interrupt}
+              onFork={async (request) => {
+                const outcome = await sessions.forkSession(request);
+                if (outcome.kind === "done") {
+                  navigation.navigate({ kind: "session", sessionId: outcome.session.id });
+                }
+              }}
+              onCompact={sessions.compact}
+              onSetLabel={sessions.setEntryLabel}
+              onNavigate={sessions.navigate}
+              translator={translator}
+            />
+          )
+        }
+        sessionArchive={
+          <ArchiveSessionsView
+            sessions={archivedSessions.state.sessions}
+            projects={
+              projects.state.snapshot === undefined
+                ? undefined
+                : [...projects.state.snapshot.projects, ...projects.state.snapshot.archived]
             }
-            translator={translator}
-          />
-        }
-        providers={
-          <ProvidersView
-            state={providers.state}
-            providerId={page.kind === "providers" ? page.providerId : undefined}
-            onOpen={(providerId) => navigation.navigate({ kind: "providers", providerId })}
-            onBack={() => navigation.navigate({ kind: "providers" })}
-            onLogIn={providers.logIn}
-            onAnswer={providers.answer}
-            onCancelLogin={providers.cancelLogin}
-            onCloseLogin={providers.closeLogin}
-            onLogOut={providers.logOut}
-            translator={translator}
-          />
-        }
-        sessions={
-          <SessionsView
-            state={sessions.state}
-            onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
-            onStartCreating={() => {
-              setDraftProjectId(undefined);
-              navigation.navigate({ kind: "new-session" });
+            loaded={archivedSessions.state.sessions !== undefined}
+            failure={archivedSessions.state.failure}
+            onOpen={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+            onRestore={async (session) => {
+              await archivedSessions.updateSession(session.id, {
+                ...(session.title === undefined ? {} : { title: session.title }),
+                archived: false,
+              });
             }}
-            onSubmit={sessions.submitTurn}
-            onSendMessage={sessions.sendMessage}
-            onInterrupt={sessions.interrupt}
-            onUpdate={sessions.updateSession}
             onRemove={async (sessionId) => {
-              const reason = await sessions.removeSession(sessionId);
-
-              // Удалённая сессия остаётся в адресе, и вью показало бы «сессия пропала». Уводим на
-              // список сам, а не ждём, пока человек догадается уйти.
-              if (reason === undefined && sessions.state.open?.id === sessionId) {
-                navigation.navigate({ kind: "sessions" });
-              }
-
-              return reason;
+              await archivedSessions.removeSession(sessionId);
             }}
-            onFork={async (request) => {
-              const outcome = await sessions.forkSession(request);
-
-              if (outcome.kind === "done") {
-                navigation.navigate({ kind: "sessions", sessionId: outcome.session.id });
-              }
-            }}
-            onCompact={sessions.compact}
-            onSetLabel={sessions.setEntryLabel}
-            onNavigate={sessions.navigate}
-            onShowArchived={sessions.setShowArchived}
             translator={translator}
           />
         }
@@ -621,7 +559,7 @@ export function App() {
               return { sessionId: outcome.session.id };
             }}
             onSubmit={sessions.submitTurnToSession}
-            onNavigate={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
+            onNavigate={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
             translator={translator}
           />
         }
@@ -636,6 +574,29 @@ export function App() {
                 locales={shippedLocales}
                 onChange={change}
                 refusal={refusal}
+                translator={translator}
+              />
+            }
+            providers={
+              <ProvidersView
+                state={providers.state}
+                providerId={page.kind === "settings" ? page.providerId : undefined}
+                onOpen={(providerId) =>
+                  navigation.navigate({ kind: "settings", section: "providers", providerId })
+                }
+                onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
+                onLogIn={providers.logIn}
+                onAnswer={providers.answer}
+                onCancelLogin={providers.cancelLogin}
+                onCloseLogin={providers.closeLogin}
+                onLogOut={providers.logOut}
+                translator={translator}
+              />
+            }
+            plugins={
+              <PluginsView
+                state={plugins.state}
+                onSwitch={plugins.switchPlugin}
                 translator={translator}
               />
             }
