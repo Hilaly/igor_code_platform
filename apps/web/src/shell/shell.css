@@ -22,8 +22,8 @@
 .shell-left {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
-  padding: var(--sovereign-space-3);
+  gap: var(--sovereign-space-2);
+  padding: var(--sovereign-space-2);
   background: var(--sovereign-panel-surface);
   border-right: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   overflow: hidden auto;
@@ -33,7 +33,7 @@
 .shell-left-main {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  gap: var(--sovereign-space-2);
   min-height: 0;
   /* Навигация прижата к верху: шапка и основной блок стоят в начале панели, а `shell-left-bottom`
      (статус демона) оттесняется вниз распором. Так список вью не висит посередине пустой панели. */
@@ -104,7 +104,7 @@
   flex-direction: column;
   gap: var(--sovereign-space-2);
   padding: var(--sovereign-space-3);
-  background: var(--sovereign-panel-surface);
+  background: var(--sovereign-sunken-surface);
   border-left: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   overflow: hidden auto;
   flex: 0 0 auto;

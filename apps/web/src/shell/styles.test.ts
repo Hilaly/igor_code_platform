@@ -121,6 +121,17 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });
 
+  it("separates shell surfaces and keeps the sidebar compact", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-left\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);/s);
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*background:\s*var\(--sovereign-page-surface\);/s);
+    expect(shell).toMatch(
+      /\.shell-right\s*\{[^}]*background:\s*var\(--sovereign-sunken-surface\);/s,
+    );
+    expect(shell).toMatch(/\.shell-left\s*\{[^}]*gap:\s*var\(--sovereign-space-2\);/s);
+  });
+
   it("keeps direct session content sized by its available container", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
