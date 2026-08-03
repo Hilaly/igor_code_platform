@@ -51,6 +51,7 @@ export type ProvidersViewProps = {
   onEdit: (providerId: string) => void;
   onDelete: (providerId: string) => Promise<void>;
   onRefresh: (providerId: string) => Promise<void>;
+  actionFailure?: string;
   /** «← все провайдера» со страницы деталей — назад к списку. */
   onBack: () => void;
   onLogIn: (providerId: string, method: ProviderAuthType) => void;
@@ -69,6 +70,7 @@ export function ProvidersView({
   onEdit,
   onDelete,
   onRefresh,
+  actionFailure,
   onBack,
   onLogIn,
   onAnswer,
@@ -114,6 +116,7 @@ export function ProvidersView({
       <div className="providers">
         <Heading level={1}>{t("page.providers.title")}</Heading>
         {logins}
+        {actionFailure ? <Notice tone="danger" title={actionFailure} /> : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -193,6 +196,7 @@ export function ProvidersView({
       {state.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("providers.failed", { reason: state.failure })} />
       )}
+      {actionFailure ? <Notice tone="danger" title={actionFailure} /> : undefined}
 
       {logins}
 

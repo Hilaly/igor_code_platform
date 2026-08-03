@@ -701,6 +701,7 @@ export function App() {
                     throw cause;
                   }
                 }}
+                actionFailure={providerFormFailure}
                 onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
                 onLogIn={providers.logIn}
                 onAnswer={providers.answer}

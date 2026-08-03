@@ -115,4 +115,24 @@ describe("parseUserProviderDraft", () => {
       "parsed",
     );
   });
+
+  it("accepts the optional fields of a manual model and fills their defaults", () => {
+    const parsed = parseUserProviderDraft({
+      ...raw,
+      manualModels: [{ id: "manual", name: "Manual", contextWindow: 32_000, maxTokens: 4_096 }],
+    });
+
+    assert.equal(parsed.kind, "parsed");
+    if (parsed.kind === "parsed") {
+      assert.deepEqual(parsed.value.manualModels[0], {
+        id: "manual",
+        name: "Manual",
+        contextWindow: 32_000,
+        maxTokens: 4_096,
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0 },
+      });
+    }
+  });
 });

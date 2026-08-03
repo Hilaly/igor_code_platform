@@ -427,7 +427,11 @@ function parseManualModels(
     const fields = objectOf(raw[index]);
     const id = textOf(fields?.["id"]);
     const name = textOf(fields?.["name"]);
-    const defaults = parseModelDefaults(fields, `${label}[${index}]`, diagnostics);
+    const defaults = parseModelDefaults(
+      { ...defaultUserModelDefinition, ...fields },
+      `${label}[${index}]`,
+      diagnostics,
+    );
     if (id === undefined || name === undefined || defaults === undefined) {
       if (id === undefined) diagnostics.push(`${label}[${index}].id must be non-empty`);
       if (name === undefined) diagnostics.push(`${label}[${index}].name must be non-empty`);

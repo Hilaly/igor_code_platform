@@ -137,7 +137,14 @@ export function UserProviderForm(props: UserProviderFormProps) {
         .split(/[,\n]/)
         .map((modelId) => modelId.trim())
         .filter(Boolean)
-        .map((modelId) => ({ id: modelId, name: modelId, ...defaults })),
+        .map(
+          (modelId) =>
+            props.initial?.manualModels.find((model) => model.id === modelId) ?? {
+              id: modelId,
+              name: modelId,
+              ...defaults,
+            },
+        ),
       modelOverrides: parsedOverrides,
       disabledModelIds: disabledModels
         .split(/[,\n]/)

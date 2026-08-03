@@ -93,6 +93,7 @@ function show(state: ProvidersState, providerId?: string) {
     onEdit: vi.fn(),
     onDelete: vi.fn(async () => undefined),
     onRefresh: vi.fn(async () => undefined),
+    actionFailure: undefined,
   };
 
   const { rerender } = render(
