@@ -44,6 +44,8 @@ function freshRoot(): string {
 
 type Started = {
   watcher: PluginWatcher;
+  changeCount: number;
+  waitForChangeCount: (target: number, timeoutMilliseconds?: number) => Promise<void>;
   /** Ждёт вызова onChange; отсутствие вызова — тоже результат, поэтому таймаут отдельный. */
   nextChange: (timeoutMilliseconds?: number) => Promise<ChangedPluginDirectory[] | undefined>;
 };
@@ -51,12 +53,22 @@ type Started = {
 function started(root: string): Started {
   const pending: ChangedPluginDirectory[][] = [];
   let waiter: ((directories: ChangedPluginDirectory[]) => void) | undefined;
+  let changeCount = 0;
+  const countWaiters: Array<{ target: number; resolve: () => void }> = [];
 
   const watcher = createPluginWatcher({
     roots: [{ source: "data", directory: root }],
     logger: silent,
     debounceMilliseconds: 20,
     onChange: (directories) => {
+      changeCount += 1;
+      for (let index = countWaiters.length - 1; index >= 0; index -= 1) {
+        const waiter = countWaiters[index];
+        if (waiter === undefined) continue;
+        if (changeCount < waiter.target) continue;
+        waiter.resolve();
+        countWaiters.splice(index, 1);
+      }
       if (waiter === undefined) {
         pending.push(directories);
 
@@ -74,6 +86,26 @@ function started(root: string): Started {
 
   return {
     watcher,
+    get changeCount() {
+      return changeCount;
+    },
+    waitForChangeCount: (target: number, timeoutMilliseconds = 1_000): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (changeCount >= target) {
+          resolve();
+          return;
+        }
+        const finish = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          const index = countWaiters.findIndex((entry) => entry.resolve === finish);
+          if (index >= 0) countWaiters.splice(index, 1);
+          reject(new Error(`watcher callback count stayed below ${target}`));
+        }, timeoutMilliseconds);
+        countWaiters.push({ target, resolve: finish });
+      }),
     nextChange: (timeoutMilliseconds = 2_000) =>
       new Promise((resolve) => {
         const ready = pending.shift();
@@ -100,7 +132,8 @@ function started(root: string): Started {
 describe("createPluginWatcher", () => {
   it("reports the plugin folder whose sources changed", async () => {
     const root = freshRoot();
-    const { watcher, nextChange } = started(root);
+    const startedWatcher = started(root);
+    const { watcher, nextChange } = startedWatcher;
 
     // Запись повторяется, пока наблюдатель не отзовётся: иначе тест проверяет гонку с его
     // постановкой, а не поведение кода (runtime-checks.md, проверка 14).
@@ -117,7 +150,8 @@ describe("createPluginWatcher", () => {
     const root = freshRoot();
     const references = join(root, "hello", "skills", "review", "references");
     mkdirSync(references, { recursive: true });
-    const { watcher, nextChange } = started(root);
+    const startedWatcher = started(root);
+    const { watcher, nextChange } = startedWatcher;
 
     const change = await repeatUntilSeen(nextChange, () =>
       writeFileSync(join(references, "checklist.md"), `${Date.now()}\n`),
@@ -131,7 +165,8 @@ describe("createPluginWatcher", () => {
     const root = freshRoot();
     const skill = join(root, "hello", "skills", "review");
     mkdirSync(skill, { recursive: true });
-    const { watcher, nextChange } = started(root);
+    const startedWatcher = started(root);
+    const { watcher, nextChange } = startedWatcher;
     let attempt = 0;
 
     const change = await repeatUntilSeen(nextChange, () => {
@@ -151,13 +186,16 @@ describe("createPluginWatcher", () => {
     writeFileSync(source, "prepared earlier\n");
     const anHourAgo = new Date(Date.now() - 3_600_000);
     utimesSync(source, anHourAgo, anHourAgo);
-    const { watcher, nextChange } = started(root);
+    const startedWatcher = started(root);
+    const { watcher, nextChange } = startedWatcher;
 
     const checklist = join(references, "checklist.md");
     renameSync(source, checklist);
-    const change = await repeatUntilSeen(nextChange, () =>
-      writeFileSync(checklist, `prepared earlier ${Date.now()}\n`),
-    );
+    const change = await nextChange();
+    assert.ok(change);
+    const callbacksAfterRename = startedWatcher.changeCount;
+    writeFileSync(checklist, `prepared earlier ${Date.now()}\n`);
+    await startedWatcher.waitForChangeCount(callbacksAfterRename + 1);
 
     assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
     watcher.close();

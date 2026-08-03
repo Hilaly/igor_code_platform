@@ -46,12 +46,22 @@ function started(
 ) {
   const pending: number[] = [];
   let waiter: (() => void) | undefined;
+  let changeCount = 0;
+  const countWaiters: Array<{ target: number; resolve: () => void }> = [];
   const watcher = createFileResourceWatcher({
     roots,
     logger,
     debounceMilliseconds: 20,
     ...(inspectPath === undefined ? {} : { inspectPath }),
     onChange: () => {
+      changeCount += 1;
+      for (let index = countWaiters.length - 1; index >= 0; index -= 1) {
+        const waiter = countWaiters[index];
+        if (waiter === undefined) continue;
+        if (changeCount < waiter.target) continue;
+        waiter.resolve();
+        countWaiters.splice(index, 1);
+      }
       if (waiter === undefined) pending.push(1);
       else {
         const resolve = waiter;
@@ -65,6 +75,26 @@ function started(
 
   return {
     watcher,
+    get changeCount() {
+      return changeCount;
+    },
+    waitForChangeCount: (target: number, timeoutMilliseconds = 1_000): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (changeCount >= target) {
+          resolve();
+          return;
+        }
+        const finish = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          const index = countWaiters.findIndex((entry) => entry.resolve === finish);
+          if (index >= 0) countWaiters.splice(index, 1);
+          reject(new Error(`watcher callback count stayed below ${target}`));
+        }, timeoutMilliseconds);
+        countWaiters.push({ target, resolve: finish });
+      }),
     nextChange: (timeoutMilliseconds = 250): Promise<boolean> =>
       new Promise((resolve) => {
         if (pending.shift() !== undefined) {
@@ -96,7 +126,8 @@ describe("createFileResourceWatcher", () => {
     const parent = join(workspace, `missing-${sequence++}`);
     mkdirSync(parent);
     const directory = join(parent, ".sovereign", "agents");
-    const { watcher, nextChange } = started([root(directory)]);
+    const startedWatcher = started([root(directory)]);
+    const { watcher, nextChange } = startedWatcher;
 
     let attempt = 0;
     await repeatUntilSeen(nextChange, () => {
@@ -106,13 +137,28 @@ describe("createFileResourceWatcher", () => {
     watcher.close();
   });
 
+  it("ignores unrelated siblings while an absent root is watched", async () => {
+    const parent = join(workspace, `unrelated-${sequence++}`);
+    mkdirSync(parent);
+    const directory = join(parent, ".sovereign", "agents");
+    const { watcher, nextChange } = started([root(directory)]);
+
+    mkdirSync(join(parent, "unrelated-sibling"));
+    assert.equal(await nextChange(150), false);
+
+    mkdirSync(directory, { recursive: true });
+    assert.equal(await nextChange(1_000), true);
+    watcher.close();
+  });
+
   it("reports create, change, delete, and sibling resource events", async () => {
     const directory = join(workspace, `existing-${sequence++}`);
     const definition = join(directory, "helper");
     mkdirSync(definition, { recursive: true });
     const entry = join(definition, "AGENT.md");
     const sibling = join(definition, "reference.md");
-    const { watcher, nextChange } = started([root(directory)]);
+    const startedWatcher = started([root(directory)]);
+    const { watcher, nextChange } = startedWatcher;
 
     await repeatUntilSeen(nextChange, () => writeFileSync(entry, `created ${Date.now()}\n`));
     await repeatUntilSeen(nextChange, () => writeFileSync(entry, `changed ${Date.now()}\n`));
@@ -133,16 +179,22 @@ describe("createFileResourceWatcher", () => {
     utimesSync(join(prepared, "references", "guide.md"), anHourAgo, anHourAgo);
     utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
     utimesSync(prepared, anHourAgo, anHourAgo);
-    const { watcher, nextChange } = started([root(directory)]);
+    const startedWatcher = started([root(directory)]);
+    const { watcher, nextChange } = startedWatcher;
     const moved = join(directory, "moved");
 
-    // A one-shot rename can race native watcher activation under parallel test load. Keep the
-    // moved tree intact and repeat a real sibling-resource mutation until the callback proves the
-    // recursive watcher is armed.
+    // Establish that the recursive watcher is active before issuing the one-shot rename.
+    writeFileSync(join(directory, "watcher-ready.md"), "ready\n");
+    assert.equal(await nextChange(1_000), true);
+    const callbacksAfterReady = startedWatcher.changeCount;
+
+    // First prove the original one-shot rename event. Only after that callback (including debounce,
+    // rearm, and onChange) completes may a later mutation prove the moved tree remains watched.
     renameSync(prepared, moved);
-    await repeatUntilSeen(nextChange, () =>
-      writeFileSync(join(moved, "references", "guide.md"), `old resource ${Date.now()}\n`),
-    );
+    await startedWatcher.waitForChangeCount(callbacksAfterReady + 1);
+    const callbacksAfterRename = startedWatcher.changeCount;
+    writeFileSync(join(moved, "references", "guide.md"), `old resource ${Date.now()}\n`);
+    await startedWatcher.waitForChangeCount(callbacksAfterRename + 1);
     watcher.close();
   });
 
@@ -160,9 +212,9 @@ describe("createFileResourceWatcher", () => {
       return lstatSync(path, { throwIfNoEntry: false });
     });
 
-    writeFileSync(join(directory, "raced.md"), "changed\n");
-
-    assert.equal(await nextChange(1_000), true);
+    await repeatUntilSeen(nextChange, () =>
+      writeFileSync(join(directory, "raced.md"), `${Date.now()}\n`),
+    );
     assert.ok(inspections > 1);
     watcher.close();
   });
