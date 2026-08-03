@@ -130,7 +130,7 @@ sessions/
 | `config.json`      | `compactionKeepRecentTokens`                    | целое число больше нуля                | `20000`              | живьём     |
 | `preferences.json` | `plugins.<источник>:<id>.enabled`               | `true` \| `false`                      | зависит от источника | живьём     |
 | `preferences.json` | `plugins.<источник>:<id>.disabledContributions` | список идентификаторов вкладов         | пусто                | живьём     |
-| `preferences.json` | `appearance.colorScheme`                        | идентификатор цветовой схемы           | `base`               | живьём     |
+| `preferences.json` | `appearance.colorScheme`                        | идентификатор цветовой схемы           | `imperium`           | живьём     |
 | `preferences.json` | `appearance.variant`                            | `light` \| `dark` \| `system`          | `system`             | живьём     |
 | `preferences.json` | `appearance.scale`                              | `smaller` \| `default` \| `larger`     | `default`            | живьём     |
 | `preferences.json` | `locale`                                        | языковой тег (`en`, `ru`, …)           | `en`                 | живьём     |

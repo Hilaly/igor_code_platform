@@ -114,8 +114,9 @@ describe("matchPage", () => {
     expect(matchPage("/p")).toEqual({ kind: "unknown", path: "/p" });
   });
 
-  it("keeps the settings on their own address, with an optional section", () => {
-    expect(matchPage("/settings")).toEqual({ kind: "settings" });
+  it("takes bare settings for appearance", () => {
+    expect(matchPage("/settings")).toEqual({ kind: "settings", section: "appearance" });
+    expect(pathOf(matchPage("/settings"))).toBe("/settings/appearance");
     expect(matchPage("/settings/appearance")).toEqual({
       kind: "settings",
       section: "appearance",
@@ -164,7 +165,6 @@ describe("pathOf", () => {
       "/sessions/new",
       "/sessions/archive",
       "/sessions/0199abcd-ef01",
-      "/settings",
       "/settings/appearance",
       "/settings/providers",
       "/settings/providers/anthropic",

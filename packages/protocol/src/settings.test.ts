@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  defaultAppearance,
   defaultConfig,
   defaultPreferences,
+  builtInColorScheme,
   interfaceScales,
   parseConfig,
   parsePreferences,
@@ -110,9 +112,9 @@ describe("parsePreferences: appearance and locale", () => {
     return result.kind === "parsed" ? result.value : defaultPreferences;
   };
 
-  it("takes a file that says nothing as the built-in scheme and the base locale", () => {
+  it("takes a file that says nothing as the Imperium scheme and the base locale", () => {
     assert.deepEqual(parsed({}).appearance, {
-      colorScheme: "base",
+      colorScheme: "imperium",
       variant: "system",
       scale: "default",
     });
@@ -142,9 +144,15 @@ describe("parsePreferences: appearance and locale", () => {
   it("fills in what the appearance does not name", () => {
     assert.deepEqual(parsed({ appearance: { variant: "light" } }), {
       plugins: {},
-      appearance: { colorScheme: "base", variant: "light", scale: "default" },
+      appearance: { colorScheme: "imperium", variant: "light", scale: "default" },
       locale: "en",
     });
+  });
+
+  it("uses Imperium as the built-in appearance", () => {
+    assert.equal(builtInColorScheme, "imperium");
+    assert.equal(defaultAppearance.colorScheme, "imperium");
+    assert.equal(defaultPreferences.appearance.colorScheme, "imperium");
   });
 
   it("refuses the whole file when the appearance or the locale is wrong", () => {

@@ -259,7 +259,6 @@ export const Waiting = () => (
 );
 
 const selectionOptions = [
-  { value: "base", label: "Базовая" },
   { value: "imperium", label: "Империум" },
   { value: "nord", label: "Норд" },
   { value: "legacy", label: "Устаревшая", disabled: true },
@@ -267,8 +266,8 @@ const selectionOptions = [
 
 export const Selectors = () => {
   const [scheme, setScheme] = useState("imperium");
-  const [searchableScheme, setSearchableScheme] = useState("base");
-  const [visibleColumns, setVisibleColumns] = useState(["base", "nord"]);
+  const [searchableScheme, setSearchableScheme] = useState("imperium");
+  const [visibleColumns, setVisibleColumns] = useState(["imperium", "nord"]);
 
   return (
     <div style={column}>
@@ -294,8 +293,8 @@ export const Selectors = () => {
           { value: "comfortable", label: "Обычно" },
           { value: "spacious", label: "Свободно", disabled: true },
         ]}
-        value={scheme === "base" ? "compact" : "comfortable"}
-        onChange={(value) => setScheme(value === "compact" ? "base" : "imperium")}
+        value={scheme === "imperium" ? "compact" : "comfortable"}
+        onChange={(value) => setScheme(value === "compact" ? "imperium" : "nord")}
       />
       <RadioGroup
         label="Схема по умолчанию"

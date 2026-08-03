@@ -31,6 +31,8 @@ export type ShellProps = {
   /** Низ левой панели: индикатор связи с демоном. Он виден всегда, а не по переходу на страницу. */
   status: ReactNode;
   tabs: ShellTabDescription[];
+  /** Текущая страница не даёт правой панели места; сохранённый layout при этом не меняется. */
+  rightUnavailable?: boolean;
   children: ReactNode;
 };
 
@@ -41,9 +43,11 @@ export function Shell({
   navigation,
   status,
   tabs,
+  rightUnavailable = false,
   children,
 }: ShellProps) {
   const open = tabs.find((tab) => tab.id === layout.openTab);
+  const rightVisible = !rightUnavailable && !layout.rightHidden;
 
   return (
     <div className="shell">
@@ -100,7 +104,7 @@ export function Shell({
             </Button>
           </span>
         ) : undefined}
-        {layout.rightHidden ? (
+        {!rightUnavailable && layout.rightHidden ? (
           <span className="shell-restore shell-restore-right">
             <Button
               size="sm"
@@ -114,7 +118,7 @@ export function Shell({
           </span>
         ) : undefined}
       </main>
-      {layout.rightHidden ? undefined : (
+      {rightVisible ? (
         <>
           <PanelResizer
             edge="right"
@@ -161,7 +165,7 @@ export function Shell({
             )}
           </aside>
         </>
-      )}
+      ) : undefined}
     </div>
   );
 }

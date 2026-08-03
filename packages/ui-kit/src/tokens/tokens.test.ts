@@ -5,7 +5,7 @@ import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
 import { paletteKeys, paletteVariants, type Palette } from "./palette.ts";
 import { deriveRoles, roleNames, rolePropertyName } from "./roles.ts";
 import { resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
-import { baseScheme } from "./schemes/base.ts";
+import { imperiumScheme } from "./schemes/imperium.ts";
 import { shippedSchemes } from "./schemes/shipped.ts";
 
 describe("deriveRoles", () => {
@@ -24,10 +24,10 @@ describe("deriveRoles", () => {
   });
 
   it("names the palette in the derived value, so a scheme change reaches every state", () => {
-    const roles = deriveRoles(baseScheme.variants.light);
+    const roles = deriveRoles(imperiumScheme.variants.light);
 
-    expect(roles.accentHover).toContain(baseScheme.variants.light.accent);
-    expect(roles.accentHover).toContain(baseScheme.variants.light.ink);
+    expect(roles.accentHover).toContain(imperiumScheme.variants.light.accent);
+    expect(roles.accentHover).toContain(imperiumScheme.variants.light.ink);
   });
 });
 
@@ -46,7 +46,7 @@ describe("rolePropertyName", () => {
 describe("resolveScheme", () => {
   it("refuses a scheme that speaks another token contract", () => {
     const outcome = resolveScheme(
-      { ...baseScheme, tokenContract: tokenContractMajor + 1 },
+      { ...imperiumScheme, tokenContract: tokenContractMajor + 1 },
       "light",
     );
 
@@ -55,7 +55,7 @@ describe("resolveScheme", () => {
   });
 
   it("applies a declared role override and says the scheme is now brittle", () => {
-    const scheme: ColorScheme = { ...baseScheme, roleOverrides: { accent: "#123456" } };
+    const scheme: ColorScheme = { ...imperiumScheme, roleOverrides: { accent: "#123456" } };
     const outcome = resolveScheme(scheme, "light");
 
     expect(outcome.kind).toBe("resolved");
@@ -65,7 +65,7 @@ describe("resolveScheme", () => {
 
   it("ignores an override of an unknown role instead of refusing the scheme", () => {
     const scheme = {
-      ...baseScheme,
+      ...imperiumScheme,
       roleOverrides: { neonEdge: "#123456" },
     } as unknown as ColorScheme;
     const outcome = resolveScheme(scheme, "light");
@@ -75,22 +75,24 @@ describe("resolveScheme", () => {
   });
 
   it("leaves the roles it was not told to override derived from the palette", () => {
-    const scheme: ColorScheme = { ...baseScheme, roleOverrides: { accent: "#123456" } };
+    const scheme: ColorScheme = { ...imperiumScheme, roleOverrides: { accent: "#123456" } };
     const outcome = resolveScheme(scheme, "dark");
 
-    expect(outcome.kind === "resolved" && outcome.roles.text).toBe(baseScheme.variants.dark.ink);
+    expect(outcome.kind === "resolved" && outcome.roles.text).toBe(
+      imperiumScheme.variants.dark.ink,
+    );
   });
 });
 
 describe("applyRoles", () => {
   it("writes every role as a css variable", () => {
     const written = new Map<string, string>();
-    const roles = deriveRoles(baseScheme.variants.dark);
+    const roles = deriveRoles(imperiumScheme.variants.dark);
 
     applyRoles(roles, { setProperty: (property, value) => void written.set(property, value) });
 
     expect(written.size).toBe(roleNames.length);
-    expect(written.get("--sovereign-page-surface")).toBe(baseScheme.variants.dark.surface);
+    expect(written.get("--sovereign-page-surface")).toBe(imperiumScheme.variants.dark.surface);
   });
 });
 
@@ -168,6 +170,10 @@ describe("contrast", () => {
     for (const scheme of shippedSchemes) {
       expect(scheme.tokenContract, scheme.id).toBe(tokenContractMajor);
     }
+  });
+
+  it("ships only the retained schemes", () => {
+    expect(shippedSchemes.map((scheme) => scheme.id)).toEqual(["imperium", "nord", "oled", "sage"]);
   });
 });
 

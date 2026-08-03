@@ -119,7 +119,7 @@ describe("appearancePreferencesRoutes", () => {
 
     assert.equal(answer.status, 200);
     assert.deepEqual(JSON.parse(answer.body), {
-      appearance: { colorScheme: "base", variant: "system", scale: "default" },
+      appearance: { colorScheme: "imperium", variant: "system", scale: "default" },
       locale: "en",
     });
   });
@@ -137,7 +137,7 @@ describe("appearancePreferencesRoutes", () => {
   it("writes the scale to the file and gives it back", async () => {
     const { get, put, stored } = await serve();
     const smaller = {
-      appearance: { colorScheme: "base", variant: "system", scale: "smaller" },
+      appearance: { colorScheme: "imperium", variant: "system", scale: "smaller" },
       locale: "en",
     };
     const answer = await put(JSON.stringify(smaller));
@@ -170,7 +170,7 @@ describe("appearancePreferencesRoutes", () => {
   it("refuses a body with an unknown variant and writes nothing", async () => {
     const { directory, put } = await serve();
     const answer = await put(
-      JSON.stringify({ appearance: { colorScheme: "base", variant: "bright" }, locale: "en" }),
+      JSON.stringify({ appearance: { colorScheme: "imperium", variant: "bright" }, locale: "en" }),
     );
 
     assert.equal(answer.status, 400);
@@ -182,7 +182,7 @@ describe("appearancePreferencesRoutes", () => {
     const { directory, put } = await serve();
     const answer = await put(
       JSON.stringify({
-        appearance: { colorScheme: "base", variant: "dark", scale: "huge" },
+        appearance: { colorScheme: "imperium", variant: "dark", scale: "huge" },
         locale: "en",
       }),
     );

@@ -16,7 +16,7 @@ import { interfaceScales, type InterfaceScale } from "@sovereign/protocol";
 import {
   applyRoles,
   applyScale,
-  baseScheme,
+  imperiumScheme,
   resolveScheme,
   shippedSchemes,
   type PaletteVariant,
@@ -53,7 +53,7 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
   const [schemeId, setSchemeId] = useRemembered(
     "sovereign.catalogue.scheme",
     schemeIds,
-    baseScheme.id,
+    imperiumScheme.id,
   );
   const [scale, setScale] = useRemembered<InterfaceScale>(
     "sovereign.catalogue.scale",
@@ -66,7 +66,7 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
   const variant: PaletteVariant = globalState.theme === "dark" ? "dark" : "light";
 
   useEffect(() => {
-    const scheme = shippedSchemes.find((candidate) => candidate.id === schemeId) ?? baseScheme;
+    const scheme = shippedSchemes.find((candidate) => candidate.id === schemeId) ?? imperiumScheme;
     const resolved = resolveScheme(scheme, variant);
 
     if (resolved.kind === "resolved") {

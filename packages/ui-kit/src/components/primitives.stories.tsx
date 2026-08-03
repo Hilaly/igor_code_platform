@@ -102,7 +102,6 @@ export const Controls = () => {
         value={scheme}
         onChange={setScheme}
         options={[
-          { value: "base", label: "Базовая" },
           { value: "imperium", label: "Империум" },
           { value: "nord", label: "Норд" },
         ]}

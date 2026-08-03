@@ -472,7 +472,7 @@ describe("file resources end to end", () => {
       );
 
       const missingRevision = registry.revision();
-      await changeAndWait(bus, missingRevision, () => rmSync(agentPath));
+      await changeAndWait(bus, missingRevision, () => rmSync(agentPath, { force: true }));
       const summary = (await sessions.list(project.id)).find((session) => session.id === sessionId);
       assert.equal(summary?.agentAvailable, false);
       const refusedTurn = await requestJson(port, "POST", sessionTurnsPath(sessionId), {
