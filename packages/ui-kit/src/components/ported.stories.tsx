@@ -330,6 +330,11 @@ function TreeSelection() {
             id: "packages",
             label: "packages",
             badge: { tone: "neutral", text: "2" },
+            actions: (
+              <Button size="sm" onClick={() => {}}>
+                Добавить
+              </Button>
+            ),
             children: [
               { id: "ui-kit", label: "ui-kit", badge: { tone: "accent", text: "изменён" } },
               { id: "protocol", label: "protocol" },

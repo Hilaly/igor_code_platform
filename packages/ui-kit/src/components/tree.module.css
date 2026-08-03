@@ -79,6 +79,16 @@
 
 .label {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  margin-left: auto;
 }
 
 .children {

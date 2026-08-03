@@ -45,6 +45,8 @@ export type TreeNode = {
   icon?: ReactNode;
   /** Метка рядом с подписью — состояние записи, число вложенных, что угодно ещё. */
   badge?: TreeNodeBadge;
+  /** Независимые действия рядом со строкой: они не выбирают и не раскрывают узел. */
+  actions?: ReactNode;
   children?: TreeNode[];
 };
 
@@ -298,6 +300,15 @@ export function Tree({
             {node.badge ? (
               <span id={badgeElementId}>
                 <Badge tone={node.badge.tone}>{node.badge.text}</Badge>
+              </span>
+            ) : null}
+            {node.actions ? (
+              <span
+                className={styles.actions}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {node.actions}
               </span>
             ) : null}
           </div>

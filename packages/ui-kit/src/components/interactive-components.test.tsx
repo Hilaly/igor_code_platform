@@ -11,6 +11,7 @@ import { Menu } from "./menu.tsx";
 import { Popover } from "./popover.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
+import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
 import { Tree, type TreeNode } from "./tree.tsx";
 
@@ -27,6 +28,37 @@ const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it("names a status dot without exposing its color as meaning", () => {
+    render(<StatusDot tone="positive" label="Демон подключён" />);
+
+    const dot = screen.getByRole("status", { name: "Демон подключён" });
+    expect(dot.getAttribute("title")).toBe("Демон подключён");
+  });
+
+  it("keeps Tree actions independent from row selection", () => {
+    const onSelect = vi.fn();
+    render(
+      <Tree
+        label="Проекты"
+        toggleLabel={treeToggleLabel}
+        onSelect={onSelect}
+        nodes={[
+          {
+            id: "project",
+            label: "Alpha",
+            actions: <button type="button">Создать сессию</button>,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Создать сессию" }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Создать сессию" }), { key: "Enter" });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("renders a compact menu popup in the document body", () => {
     render(
       <Menu
