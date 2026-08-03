@@ -34,6 +34,10 @@ function styleSheets(directory: string): { name: string; styles: string }[] {
 
 const sheets = styleSheets(sources);
 
+/** Production entrypoint обязан загрузить каждую найденную прикладную таблицу, иначе тест правил
+ *  читает CSS, которого в интерфейсе нет, и создаёт ложную уверенность. */
+const entrypoint = readFileSync(join(sources, "main.tsx"), "utf8");
+
 /** Общий слой кита: приложение имеет право опираться на его шкалы, но не на его классы. */
 const kitStyles = join(
   import.meta.dirname,
@@ -70,6 +74,14 @@ describe("the style sheets of the application", () => {
       "settings.css",
       "shell.css",
     ]);
+  });
+
+  it("are all loaded by the production entrypoint", () => {
+    const loaded = [...entrypoint.matchAll(/import\s+"\.\/[^"/]+\/([^"/]+\.css)";/g)]
+      .map(([, name]) => name ?? "")
+      .sort();
+
+    expect(loaded).toEqual(sheets.map((sheet) => sheet.name).sort());
   });
 
   it.each(sheets)("$name takes every colour from a role variable", ({ styles }) => {
@@ -116,5 +128,18 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-height:\s*0;/s);
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
+  });
+
+  it("keeps settings split by their container and scrolls the active content", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
+
+    expect(settings).toMatch(/\.settings\s*\{[^}]*container-type:\s*inline-size;/s);
+    expect(settings).toMatch(/\.settings-layout\s*\{[^}]*grid-template-columns:[^;}]+;/s);
+    expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(settings).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)\s*\{[\s\S]*?\.settings-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
+    expect(settings).toMatch(/\.settings-nav\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;/s);
+    expect(settings).not.toMatch(/\.settings-split/);
   });
 });

@@ -39,8 +39,8 @@ export type Page =
    * список моделей в нём не помещается. Адрес даёт ещё и рабочую кнопку «назад» и перезагрузку.
    */
   | { kind: "new-session" }
-  /** Голый адрес — без выбранного раздела, вью сама показывает первый. */
-  | { kind: "settings"; section?: SettingsSection; providerId?: string }
+  /** Выбранный раздел всегда записан в адресе и остаётся единственным источником выбора. */
+  | { kind: "settings"; section: SettingsSection; providerId?: string }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
@@ -150,7 +150,7 @@ export function matchPage(path: string): Page {
     const section = segments[1];
 
     if (section === undefined) {
-      return { kind: "settings" };
+      return { kind: "settings", section: "appearance" };
     }
 
     if (!settingsSections.includes(section as SettingsSection)) {
@@ -203,10 +203,6 @@ export function pathOf(page: Page): string {
     case "new-session":
       return `${sessionsPagePath}/new`;
     case "settings":
-      if (page.section === undefined) {
-        return settingsPagePath;
-      }
-
       return page.section === "providers" && page.providerId !== undefined
         ? `${settingsPagePath}/providers/${encodeProviderId(page.providerId)}`
         : `${settingsPagePath}/${page.section}`;

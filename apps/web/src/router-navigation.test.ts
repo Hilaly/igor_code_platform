@@ -22,6 +22,7 @@ describe("provider navigation in a browser", () => {
 
   it.each([
     ["/sessions", "/", { kind: "home" }],
+    ["/settings", "/settings/appearance", { kind: "settings", section: "appearance" }],
     ["/plugins", "/settings/plugins", { kind: "settings", section: "plugins" }],
     ["/providers", "/settings/providers", { kind: "settings", section: "providers" }],
     [
