@@ -8,6 +8,8 @@ import {
   symlinkSync,
   utimesSync,
   writeFileSync,
+  watch,
+  type FSWatcher,
   type Stats,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +17,11 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { createLogger } from "../platform/public.ts";
-import { createFileResourceWatcher, type FileResourceWatcher } from "./file-resource-watcher.ts";
+import {
+  createFileResourceWatcher,
+  type CreateFileResourceWatcherOptions,
+  type FileResourceWatcher,
+} from "./file-resource-watcher.ts";
 import type { StandaloneResourceRoot } from "./file-resource-roots.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-file-resource-watcher-"));
@@ -43,16 +49,28 @@ function root(directory: string, key = "data:agents"): StandaloneResourceRoot {
 function started(
   roots: StandaloneResourceRoot[],
   inspectPath?: (path: string) => Stats | undefined,
+  watchDirectory?: CreateFileResourceWatcherOptions["watchDirectory"],
+  debounce?: Pick<CreateFileResourceWatcherOptions, "scheduleDebounce" | "cancelDebounce">,
 ) {
   const pending: number[] = [];
   let waiter: (() => void) | undefined;
   let changeCount = 0;
+  const watchFactory: CreateFileResourceWatcherOptions["watchDirectory"] = (
+    directory,
+    recursive,
+    listener,
+  ) => {
+    if (watchDirectory !== undefined) return watchDirectory(directory, recursive, listener);
+    return watch(directory, { recursive }, listener);
+  };
   const countWaiters: Array<{ target: number; resolve: () => void }> = [];
   const watcher = createFileResourceWatcher({
     roots,
     logger,
     debounceMilliseconds: 20,
     ...(inspectPath === undefined ? {} : { inspectPath }),
+    watchDirectory: watchFactory,
+    ...debounce,
     onChange: () => {
       changeCount += 1;
       for (let index = countWaiters.length - 1; index >= 0; index -= 1) {
@@ -113,12 +131,70 @@ function started(
   };
 }
 
+function injectedWatcher(directory: string) {
+  const listeners: Array<(event: string, name: string | Buffer | null) => void> = [];
+  const scheduled: Array<() => void> = [];
+  const startedWatcher = started(
+    [root(directory)],
+    (path) => lstatSync(path, { throwIfNoEntry: false }),
+    (_watchedDirectory, _recursive, listener) => {
+      listeners.push(listener);
+      return { close: () => undefined } as unknown as FSWatcher;
+    },
+    {
+      scheduleDebounce: (callback) => {
+        scheduled.push(callback);
+        return { unref: () => undefined } as unknown as NodeJS.Timeout;
+      },
+      cancelDebounce: () => undefined,
+    },
+  );
+
+  return {
+    watcher: startedWatcher.watcher,
+    get changeCount() {
+      return startedWatcher.changeCount;
+    },
+    waitForChangeCount: startedWatcher.waitForChangeCount,
+    scheduled,
+    flush: () => {
+      const callback = scheduled.shift();
+      if (callback === undefined) throw new Error("no watcher callback is scheduled");
+      callback();
+    },
+    emit: (event: string, name: string) => {
+      const listener = listeners.at(-1);
+      if (listener === undefined) throw new Error("watcher listener is not armed");
+      listener(event, name);
+    },
+  };
+}
+
 async function repeatUntilSeen(nextChange: () => Promise<boolean>, change: () => void) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     change();
     if (await nextChange()) return;
   }
   throw new Error("the watcher never reported the change");
+}
+
+async function repeatUntilChangeCount(
+  startedWatcher: { waitForChangeCount: (target: number, timeout?: number) => Promise<void> },
+  target: number,
+  change: () => void,
+) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    change();
+    try {
+      await startedWatcher.waitForChangeCount(target, 200);
+      return;
+    } catch (cause) {
+      if (!(cause instanceof Error) || !cause.message.startsWith("watcher callback count stayed")) {
+        throw cause;
+      }
+    }
+  }
+  throw new Error(`watcher callback count stayed below ${target}`);
 }
 
 describe("createFileResourceWatcher", () => {
@@ -132,6 +208,7 @@ describe("createFileResourceWatcher", () => {
     let attempt = 0;
     await repeatUntilSeen(nextChange, () => {
       attempt += 1;
+      mkdirSync(directory, { recursive: true });
       mkdirSync(join(directory, `definition-${attempt}`), { recursive: true });
     });
     watcher.close();
@@ -149,6 +226,45 @@ describe("createFileResourceWatcher", () => {
     mkdirSync(directory, { recursive: true });
     assert.equal(await nextChange(1_000), true);
     watcher.close();
+  });
+
+  it("accepts a coalesced event only after the complete absent root exists", () => {
+    const parent = join(workspace, `injected-missing-${sequence++}`);
+    mkdirSync(parent);
+    const sovereignDirectory = join(parent, ".sovereign");
+    const directory = join(sovereignDirectory, "agents");
+    const startedWatcher = injectedWatcher(directory);
+
+    mkdirSync(sovereignDirectory);
+    startedWatcher.emit("rename", ".sovereign");
+    assert.equal(startedWatcher.scheduled.length, 0);
+    assert.equal(startedWatcher.changeCount, 0);
+
+    mkdirSync(join(parent, "unrelated-sibling"));
+    startedWatcher.emit("rename", "unrelated-sibling");
+    assert.equal(startedWatcher.scheduled.length, 0);
+    assert.equal(startedWatcher.changeCount, 0);
+
+    mkdirSync(directory);
+    startedWatcher.emit("change", "injected-missing");
+    assert.equal(startedWatcher.scheduled.length, 1);
+    startedWatcher.flush();
+    assert.equal(startedWatcher.changeCount, 1);
+    startedWatcher.watcher.close();
+  });
+
+  it("accepts the expected segment event once the complete absent root exists", () => {
+    const parent = join(workspace, `injected-expected-${sequence++}`);
+    mkdirSync(parent);
+    const directory = join(parent, ".sovereign", "agents");
+    const startedWatcher = injectedWatcher(directory);
+
+    mkdirSync(directory, { recursive: true });
+    startedWatcher.emit("rename", ".sovereign");
+    assert.equal(startedWatcher.scheduled.length, 1);
+    startedWatcher.flush();
+    assert.equal(startedWatcher.changeCount, 1);
+    startedWatcher.watcher.close();
   });
 
   it("reports create, change, delete, and sibling resource events", async () => {
@@ -180,21 +296,34 @@ describe("createFileResourceWatcher", () => {
     utimesSync(join(prepared, "references"), anHourAgo, anHourAgo);
     utimesSync(prepared, anHourAgo, anHourAgo);
     const startedWatcher = started([root(directory)]);
-    const { watcher, nextChange } = startedWatcher;
+    const { watcher } = startedWatcher;
     const moved = join(directory, "moved");
 
+    const readyBaseline = startedWatcher.changeCount;
     // Establish that the recursive watcher is active before issuing the one-shot rename.
-    writeFileSync(join(directory, "watcher-ready.md"), "ready\n");
-    assert.equal(await nextChange(1_000), true);
+    let readyAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, readyBaseline + 1, () => {
+      readyAttempt += 1;
+      writeFileSync(join(directory, "watcher-ready.md"), `ready ${readyAttempt}\n`);
+    });
+    assert.equal(startedWatcher.changeCount, readyBaseline + 1);
     const callbacksAfterReady = startedWatcher.changeCount;
 
     // First prove the original one-shot rename event. Only after that callback (including debounce,
     // rearm, and onChange) completes may a later mutation prove the moved tree remains watched.
     renameSync(prepared, moved);
     await startedWatcher.waitForChangeCount(callbacksAfterReady + 1);
+    assert.equal(startedWatcher.changeCount, callbacksAfterReady + 1);
     const callbacksAfterRename = startedWatcher.changeCount;
-    writeFileSync(join(moved, "references", "guide.md"), `old resource ${Date.now()}\n`);
-    await startedWatcher.waitForChangeCount(callbacksAfterRename + 1);
+    let movedMutationAttempt = 0;
+    await repeatUntilChangeCount(startedWatcher, callbacksAfterRename + 1, () => {
+      movedMutationAttempt += 1;
+      writeFileSync(
+        join(moved, "references", "guide.md"),
+        `old resource ${movedMutationAttempt}\n`,
+      );
+    });
+    assert.equal(startedWatcher.changeCount, callbacksAfterRename + 1);
     watcher.close();
   });
 

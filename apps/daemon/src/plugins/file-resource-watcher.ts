@@ -16,6 +16,13 @@ export type CreateFileResourceWatcherOptions = {
   onChange: () => void;
   debounceMilliseconds?: number;
   inspectPath?: (path: string) => Stats | undefined;
+  watchDirectory?: (
+    directory: string,
+    recursive: boolean,
+    listener: (event: string, name: string | Buffer | null) => void,
+  ) => FSWatcher;
+  scheduleDebounce?: (callback: () => void, delay: number) => NodeJS.Timeout;
+  cancelDebounce?: (timer: NodeJS.Timeout) => void;
 };
 
 const defaultDebounceMilliseconds = 75;
@@ -32,6 +39,11 @@ export function createFileResourceWatcher(
   const debounceMilliseconds = options.debounceMilliseconds ?? defaultDebounceMilliseconds;
   const inspectPath =
     options.inspectPath ?? ((path: string) => lstatSync(path, { throwIfNoEntry: false }));
+  const watchFactory =
+    options.watchDirectory ??
+    ((directory, recursive, listener) => watch(directory, { recursive }, listener));
+  const scheduleDebounce = options.scheduleDebounce ?? setTimeout;
+  const cancelDebounce = options.cancelDebounce ?? clearTimeout;
 
   const disarm = (): void => {
     generation += 1;
@@ -41,8 +53,8 @@ export function createFileResourceWatcher(
 
   const changed = (): void => {
     if (closed) return;
-    if (timer !== undefined) clearTimeout(timer);
-    timer = setTimeout(() => {
+    if (timer !== undefined) cancelDebounce(timer);
+    timer = scheduleDebounce(() => {
       timer = undefined;
       if (closed) return;
 
@@ -60,7 +72,7 @@ export function createFileResourceWatcher(
     armedGeneration: number,
     shouldReport: (event: string, name: string) => boolean,
   ): void => {
-    const watcher = watch(directory, { recursive }, (event, name) => {
+    const watcher = watchFactory(directory, recursive, (event, name) => {
       const relativeName = typeof name === "string" ? name : "";
       if (armedGeneration === generation && shouldReport(event, relativeName)) changed();
     });
@@ -74,6 +86,11 @@ export function createFileResourceWatcher(
   };
 
   const armRoot = (root: StandaloneResourceRoot): void => {
+    const rootIsUsableDirectory = (): boolean => {
+      const stat = inspectPath(root.directory);
+      return stat?.isDirectory() === true && !stat.isSymbolicLink();
+    };
+
     const rootStat = inspectPath(root.directory);
     if (rootStat?.isDirectory() === true && !rootStat.isSymbolicLink()) {
       watchDirectory(root.directory, true, generation, (_event, name) => {
@@ -108,11 +125,21 @@ export function createFileResourceWatcher(
         const nextSegment = relative(candidate, root.directory).split(sep)[0];
         if (nextSegment === undefined || nextSegment === "") return;
         watchDirectory(candidate, false, generation, (_event, name) => {
-          if (name === nextSegment || name.startsWith(`${nextSegment}${sep}`)) return true;
+          if (name === nextSegment || name.startsWith(`${nextSegment}${sep}`)) {
+            try {
+              return rootIsUsableDirectory();
+            } catch (cause) {
+              options.logger.error("inspecting a standalone file resource root failed", {
+                directory: root.directory,
+                reason: cause instanceof Error ? cause.message : String(cause),
+              });
+              return false;
+            }
+          }
           // macOS can coalesce a nested create and report the watched parent's own basename. In
           // that case the event name is unrelated, but inspection confirms the target appeared.
           try {
-            return inspectPath(join(candidate, nextSegment)) !== undefined;
+            return rootIsUsableDirectory();
           } catch (cause) {
             options.logger.error("inspecting a standalone file resource root failed", {
               directory: root.directory,
@@ -149,7 +176,7 @@ export function createFileResourceWatcher(
       roots = next;
       if (!started || closed) return;
       if (timer !== undefined) {
-        clearTimeout(timer);
+        cancelDebounce(timer);
         timer = undefined;
       }
       disarm();
@@ -158,7 +185,7 @@ export function createFileResourceWatcher(
     close: () => {
       closed = true;
       if (timer !== undefined) {
-        clearTimeout(timer);
+        cancelDebounce(timer);
         timer = undefined;
       }
       disarm();

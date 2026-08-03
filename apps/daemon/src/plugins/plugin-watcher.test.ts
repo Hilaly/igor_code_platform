@@ -45,6 +45,7 @@ function freshRoot(): string {
 type Started = {
   watcher: PluginWatcher;
   changeCount: number;
+  changes: ChangedPluginDirectory[][];
   waitForChangeCount: (target: number, timeoutMilliseconds?: number) => Promise<void>;
   /** Ждёт вызова onChange; отсутствие вызова — тоже результат, поэтому таймаут отдельный. */
   nextChange: (timeoutMilliseconds?: number) => Promise<ChangedPluginDirectory[] | undefined>;
@@ -52,6 +53,7 @@ type Started = {
 
 function started(root: string): Started {
   const pending: ChangedPluginDirectory[][] = [];
+  const history: ChangedPluginDirectory[][] = [];
   let waiter: ((directories: ChangedPluginDirectory[]) => void) | undefined;
   let changeCount = 0;
   const countWaiters: Array<{ target: number; resolve: () => void }> = [];
@@ -62,6 +64,7 @@ function started(root: string): Started {
     debounceMilliseconds: 20,
     onChange: (directories) => {
       changeCount += 1;
+      history.push(directories);
       for (let index = countWaiters.length - 1; index >= 0; index -= 1) {
         const waiter = countWaiters[index];
         if (waiter === undefined) continue;
@@ -89,6 +92,7 @@ function started(root: string): Started {
     get changeCount() {
       return changeCount;
     },
+    changes: history,
     waitForChangeCount: (target: number, timeoutMilliseconds = 1_000): Promise<void> =>
       new Promise((resolve, reject) => {
         if (changeCount >= target) {
@@ -187,17 +191,32 @@ describe("createPluginWatcher", () => {
     const anHourAgo = new Date(Date.now() - 3_600_000);
     utimesSync(source, anHourAgo, anHourAgo);
     const startedWatcher = started(root);
-    const { watcher, nextChange } = startedWatcher;
+    const { watcher, waitForChangeCount } = startedWatcher;
+
+    const readyBaseline = startedWatcher.changeCount;
+    writeFileSync(join(references, "watcher-ready.md"), "ready\n");
+    await waitForChangeCount(readyBaseline + 1);
+    const readyCallbackCount = startedWatcher.changeCount;
+    assert.equal(readyCallbackCount, readyBaseline + 1);
+    assert.deepEqual(startedWatcher.changes[readyBaseline], [
+      { directory: join(root, "hello"), fileResourcesChanged: true },
+    ]);
 
     const checklist = join(references, "checklist.md");
     renameSync(source, checklist);
-    const change = await nextChange();
-    assert.ok(change);
-    const callbacksAfterRename = startedWatcher.changeCount;
+    await waitForChangeCount(readyCallbackCount + 1);
+    assert.deepEqual(startedWatcher.changes[readyCallbackCount], [
+      { directory: join(root, "hello"), fileResourcesChanged: true },
+    ]);
+    const renameCallbackCount = startedWatcher.changeCount;
+    assert.equal(renameCallbackCount, readyCallbackCount + 1);
     writeFileSync(checklist, `prepared earlier ${Date.now()}\n`);
-    await startedWatcher.waitForChangeCount(callbacksAfterRename + 1);
+    await waitForChangeCount(renameCallbackCount + 1);
 
-    assert.deepEqual(change, [{ directory: join(root, "hello"), fileResourcesChanged: true }]);
+    assert.deepEqual(startedWatcher.changes[renameCallbackCount], [
+      { directory: join(root, "hello"), fileResourcesChanged: true },
+    ]);
+    assert.equal(startedWatcher.changeCount, renameCallbackCount + 1);
     watcher.close();
   });
 
