@@ -23,7 +23,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
@@ -62,6 +62,7 @@ export function ChatView(props: ChatViewProps) {
    */
   const [refusal, setRefusal] = useState<Refusal | undefined>(undefined);
   const busy = isBusy(open.summary);
+  const agentAvailable = open.summary?.agentAvailable !== false;
   const queues = open.queues;
   const waiting = [
     ...(queues?.steer ?? []),
@@ -72,6 +73,12 @@ export function ChatView(props: ChatViewProps) {
   const compact = async (): Promise<void> => {
     setCompacting(false);
 
+    // Обновление contribution может убрать сохранённого агента, пока подтверждение уже открыто.
+    // Кнопка ниже выключается сразу новым кадром, а эта проверка не выпускает устаревшее событие.
+    if (!agentAvailable) {
+      return;
+    }
+
     const asked = instructions.trim();
     const reason = await onCompact(asked === "" ? undefined : asked);
 
@@ -79,6 +86,12 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
+
+  useEffect(() => {
+    if (!agentAvailable) {
+      setCompacting(false);
+    }
+  }, [agentAvailable]);
 
   return (
     <div className="sessions-chat">
@@ -100,6 +113,7 @@ export function ChatView(props: ChatViewProps) {
         {...(open.leafId === undefined ? {} : { leafId: open.leafId })}
         busy={busy}
         archived={archived}
+        harnessAvailable={agentAvailable}
         onNavigate={props.onNavigate}
         onSetLabel={onSetLabel}
         onEditorText={setDraft}
@@ -108,6 +122,13 @@ export function ChatView(props: ChatViewProps) {
 
       {open.failure === undefined ? undefined : (
         <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
+      )}
+
+      {agentAvailable ? undefined : (
+        <Notice
+          tone="warning"
+          title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
+        />
       )}
 
       {refusal?.what !== "compact" ? undefined : (
@@ -165,6 +186,7 @@ export function ChatView(props: ChatViewProps) {
           draft={draft}
           onDraftChange={setDraft}
           busy={busy}
+          disabled={!agentAvailable}
           onSubmit={onSubmit}
           onSendMessage={onSendMessage}
           onInterrupt={onInterrupt}
@@ -183,7 +205,7 @@ export function ChatView(props: ChatViewProps) {
         {archived ? undefined : (
           <Button
             onClick={() => setCompacting(true)}
-            disabled={busy}
+            disabled={busy || !agentAvailable}
             {...(busy ? { title: t("chat.busy.hint") } : {})}
           >
             {t("chat.compact")}
@@ -192,13 +214,14 @@ export function ChatView(props: ChatViewProps) {
       </div>
 
       <ConfirmDialog
-        open={compacting}
+        open={compacting && agentAvailable}
         onClose={() => setCompacting(false)}
         title={t("chat.compact.title")}
         description={t("chat.compact.hint")}
         confirmLabel={t("chat.compact.confirm")}
         cancelLabel={t("common.cancel")}
         onConfirm={() => void compact()}
+        pending={!agentAvailable}
       >
         <Field label={t("chat.compact.instructions")} hint={t("chat.compact.instructions.hint")}>
           {(control) => <Input {...control} value={instructions} onChange={setInstructions} />}

@@ -17,6 +17,7 @@ export type ProjectDetailViewProps = {
   project?: Project;
   failure?: string;
   loaded: boolean;
+  fileResources?: ReactNode;
   sessions: ReactNode;
   onBack: () => void;
   onNewSession: () => void;
@@ -26,6 +27,7 @@ export type ProjectDetailViewProps = {
 export function ProjectDetailView({
   project,
   failure,
+  fileResources,
   sessions,
   loaded,
   onBack,
@@ -78,6 +80,7 @@ export function ProjectDetailView({
           ) : undefined}
         </div>
       </Panel>
+      {fileResources}
       {sessions}
     </div>
   );

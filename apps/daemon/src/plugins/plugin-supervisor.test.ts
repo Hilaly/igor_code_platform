@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { setTimeout as wait } from "node:timers/promises";
@@ -286,6 +287,8 @@ describe("createPluginSupervisor", () => {
       bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
+      publishContributionChanges: () =>
+        recorded.bus.publish("core.contributions.changed", { revision: registry.revision() }),
     });
     running = supervisor;
 
@@ -300,6 +303,10 @@ describe("createPluginSupervisor", () => {
     assert.equal(last?.revision, registry.revision());
     assert.deepEqual(last?.contributions, registry.resolved());
     assert.equal((last?.contributions.length ?? 0) > 0, true);
+    assert.deepEqual(
+      recorded.events.filter((event) => event.type === "core.contributions.changed"),
+      [{ type: "core.contributions.changed", payload: { revision: registry.revision() } }],
+    );
   });
 
   it("puts an event published by a plugin on the bus with its namespace and origin", async () => {
@@ -394,7 +401,9 @@ describe("createPluginSupervisor", () => {
     await recorded.waitFor(reachedState("data:subscriber", "running"), "subscriber running");
     assert.equal(await deliverOnce("the first delivery"), 1);
 
-    await supervisor.reload([join(fixtures, "subscriber")]);
+    await supervisor.reload([
+      { directory: join(fixtures, "subscriber"), fileResourcesChanged: false },
+    ]);
     await recorded.waitFor(
       (record) =>
         record.message === "plugin lifecycle" &&
@@ -594,7 +603,7 @@ describe("createPluginSupervisor", () => {
     assert.equal(changes(), 1);
 
     // Перезагрузка — это выгрузка и возврат: провайдер уходит и регистрируется заново в `activate`.
-    await supervisor.reload([vendor.directory]);
+    await supervisor.reload([{ directory: vendor.directory, fileResourcesChanged: false }]);
     await recorded.waitFor(
       (record) =>
         recorded.records.filter((seen) => seen.message === "provider-vendor registered a provider")
@@ -620,6 +629,8 @@ describe("createPluginSupervisor", () => {
       bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
+      publishContributionChanges: () =>
+        recorded.bus.publish("core.contributions.changed", { revision: registry.revision() }),
     });
     running = supervisor;
 
@@ -629,6 +640,9 @@ describe("createPluginSupervisor", () => {
     const before = recorded.events.filter(
       (event) => event.type === "core.plugin.contributions",
     ).length;
+    const invalidationsBefore = recorded.events.filter(
+      (event) => event.type === "core.contributions.changed",
+    ).length;
 
     // Тот же набор предпочтений: плагин остаётся запущенным, реестр не трогается.
     await supervisor.apply(only("hello"), enabled("data:hello"));
@@ -636,6 +650,36 @@ describe("createPluginSupervisor", () => {
     assert.equal(
       recorded.events.filter((event) => event.type === "core.plugin.contributions").length,
       before,
+    );
+    assert.equal(
+      recorded.events.filter((event) => event.type === "core.contributions.changed").length,
+      invalidationsBefore,
+    );
+  });
+
+  it("does not publish the plugin snapshot for a standalone-only registry change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    registry.applyStandalone({
+      rootKey: "user:skills:sovereign",
+      source: "sovereign",
+      precedence: 300,
+      scope: "user",
+      contributions: [],
+    });
+    await supervisor.apply(only("hello"), disabled("data:hello"));
+
+    assert.deepEqual(
+      recorded.events.filter((event) => event.type === "core.plugin.contributions"),
+      [],
     );
   });
 
@@ -688,6 +732,45 @@ describe("createPluginSupervisor", () => {
     );
   });
 
+  it("ignores contributions and activated from a worker stopped during activate", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+    const plugin = only("late-activation").plugins[0];
+    assert.ok(plugin !== undefined);
+    const release = join(plugin.directory, "src", "release");
+    rmSync(release, { force: true });
+
+    try {
+      await supervisor.apply(only("late-activation"), enabled("data:late-activation"));
+      await recorded.waitFor(
+        (record) => record.message === "late activation is waiting",
+        "activate waiting",
+      );
+
+      const disabling = supervisor.apply(only("late-activation"), disabled("data:late-activation"));
+      await recorded.waitFor(reachedState("data:late-activation", "stopping"), "stop started");
+      writeFileSync(release, "continue\n");
+      await disabling;
+
+      assert.equal(recorded.records.some(reachedState("data:late-activation", "running")), false);
+      assert.deepEqual(registry.pluginContributions(), []);
+      assert.equal(registry.revision(), 0);
+      assert.equal(
+        supervisor.statuses().find((status) => status.key === "data:late-activation")?.state,
+        "disabled",
+      );
+    } finally {
+      rmSync(release, { force: true });
+    }
+  });
+
   it("runs plugin code written with non-erasable typescript", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();
@@ -724,6 +807,77 @@ describe("createPluginSupervisor", () => {
       registry.resolved().map((registration) => [registration.id, registration.pluginKey]),
       [["hello.board", "data:hello"]],
     );
+  });
+
+  it("publishes file and programmatic contributions atomically after activation", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("file-resources"), enabled("data:file-resources"));
+    assert.deepEqual(registry.pluginContributions(), []);
+    await recorded.waitFor(
+      reachedState("data:file-resources", "running"),
+      "file-resources running",
+    );
+
+    const registrations = registry.pluginContributions();
+    assert.deepEqual(
+      registrations.map((registration) => [registration.kind, registration.id]),
+      [
+        ["agent", "file-resources.helper"],
+        ["custom", "file-resources.board"],
+        ["skill", "file-resources.review"],
+      ],
+    );
+    assert.equal(registry.revision(), 1);
+
+    const status = supervisor.statuses().find((entry) => entry.key === "data:file-resources");
+    assert.match(status?.contributionProblems?.[0] ?? "", /agents\/broken\/AGENT\.md/);
+    assert.match(status?.contributionProblems?.[0] ?? "", /description is required/);
+    const resources = registry.fileResourcesForProject("any");
+    assert.equal(
+      resources.resources.some(
+        (resource) => resource.state === "invalid" && resource.path.endsWith("broken/AGENT.md"),
+      ),
+      true,
+    );
+  });
+
+  it("excludes only a file/programmatic duplicate from the plugin snapshot", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("file-resource-conflict"), enabled("data:file-resource-conflict"));
+    await recorded.waitFor(
+      reachedState("data:file-resource-conflict", "running"),
+      "file-resource-conflict running",
+    );
+
+    assert.deepEqual(
+      registry.pluginContributions().map((registration) => registration.id),
+      ["file-resource-conflict.board"],
+    );
+    const status = supervisor
+      .statuses()
+      .find((entry) => entry.key === "data:file-resource-conflict");
+    assert.match(status?.contributionProblems?.[0] ?? "", /declared 2 times/);
+    const resources = registry.fileResourcesForProject("any");
+    assert.equal(resources.resources[0]?.path.endsWith("agents/agent/AGENT.md"), true);
+    assert.match(resources.diagnostics[0]?.message ?? "", /also declared programmatically/);
   });
 
   it("carries the rejected contribution as a reason on the status of a running plugin", async () => {
@@ -1174,8 +1328,9 @@ describe("createPluginSupervisor", () => {
 
     await supervisor.apply(only("hello"), enabled("data:hello"));
     await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+    const beforeReload = registry.revision();
 
-    await supervisor.reload([hello.directory]);
+    await supervisor.reload([{ directory: hello.directory, fileResourcesChanged: false }]);
     await recorded.waitFor(reachedState("data:hello", "stopped"), "hello stopped for the reload");
     await recorded.waitFor(
       (record) =>
@@ -1192,6 +1347,35 @@ describe("createPluginSupervisor", () => {
       registry.resolved().map((registration) => registration.id),
       ["hello.board"],
     );
+    assert.equal(registry.revision(), beforeReload);
+  });
+
+  it("bumps the contribution revision once for a sibling file-resource change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+    const plugin = only("file-resources").plugins[0];
+    assert.ok(plugin !== undefined);
+
+    await supervisor.apply(only("file-resources"), enabled("data:file-resources"));
+    await recorded.waitFor(reachedState("data:file-resources", "running"), "first activation");
+    const beforeReload = registry.revision();
+
+    await supervisor.reload([{ directory: plugin.directory, fileResourcesChanged: true }]);
+    await recorded.waitFor(
+      (record) =>
+        recorded.records.filter(reachedState("data:file-resources", "running")).length === 2 &&
+        record.message === "plugin lifecycle",
+      "second activation",
+    );
+
+    assert.equal(registry.revision(), beforeReload + 1);
   });
 
   it("leaves a plugin nobody enabled alone when its sources change", async () => {
@@ -1209,7 +1393,7 @@ describe("createPluginSupervisor", () => {
     assert.ok(hello !== undefined);
 
     await supervisor.apply(only("hello"), disabled("data:hello"));
-    await supervisor.reload([hello.directory]);
+    await supervisor.reload([{ directory: hello.directory, fileResourcesChanged: false }]);
 
     assert.equal(
       recorded.records.some((record) => record.message === "hello is up"),

@@ -9,7 +9,7 @@
 
 import type { PluginSource } from "./plugin.ts";
 import type { ThinkingLevel } from "./session.ts";
-import type { AgentToolSelection } from "./tool-pattern.ts";
+import type { AgentSkillSelection, AgentToolSelection } from "./tool-pattern.ts";
 
 /**
  * Схема нагрузки в виде данных — то, что отдаёт `z.toJSONSchema()`. Сама схема сюда попасть не
@@ -17,13 +17,25 @@ import type { AgentToolSelection } from "./tool-pattern.ts";
  */
 export type PayloadSchema = Record<string, unknown>;
 
-type RegistrationCommon = {
+export type ContributionOwnership =
+  | {
+      ownership: "plugin";
+      pluginKey: string;
+      pluginId: string;
+      source: PluginSource;
+    }
+  | {
+      ownership: "standalone";
+      /** Точный ключ нативного или межклиентского корня. */
+      source: string;
+      scope: "user" | "project";
+      projectId?: string;
+    };
+
+export type RegistrationCommon = ContributionOwnership & {
   /** С неймспейсом: `<pluginId>.<объявленный>` (docs/ui-extension-model.md, docs/event-bus.md). */
   id: string;
   declaredId: string;
-  pluginKey: string;
-  pluginId: string;
-  source: PluginSource;
   title?: string;
   description?: string;
 };
@@ -54,22 +66,39 @@ export type AgentContributionRegistration = RegistrationCommon & {
   tools: AgentToolSelection;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: string[];
+  skills: AgentSkillSelection;
+};
+
+/** Скил из файла: реестр хранит разобранные метаданные, но не текст Markdown. */
+export type SkillContributionRegistration = RegistrationCommon & {
+  kind: "skill";
+  name: string;
+  location: string;
+  license?: string;
+  compatibility?: string;
+  metadata?: Record<string, string>;
+  allowedTools?: string[];
+  disableModelInvocation: boolean;
 };
 
 export type ContributionRegistration =
-  CustomContributionRegistration | EventContributionRegistration | AgentContributionRegistration;
+  | CustomContributionRegistration
+  | EventContributionRegistration
+  | AgentContributionRegistration
+  | SkillContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
 /**
  * Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника: не применяется ни
- * один (docs/plugins.md). Форма — контракт, потому что спор уходит в снимок: диагностика обязана быть
- * заметной в интерфейсе, а не строкой в журнале.
+ * один (docs/plugins.md). Претенденты — плагины или standalone-корни. Форма — контракт, потому что
+ * спор уходит в снимок: диагностика обязана быть заметной в интерфейсе, а не строкой в журнале.
  */
 export type ContributionConflict = {
   id: string;
-  source: PluginSource;
+  source: string;
   /** Ключи плагинов, претендующих на идентификатор. */
   plugins: string[];
+  /** Ключи standalone-корней, претендующих на короткий идентификатор. */
+  standaloneRoots?: string[];
 };

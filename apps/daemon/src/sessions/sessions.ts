@@ -18,7 +18,7 @@ import {
   parseSessionNavigateRequest,
   parseSessionUpdate,
   parseTurnRequest,
-  selectToolNames,
+  selectNames,
   sessionArchivedParameter,
   sessionBranchFromParameter,
   sessionBranchPathPattern,
@@ -39,6 +39,7 @@ import {
   type AgentsSnapshot,
   type AgentSummary,
   type ContributionRegistration,
+  type SkillContributionRegistration,
   type Session,
   type SessionBranch,
   type SessionCompactAccepted,
@@ -64,6 +65,7 @@ import type {
   AgentSession,
   AgentSessionStore,
   AgentSessionSummary,
+  AgentSkill,
 } from "@sovereign/agent-runtime-pi";
 
 import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
@@ -84,8 +86,11 @@ export type SessionDeltaSink = (frame: {
 export type SessionServiceOptions = {
   store: AgentSessionStore;
   projects: Pick<ProjectStore, "find" | "list">;
-  /** Действующий набор вкладов. Агенты выбираются из него, а не из отдельного списка. */
-  contributions: () => ContributionRegistration[];
+  /** Global snapshot для общего каталога и project-resolved snapshot для сессии. */
+  contributions: {
+    base: () => ContributionRegistration[];
+    forProject: (projectId: string) => ContributionRegistration[];
+  };
   tools: ToolCollector;
   queue: TurnQueue;
   bus: Pick<EventBus, "publish">;
@@ -155,6 +160,8 @@ export type SessionLabelOutcome =
 export type SessionService = {
   /** Включённые агенты. Пустой список — законный ответ. */
   agents: () => AgentSummary[];
+  /** Агенты после разрешения перекрытий в одном проекте. */
+  agentsForProject: (projectId: string) => AgentSummary[];
   /** Действующие сессии; `archived` переключает список на архивные (docs/web-api.md). */
   list: (projectId?: string, archived?: boolean) => Session[];
   create: (draft: SessionDraft) => Promise<CreateSessionOutcome>;
@@ -224,30 +231,76 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     summaries = await options.store.list();
   };
 
-  const agentsOf = (): AgentContributionRegistration[] =>
-    options
-      .contributions()
-      .filter(
-        (registration): registration is AgentContributionRegistration =>
-          registration.kind === "agent",
-      );
+  const agentsFor = (projectId?: string): AgentContributionRegistration[] =>
+    (projectId === undefined
+      ? options.contributions.base()
+      : options.contributions.forProject(projectId)
+    ).filter(
+      (registration): registration is AgentContributionRegistration =>
+        registration.kind === "agent",
+    );
 
-  const describeAgent = (agent: AgentContributionRegistration): AgentSummary => ({
-    id: agent.id,
-    ...(agent.title === undefined ? {} : { title: agent.title }),
-    ...(agent.description === undefined ? {} : { description: agent.description }),
-    pluginKey: agent.pluginKey,
-    source: agent.source,
-    ...(agent.model === undefined ? {} : { model: agent.model }),
-    ...(agent.thinkingLevel === undefined ? {} : { thinkingLevel: agent.thinkingLevel }),
-    skills: [...agent.skills],
-  });
+  const emptySelection = { include: [], exclude: [] };
+
+  const skillsFor = (
+    contributions: ContributionRegistration[],
+    agent: AgentContributionRegistration,
+  ): AgentSkill[] => {
+    const registrations = contributions.filter(
+      (registration): registration is SkillContributionRegistration =>
+        registration.kind === "skill" && registration.disableModelInvocation !== true,
+    );
+    const selected = new Set(
+      selectNames(
+        registrations.map((registration) => registration.id),
+        agent.skills ?? emptySelection,
+      ),
+    );
+
+    return registrations
+      .filter((registration) => selected.has(registration.id))
+      .map((registration) => ({
+        name: registration.id,
+        description: registration.description ?? "",
+        location: registration.location,
+      }));
+  };
+
+  const describeAgent = (agent: AgentContributionRegistration): AgentSummary => {
+    const common = {
+      id: agent.id,
+      ...(agent.title === undefined ? {} : { title: agent.title }),
+      ...(agent.description === undefined ? {} : { description: agent.description }),
+      ...(agent.model === undefined ? {} : { model: agent.model }),
+      ...(agent.thinkingLevel === undefined ? {} : { thinkingLevel: agent.thinkingLevel }),
+      skills: {
+        include: [...(agent.skills?.include ?? [])],
+        exclude: [...(agent.skills?.exclude ?? [])],
+      },
+    };
+
+    return agent.ownership === "plugin"
+      ? {
+          ...common,
+          ownership: "plugin",
+          pluginKey: agent.pluginKey,
+          source: agent.source,
+        }
+      : {
+          ...common,
+          ownership: "standalone",
+          source: agent.source,
+          scope: agent.scope,
+          ...(agent.projectId === undefined ? {} : { projectId: agent.projectId }),
+        };
+  };
 
   const describeSession = (summary: AgentSessionSummary): Session => ({
     id: summary.id,
     projectId: summary.projectId,
     folder: summary.folder,
     agentId: summary.agentId,
+    agentAvailable: agentsFor(summary.projectId).some((agent) => agent.id === summary.agentId),
     // Модель и уровень ризонинга меняются в открытом harness и пишутся в JSONL. Снимок списка
     // намеренно не обновляем на каждый турн, поэтому для живой сессии берём именно её summary.
     model: live.get(summary.id)?.summary().model ?? summary.model,
@@ -308,12 +361,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         return { kind: "unknown" } as const;
       }
 
-      const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
+      const agent = agentsFor(summary.projectId).find(
+        (candidate) => candidate.id === summary.agentId,
+      );
 
       if (agent === undefined) {
         return {
           kind: "unavailable",
-          reason: `no agent ${summary.agentId} is enabled right now`,
+          reason: `the agent ${summary.agentId} is not available`,
         } as const;
       }
 
@@ -398,19 +453,21 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   };
 
   /** Набор инструментов пересобирается перед каждым турном: сессия доигрывает с тем, что осталось. */
-  const applyTools = async (
+  const applyRuntimeDefinitions = async (
     session: AgentSession,
+    projectId: string,
     agent: AgentContributionRegistration,
     folder: string,
+    contributions: ContributionRegistration[],
   ): Promise<void> => {
-    const collected = await options.tools.collect({ folder });
+    const collected = await options.tools.collect({ projectId, folder });
 
     for (const problem of collected.problems) {
       options.logger.warn("a tool source did not answer", { problem });
     }
 
     const names = collected.tools.map((tool) => tool.name);
-    const active = selectToolNames(names, agent.tools);
+    const active = selectNames(names, agent.tools ?? emptySelection);
     const sessionId = session.summary().id;
     const before = activeTools.get(sessionId) ?? [];
 
@@ -419,6 +476,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       active,
     );
     activeTools.set(sessionId, active);
+    session.setInstructions(agent.instructions);
+    session.setSkills(skillsFor(contributions, agent));
 
     // Первый турн сравнивать не с чем: до него у сессии не было набора, а не «был и опустел».
     for (const lost of before.filter((name) => !active.includes(name))) {
@@ -426,8 +485,35 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     }
   };
 
+  const prepareForModel = async (
+    session: AgentSession,
+    summary: AgentSessionSummary,
+  ): Promise<{ kind: "ready" } | { kind: "missing-agent"; agentId: string }> => {
+    const contributions = options.contributions.forProject(summary.projectId);
+    const currentAgent = contributions.find(
+      (registration): registration is AgentContributionRegistration =>
+        registration.kind === "agent" && registration.id === summary.agentId,
+    );
+
+    if (currentAgent === undefined) {
+      return { kind: "missing-agent", agentId: summary.agentId };
+    }
+
+    await applyRuntimeDefinitions(
+      session,
+      summary.projectId,
+      currentAgent,
+      summary.folder,
+      contributions,
+    );
+
+    return { kind: "ready" };
+  };
+
   /** Операции. Маршруты и мост плагинов зовут их одни и те же: набор обязан быть один. */
-  const agents = (): AgentSummary[] => agentsOf().map(describeAgent);
+  const agents = (): AgentSummary[] => agentsFor().map(describeAgent);
+  const agentsForProject = (projectId: string): AgentSummary[] =>
+    agentsFor(projectId).map(describeAgent);
 
   const visible = (summary: AgentSessionSummary): boolean => {
     const project = options.projects.find(summary.projectId);
@@ -483,10 +569,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         return { kind: "refused", reason: `the folder ${project.folder} is not there` };
       }
 
-      const agent = agentsOf().find((candidate) => candidate.id === draft.agentId);
+      const agent = agentsFor(draft.projectId).find((candidate) => candidate.id === draft.agentId);
 
       if (agent === undefined) {
-        return { kind: "refused", reason: `no agent ${draft.agentId} is enabled right now` };
+        return { kind: "refused", reason: `the agent ${draft.agentId} is not available` };
       }
 
       const model = draft.model ?? agent.model;
@@ -659,6 +745,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is archived" };
     }
 
+    const contributions = options.contributions.forProject(summary.projectId);
+    const currentAgent = contributions.find(
+      (registration): registration is AgentContributionRegistration =>
+        registration.kind === "agent" && registration.id === summary.agentId,
+    );
+
+    if (currentAgent === undefined) {
+      return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
+    }
+
     const opened = await openSession(sessionId);
 
     if (opened.kind === "unknown") {
@@ -698,14 +794,41 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is busy" };
     }
 
+    const prepared = await prepareForModel(ready.session, ready.session.summary());
+
+    if (prepared.kind === "missing-agent") {
+      place.release();
+      return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
+    }
+
     const tracked = { turnId: place.turnId, cancel: place.cancel, validating: false };
 
     places.set(sessionId, tracked);
 
     const started = place.start({
       kind: "compaction",
-      run: async () => {
+      run: async (turnId, queued) => {
         try {
+          if (queued) {
+            const prepared = await prepareForModel(ready.session, ready.session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              options.emitDelta({
+                sessionId,
+                turnId,
+                delta: {
+                  kind: "turn-failed",
+                  reason: `the agent ${prepared.agentId} is not available`,
+                },
+              });
+              options.logger.warn("a queued compaction lost its agent", {
+                session: sessionId,
+                agent: prepared.agentId,
+              });
+              return;
+            }
+          }
+
           const outcome = await ready.session.compact(request.instructions);
 
           if (outcome.kind !== "done") {
@@ -772,6 +895,13 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is busy" };
     }
 
+    const prepared = await prepareForModel(session, session.summary());
+
+    if (prepared.kind === "missing-agent") {
+      place.release();
+      return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
+    }
+
     places.set(sessionId, { turnId: place.turnId, cancel: place.cancel, validating: false });
 
     let settle: (outcome: Awaited<ReturnType<AgentSession["navigate"]>>) => void = () => undefined;
@@ -781,8 +911,20 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const started = place.start({
       kind: "branch-summary",
-      run: async () => {
+      run: async (_turnId, queued) => {
         try {
+          if (queued) {
+            const prepared = await prepareForModel(session, session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              settle({
+                kind: "failed",
+                reason: `the agent ${prepared.agentId} is not available`,
+              });
+              return;
+            }
+          }
+
           settle(await session.navigate(request));
         } catch (cause) {
           // Ждущий обязан получить ответ даже на сбое: иначе запрос повис бы навсегда.
@@ -1000,6 +1142,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is archived" };
     }
 
+    if (!agentsFor(summary.projectId).some((agent) => agent.id === summary.agentId)) {
+      return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
+    }
+
     // Стиринг и догоняющее требуют идущего турна, а идущий турн бывает только у поднятой сессии:
     // если harness не поднят, поднимать его незачем — очередь всё равно окажется пустой.
     if (
@@ -1019,6 +1165,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: opened.reason };
     }
 
+    const prepared = await prepareForModel(opened.session, summary);
+
+    if (prepared.kind === "missing-agent") {
+      return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
+    }
+
     const outcome = await opened.session.message(wanted.text, wanted.mode);
 
     if (outcome.kind === "idle") {
@@ -1034,39 +1186,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   const prompt = async (request: PromptRequest): Promise<PromptOutcome> => {
     const sessionId = request.sessionId;
-    const persistedSummary = find(sessionId);
+    const ready = await readyForModel(sessionId);
 
-    if (persistedSummary === undefined) {
-      return { kind: "unknown" };
+    if (ready.kind !== "ready") {
+      return ready;
     }
 
-    // Архивная сессия читается, но не работает: убрать с глаз и продолжать тратить деньги — разные
-    // вещи, и вернуть её из архива человек обязан осознанно (docs/sessions-and-projects.md).
-    if (persistedSummary.archived) {
-      return { kind: "refused", reason: "the session is archived" };
-    }
-
-    const opened = await openSession(sessionId);
-
-    if (opened.kind === "unknown") {
-      return { kind: "unknown" };
-    }
-
-    if (opened.kind === "unavailable") {
-      return { kind: "refused", reason: opened.reason };
-    }
-
-    const session = opened.session;
-    if (phaseOf(sessionId) !== "idle") {
-      return { kind: "refused", reason: "the session is busy" };
-    }
-
+    const session = ready.session;
     const summary = session.summary();
-    const agent = agentsOf().find((candidate) => candidate.id === summary.agentId);
-
-    if (agent === undefined) {
-      return { kind: "refused", reason: `no agent ${summary.agentId} is enabled right now` };
-    }
 
     const project = options.projects.find(summary.projectId);
 
@@ -1124,6 +1251,20 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       if (request.thinkingLevel !== undefined) {
         await session.setThinkingLevel(request.thinkingLevel);
       }
+
+      const prepared = await prepareForModel(session, summary);
+
+      if (prepared.kind === "missing-agent") {
+        place.release();
+        places.delete(sessionId);
+        return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
+      }
+
+      if (place.cancelled()) {
+        place.release();
+        places.delete(sessionId);
+        return { kind: "refused", reason: "the turn was cancelled" };
+      }
     } catch (cause) {
       place.release();
       places.delete(sessionId);
@@ -1133,11 +1274,23 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const started = place.start({
       kind: "turn",
-      run: async (turnId) => {
+      run: async (turnId, queued) => {
         try {
-          // Набор пересобирается перед каждым турном, а не берётся снимком на старте сессии:
-          // инструменты исчезают вместе с выключенным плагином (docs/sessions-and-projects.md).
-          await applyTools(session, agent, summary.folder);
+          if (queued) {
+            const prepared = await prepareForModel(session, session.summary());
+
+            if (prepared.kind === "missing-agent") {
+              options.emitDelta({
+                sessionId,
+                turnId,
+                delta: {
+                  kind: "turn-failed",
+                  reason: `the agent ${prepared.agentId} is not available`,
+                },
+              });
+              return;
+            }
+          }
 
           const outcome = await session.prompt(request.text, turnId);
 
@@ -1202,6 +1355,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   return {
     agents,
+    agentsForProject,
     list,
     create,
     entries,

@@ -12,6 +12,9 @@
 import {
   agentsPath,
   coreEventTypes,
+  projectAgentsPath,
+  projectsPath,
+  providersPath,
   sessionBranchPath,
   sessionCompactPath,
   sessionContextPath,
@@ -29,6 +32,7 @@ import {
   type SessionDeltaFrame,
   type SessionEntriesPage,
   type SessionEntry,
+  type Project,
 } from "@sovereign/protocol";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +49,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   projectId: "b7Kq",
   folder: "/code/platform",
   agentId: "base-agent.agent",
+  agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",
   phase: "idle",
@@ -79,6 +84,10 @@ let context: SessionContextUsage = { sessionId: "0199", tokens: 0, threshold: 0 
 let delayedBranch: Promise<Response> | undefined;
 let delayedBranches: Promise<Response>[] | undefined;
 let delayedEntries: Promise<Response> | undefined;
+let projectAgents: Record<string, unknown[]> = {};
+let delayedProjectAgents: Record<string, Promise<Response>> = {};
+let delayedProjects: Promise<Response>[] = [];
+let projects: Project[] = [];
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -98,6 +107,10 @@ beforeEach(() => {
   delayedBranch = undefined;
   delayedBranches = undefined;
   delayedEntries = undefined;
+  projectAgents = {};
+  delayedProjectAgents = {};
+  delayedProjects = [];
+  projects = [];
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -121,6 +134,25 @@ beforeEach(() => {
 
     if (url === agentsPath) {
       return answer({ agents: [] });
+    }
+
+    if (url === projectsPath) {
+      const delayed = delayedProjects.shift();
+      if (delayed !== undefined) {
+        return delayed;
+      }
+
+      return answer({ projects, archived: [] });
+    }
+
+    if (url === providersPath) {
+      return answer({ providers: [] });
+    }
+
+    for (const [projectId, agents] of Object.entries(projectAgents)) {
+      if (url === projectAgentsPath(projectId)) {
+        return delayedProjectAgents[projectId] ?? answer({ agents });
+      }
     }
 
     if (url === sessionPath("0199")) {
@@ -192,7 +224,7 @@ const asked = (url: string, method = "GET"): Call[] =>
   calls.filter((call) => call.url === url && call.method === method);
 
 describe("useSessions", () => {
-  it("asks for the sessions and the agents as soon as the stream is up", async () => {
+  it("asks for sessions but not the global agent catalogue as soon as the stream is up", async () => {
     const view = connect({ stream: "connecting" });
 
     expect(calls).toEqual([]);
@@ -200,7 +232,219 @@ describe("useSessions", () => {
     view.rerender({ stream: "open" });
 
     await waitFor(() => expect(view.result.current.state.sessions).toHaveLength(1));
-    expect(asked(agentsPath)).toHaveLength(1);
+    expect(asked(agentsPath)).toHaveLength(0);
+  });
+
+  it("loads only the agents resolved for the project selected in the draft", async () => {
+    projectAgents = { p1: [{ id: "p1-agent" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "p1-agent" }]),
+    );
+    expect(asked(projectAgentsPath("p1"))).toHaveLength(1);
+    expect(asked(agentsPath)).toHaveLength(0);
+  });
+
+  it("aborts and ignores a stale project agent answer after the project changes", async () => {
+    let resolveP1!: (response: Response) => void;
+    delayedProjectAgents.p1 = new Promise((resolve) => {
+      resolveP1 = resolve;
+    });
+    projectAgents = { p1: [], p2: [{ id: "p2-agent" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() => expect(asked(projectAgentsPath("p1"))).toHaveLength(1));
+    const p1Call = asked(projectAgentsPath("p1"))[0];
+
+    act(() => view.result.current.selectProject("p2"));
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "p2-agent" }]),
+    );
+    expect(p1Call?.signal?.aborted).toBe(true);
+
+    resolveP1(await answer({ agents: [{ id: "stale-p1-agent" }] }));
+    await act(async () => Promise.resolve());
+    expect(view.result.current.projectAgents).toMatchObject({
+      projectId: "p2",
+      agents: [{ id: "p2-agent" }],
+      loading: false,
+    });
+  });
+
+  it("refetches the current project agents when contributions change", async () => {
+    projectAgents = { p1: [{ id: "before" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "before" }]),
+    );
+
+    projectAgents.p1 = [{ id: "after" }];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.contributionsChanged,
+        payload: { revision: 2 },
+      } as never);
+    });
+
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "after" }]),
+    );
+    expect(asked(projectAgentsPath("p1"))).toHaveLength(2);
+  });
+
+  it("clears a selected project and aborts its agents when the selectable snapshot drops it", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    projects = [p1];
+    projectAgents = { p1: [] };
+    let resolveP1!: (response: Response) => void;
+    delayedProjectAgents.p1 = new Promise((resolve) => {
+      resolveP1 = resolve;
+    });
+    const view = connect();
+
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() => expect(asked(projectAgentsPath("p1"))).toHaveLength(1));
+    const request = asked(projectAgentsPath("p1"))[0];
+
+    projects = [];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([]));
+    expect(request?.signal?.aborted).toBe(true);
+    expect(view.result.current.projectAgents).toEqual({ loading: false });
+
+    resolveP1(await answer({ agents: [{ id: "stale" }] }));
+    await act(async () => Promise.resolve());
+    expect(view.result.current.projectAgents).toEqual({ loading: false });
+  });
+
+  it("keeps a newer selectable project snapshot when an older request finishes last", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    const p2: Project = { ...p1, id: "p2", name: "Two", folder: "/two", folderKey: "/two" };
+    projects = [p1];
+    projectAgents = { p2: [{ id: "p2-agent" }] };
+    const view = connect();
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+
+    let resolveOlder!: (response: Response) => void;
+    let resolveNewer!: (response: Response) => void;
+    delayedProjects = [
+      new Promise((resolve) => {
+        resolveOlder = resolve;
+      }),
+      new Promise((resolve) => {
+        resolveNewer = resolve;
+      }),
+    ];
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(2));
+    const older = asked(projectsPath)[1];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(3));
+
+    resolveNewer(await answer({ projects: [p1, p2], archived: [] }));
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1, p2]));
+    act(() => view.result.current.selectProject("p2"));
+    await waitFor(() => expect(view.result.current.projectAgents.projectId).toBe("p2"));
+
+    expect(older?.signal?.aborted).toBe(true);
+    resolveOlder(await answer({ projects: [p1], archived: [] }));
+    await act(async () => Promise.resolve());
+
+    expect(view.result.current.state.projects).toEqual([p1, p2]);
+    expect(view.result.current.projectAgents.projectId).toBe("p2");
+  });
+
+  it("ignores an older project snapshot failure after a newer refresh succeeds", async () => {
+    const p1: Project = {
+      id: "p1",
+      name: "One",
+      folder: "/one",
+      folderKey: "/one",
+      archived: false,
+      availability: "available",
+      sessionCount: 0,
+      ephemeral: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    projects = [p1];
+    const view = connect();
+    act(() => view.result.current.prepareDraft());
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+
+    let resolveOlder!: (response: Response) => void;
+    let resolveNewer!: (response: Response) => void;
+    delayedProjects = [
+      new Promise((resolve) => {
+        resolveOlder = resolve;
+      }),
+      new Promise((resolve) => {
+        resolveNewer = resolve;
+      }),
+    ];
+    act(() => view.result.current.prepareDraft());
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.projectsChanged,
+        payload: {},
+      } as never);
+    });
+    await waitFor(() => expect(asked(projectsPath)).toHaveLength(3));
+
+    resolveNewer(await answer({ projects: [p1], archived: [] }));
+    await waitFor(() => expect(view.result.current.state.projects).toEqual([p1]));
+    resolveOlder(await answer({ error: "stale project failure" }, 503));
+    await act(async () => Promise.resolve());
+
+    expect(view.diagnostics).not.toContain("the projects could not be read: stale project failure");
+    expect(view.result.current.state.projects).toEqual([p1]);
   });
 
   it("filters the sessions snapshot by the project from the address", async () => {
@@ -287,6 +531,27 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
     expect(view.result.current.state.open?.summary).toBeUndefined();
+  });
+
+  it("refreshes an open missing-agent session when contributions change", async () => {
+    sessions = [session({ agentAvailable: false })];
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() =>
+      expect(view.result.current.state.open?.summary?.agentAvailable).toBe(false),
+    );
+
+    sessions = [session({ agentAvailable: true })];
+    act(() =>
+      view.bus.publish({
+        index: 9,
+        time: "2026-08-03T00:00:00.000Z",
+        type: coreEventTypes.contributionsChanged,
+        payload: { revision: 4 },
+      }),
+    );
+
+    await waitFor(() => expect(view.result.current.state.open?.summary?.agentAvailable).toBe(true));
   });
 
   it("ignores a delta that belongs to another session", async () => {

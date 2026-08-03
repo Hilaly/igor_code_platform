@@ -13,7 +13,8 @@
     "@sovereign/agent-runtime-pi": "workspace:*",
     "@sovereign/protocol": "workspace:*",
     "@sovereign/sdk": "workspace:*",
-    "cookie": "^2.0.1"
+    "cookie": "^2.0.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "eslint": "^9.0.0"

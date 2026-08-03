@@ -14,7 +14,7 @@ import {
   sessions,
   z,
 } from "./index.ts";
-import type { CustomProviderDefinition, ProviderSummary } from "./index.ts";
+import type { AgentSummary, CustomProviderDefinition, ProviderSummary } from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
 const anthropic: ProviderSummary = {
@@ -65,6 +65,61 @@ describe("the sdk without a host", () => {
 });
 
 describe("the session surface", () => {
+  it("types agent ownership and normalized skill selectors in responses", () => {
+    const pluginAgent: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      pluginKey: "builtin:github",
+      source: "builtin",
+      skills: { include: ["github.*"], exclude: ["*-unsafe"] },
+    };
+    const standaloneAgent: AgentSummary = {
+      id: "review",
+      ownership: "standalone",
+      source: "native:user-agents",
+      scope: "user",
+      skills: { include: [], exclude: [] },
+    };
+
+    assert.equal(
+      pluginAgent.ownership === "plugin" ? pluginAgent.pluginKey : undefined,
+      "builtin:github",
+    );
+    assert.equal(
+      standaloneAgent.ownership === "standalone" ? standaloneAgent.scope : undefined,
+      "user",
+    );
+
+    // @ts-expect-error — plugin-owned summaries always identify their plugin instance.
+    const pluginWithoutKey: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      source: "builtin",
+      skills: { include: [], exclude: [] },
+    };
+    // @ts-expect-error — standalone summaries do not fabricate a plugin owner.
+    const standaloneWithKey: AgentSummary = {
+      id: "review",
+      ownership: "standalone",
+      pluginKey: "builtin:fake",
+      source: "native:user-agents",
+      scope: "user",
+      skills: { include: [], exclude: [] },
+    };
+    const skillsWithoutExclude: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      pluginKey: "builtin:github",
+      source: "builtin",
+      // @ts-expect-error — response selectors are normalized even though declaration exclude is optional.
+      skills: { include: ["github.*"] },
+    };
+
+    assert.ok(pluginWithoutKey);
+    assert.ok(standaloneWithKey);
+    assert.ok(skillsWithoutExclude);
+  });
+
   it("can ask for the archived sessions of one project", async () => {
     const host = installTestHost({ id: "tracker" });
 
@@ -80,9 +135,10 @@ describe("the session surface", () => {
     const host = installTestHost({ id: "tracker" });
     const agent = {
       id: "base-agent.agent",
+      ownership: "plugin" as const,
       pluginKey: "builtin:base-agent",
-      source: "builtin",
-      skills: [],
+      source: "builtin" as const,
+      skills: { include: [], exclude: [] },
     };
 
     host.answerSessions(() => ({ kind: "agent-list", agents: [agent] }));
@@ -98,6 +154,7 @@ describe("the session surface", () => {
       projectId: "p1",
       folder: "/tmp/demo",
       agentId: "base-agent.agent",
+      agentAvailable: true,
       model: "scripted/one",
       thinkingLevel: "off" as const,
       phase: "idle" as const,
@@ -409,10 +466,14 @@ describe("the testing seam", () => {
     const host = installTestHost();
 
     await contribute.agent({
-      id: "agent",
-      title: "Base agent",
-      instructions: "делай, что просят",
-      tools: { include: ["*"] },
+      id: "safe",
+      instructions: "work",
+    });
+    await contribute.agent({
+      id: "full",
+      instructions: "work",
+      tools: { include: ["*"], exclude: ["bash"] },
+      skills: { include: ["review-*"], exclude: ["*-unsafe"] },
     });
 
     // Умолчаний SDK не подставляет: ни пустого exclude, ни пустых скилов. Их ставит ядро, и вторая
@@ -420,10 +481,15 @@ describe("the testing seam", () => {
     assert.deepEqual(host.contributions, [
       {
         kind: "agent",
-        id: "agent",
-        title: "Base agent",
-        instructions: "делай, что просят",
-        tools: { include: ["*"] },
+        id: "safe",
+        instructions: "work",
+      },
+      {
+        kind: "agent",
+        id: "full",
+        instructions: "work",
+        tools: { include: ["*"], exclude: ["bash"] },
+        skills: { include: ["review-*"], exclude: ["*-unsafe"] },
       },
     ]);
   });

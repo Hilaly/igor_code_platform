@@ -12,10 +12,14 @@
  * который перебивается разрешением, перестаёт быть запретом ровно тогда, когда появляется новый
  * инструмент под старым шаблоном.
  */
-export type AgentToolSelection = {
+export type NamePatternSelection = {
   include: string[];
   exclude: string[];
 };
+
+/** Инструменты и скилы выбираются одним языком шаблонов и с одинаковыми безопасными правилами. */
+export type AgentToolSelection = NamePatternSelection;
+export type AgentSkillSelection = NamePatternSelection;
 
 export function matchesToolPattern(pattern: string, toolName: string): boolean {
   return toRegExp(pattern).test(toolName);
@@ -25,7 +29,7 @@ export function matchesToolPattern(pattern: string, toolName: string): boolean {
  * Имена в порядке набора, а не в порядке шаблонов: порядок собранного набора детерминирован
  * (docs/hooks.md), и отбор его не переставляет.
  */
-export function selectToolNames(names: readonly string[], selection: AgentToolSelection): string[] {
+export function selectNames(names: readonly string[], selection: NamePatternSelection): string[] {
   const included = selection.include.map(toRegExp);
   const excluded = selection.exclude.map(toRegExp);
 
@@ -34,6 +38,11 @@ export function selectToolNames(names: readonly string[], selection: AgentToolSe
       included.some((pattern) => pattern.test(name)) &&
       !excluded.some((pattern) => pattern.test(name)),
   );
+}
+
+/** Обратная совместимость для существующих потребителей отбора инструментов. */
+export function selectToolNames(names: readonly string[], selection: AgentToolSelection): string[] {
+  return selectNames(names, selection);
 }
 
 const compiled = new Map<string, RegExp>();

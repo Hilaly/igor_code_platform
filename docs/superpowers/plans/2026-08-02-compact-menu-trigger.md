@@ -18,10 +18,12 @@
 ### Task 1: Add the compact prop contract and rendering test
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/menu.tsx`
 - Modify: `packages/ui-kit/src/components/rendering.test.tsx`
 
 **Interfaces:**
+
 - `MenuProps.compact?: boolean`, default `false`.
 - Compact state adds `styles.compact` to the trigger class list and does not change menu behavior.
 
@@ -70,9 +72,11 @@ git commit -m "feat(ui-kit): add compact menu trigger mode"
 ### Task 2: Style the compact trigger
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/menu.module.css`
 
 **Interfaces:**
+
 - `styles.compact` is a trigger-only CSS-module modifier.
 
 - [ ] **Step 1: Write the failing style assertion**
@@ -106,11 +110,13 @@ git commit -m "style(ui-kit): make compact menu triggers lightweight"
 ### Task 3: Apply compact mode to every ellipsis context menu
 
 **Files:**
+
 - Modify: `apps/web/src/projects/projects-view.tsx`
 - Modify: `apps/web/src/sessions/sessions-view.tsx`
 - Search: `apps/web/src packages/ui-kit/src` for `trigger="…"` and update every context-menu call site.
 
 **Interfaces:**
+
 - Every `Menu` with the ellipsis trigger passes `compact`.
 - Labeled menus such as the shell Account menu remain unchanged.
 
@@ -144,6 +150,7 @@ git commit -m "style(web): use compact triggers for context menus"
 ### Task 4: Full verification and documentation
 
 **Files:**
+
 - Modify: `docs/ui-kit.md` (document the new optional `compact` prop in the Menu catalog entry)
 
 - [ ] **Step 1: Update the UI-kit catalog documentation**

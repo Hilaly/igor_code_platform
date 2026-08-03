@@ -19,7 +19,8 @@ export type TurnJob = {
    * Идентификатор турна выдаёт очередь и отдаёт его работе аргументом: он же уезжает в ответ на
    * запуск и в дельты потока, и родись он позже старта — первые дельты приехали бы без него.
    */
-  run: (turnId: string) => Promise<void>;
+  /** `queued` отличает немедленный старт от работы, которая успела подождать за чужим слотом. */
+  run: (turnId: string, queued: boolean) => Promise<void>;
 };
 
 export type TurnPlace = {
@@ -101,17 +102,17 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
         continue;
       }
 
-      start(next.job, next.turnId);
+      start(next.job, next.turnId, true);
     }
   };
 
-  const start = (job: TurnJob, turnId: string): void => {
+  const start = (job: TurnJob, turnId: string, queued: boolean): void => {
     running.add(job.sessionId);
     options.onChange?.(job.sessionId);
 
     void (async () => {
       try {
-        await job.run(turnId);
+        await job.run(turnId, queued);
       } catch (cause) {
         options.onFailure?.(job.sessionId, cause);
       } finally {
@@ -186,9 +187,9 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
           job: {
             ...job,
             sessionId,
-            run: async (activeTurnId) => {
+            run: async (activeTurnId, queued) => {
               try {
-                await job.run(activeTurnId);
+                await job.run(activeTurnId, queued);
               } finally {
                 release();
               }
@@ -198,12 +199,16 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
           cancelled: false,
         };
 
-        waiting.push(place);
         drain();
 
-        if (waiting.includes(place)) {
+        if (waiting.length === 0 && running.size < options.limit()) {
+          start(place.job, turnId, false);
+        } else {
+          waiting.push(place);
           options.onChange?.(sessionId);
         }
+
+        drain();
 
         return {
           kind: "accepted",

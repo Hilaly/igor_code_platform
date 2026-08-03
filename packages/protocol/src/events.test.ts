@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { coreEventTypes, isPluginBusEvent, type BusEvent } from "./events.ts";
+import { coreEventTypes, isPluginBusEvent, type BusEvent, type CoreEvent } from "./events.ts";
 
 describe("isPluginBusEvent", () => {
   it("separates a plugin event from a core one and keeps the core payload typed", () => {
@@ -34,5 +34,16 @@ describe("isPluginBusEvent", () => {
     });
 
     assert.deepEqual(messages, ["running", "tracker said tracker.task.created"]);
+  });
+});
+
+describe("core.contributions.changed", () => {
+  it("invalidates project-scoped contribution snapshots by revision", () => {
+    const event: CoreEvent = {
+      type: coreEventTypes.contributionsChanged,
+      payload: { revision: 7 },
+    };
+
+    assert.deepEqual(event.payload, { revision: 7 });
   });
 });

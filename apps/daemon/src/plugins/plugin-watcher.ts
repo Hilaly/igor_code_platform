@@ -9,7 +9,7 @@
  * перезагрузка на её события запустила бы установку заново по кругу (docs/plugins.md, проверка 17).
  */
 
-import { statSync, watch, type FSWatcher } from "node:fs";
+import { statSync, watch, type FSWatcher, type Stats } from "node:fs";
 import { join, sep } from "node:path";
 
 import type { Logger } from "../platform/public.ts";
@@ -31,8 +31,22 @@ export type CreatePluginWatcherOptions = {
   roots: PluginRoot[];
   logger: Logger;
   /** Папки плагинов, в которых что-то изменилось. Пустой набор значит «изменился сам корень». */
-  onChange: (changedDirectories: string[]) => void;
+  onChange: (changedDirectories: ChangedPluginDirectory[]) => void;
   debounceMilliseconds?: number;
+  inspectPath?: (path: string) => Stats | undefined;
+  watchDirectory?: (
+    directory: string,
+    recursive: boolean,
+    listener: (event: string, name: string | Buffer | null) => void,
+  ) => FSWatcher;
+  scheduleDebounce?: (callback: () => void, delay: number) => NodeJS.Timeout;
+  cancelDebounce?: (timer: NodeJS.Timeout) => void;
+  now?: () => number;
+};
+
+export type ChangedPluginDirectory = {
+  directory: string;
+  fileResourcesChanged: boolean;
 };
 
 /** Крупнее, чем у настроек: редактор пишет пачкой, а перезапуск плагина дороже перечитывания файла. */
@@ -43,14 +57,23 @@ const ignoredNames = new Set(["node_modules", "package-lock.json", ".DS_Store"])
 export function createPluginWatcher(options: CreatePluginWatcherOptions): PluginWatcher {
   const { roots, logger, onChange } = options;
   const debounceMilliseconds = options.debounceMilliseconds ?? defaultDebounceMilliseconds;
+  const inspectPath =
+    options.inspectPath ?? ((path: string) => statSync(path, { throwIfNoEntry: false }));
+  const watchDirectory =
+    options.watchDirectory ??
+    ((directory, recursive, listener) => watch(directory, { recursive }, listener));
+  const scheduleDebounce = options.scheduleDebounce ?? setTimeout;
+  const cancelDebounce = options.cancelDebounce ?? clearTimeout;
+  const now = options.now ?? Date.now;
 
   const watchers: FSWatcher[] = [];
-  const changed = new Set<string>();
+  const changed = new Map<string, boolean>();
 
   let debounceTimer: NodeJS.Timeout | undefined;
   let armedAt = 0;
+  let generation = 0;
 
-  const note = (root: PluginRoot, relative: string): void => {
+  const note = (root: PluginRoot, event: string, relative: string): void => {
     const segments = relative.split(sep).filter((segment) => segment.length > 0);
 
     if (segments.some((segment) => ignoredNames.has(segment))) {
@@ -58,26 +81,39 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
     }
 
     const first = segments[0];
+    const fileResourcesChanged = segments[1] === "agents" || segments[1] === "skills";
 
     // Первое событие после постановки наблюдателя приходит пачкой на всё поддерево — со всеми
     // папками и всеми давно лежащими файлами (проверка 17). Правкой считается только то, что
     // изменилось после постановки: папка сама по себе правкой не является, файл старше наблюдателя
     // — тоже. Исчезнувший путь считается правкой: так выглядит удаление.
-    const entry = statSync(join(root.directory, relative), { throwIfNoEntry: false });
-    const edited = entry === undefined || (!entry.isDirectory() && entry.mtimeMs >= armedAt);
+    const path = join(root.directory, relative);
+    const entry = inspectPath(path);
+    const parent = inspectPath(join(path, ".."));
+    const edited =
+      entry === undefined ||
+      (!entry.isDirectory() && entry.mtimeMs >= armedAt) ||
+      (fileResourcesChanged &&
+        (event === "change" ||
+          entry.mtimeMs >= armedAt ||
+          (parent !== undefined && parent.mtimeMs >= armedAt)));
 
     // Событие о самой папке плагина (создание, удаление, переименование) приходит с одним
     // сегментом — там менять нечего, переобнаружение покажет и появление, и исчезновение.
     if (first !== undefined && segments.length > 1 && edited) {
-      changed.add(join(root.directory, first));
+      const directory = join(root.directory, first);
+      changed.set(directory, changed.get(directory) === true || fileResourcesChanged);
     }
 
     if (debounceTimer !== undefined) {
-      clearTimeout(debounceTimer);
+      cancelDebounce(debounceTimer);
     }
 
-    debounceTimer = setTimeout(() => {
-      const directories = [...changed];
+    debounceTimer = scheduleDebounce(() => {
+      const directories = [...changed].map(([directory, fileResourcesChanged]) => ({
+        directory,
+        fileResourcesChanged,
+      }));
       changed.clear();
       debounceTimer = undefined;
 
@@ -89,14 +125,16 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
   };
 
   const arm = (armed: PluginRoot[]): void => {
-    armedAt = Date.now();
+    armedAt = now();
+    const armedGeneration = generation;
 
     for (const root of armed) {
       try {
         // Событие без имени возможно: тогда известно только, что в корне что-то было, и это
         // повод переобнаружить источник, а не перезагружать плагины.
-        const watcher = watch(root.directory, { recursive: true }, (_event, name) => {
-          note(root, typeof name === "string" ? name : "");
+        const watcher = watchDirectory(root.directory, true, (event, name) => {
+          if (armedGeneration !== generation) return;
+          note(root, event, typeof name === "string" ? name : "");
         });
 
         // Ошибка наблюдателя не глушится: без него плагины молча перестают перезагружаться.
@@ -124,11 +162,17 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
   };
 
   const disarm = (): void => {
+    generation += 1;
     for (const watcher of watchers) {
       watcher.close();
     }
 
     watchers.length = 0;
+    changed.clear();
+    if (debounceTimer !== undefined) {
+      cancelDebounce(debounceTimer);
+      debounceTimer = undefined;
+    }
   };
 
   return {
@@ -138,11 +182,6 @@ export function createPluginWatcher(options: CreatePluginWatcherOptions): Plugin
       arm(next);
     },
     close: () => {
-      if (debounceTimer !== undefined) {
-        clearTimeout(debounceTimer);
-        debounceTimer = undefined;
-      }
-
       disarm();
     },
   };

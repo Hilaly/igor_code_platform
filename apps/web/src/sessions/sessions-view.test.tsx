@@ -50,6 +50,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   projectId: "b7Kq",
   folder: "/code/platform",
   agentId: "base-agent.agent",
+  agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",
   phase: "idle",
@@ -332,6 +333,49 @@ describe("the chat", () => {
 
     expect(onSubmit).toHaveBeenCalledWith("привет");
     expect((field as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("keeps history readable while the saved agent is missing and recovers in place", () => {
+    const view = show(withOpen([message("m1", "сохранённый ответ")], { agentAvailable: false }));
+
+    expect(screen.getByText("сохранённый ответ")).not.toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("base-agent.agent");
+    expect(screen.getByRole("textbox", { name: "Сообщение агенту" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Свернуть контекст" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Дерево записей" }));
+    fireEvent.click(screen.getByRole("treeitem", { name: "Агент: сохранённый ответ" }));
+    expect(screen.getByRole("button", { name: "Перейти к записи" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+
+    view.rerender(
+      <SessionsView
+        state={withOpen([message("m1", "сохранённый ответ")], { agentAvailable: true })}
+        onOpen={vi.fn()}
+        onStartCreating={vi.fn()}
+        onSubmit={vi.fn()}
+        onSendMessage={vi.fn()}
+        onInterrupt={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onFork={vi.fn()}
+        onCompact={vi.fn()}
+        onSetLabel={vi.fn()}
+        onNavigate={vi.fn()}
+        onShowArchived={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.queryByText(/base-agent\.agent/)).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Сообщение агенту" }).hasAttribute("disabled")).toBe(
+      false,
+    );
   });
 
   it("interrupts the running turn from the same place", () => {
@@ -709,6 +753,46 @@ describe("the session lifecycle from the view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Свернуть" }));
 
     await waitFor(() => expect(onCompact).toHaveBeenCalledWith("сохрани решения"));
+  });
+
+  it("cancels an open compaction when the saved agent disappears", () => {
+    const onCompact = vi.fn().mockResolvedValue(undefined);
+    const view = show(withOpen(), { onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    expect(screen.getByRole("button", { name: "Свернуть" })).not.toBeNull();
+
+    view.rerender(
+      <SessionsView
+        state={withOpen([], { agentAvailable: false })}
+        onOpen={vi.fn()}
+        onStartCreating={vi.fn()}
+        onSubmit={vi.fn()}
+        onSendMessage={vi.fn()}
+        onInterrupt={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onFork={vi.fn()}
+        onCompact={onCompact}
+        onSetLabel={vi.fn()}
+        onNavigate={vi.fn()}
+        onShowArchived={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain("base-agent.agent");
+    expect(screen.getByRole("textbox", { name: "Сообщение агенту" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+
+    const confirm = screen.queryByRole("button", { name: "Свернуть" });
+    if (confirm !== null) {
+      fireEvent.click(confirm);
+    }
+
+    expect(confirm === null || confirm.hasAttribute("disabled")).toBe(true);
+    expect(onCompact).not.toHaveBeenCalled();
   });
 
   it("folds by the prompt of the runtime when no instructions were given", async () => {

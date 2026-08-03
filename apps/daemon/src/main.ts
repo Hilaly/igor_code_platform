@@ -1,4 +1,7 @@
 import { join } from "node:path";
+import { homedir } from "node:os";
+
+import { coreEventTypes } from "@sovereign/protocol";
 
 import {
   authenticationRoutes,
@@ -31,16 +34,19 @@ import {
   createPluginSessions,
   createPluginSupervisor,
   createPluginWatcher,
+  createStandaloneFileResourceService,
+  type ChangedPluginDirectory,
   defaultPluginRoots,
   discoverPlugins,
   isSessionRequest,
   pluginPreferencesRoute,
   pluginsRoute,
   projectPluginRoots,
+  standaloneResourceRoots,
   type PluginRoot,
   type PluginSessions,
 } from "./plugins/public.ts";
-import { createProjectAvailabilityWatcher } from "./projects/public.ts";
+import { createProjectAvailabilityWatcher, projectResourceRoutes } from "./projects/public.ts";
 import { createProjectPathNormalizer } from "./projects/public.ts";
 import { createProjectStore } from "./projects/public.ts";
 import { createProjectLifecycle } from "./projects/public.ts";
@@ -139,7 +145,7 @@ const providerLogins = createProviderLogins({ runner: providers, logger });
 const projectAvailability = createProjectAvailabilityWatcher({
   projects,
   bus,
-  onChange: () => applyPlugins(),
+  onChange: () => applyFileSources(),
 });
 
 // Корни перестали быть константой: папки проектов появляются и исчезают на живом демоне
@@ -150,6 +156,35 @@ const pluginRoots = (): PluginRoot[] => [
 ];
 
 const contributions = createContributionRegistry();
+
+// Единого снимка без project context нет: событие только инвалидирует выбранный проект. Оба
+// производителя зовут один publisher, а revision не даёт повторному scan разбудить клиентов.
+let publishedContributionRevision = contributions.revision();
+const publishContributionChanges = (): void => {
+  const revision = contributions.revision();
+
+  if (revision === publishedContributionRevision) {
+    return;
+  }
+
+  publishedContributionRevision = revision;
+  bus.publish(coreEventTypes.contributionsChanged, { revision });
+};
+
+const standaloneRoots = () =>
+  standaloneResourceRoots({
+    dataDirectory: directory,
+    homeDirectory: homedir(),
+    projects: projects.list(),
+    availability: (project) => projectAvailability.of(project.id),
+  });
+
+const standaloneResources = createStandaloneFileResourceService({
+  roots: standaloneRoots(),
+  registry: contributions,
+  logger,
+  publishContributionChanges,
+});
 
 // Мост провайдеров: единственная пара «запрос-ответ» в канале плагина
 // (docs/models-and-providers.md). Каталог тот же, что у веб-API, — иначе плагин и человек видели бы
@@ -173,6 +208,7 @@ const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
   bus,
+  publishContributionChanges,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
   onRequest: async (plugin, request, call) => {
@@ -202,7 +238,7 @@ const pluginWatcher = createPluginWatcher({
 let applying = Promise.resolve();
 let armedRoots = "";
 
-const applyPlugins = (changedDirectories: string[] = []): Promise<void> => {
+const applyPlugins = (changedDirectories: ChangedPluginDirectory[] = []): Promise<void> => {
   applying = applying
     .then(async () => {
       const roots = pluginRoots();
@@ -229,6 +265,15 @@ const applyPlugins = (changedDirectories: string[] = []): Promise<void> => {
   return applying;
 };
 
+const applyFileSources = (): void => {
+  void applyPlugins();
+  void standaloneResources.rearm(standaloneRoots()).catch((cause: unknown) => {
+    logger.error("applying standalone file resource roots failed", {
+      reason: cause instanceof Error ? cause.message : String(cause),
+    });
+  });
+};
+
 settings.subscribe((snapshot) => {
   logger.info("settings reloaded", { logLevel: snapshot.config.logLevel });
   applyPlugins();
@@ -238,7 +283,7 @@ publishAppearanceChanges({ settings, bus });
 publishProjectChanges({ projects, bus });
 
 // Список проектов меняет набор корней: созданный проект приносит источник, архивированный уносит.
-projects.subscribe(() => applyPlugins());
+projects.subscribe(() => applyFileSources());
 
 // Наблюдатель ставится до первого обхода: правка, потерянная не успевшим встать наблюдателем, при
 // таком порядке всё равно попадает в первый снимок (runtime-checks.md, проверка 14).
@@ -247,6 +292,7 @@ armedRoots = pluginRoots()
   .map((root) => root.directory)
   .join("\n");
 const initialPluginApplication = applyPlugins();
+const initialStandaloneApplication = standaloneResources.start();
 
 // Поток подписывается на шину последним из подписчиков ядра, но нумерует всё, что придёт после:
 // события до его создания рассказывать некому — клиентов ещё нет.
@@ -272,7 +318,10 @@ const sessions = createSessionService({
     }),
   }),
   projects,
-  contributions: () => contributions.resolved(),
+  contributions: {
+    base: () => contributions.resolvedBase(),
+    forProject: (projectId) => contributions.resolvedForProject(projectId),
+  },
   tools: toolCollector,
   queue: createTurnQueue({
     // Предел читается живьём: правка `config.json` применяется без перезапуска демона.
@@ -289,7 +338,7 @@ const sessions = createSessionService({
   compactionThreshold: () => settings.current().config.compactionThreshold,
 });
 
-await Promise.all([initialPluginApplication, sessions.refresh()]);
+await Promise.all([initialPluginApplication, initialStandaloneApplication, sessions.refresh()]);
 
 pluginSessions.answer = createPluginSessions({ sessions }).answer;
 
@@ -330,6 +379,12 @@ const server = createDaemonServer({
       sessionCount: (folderKey) => sessions.countByFolderKey(folderKey),
       projectLifecycle,
     }),
+    ...projectResourceRoutes({
+      projects,
+      availability: (project) => projectAvailability.of(project.id),
+      agents: (projectId) => ({ agents: sessions.agentsForProject(projectId) }),
+      fileResources: (projectId) => contributions.fileResourcesForProject(projectId),
+    }),
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
@@ -359,6 +414,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.closeAllConnections();
     settings.close();
     pluginWatcher.close();
+    standaloneResources.close();
     loginSessions.stop();
     projectAvailability.stop();
     void sessions.close();

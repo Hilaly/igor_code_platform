@@ -47,6 +47,8 @@ import {
   type ThinkingLevel,
 } from "@sovereign/protocol";
 
+import { renderSkillCatalogue, type AgentSkill } from "./skills.ts";
+
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
 export type AgentTool = {
   name: string;
@@ -89,6 +91,10 @@ export type AgentSession = {
   setModel: (reference: string) => Promise<ModelOutcome>;
   setThinkingLevel: (level: ThinkingLevel) => Promise<void>;
   setTools: (tools: AgentTool[], activeToolNames: string[]) => Promise<void>;
+  /** Целиком заменить инструкции, которые попадут в следующую операцию модели. */
+  setInstructions: (instructions: string) => void;
+  /** Целиком заменить каталог скилов, который попадёт в следующую операцию модели. */
+  setSkills: (skills: AgentSkill[]) => void;
   /**
    * Сообщение, которое не запускает турн. Куда оно встанет, решает режим; отказ приезжает исходом,
    * а не исключением, потому что у режимов разные требования к занятости сессии.
@@ -617,6 +623,8 @@ function liveSession(
   }
 
   const environment = new NodeExecutionEnv({ cwd: summary.folder });
+  let instructions = agent.instructions;
+  let skills: AgentSkill[] = [];
   const harness = new AgentHarness<ExecutionToolContext>({
     session,
     models,
@@ -624,7 +632,11 @@ function liveSession(
     thinkingLevel: summary.thinkingLevel,
     tools: [],
     toolContext: { env: environment },
-    systemPrompt: agent.instructions,
+    systemPrompt: () => {
+      const catalogue = renderSkillCatalogue(skills);
+
+      return catalogue === "" ? instructions : `${instructions}\n\n${catalogue}`;
+    },
   });
 
   const listeners = new Set<(delta: SessionDelta) => void>();
@@ -814,6 +826,16 @@ function liveSession(
         tools.map((entry) => entry.tool as AgentHarnessTool<ExecutionToolContext>),
         activeToolNames,
       );
+    },
+    setInstructions: (next) => {
+      if (next === "") {
+        throw new Error("agent instructions must not be empty");
+      }
+
+      instructions = next;
+    },
+    setSkills: (next) => {
+      skills = [...next];
     },
     entries: async (after = 0) => {
       return entriesOf(session, after);

@@ -23,6 +23,8 @@ export const coreEventTypes = {
   pluginLifecycle: "core.plugin.lifecycle",
   /** Действующий набор вкладов изменился. */
   pluginContributions: "core.plugin.contributions",
+  /** Контекстные наборы вкладов изменились; клиент перечитывает снимок нужного проекта. */
+  contributionsChanged: "core.contributions.changed",
   /**
    * Внешний вид или локаль изменились. Событие обязано быть: `preferences.json` перечитывается на
    * живом демоне (docs/data-directory.md), и правка файла руками должна доезжать до открытого браузера. О записях
@@ -76,6 +78,9 @@ export type PluginContributionsChanged = {
   contributions: ContributionRegistration[];
 };
 
+/** Только инвалидация: единого разрешённого набора без контекста проекта больше нет. */
+export type ContributionsChanged = { revision: number };
+
 /**
  * Нагрузки нет: событие говорит «изменилось», а состояние спрашивается у владельца — `GET
  * /api/preferences` (docs/event-bus.md). Дублировать значения в событии значит завести второй источник правды
@@ -125,6 +130,7 @@ export type ProviderLogout = {
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
+  "core.contributions.changed": ContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
   "core.projects.changed": ProjectsChanged;
   "core.sessions.changed": SessionsChanged;

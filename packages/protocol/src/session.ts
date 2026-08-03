@@ -8,6 +8,7 @@
 
 import type { PluginSource } from "./plugin.ts";
 import type { SettingsParseResult } from "./settings.ts";
+import type { AgentSkillSelection } from "./tool-pattern.ts";
 
 export const sessionsPath = "/api/sessions";
 
@@ -128,10 +129,13 @@ export type SessionPhase = (typeof sessionPhases)[number];
 
 export type Session = {
   id: string;
-  /** Проект, в папке которого идёт работа. Привязка выражена папкой (docs/sessions-and-projects.md). */
+  /** Идентичность проекта для разрешения вкладов и принадлежности сессии. */
   projectId: string;
+  /** Рабочий контекст рантайма и файловых инструментов; не заменяет идентичность проекта. */
   folder: string;
   agentId: string;
+  /** Есть ли сохранённый агент в текущем разрешённом наборе именно этого проекта. */
+  agentAvailable: boolean;
   model: string;
   thinkingLevel: ThinkingLevel;
   phase: SessionPhase;
@@ -480,18 +484,32 @@ export type SessionDelta =
   | { kind: "turn-failed"; reason: string }
   | { kind: "queues"; queues: SessionQueues };
 
-/** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
-export type AgentSummary = {
+type AgentSummaryCommon = {
   id: string;
   title?: string;
   description?: string;
-  pluginKey: string;
-  source: PluginSource;
   /** Модель по умолчанию. Её может не быть: тогда модель называют при создании сессии. */
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: string[];
+  skills: AgentSkillSelection;
 };
+
+/** Агент глазами интерфейса: то, из чего выбирают при создании сессии. */
+export type AgentSummary = AgentSummaryCommon &
+  (
+    | {
+        ownership: "plugin";
+        pluginKey: string;
+        source: PluginSource;
+      }
+    | {
+        ownership: "standalone";
+        pluginKey?: never;
+        source: string;
+        scope: "user" | "project";
+        projectId?: string;
+      }
+  );
 
 /** Ноль агентов — законный ответ, а не отказ: единственный плагин с агентом могли выключить. */
 export type AgentsSnapshot = { agents: AgentSummary[] };

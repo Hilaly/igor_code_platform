@@ -46,9 +46,10 @@ const project: Project = {
 const baseAgent: AgentSummary = {
   id: "base-agent.agent",
   title: "Базовый агент",
+  ownership: "plugin",
   pluginKey: "builtin:base-agent",
   source: "builtin",
-  skills: [],
+  skills: { include: [], exclude: [] },
 };
 
 const provider: ProviderSummary = {
@@ -85,12 +86,14 @@ const show = (overrides: Partial<NewSessionViewProps> = {}) => {
   const onSubmit = vi.fn();
   const onNavigate = vi.fn();
   const onPrepareDraft = vi.fn();
+  const onSelectProject = vi.fn();
   const props: NewSessionViewProps = {
     projects: [project],
-    agents: [baseAgent],
+    projectAgents: { projectId: "b7Kq", agents: [baseAgent], loading: false },
     providers: [provider],
     models: {},
     onPrepareDraft,
+    onSelectProject,
     onPickProvider,
     onCreate,
     onSubmit,
@@ -105,6 +108,7 @@ const show = (overrides: Partial<NewSessionViewProps> = {}) => {
     onPickProvider,
     onSubmit,
     onNavigate,
+    onSelectProject,
   };
 };
 
@@ -132,6 +136,188 @@ describe("the screen that creates a session", () => {
     show();
 
     expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("disables agent selection until a project is chosen", () => {
+    const view = show();
+
+    expect(screen.getByRole("combobox", { name: "Агент" }).getAttribute("aria-disabled")).toBe(
+      "true",
+    );
+    expect(view.onSelectProject).not.toHaveBeenCalled();
+
+    pick("Проект", "Платформа — /code/platform");
+
+    expect(view.onSelectProject).toHaveBeenCalledWith("b7Kq");
+  });
+
+  it("shows loading, failure, and project-specific empty agent states", () => {
+    const view = show({ projectAgents: { projectId: "b7Kq", loading: true } });
+    pick("Проект", "Платформа — /code/platform");
+    expect(screen.getByText(/агенты проекта загружаются/i)).not.toBeNull();
+
+    view.rerender(
+      <NewSessionView
+        {...({
+          projects: [project],
+          projectAgents: { projectId: "b7Kq", loading: false, failure: "catalogue unavailable" },
+          providers: [provider],
+          models: {},
+          onPrepareDraft: vi.fn(),
+          onSelectProject: vi.fn(),
+          onPickProvider: vi.fn(),
+          onCreate: vi.fn(),
+          onSubmit: vi.fn(),
+          onNavigate: vi.fn(),
+          translator,
+        } satisfies NewSessionViewProps)}
+      />,
+    );
+    expect(screen.getByText(/catalogue unavailable/)).not.toBeNull();
+
+    view.rerender(
+      <NewSessionView
+        {...({
+          projects: [project],
+          projectAgents: { projectId: "b7Kq", agents: [], loading: false },
+          providers: [provider],
+          models: {},
+          onPrepareDraft: vi.fn(),
+          onSelectProject: vi.fn(),
+          onPickProvider: vi.fn(),
+          onCreate: vi.fn(),
+          onSubmit: vi.fn(),
+          onNavigate: vi.fn(),
+          translator,
+        } satisfies NewSessionViewProps)}
+      />,
+    );
+    expect(screen.getByText(/в проекте «Платформа» нет доступных агентов/i)).not.toBeNull();
+  });
+
+  it("preselects a project from its detail page and requests its agents immediately", () => {
+    const view = show({ initialProjectId: "b7Kq" });
+
+    expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Платформа");
+    expect(view.onSelectProject).toHaveBeenCalledWith("b7Kq");
+  });
+
+  it("resets the agent, model, and thinking defaults before loading another project", () => {
+    const agentWithDefaults: AgentSummary = {
+      ...baseAgent,
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "high",
+    };
+    const view = show({
+      projectAgents: { projectId: "b7Kq", agents: [agentWithDefaults], loading: false },
+      models: ready,
+    });
+    pick("Проект", "Платформа — /code/platform");
+    pick("Агент", "Базовый агент");
+
+    const other = { ...project, id: "p2", name: "Другой" };
+    view.rerender(
+      <NewSessionView
+        projects={[project, other]}
+        projectAgents={{ projectId: "b7Kq", agents: [agentWithDefaults], loading: false }}
+        providers={[provider]}
+        models={ready}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+    pick("Проект", "Другой — /code/platform");
+
+    expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
+      "Средний",
+    );
+    expect(view.onSelectProject).toHaveBeenLastCalledWith("p2");
+  });
+
+  it("clears a selected agent and its defaults when a refreshed project catalogue removes it", () => {
+    const agentWithDefaults: AgentSummary = {
+      ...baseAgent,
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "high",
+    };
+    const view = show({
+      projectAgents: { projectId: "b7Kq", agents: [agentWithDefaults], loading: false },
+      models: ready,
+    });
+    pick("Проект", "Платформа — /code/platform");
+    pick("Агент", "Базовый агент");
+
+    view.rerender(
+      <NewSessionView
+        projects={[project]}
+        projectAgents={{ projectId: "b7Kq", agents: [], loading: false }}
+        providers={[provider]}
+        models={ready}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
+      "Средний",
+    );
+  });
+
+  it("clears the project and every dependent field when the selectable projects drop it", async () => {
+    const agentWithDefaults: AgentSummary = {
+      ...baseAgent,
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "high",
+    };
+    const view = show({
+      projectAgents: { projectId: "b7Kq", agents: [agentWithDefaults], loading: false },
+      models: ready,
+    });
+    pick("Проект", "Платформа — /code/platform");
+    pick("Агент", "Базовый агент");
+
+    view.rerender(
+      <NewSessionView
+        projects={[]}
+        projectAgents={{ projectId: "b7Kq", agents: [agentWithDefaults], loading: false }}
+        providers={[provider]}
+        models={ready}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Выберите"),
+    );
+    expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
+    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
+      "Средний",
+    );
+    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    expect(view.onCreate).not.toHaveBeenCalled();
+    expect(view.onSelectProject).toHaveBeenLastCalledWith("");
   });
 
   it("asks for the models of a provider when its group is expanded", () => {
@@ -170,14 +356,17 @@ describe("the screen that creates a session", () => {
       model: "anthropic/claude-opus-4-5",
       thinkingLevel: "high",
     };
-    const view = show({ agents: [agentWithDefaults], models: ready });
+    const view = show({
+      projectAgents: { projectId: "b7Kq", agents: [agentWithDefaults], loading: false },
+      models: ready,
+    });
 
+    pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Базовый агент");
 
     // Модель из агента предзаполнена, и провайдер её уже опрошен.
     expect(view.onPickProvider).toHaveBeenCalledWith("anthropic");
 
-    pick("Проект", "Платформа — /code/platform");
     fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
@@ -199,11 +388,18 @@ describe("the screen that creates a session", () => {
       id: "agent-without-defaults.agent",
       title: "Агент без умолчаний",
     };
-    const view = show({ agents: [agentWithDefaults, agentWithoutDefaults], models: ready });
+    const view = show({
+      projectAgents: {
+        projectId: "b7Kq",
+        agents: [agentWithDefaults, agentWithoutDefaults],
+        loading: false,
+      },
+      models: ready,
+    });
 
+    pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Агент с умолчаниями");
     pick("Агент", "Агент без умолчаний");
-    pick("Проект", "Платформа — /code/platform");
     fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
@@ -277,11 +473,11 @@ describe("the screen that creates a session", () => {
     expect(view.onSubmit).not.toHaveBeenCalled();
   });
 
-  it("explains an empty platform instead of showing three empty lists", () => {
-    show({ projects: [], agents: [], providers: [] });
+  it("explains an empty platform without pretending that a global agent list exists", () => {
+    show({ projects: [], projectAgents: { loading: false }, providers: [] });
 
     expect(screen.getByText(/сначала заведи проект/)).not.toBeNull();
-    expect(screen.getByText(/Агента приносит плагин/)).not.toBeNull();
+    expect(screen.getByText(/Сначала выбери проект/)).not.toBeNull();
     expect(screen.getByText(/Модели нужен кред/)).not.toBeNull();
     expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
   });

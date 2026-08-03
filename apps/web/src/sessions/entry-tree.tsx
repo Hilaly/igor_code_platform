@@ -38,6 +38,8 @@ export type EntryTreeDrawerProps = {
   leafId?: string;
   busy: boolean;
   archived: boolean;
+  /** Переход требует harness и модели; чтение дерева и метки от них не зависят. */
+  harnessAvailable?: boolean;
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
   /** Текст, отданный переходом к своей реплике: его подставляет в поле ввода вызывающий. */
@@ -49,7 +51,17 @@ export type EntryTreeDrawerProps = {
 const labelLimit = 48;
 
 export function EntryTreeDrawer(props: EntryTreeDrawerProps) {
-  const { open, onClose, entries, labels, leafId, busy, archived, translator } = props;
+  const {
+    open,
+    onClose,
+    entries,
+    labels,
+    leafId,
+    busy,
+    archived,
+    harnessAvailable = true,
+    translator,
+  } = props;
   const { t } = translator;
   /**
    * Раскрытие и выбор — своё состояние, но с падением на рабочую ветку: `undefined` означает «человек
@@ -156,7 +168,7 @@ export function EntryTreeDrawer(props: EntryTreeDrawerProps) {
               <Button
                 tone="accent"
                 onClick={() => void navigate(selectedEntry.id)}
-                disabled={busy}
+                disabled={busy || !harnessAvailable}
                 {...(busy ? { title: t("chat.busy.hint") } : {})}
               >
                 {t("chat.tree.navigate")}

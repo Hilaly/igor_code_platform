@@ -75,6 +75,12 @@ export type AgentToolSelection = {
   exclude?: string[];
 };
 
+/** Скилы выбираются теми же glob-шаблонами, что и инструменты. */
+export type AgentSkillSelection = {
+  include: string[];
+  exclude?: string[];
+};
+
 /**
  * Объявление агента (docs/plugins.md). Модель и уровень ризонинга — умолчания, а не запрет: при
  * создании сессии их переопределяют.
@@ -84,10 +90,10 @@ export type AgentContribution = {
   title?: string;
   description?: string;
   instructions: string;
-  tools: AgentToolSelection;
+  tools?: AgentToolSelection;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills?: string[];
+  skills?: AgentSkillSelection;
 };
 
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */

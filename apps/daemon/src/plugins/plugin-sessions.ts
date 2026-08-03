@@ -128,7 +128,7 @@ const labelFromPlugin = sameShape<PluginSessionLabelUpdate, SessionLabelUpdate>(
 
 const agentForPlugin = sameShape<AgentSummary, PluginAgentSummary>({
   forward: (agent) => agent,
-  backward: (agent) => ({ ...agent, source: agent.source as AgentSummary["source"] }),
+  backward: (agent) => agent,
 });
 
 /**

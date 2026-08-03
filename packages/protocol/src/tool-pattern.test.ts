@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { matchesToolPattern, selectToolNames } from "./tool-pattern.ts";
+import {
+  matchesToolPattern,
+  selectNames,
+  selectToolNames,
+  type AgentSkillSelection,
+  type AgentToolSelection,
+  type NamePatternSelection,
+} from "./tool-pattern.ts";
 
 describe("matchesToolPattern", () => {
   it("matches a whole name, not a piece of it", () => {
@@ -62,5 +69,24 @@ describe("selectToolNames", () => {
     // «Агент без единого инструмента» — законное состояние (docs/plugins.md), и пустой список
     // значит ровно это: иначе опечатка в наборе молча открыла бы агенту bash.
     assert.deepEqual(selectToolNames(names, { include: [], exclude: [] }), []);
+  });
+});
+
+describe("selectNames", () => {
+  it("shares include and exclude semantics between tools and skills", () => {
+    const selection: NamePatternSelection = {
+      include: ["github.*", "code-*"],
+      exclude: ["*-unsafe"],
+    };
+    const toolSelection: AgentToolSelection = selection;
+    const skillSelection: AgentSkillSelection = selection;
+
+    assert.deepEqual(
+      selectNames(["github.review", "code-safe", "code-unsafe", "notes"], selection),
+      ["github.review", "code-safe"],
+    );
+    assert.deepEqual(selectNames(["read"], { include: [], exclude: [] }), []);
+    assert.deepEqual(selectNames(["code-safe", "code-unsafe"], toolSelection), ["code-safe"]);
+    assert.deepEqual(selectNames(["github.review"], skillSelection), ["github.review"]);
   });
 });

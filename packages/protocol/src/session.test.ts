@@ -14,7 +14,85 @@ import {
   sessionPath,
   sessionStatsPath,
   sessionTurnsPath,
+  type AgentSummary,
+  type Session,
 } from "./session.ts";
+
+describe("AgentSummary", () => {
+  it("keeps normalized skills and distinguishes plugin from standalone ownership", () => {
+    const pluginAgent: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      pluginKey: "builtin:github",
+      source: "builtin",
+      skills: { include: ["github.*"], exclude: ["*-unsafe"] },
+    };
+    const standaloneAgent: AgentSummary = {
+      id: "review",
+      ownership: "standalone",
+      source: "native:user-agents",
+      scope: "user",
+      skills: { include: [], exclude: [] },
+    };
+
+    assert.equal(
+      pluginAgent.ownership === "plugin" ? pluginAgent.pluginKey : undefined,
+      "builtin:github",
+    );
+    assert.equal(
+      standaloneAgent.ownership === "standalone" ? standaloneAgent.scope : undefined,
+      "user",
+    );
+
+    // @ts-expect-error — plugin-owned summaries always identify their plugin instance.
+    const pluginWithoutKey: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      source: "builtin",
+      skills: { include: [], exclude: [] },
+    };
+    // @ts-expect-error — standalone summaries do not fabricate a plugin owner.
+    const standaloneWithKey: AgentSummary = {
+      id: "review",
+      ownership: "standalone",
+      pluginKey: "builtin:fake",
+      source: "native:user-agents",
+      scope: "user",
+      skills: { include: [], exclude: [] },
+    };
+    const skillsWithoutExclude: AgentSummary = {
+      id: "github.review",
+      ownership: "plugin",
+      pluginKey: "builtin:github",
+      source: "builtin",
+      // @ts-expect-error — summaries carry normalized selectors, including an explicit exclude list.
+      skills: { include: ["github.*"] },
+    };
+
+    assert.ok(pluginWithoutKey);
+    assert.ok(standaloneWithKey);
+    assert.ok(skillsWithoutExclude);
+  });
+});
+
+describe("Session", () => {
+  it("reports whether its current project agent is available", () => {
+    const session: Session = {
+      id: "0199",
+      projectId: "p1",
+      folder: "/tmp/demo",
+      agentId: "base-agent.agent",
+      agentAvailable: false,
+      model: "scripted/one",
+      thinkingLevel: "off",
+      phase: "idle",
+      archived: false,
+      createdAt: "2026-08-02T09:00:00.000Z",
+    };
+
+    assert.equal(session.agentAvailable, false);
+  });
+});
 
 describe("parseSessionDraft", () => {
   it("reads a project and an agent", () => {

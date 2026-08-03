@@ -15,7 +15,10 @@ import type { SettingsStore } from "../settings/public.ts";
 
 export type PluginsSnapshotSources = {
   plugins: Pick<PluginSupervisor, "statuses">;
-  registry: Pick<ContributionRegistry, "revision" | "resolved" | "switchedOff" | "conflicts">;
+  registry: Pick<
+    ContributionRegistry,
+    "revision" | "pluginContributions" | "switchedOff" | "conflicts"
+  >;
   /** Предпочтения нужны не как файл, а как решение: что из записанного действует прямо сейчас. */
   settings: Pick<SettingsStore, "current">;
 };
@@ -50,7 +53,7 @@ export function buildPluginsSnapshot(sources: PluginsSnapshotSources): PluginsSn
   return {
     revision: sources.registry.revision(),
     plugins: statuses,
-    contributions: sources.registry.resolved(),
+    contributions: sources.registry.pluginContributions(),
     switchedOffContributions: sources.registry.switchedOff(),
     conflicts: sources.registry.conflicts(),
     enablement,

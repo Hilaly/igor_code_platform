@@ -28,6 +28,8 @@
 | `POST /api/projects`                                  | Создать проект на папке                              | нужна сессия |
 | `PUT /api/projects/:id`                               | Переименовать, архивировать или восстановить         | нужна сессия |
 | `DELETE /api/projects/:id`                            | Удалить проект безвозвратно, если нет сессий         | нужна сессия |
+| `GET /api/projects/:id/agents`                        | Применимые агенты выбранного проекта                 | нужна сессия |
+| `GET /api/projects/:id/file-resources`                | Файловые агенты, скилы и их диагностика              | нужна сессия |
 | `GET /api/providers`                                  | Провайдеры LLM и статус авторизации у каждого        | нужна сессия |
 | `GET /api/providers/:providerId/models`               | Модели одного провайдера                             | нужна сессия |
 | `POST /api/providers/refresh`                         | Перечитать динамические списки моделей               | нужна сессия |
@@ -238,13 +240,14 @@ data: {"index":18,"time":"2026-07-27T07:06:07.923Z","type":"core.plugin.lifecycl
 
 События ядра:
 
-| Тип                         | Когда                                               |
-| --------------------------- | --------------------------------------------------- |
-| `core.plugin.lifecycle`     | Переход состояния плагина                           |
-| `core.plugin.contributions` | Действующий набор вкладов изменился                 |
-| `core.preferences.changed`  | Изменились цветовая схема, вариант или локаль       |
-| `core.sessions.changed`     | Список сессий или состояние одной из них изменились |
-| `core.stream.gap`           | Пропущенного уже нет, состояние надо перезапросить  |
+| Тип                          | Когда                                               |
+| ---------------------------- | --------------------------------------------------- |
+| `core.plugin.lifecycle`      | Переход состояния плагина                           |
+| `core.plugin.contributions`  | Действующий набор вкладов изменился                 |
+| `core.contributions.changed` | Контекстные наборы вкладов изменились               |
+| `core.preferences.changed`   | Изменились цветовая схема, вариант или локаль       |
+| `core.sessions.changed`      | Список сессий или состояние одной из них изменились |
+| `core.stream.gap`            | Пропущенного уже нет, состояние надо перезапросить  |
 
 У `core.preferences.changed` нагрузки нет: событие говорит «изменилось», а состояние спрашивается у
 владельца — `GET /api/preferences` ([event-bus.md](event-bus.md)). О записях
@@ -285,7 +288,10 @@ data: {"index":73,"time":"2026-07-27T08:12:08.713Z","type":"tracker.task.created
 
 ```bash
 curl -b jar localhost:5273/api/agents
-# {"agents":[{"id":"base-agent.agent","title":"Base agent","pluginKey":"builtin:base-agent","source":"builtin","skills":[]}]}
+# {"agents":[{"id":"base-agent.agent","title":"Base agent","ownership":"plugin","pluginKey":"builtin:base-agent","source":"builtin","skills":{"include":[],"exclude":[]}}]}
+
+curl -b jar localhost:5273/api/projects/b7Kq3xv9pQdT/agents
+# {"agents":[{"id":"review","description":"Reviews changes","ownership":"standalone","source":"project:b7Kq3xv9pQdT","scope":"project","projectId":"b7Kq3xv9pQdT","skills":{"include":[],"exclude":[]}}]}
 
 curl -b jar -X POST localhost:5273/api/sessions -H 'content-type: application/json' \
   -d '{"projectId":"b7Kq3xv9pQdT","agentId":"base-agent.agent","model":"anthropic/claude-opus-4-5"}'
@@ -304,8 +310,57 @@ curl -b jar -X POST localhost:5273/api/sessions/0199…/turns -H 'content-type: 
 она равна `queued`: турн принят, но ещё не начат ([architecture.md](architecture.md)). Значения:
 `idle`, `queued`, `turn`, `compaction`, `branch-summary`, `retry`.
 
-**Ноль агентов — законный ответ `GET /api/agents`, а не отказ:** единственный плагин с агентом могли
-выключить.
+`GET /api/agents` — базовый каталог без контекста проекта: built-in, data и пользовательские
+standalone-агенты. Проектные определения в него не входят. Маршрут сохраняется для общего обзора и
+обратной совместимости, но выбирать агента для новой проектной сессии надо только из
+`GET /api/projects/:id/agents`. Оба маршрута возвращают точную форму `{ agents: AgentSummary[] }`,
+а ноль агентов — законный `200 {"agents":[]}`.
+
+Веб-форма следует этому контракту буквально: сначала выбирается проект, и только после этого она
+запрашивает `GET /api/projects/:id/agents` и включает поле агента. При смене проекта прежний запрос
+отменяется, агент, модель и уровень размышлений сбрасываются; протухший ответ другого проекта не
+применяется. Пустой список, ожидание и отказ показываются как состояния именно выбранного проекта.
+Переход со страницы проекта сразу подставляет его и запускает тот же проектный запрос, а прямой
+переход на `/sessions/new` оставляет проект пустым. `core.contributions.changed` инвалидирует
+каталог текущего проекта: форма перечитывает его и снимает выбор агента, если тот исчез.
+`core.projects.changed` перечитывает варианты открытой формы; если выбранный проект удалён,
+архивирован или стал недоступен, форма снимает проект и все зависимые значения и отменяет запрос его
+агентов.
+
+```ts
+type AgentsSnapshot = { agents: AgentSummary[] };
+
+type AgentSummary = {
+  id: string;
+  title?: string;
+  description?: string;
+  model?: string;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  skills: { include: string[]; exclude: string[] };
+} & (
+  | {
+      ownership: "plugin";
+      pluginKey: string;
+      source: "builtin" | "data" | `project:${string}`;
+    }
+  | {
+      ownership: "standalone";
+      source: string;
+      scope: "user" | "project";
+      projectId?: string;
+    }
+);
+```
+
+Проектный маршрут уже разрешил приоритеты `project → user → built-in`: в ответ попадают только
+действующие агенты, без invalid и shadowed определений. Неизвестный проект отвечает `404
+{"error":"not found"}`. Архивный проект и проект с пропавшей папкой отвечают `409` с причиной — те
+же предусловия действуют при создании сессии.
+
+Даже после успешного чтения каталога `POST /api/sessions` повторно проверяет `projectId` и `agentId`
+на текущем серверном снимке. Устаревший выбор клиента поэтому получает `409`, а не создаёт сессию с
+уже исчезнувшим агентом. Исчезновение агента сохранённой сессии не закрывает чтение истории, но
+операции модели и harness, которым нужен агент, отвечают `409` с понятной причиной до его возврата.
 
 Отказы создания сессии — `409` с причиной: проект архивный, папка проекта пропала, такого агента
 никто не включал, у агента нет модели по умолчанию и её не назвали, названной модели нет в каталоге.
@@ -571,6 +626,49 @@ curl -b jar -X DELETE http://localhost:5273/api/projects/b7Kq3xv9pQdT
 себе, поэтому смену приносит событие `core.projects.changed`, а не ответ запроса
 ([event-bus.md](event-bus.md)). `sessionCount` считается по уже загруженному снимку списка сессий:
 сравнивается `folderKey`, поэтому сам запрос проектов на диск за деревьями не ходит.
+
+### Файловые ресурсы проекта
+
+`GET /api/projects/:id/file-resources` возвращает один атомарный снимок без пагинации:
+
+```ts
+type FileResourcesSnapshot = {
+  revision: number;
+  resources: FileResourceSummary[];
+  diagnostics: FileResourceDiagnostic[];
+};
+
+type FileResourceSummary = {
+  kind: "agent" | "skill";
+  id?: string;
+  name?: string;
+  ownership: "standalone" | "plugin";
+  scope: "built-in" | "user" | "project";
+  source: string;
+  path: string;
+  state: "active" | "shadowed" | "switched-off" | "invalid";
+  pluginKey?: string;
+  description?: string;
+};
+
+type FileResourceDiagnostic = {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  path: string;
+  kind?: "agent" | "skill";
+  id?: string;
+};
+```
+
+Снимок включает все состояния, а не только применимые определения: UI видит затенённые,
+выключенные и некорректные файлы вместе с причиной. Для пустого проекта ответ — `200` с текущей
+`revision` и пустыми `resources` и `diagnostics`. Неизвестный проект отвечает `404`; архивный или с
+недоступной папкой — `409`, как проектный каталог агентов и создание сессии.
+
+`revision` совпадает с ревизией инвалидации `core.contributions.changed`. После такого события
+клиент повторно запрашивает оба подресурса выбранного проекта, если они ему нужны; сама ревизия
+живёт только до перезапуска демона и не является постоянной версией данных.
 
 ### Проводник файловой системы
 

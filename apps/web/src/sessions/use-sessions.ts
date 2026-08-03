@@ -1,20 +1,22 @@
 /**
- * Связь вью сессий с демоном: список и агенты на подъёме соединения, записи открытой сессии по её
- * адресу, турн и прерывание по нажатию. Своего потока вью не открывает — соединение одно на вкладку
- * (docs/web-api.md).
+ * Связь вью сессий с демоном: список на подъёме соединения, проектный каталог агентов по выбору в
+ * черновике, записи открытой сессии по её адресу, турн и прерывание по нажатию. Своего потока вью
+ * не открывает — соединение одно на вкладку (docs/web-api.md).
  *
  * Дельты турна приезжают не шиной, а отдельным кадром того же соединения: их сотни на один ответ
  * модели, и на шину они не выходят (docs/sessions-and-projects.md). Поэтому кадр приходит сюда
  * вызовом `receiveSessionDelta`, как шаг входа во вью провайдеров.
  */
 
-import type {
-  SessionDeltaFrame,
-  SessionDraft,
-  SessionForkRequest,
-  SessionMessage,
-  SessionNavigateRequest,
-  SessionUpdate,
+import {
+  coreEventTypes,
+  type AgentSummary,
+  type SessionDeltaFrame,
+  type SessionDraft,
+  type SessionForkRequest,
+  type SessionMessage,
+  type SessionNavigateRequest,
+  type SessionUpdate,
 } from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -24,12 +26,12 @@ import { fetchProjectsSnapshot } from "../projects/api.ts";
 import { fetchProviderModels, fetchProvidersSnapshot } from "../providers/api.ts";
 import {
   createSession as createSessionRequest,
-  fetchAgents,
   fetchBranch,
   fetchContextUsage,
   fetchEntries,
   fetchSession,
   fetchSessions,
+  fetchProjectAgents,
   fetchStats,
   forkSession as forkSessionRequest,
   interruptTurn,
@@ -46,7 +48,6 @@ import {
   type SessionOutcome,
 } from "./api.ts";
 import {
-  applyAgents,
   applyBranch,
   applyContext,
   applyEntries,
@@ -85,9 +86,12 @@ export type UseSessionsOptions = {
 
 export type SessionsController = {
   state: SessionsState;
+  projectAgents: ProjectAgentsState;
   createSession: (draft: SessionDraft) => Promise<CreateSessionOutcome>;
   /** Подготовить диалог создания: проекты и настроенные провайдеры. Зовётся по его открытию. */
   prepareDraft: () => void;
+  /** Выбрать проект черновика и прочитать только разрешённых в нём агентов. */
+  selectProject: (projectId: string) => void;
   /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
   loadModels: (providerId: string) => void;
   submitTurn: (text: string) => void;
@@ -113,12 +117,20 @@ export type SessionsController = {
   receiveSessionDelta: (frame: SessionDeltaFrame) => void;
 };
 
+export type ProjectAgentsState = {
+  projectId?: string;
+  agents?: AgentSummary[];
+  loading: boolean;
+  failure?: string;
+};
+
 const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
 export function useSessions(options: UseSessionsOptions): SessionsController {
   const { bus, stream, sessionId, projectId, onDiagnostic } = options;
   const [state, setState] = useState<SessionsState>(initialSessionsState);
+  const [projectAgents, setProjectAgents] = useState<ProjectAgentsState>({ loading: false });
 
   // То же зеркало, что во вью провайдеров: правило смотрит на предыдущее состояние, а дельты
   // приходят чаще, чем React успевает отрисовать. Единственный источник изменения — `apply`.
@@ -129,7 +141,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   }, []);
 
   const pendingSessions = useRef<AbortController | undefined>(undefined);
+  const pendingDraftProjects = useRef<AbortController | undefined>(undefined);
+  const draftProjectsSequence = useRef(0);
   const pendingAgents = useRef<AbortController | undefined>(undefined);
+  const projectAgentsSequence = useRef(0);
+  const selectedProject = useRef<string | undefined>(undefined);
   const pendingOpen = useRef<AbortController | undefined>(undefined);
 
   const reloadSessions = useCallback(() => {
@@ -152,23 +168,85 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       });
   }, [apply, onDiagnostic, projectId]);
 
-  const reloadAgents = useCallback(() => {
-    pendingAgents.current?.abort();
+  const reloadProjectAgents = useCallback(
+    (selected: string) => {
+      pendingAgents.current?.abort();
+
+      const controller = new AbortController();
+      pendingAgents.current = controller;
+      const sequence = projectAgentsSequence.current + 1;
+      projectAgentsSequence.current = sequence;
+      setProjectAgents({ projectId: selected, loading: true });
+
+      void fetchProjectAgents(selected, controller.signal)
+        .then((snapshot) => {
+          if (controller.signal.aborted || projectAgentsSequence.current !== sequence) {
+            return;
+          }
+
+          setProjectAgents({ projectId: selected, agents: snapshot.agents, loading: false });
+        })
+        .catch((cause: unknown) => {
+          if (controller.signal.aborted || projectAgentsSequence.current !== sequence) {
+            return;
+          }
+
+          const failure = reasonOf(cause);
+          onDiagnostic(`the agents of project ${selected} could not be read: ${failure}`);
+          setProjectAgents({ projectId: selected, loading: false, failure });
+        });
+    },
+    [onDiagnostic],
+  );
+
+  const selectProject = useCallback(
+    (selected: string) => {
+      selectedProject.current = selected === "" ? undefined : selected;
+
+      if (selected === "") {
+        pendingAgents.current?.abort();
+        projectAgentsSequence.current += 1;
+        setProjectAgents({ loading: false });
+        return;
+      }
+
+      reloadProjectAgents(selected);
+    },
+    [reloadProjectAgents],
+  );
+
+  const reloadDraftProjects = useCallback(() => {
+    pendingDraftProjects.current?.abort();
 
     const controller = new AbortController();
-    pendingAgents.current = controller;
+    pendingDraftProjects.current = controller;
+    const sequence = draftProjectsSequence.current + 1;
+    draftProjectsSequence.current = sequence;
 
-    void fetchAgents(controller.signal)
-      .then((snapshot) => apply((current) => applyAgents(current, snapshot.agents)))
-      .catch((cause: unknown) => {
-        if (controller.signal.aborted) {
+    void fetchProjectsSnapshot(controller.signal)
+      .then((snapshot) => {
+        if (controller.signal.aborted || draftProjectsSequence.current !== sequence) {
           return;
         }
 
-        // Список сессий от агентов не зависит: без них нельзя создать новую, но не читать старые.
-        onDiagnostic(`the agents could not be read: ${reasonOf(cause)}`);
+        apply((current) => applyProjects(current, snapshot.projects));
+
+        const selected = selectedProject.current;
+        if (
+          selected !== undefined &&
+          !latest.current.projects?.some((project) => project.id === selected)
+        ) {
+          selectProject("");
+        }
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted || draftProjectsSequence.current !== sequence) {
+          return;
+        }
+
+        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`);
       });
-  }, [apply, onDiagnostic]);
+  }, [apply, onDiagnostic, selectProject]);
 
   /**
    * Снимок открытой сессии, её записи, счёт и заполнение контекста. Спрашиваются вместе и под одной
@@ -265,9 +343,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     // дельты разрыва не догоняются, и в обоих случаях правильный ход один — спросить заново.
     apply(reconnected);
     reloadSessions();
-    reloadAgents();
+    if (selectedProject.current !== undefined) {
+      reloadProjectAgents(selectedProject.current);
+    }
     reloadOpen();
-  }, [apply, reloadAgents, reloadOpen, reloadSessions, sessionId, stream]);
+  }, [apply, reloadOpen, reloadProjectAgents, reloadSessions, sessionId, stream]);
 
   useEffect(() => {
     const unsubscribe = bus.subscribe((event) => {
@@ -279,14 +359,30 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         reloadSessions();
         reloadOpen();
       }
+
+      if (event.type === coreEventTypes.contributionsChanged) {
+        reloadOpen();
+      }
+
+      if (
+        event.type === coreEventTypes.contributionsChanged &&
+        selectedProject.current !== undefined
+      ) {
+        reloadProjectAgents(selectedProject.current);
+      }
+
+      if (event.type === coreEventTypes.projectsChanged && latest.current.projects !== undefined) {
+        reloadDraftProjects();
+      }
     });
 
     return unsubscribe;
-  }, [apply, bus, reloadOpen, reloadSessions]);
+  }, [apply, bus, reloadDraftProjects, reloadOpen, reloadProjectAgents, reloadSessions]);
 
   useEffect(
     () => () => {
       pendingSessions.current?.abort();
+      pendingDraftProjects.current?.abort();
       pendingAgents.current?.abort();
       pendingOpen.current?.abort();
     },
@@ -294,18 +390,14 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   const prepareDraft = useCallback(() => {
-    void fetchProjectsSnapshot()
-      .then((snapshot) => apply((current) => applyProjects(current, snapshot.projects)))
-      .catch((cause: unknown) =>
-        onDiagnostic(`the projects could not be read: ${reasonOf(cause)}`),
-      );
+    reloadDraftProjects();
 
     void fetchProvidersSnapshot()
       .then((snapshot) => apply((current) => applyProviders(current, snapshot.providers)))
       .catch((cause: unknown) =>
         onDiagnostic(`the providers could not be read: ${reasonOf(cause)}`),
       );
-  }, [apply, onDiagnostic]);
+  }, [apply, onDiagnostic, reloadDraftProjects]);
 
   const loadModels = useCallback(
     (providerId: string) => {
@@ -629,8 +721,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
 
   return {
     state,
+    projectAgents,
     createSession,
     prepareDraft,
+    selectProject,
     loadModels,
     submitTurn,
     submitTurnToSession,

@@ -19,9 +19,12 @@ export type SessionPhase = "idle" | "queued" | "turn" | "compaction" | "branch-s
 
 export type Session = {
   id: string;
+  /** Идентичность проекта для разрешения вкладов и принадлежности сессии. */
   projectId: string;
+  /** Рабочий контекст рантайма и файловых инструментов; не заменяет идентичность проекта. */
   folder: string;
   agentId: string;
+  agentAvailable: boolean;
   /** `<провайдер>/<модель>`. */
   model: string;
   thinkingLevel: ThinkingLevel;
@@ -107,16 +110,39 @@ export type SessionEntriesPage = {
   seen: number;
 };
 
-export type AgentSummary = {
+/** Нормализованный selector в ответе ядра; в отличие от SDK-объявления оба списка уже существуют. */
+export type NormalizedAgentSkillSelection = {
+  include: string[];
+  exclude: string[];
+};
+
+type AgentSummaryCommon = {
   id: string;
   title?: string;
   description?: string;
-  pluginKey: string;
-  source: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  skills: string[];
+  skills: NormalizedAgentSkillSelection;
 };
+
+/** Копия `PluginSource` из протокола: SDK не тянет внутренний пакет. */
+export type AgentPluginSource = "builtin" | "data" | `project:${string}`;
+
+export type AgentSummary = AgentSummaryCommon &
+  (
+    | {
+        ownership: "plugin";
+        pluginKey: string;
+        source: AgentPluginSource;
+      }
+    | {
+        ownership: "standalone";
+        pluginKey?: never;
+        source: string;
+        scope: "user" | "project";
+        projectId?: string;
+      }
+  );
 
 export type SessionDraft = {
   projectId: string;

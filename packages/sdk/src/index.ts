@@ -21,6 +21,7 @@ export { thinkingLevels } from "./host.ts";
 
 export type {
   AgentContribution,
+  AgentSkillSelection,
   AgentToolSelection,
   CustomContribution,
   EventContribution,
@@ -39,7 +40,9 @@ export { providers } from "./providers.ts";
 export { foldEntryLabels, sessions } from "./sessions.ts";
 
 export type {
+  AgentPluginSource,
   AgentSummary,
+  NormalizedAgentSkillSelection,
   Session,
   SessionBranch,
   SessionCompactAccepted,

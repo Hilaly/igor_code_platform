@@ -13,19 +13,30 @@ import { Worker } from "node:worker_threads";
 import type { LoginStep, PluginContribution } from "@sovereign/sdk";
 import {
   coreEventTypes,
+  type ContributionRegistration,
   type LogSource,
   type PluginLifecycleState,
   type PluginStatus,
   type Preferences,
 } from "@sovereign/protocol";
 
-import type { ContributingPlugin, ContributionRegistry } from "./contribution-registry.ts";
+import type {
+  ContributingPlugin,
+  ContributionRegistry,
+  FileContributionInput,
+} from "./contribution-registry.ts";
 import type { EventBus } from "../platform/public.ts";
 import type { Logger } from "../platform/public.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";
-import type { DiscoveredPlugin, PluginDiscovery } from "./plugin-sources.ts";
+import {
+  rediscoverPlugin,
+  type DiscoveredPlugin,
+  type DiscoveredPluginFileResources,
+  type PluginDiscovery,
+} from "./plugin-sources.ts";
+import type { ChangedPluginDirectory } from "./plugin-watcher.ts";
 import type {
   PluginIncoming,
   PluginLoginReply,
@@ -40,7 +51,7 @@ export type PluginSupervisor = {
   /** Привести живое к желаемому: поднять включённые, погасить выключенные, забыть исчезнувшие. */
   apply: (discovery: PluginDiscovery, preferences: Preferences) => Promise<void>;
   /** Поднять заново включённые плагины из перечисленных папок: их исходники изменились. */
-  reload: (directories: Iterable<string>) => Promise<void>;
+  reload: (directories: Iterable<ChangedPluginDirectory>) => Promise<void>;
   stopAll: () => Promise<void>;
 };
 
@@ -63,6 +74,8 @@ export type CreatePluginSupervisorOptions = {
   registry: ContributionRegistry;
   /** Куда уходят переходы жизненного цикла и смена набора вкладов (docs/plugins.md). */
   bus: EventBus;
+  /** Общая инвалидация контекстных вкладов; дедупликация по revision живёт в composition root. */
+  publishContributionChanges?: () => void;
   /** Источник записи штампует ядро: плагин не может назваться чужим именем (docs/logging.md). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
@@ -116,16 +129,20 @@ type Supervised = {
   attempt: number;
   nextAttemptAt?: number;
   worker?: Worker;
+  stoppingWorker?: Worker;
   runningSince?: number;
   /** Вклады копятся до `activated` и применяются одним снимком (docs/ui-extension-model.md). */
   pending: PluginContribution[];
   /** Последний применённый снимок: он переприменяется, когда человек переключил вклад. */
   contributed: PluginContribution[];
+  /** Файловый снимок той же успешной активации; новый discovery не публикует его раньше времени. */
+  fileResources: DiscoveredPluginFileResources;
   /** Почему объявленный вклад не появился (docs/plugins.md): причина живёт до следующего применения. */
   contributionProblems: string[];
   disabledContributions: ReadonlySet<string>;
   /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
   enabled: boolean;
+  resourceChanged: boolean;
   cancelRetry?: CancelScheduled;
   /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
   startToken?: object;
@@ -195,36 +212,46 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     bus.publish(coreEventTypes.pluginLifecycle, status);
   };
 
-  /**
-   * Ревизия реестра растёт только при настоящем изменении набора, поэтому она же и решает, есть ли
-   * о чём сообщать: переприменение того же снимка никого не будит.
-   */
-  let publishedRevision = registry.revision();
-
-  const publishContributions = (): void => {
+  /** Plugin-specific событие следует только за мутацией плагина; standalone меняет тот же реестр. */
+  const publishContributions = (previousRevision: number): void => {
     const revision = registry.revision();
 
-    if (revision === publishedRevision) {
+    if (revision === previousRevision) {
       return;
     }
 
-    publishedRevision = revision;
     bus.publish(coreEventTypes.pluginContributions, {
       revision,
       contributions: registry.resolved(),
     });
+    options.publishContributionChanges?.();
   };
 
   /** Единственное место, где вклады плагина попадают в реестр: снимком, между activate и running. */
   const applyContributions = (entry: Supervised): void => {
-    const outcome = registry.apply(entry.plugin, entry.contributed, entry.disabledContributions);
+    const revision = registry.revision();
+    const outcome = registry.applyPlugin(
+      {
+        plugin: entry.plugin,
+        contributions: entry.contributed,
+        fileContributions: fileContributions(entry.plugin, entry.fileResources),
+        disabledContributions: entry.disabledContributions,
+      },
+      { resourceChanged: entry.resourceChanged },
+    );
+    entry.resourceChanged = false;
 
     // Причина уезжает в статус, то есть и в снимок, и в событие жизненного цикла: вклады
     // применяются перед переходом в `running`, поэтому событие уносит её с собой. Переключение
     // вклада набор проблем не меняет — они про форму объявления, а не про решение человека.
-    entry.contributionProblems = outcome.problems;
+    entry.contributionProblems = [
+      ...outcome.problems,
+      ...entry.fileResources.invalid.flatMap((resource) =>
+        resource.diagnostics.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`),
+      ),
+    ];
 
-    for (const problem of outcome.problems) {
+    for (const problem of entry.contributionProblems) {
       // Кривой вклад — событие жизненного цикла плагина, а не исключение (docs/plugins.md).
       logger.warn("the plugin contribution was not applied", {
         plugin: entry.plugin.key,
@@ -250,15 +277,18 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       );
     }
 
-    publishContributions();
+    publishContributions(revision);
   };
 
-  const dropContributions = (entry: Supervised): void => {
+  const dropContributions = (entry: Supervised, preserveSnapshot = false): void => {
+    const revision = registry.revision();
     entry.pending = [];
     entry.contributed = [];
     // Причина уходит вместе с вкладами: у выгруженного плагина объявленного нет вовсе.
     entry.contributionProblems = [];
-    registry.remove(entry.plugin.key);
+    if (!preserveSnapshot) {
+      registry.remove(entry.plugin.key);
+    }
 
     // Подписки снимаются здесь же, где вклады: перезагруженный плагин подпишется заново, и две
     // подписки на одно имя означали бы двойную доставку.
@@ -267,7 +297,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // По той же причине здесь снимается и всё, что плагин занял у провайдеров: воркера больше нет,
     // а идущий вход держал бы провайдера занятым до перезапуска демона.
     options.onPluginGone?.(entry.plugin.key);
-    publishContributions();
+    publishContributions(revision);
   };
 
   const fail = (entry: Supervised, reason: string): void => {
@@ -311,12 +341,25 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       ({ kind: "failed", reason: "this daemon answers no requests from plugins" }) as const);
 
   const handle = (entry: Supervised, worker: Worker, message: PluginOutgoing): void => {
+    // Listener старого worker может получить уже поставленное в очередь сообщение после того, как
+    // stop/reload обнулили текущий worker. Такое сообщение не принадлежит новой попытке lifecycle.
+    const current =
+      entry.worker === worker && (entry.state === "starting" || entry.state === "running");
+    const stopping = entry.stoppingWorker === worker && entry.state === "stopping";
+
+    if (!current && !(stopping && (message.kind === "log" || message.kind === "deactivated"))) {
+      return;
+    }
+
     switch (message.kind) {
       case "log":
         entry.logger[message.level](message.message, message.fields);
 
         return;
       case "contribute":
+        if (entry.state !== "starting") {
+          return;
+        }
         entry.pending.push(message.contribution);
 
         return;
@@ -369,7 +412,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         return;
       }
       case "activated":
+        if (entry.state !== "starting") {
+          return;
+        }
         entry.contributed = entry.pending;
+        entry.fileResources = entry.plugin.fileResources;
         applyContributions(entry);
         entry.runningSince = now();
         entry.nextAttemptAt = undefined;
@@ -466,7 +513,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     });
   };
 
-  const stop = async (entry: Supervised, finalState: PluginLifecycleState): Promise<void> => {
+  const stop = async (
+    entry: Supervised,
+    finalState: PluginLifecycleState,
+    preserveSnapshot = false,
+  ): Promise<void> => {
     entry.cancelRetry?.();
     entry.cancelRetry = undefined;
     entry.nextAttemptAt = undefined;
@@ -477,7 +528,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // Даже без воркера переход пишется в журнал: «выключен» — такое же наблюдаемое состояние, как
     // «запущен», и человек, выключивший плагин, должен увидеть подтверждение (docs/plugins.md).
     if (worker === undefined) {
-      dropContributions(entry);
+      dropContributions(entry, preserveSnapshot);
       transition(entry, finalState);
 
       return;
@@ -485,6 +536,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
     transition(entry, "stopping");
     entry.worker = undefined;
+    entry.stoppingWorker = worker;
 
     // Выгрузка ждёт `deactivate`, но не бесконечно: зависший плагин не имеет права держать
     // остановку демона (проверка 16).
@@ -529,8 +581,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     });
 
     await worker.terminate();
+    entry.stoppingWorker = undefined;
 
-    dropContributions(entry);
+    dropContributions(entry, preserveSnapshot);
     entry.runningSince = undefined;
     transition(entry, finalState);
   };
@@ -601,9 +654,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           attempt: 0,
           pending: [],
           contributed: [],
+          fileResources: plugin.fileResources,
           contributionProblems: [],
           disabledContributions: new Set(),
           enabled: false,
+          resourceChanged: false,
         };
 
         supervised.set(plugin.key, entry);
@@ -649,7 +704,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     statuses: () => [...[...supervised.values()].map(statusOf), ...refused.values()],
     apply,
     reload: async (directories) => {
-      const affected = new Set(directories);
+      const affected = new Map(
+        [...directories].map((changed) => [changed.directory, changed.fileResourcesChanged]),
+      );
 
       for (const entry of supervised.values()) {
         // Плагин, которому сейчас ставят зависимости, перезагружать нечего: он и так поднимется с
@@ -664,7 +721,17 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
         logger.info("the plugin sources changed, reloading", { plugin: entry.plugin.key });
 
-        await stop(entry, "stopped");
+        await stop(entry, "stopped", true);
+        const refreshed = rediscoverPlugin(entry.plugin);
+        if (refreshed === undefined) {
+          const revision = registry.revision();
+          registry.removePlugin(entry.plugin.key);
+          publishContributions(revision);
+          supervised.delete(entry.plugin.key);
+          continue;
+        }
+        entry.plugin = refreshed;
+        entry.resourceChanged = affected.get(entry.plugin.directory) === true;
         entry.attempt = 0;
         start(entry);
       }
@@ -681,5 +748,71 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       // оставляло старую доставлять события в дохлые хэндлы воркеров.
       events.close();
     },
+  };
+}
+
+function fileContributions(
+  plugin: DiscoveredPlugin,
+  fileResources: DiscoveredPluginFileResources,
+): FileContributionInput[] {
+  return [
+    ...fileResources.definitions.map((definition): FileContributionInput => ({
+      path: definition.entryPath,
+      kind: definition.kind,
+      diagnostics: definition.diagnostics,
+      name: definition.name,
+      description: definition.description,
+      id: `${plugin.id}.${definition.name}`,
+      registration: fileRegistration(plugin, definition),
+    })),
+    ...fileResources.invalid.map((resource): FileContributionInput => ({
+      path: resource.entryPath,
+      kind: resource.kind,
+      diagnostics: resource.diagnostics,
+    })),
+  ];
+}
+
+function fileRegistration(
+  plugin: DiscoveredPlugin,
+  definition: DiscoveredPlugin["fileResources"]["definitions"][number],
+): Extract<ContributionRegistration, { kind: "agent" | "skill" }> {
+  const ownership = {
+    ownership: "plugin" as const,
+    pluginKey: plugin.key,
+    pluginId: plugin.id,
+    source: plugin.source,
+  };
+  const common = {
+    ...ownership,
+    id: `${plugin.id}.${definition.name}`,
+    declaredId: definition.name,
+    description: definition.description,
+  };
+
+  if (definition.kind === "agent") {
+    return {
+      ...common,
+      kind: "agent",
+      instructions: definition.instructions,
+      tools: definition.tools,
+      skills: definition.skills,
+      ...(definition.model === undefined ? {} : { model: definition.model }),
+      ...(definition.thinkingLevel === undefined
+        ? {}
+        : { thinkingLevel: definition.thinkingLevel }),
+    };
+  }
+
+  return {
+    ...common,
+    kind: "skill",
+    name: definition.name,
+    location: definition.location,
+    ...(definition.license === undefined ? {} : { license: definition.license }),
+    ...(definition.compatibility === undefined ? {} : { compatibility: definition.compatibility }),
+    ...(definition.metadata === undefined ? {} : { metadata: definition.metadata }),
+    ...(definition.allowedTools === undefined ? {} : { allowedTools: definition.allowedTools }),
+    disableModelInvocation: definition.disableModelInvocation,
   };
 }

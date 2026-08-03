@@ -1,7 +1,19 @@
-import { projectPath, projectsPath, type Project } from "@sovereign/protocol";
+import {
+  projectFileResourcesPath,
+  projectPath,
+  projectsPath,
+  type FileResourcesSnapshot,
+  type Project,
+} from "@sovereign/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createProject, deleteProject, fetchProjectsSnapshot, updateProject } from "./api.ts";
+import {
+  createProject,
+  deleteProject,
+  fetchProjectFileResources,
+  fetchProjectsSnapshot,
+  updateProject,
+} from "./api.ts";
 
 type Answer = { status: number; body: unknown };
 
@@ -59,6 +71,31 @@ describe("fetchProjectsSnapshot", () => {
     daemon({ status: 500, body: {} });
 
     await expect(fetchProjectsSnapshot()).rejects.toThrow("the daemon answered 500");
+  });
+});
+
+describe("fetchProjectFileResources", () => {
+  const snapshot: FileResourcesSnapshot = { revision: 7, resources: [], diagnostics: [] };
+
+  it("asks the exact project file-resources route and carries the abort signal", async () => {
+    const calls = daemon({ status: 200, body: snapshot });
+    const controller = new AbortController();
+
+    await expect(fetchProjectFileResources("project/one", controller.signal)).resolves.toEqual(
+      snapshot,
+    );
+    expect(calls[0]).toEqual({
+      url: projectFileResourcesPath("project/one"),
+      init: { signal: controller.signal },
+    });
+  });
+
+  it("carries the daemon reason when the project resources cannot be read", async () => {
+    daemon({ status: 409, body: { error: "the project folder is unavailable" } });
+
+    await expect(fetchProjectFileResources("missing")).rejects.toThrow(
+      "the project folder is unavailable",
+    );
   });
 });
 

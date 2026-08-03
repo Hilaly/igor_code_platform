@@ -31,23 +31,24 @@
 **Публичность объявляется в документе, который описывает интерфейс.** Правило применяется к тому, что
 названо публичным явно; «видно из кода» публичным не делает.
 
-| Поверхность                                   | Где описана                                          |
-| --------------------------------------------- | ---------------------------------------------------- |
-| `@sovereign/sdk` и `@sovereign/sdk/testing`   | [plugins.md](plugins.md)                             |
-| Поверхность `providers.*` и её типы в SDK     | [models-and-providers.md](models-and-providers.md)   |
-| Отбор инструментов агента: синтаксис шаблонов | [plugins.md](plugins.md)                             |
-| Манифест: поле `sovereign` и состав его полей | [plugins.md](plugins.md)                             |
-| Виды вкладов и состав каждого                 | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
-| Имена мест и правила разрешения провайдеров   | [ui-extension-model.md](ui-extension-model.md)       |
-| UI-кит: компоненты и их свойства              | [ui-kit.md](ui-kit.md)                               |
-| Семантические токены и политика устаревания   | [ui-kit.md](ui-kit.md)                               |
-| Палитра, форма схемы и `tokenContractMajor`   | [ui-kit.md](ui-kit.md)                               |
-| HTTP API ядра и форма SSE-потока              | [web-api.md](web-api.md)                             |
-| Схемы событий ядра                            | [event-bus.md](event-bus.md)                         |
-| Хуки: перечень, виды, слияние, форма отказа   | [hooks.md](hooks.md)                                 |
-| Типы событий Pi, реэкспортированные из `sdk`  | [hooks.md](hooks.md)                                 |
-| Поверхность `sessions.*` и её типы в SDK      | [sessions-and-projects.md](sessions-and-projects.md) |
-| Хранилище плагина: ключ и папка               | [plugins.md](plugins.md)                             |
+| Поверхность                                    | Где описана                                          |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| `@sovereign/sdk` и `@sovereign/sdk/testing`    | [plugins.md](plugins.md)                             |
+| Поверхность `providers.*` и её типы в SDK      | [models-and-providers.md](models-and-providers.md)   |
+| Отбор инструментов и скилов агента             | [plugins.md](plugins.md)                             |
+| Манифест: поле `sovereign` и состав его полей  | [plugins.md](plugins.md)                             |
+| Виды вкладов и состав каждого                  | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
+| Имена мест и правила разрешения провайдеров    | [ui-extension-model.md](ui-extension-model.md)       |
+| UI-кит: компоненты и их свойства               | [ui-kit.md](ui-kit.md)                               |
+| Семантические токены и политика устаревания    | [ui-kit.md](ui-kit.md)                               |
+| Палитра, форма схемы и `tokenContractMajor`    | [ui-kit.md](ui-kit.md)                               |
+| HTTP API ядра и форма SSE-потока               | [web-api.md](web-api.md)                             |
+| Проектные каталоги агентов и файловых ресурсов | [plugins.md](plugins.md)                             |
+| Схемы событий ядра                             | [event-bus.md](event-bus.md)                         |
+| Хуки: перечень, виды, слияние, форма отказа    | [hooks.md](hooks.md)                                 |
+| Типы событий Pi, реэкспортированные из `sdk`   | [hooks.md](hooks.md)                                 |
+| Поверхность `sessions.*` и её типы в SDK       | [sessions-and-projects.md](sessions-and-projects.md) |
+| Хранилище плагина: ключ и папка                | [plugins.md](plugins.md)                             |
 
 Публичная поверхность кита — это ровно то, что он экспортирует из `src/index.ts`: примитивы,
 токены (палитра, роли, объявление схемы, `applyRoles` и `applyScale`), список схем поставки
@@ -66,6 +67,68 @@
 `ProviderSummary`, `ModelSummary` и остальное своей копией, чтобы не тянуть внутренние пакеты в
 папку внешнего плагина. Расхождение копии с протоколом обязано быть ломающим изменением обоих, и
 проверяется это компилятором в мосте демона, а не глазами.
+
+### Агенты, скилы и файловые ресурсы
+
+SDK принимает у `contribute.agent()` необязательные `tools` и `skills` одинаковой формы:
+
+```ts
+type AgentToolSelection = { include: string[]; exclude?: string[] };
+type AgentSkillSelection = { include: string[]; exclude?: string[] };
+```
+
+SDK передаёт объявление без подстановки умолчаний. На границе ядра оба селектора
+нормализуются в `{ include: string[]; exclude: string[] }`: отсутствующие селекторы и списки
+становятся пустыми, а не неявным `*`. Точная семантика шаблонов описана в
+[plugins.md](plugins.md).
+
+Файловый скил попадает в реестр отдельным видом вклада. Он хранит `name`, `location`,
+необязательные `license`, `compatibility`, `metadata`, нормализованный `allowedTools?: string[]`
+и обязательный `disableModelInvocation`. Plugin-owned-вклад всегда несёт `pluginKey`, `pluginId` и
+`source`. Standalone-вклад вместо фиктивного плагина несёт точный `source`, `scope` и, для
+проектного корня, `projectId`. Поэтому `AgentSummary.pluginKey` у standalone-агента отсутствует.
+
+Проектные пути `GET /api/projects/:id/agents` и
+`GET /api/projects/:id/file-resources` — публичный HTTP-контракт. Второй возвращает один
+атомарный снимок:
+
+```ts
+type FileResourceKind = "agent" | "skill";
+type FileResourceState = "active" | "shadowed" | "switched-off" | "invalid";
+type FileResourceDiagnostic = {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  path: string;
+  kind?: FileResourceKind;
+  id?: string;
+};
+type FileResourceSummary = {
+  kind: FileResourceKind;
+  name?: string;
+  id?: string;
+  ownership: "standalone" | "plugin";
+  scope: "built-in" | "user" | "project";
+  source: string;
+  path: string;
+  state: FileResourceState;
+  pluginKey?: string;
+  description?: string;
+};
+type FileResourcesSnapshot = {
+  revision: number;
+  resources: FileResourceSummary[];
+  diagnostics: FileResourceDiagnostic[];
+};
+```
+
+`revision` связывает снимок с инвалидацией `core.contributions.changed { revision }`;
+нагрузка события не дублирует контекстный набор ресурсов.
+
+Конфликт вкладов сохраняет `id`, `source` и массив `plugins`. Для equal-rank standalone-спора к
+нему добавляется `standaloneRoots?: string[]` с точными ключами корней, а `plugins` остаётся пустым.
+Такой спор виден в project file-resource diagnostics; административный `GET /api/plugins` по-прежнему
+возвращает только конфликты плагинов.
 
 **Типы событий Pi публичны, потому что отдаются плагину как есть** ([hooks.md](hooks.md)). Отсюда
 правило для обновления рантайма: оно проверяется на изменение публичного так же, как наш собственный

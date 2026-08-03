@@ -1,0 +1,11 @@
+{
+  "name": "late-activation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "late-activation",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

@@ -139,6 +139,50 @@ describe("createTurnQueue", () => {
     await settle();
   });
 
+  it("starts an older waiting turn before a new turn after the limit grows", async () => {
+    let limit = 1;
+    const queue = createTurnQueue({ limit: () => limit });
+    const order: string[] = [];
+    const first = pending();
+    const second = pending();
+    const third = pending();
+
+    queue.submit({ sessionId: "s1", kind: "turn", run: first.run });
+    queue.submit({
+      sessionId: "s2",
+      kind: "turn",
+      run: async () => {
+        order.push("second");
+        await second.run();
+      },
+    });
+    await settle();
+
+    limit = 2;
+    queue.submit({
+      sessionId: "s3",
+      kind: "turn",
+      run: async () => {
+        order.push("third");
+        await third.run();
+      },
+    });
+    await settle();
+
+    assert.deepEqual(order, ["second"]);
+    assert.equal(queue.stateOf("s2"), "running");
+    assert.equal(queue.stateOf("s3"), "queued");
+
+    first.finish();
+    second.finish();
+    await settle();
+    await settle();
+
+    assert.deepEqual(order, ["second", "third"]);
+    third.finish();
+    await settle();
+  });
+
   it("leaves a running turn alone when the limit drops", async () => {
     let limit = 2;
     const queue = createTurnQueue({ limit: () => limit });

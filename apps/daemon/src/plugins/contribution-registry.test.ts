@@ -1,367 +1,497 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { CustomContribution, PluginContribution } from "@sovereign/sdk";
+import type { ContributionRegistration, FileResourceDiagnostic } from "@sovereign/protocol";
+import type { PluginContribution } from "@sovereign/sdk";
 
-import { createContributionRegistry, type ContributingPlugin } from "./contribution-registry.ts";
+import {
+  createContributionRegistry,
+  type ContributingPlugin,
+  type FileContributionInput,
+  type StandaloneContributionSnapshot,
+} from "./contribution-registry.ts";
 
 const builtinHello: ContributingPlugin = { key: "builtin:hello", id: "hello", source: "builtin" };
 const dataHello: ContributingPlugin = { key: "data:hello", id: "hello", source: "data" };
-const dataNotes: ContributingPlugin = { key: "data:notes", id: "notes", source: "data" };
 const projectHello: ContributingPlugin = {
-  key: "project:b7Kq3xv9pQdT:hello",
+  key: "project:p1:hello",
   id: "hello",
-  source: "project:b7Kq3xv9pQdT",
+  source: "project:p1",
 };
-
-/** Вид проставляет SDK, а не автор: в реестр вклад приходит уже с ним. */
-const custom = (contribution: CustomContribution): PluginContribution => ({
-  kind: "custom",
-  ...contribution,
-});
-
-const board = custom({ id: "board", title: "Board" });
-
+const projectOtherHello: ContributingPlugin = {
+  key: "project:p2:hello",
+  id: "hello",
+  source: "project:p2",
+};
 const nothingDisabled = new Set<string>();
 
+const agent = (instructions: string): PluginContribution => ({
+  kind: "agent",
+  id: "agent",
+  instructions,
+  tools: { include: ["*"] },
+});
+
+const ids = (registrations: ContributionRegistration[]): string[] =>
+  registrations.map((registration) => registration.id);
+
+type FileRegistration = Extract<ContributionRegistration, { kind: "agent" | "skill" }>;
+
+const standaloneAgent = (
+  id: string,
+  source: string,
+  scope: "user" | "project",
+  projectId?: string,
+): Extract<ContributionRegistration, { kind: "agent" }> => ({
+  ownership: "standalone",
+  kind: "agent",
+  id,
+  declaredId: id,
+  source,
+  scope,
+  ...(projectId === undefined ? {} : { projectId }),
+  instructions: `${source} instructions`,
+  tools: { include: [], exclude: [] },
+  skills: { include: [], exclude: [] },
+});
+
+const standaloneSkill = (
+  id: string,
+  source: string,
+  scope: "user" | "project",
+  projectId?: string,
+): Extract<ContributionRegistration, { kind: "skill" }> => ({
+  ownership: "standalone",
+  kind: "skill",
+  id,
+  declaredId: id,
+  source,
+  scope,
+  ...(projectId === undefined ? {} : { projectId }),
+  name: id,
+  description: `${source} skill`,
+  location: `/roots/${source}/${id}/SKILL.md`,
+  disableModelInvocation: false,
+});
+
+const file = (
+  registration: FileRegistration,
+  path = `/definitions/${registration.id}`,
+  diagnostics: FileResourceDiagnostic[] = [],
+): FileContributionInput => ({ registration, path, diagnostics, kind: registration.kind });
+
+const acceptStandaloneSnapshot = (snapshot: StandaloneContributionSnapshot): void => {
+  void snapshot;
+};
+const acceptFileInput = (input: FileContributionInput): void => {
+  void input;
+};
+
+// @ts-expect-error Project ownership is incomplete without the project identifier.
+acceptStandaloneSnapshot({
+  rootKey: "project:missing:skills",
+  source: "sovereign",
+  scope: "project",
+  precedence: 400,
+  contributions: [],
+});
+
+// @ts-expect-error Discovery must preserve the requested kind even when parsing failed.
+acceptFileInput({ path: "/broken/ENTRY.md", diagnostics: [] });
+
+function standalone(
+  rootKey: string,
+  precedence: number,
+  contributions: FileContributionInput[],
+  overrides: { scope: "project"; projectId: string; source?: string },
+): StandaloneContributionSnapshot;
+function standalone(
+  rootKey: string,
+  precedence: number,
+  contributions: FileContributionInput[],
+  overrides?: { scope?: "user"; projectId?: never; source?: string },
+): StandaloneContributionSnapshot;
+function standalone(
+  rootKey: string,
+  precedence: number,
+  contributions: FileContributionInput[],
+  overrides:
+    | { scope: "project"; projectId: string; source?: string }
+    | { scope?: "user"; projectId?: never; source?: string } = {},
+): StandaloneContributionSnapshot {
+  return {
+    rootKey,
+    source: "sovereign",
+    scope: "user",
+    precedence,
+    contributions,
+    ...overrides,
+  } as StandaloneContributionSnapshot;
+}
+
 describe("createContributionRegistry", () => {
-  it("gives the identifier the plugin namespace", () => {
+  it("keeps a malformed project snapshot out of base resolution defensively", () => {
     const registry = createContributionRegistry();
+    const malformed = {
+      rootKey: "project:missing:skills",
+      source: "sovereign",
+      scope: "project",
+      precedence: 400,
+      contributions: [file(standaloneSkill("review", "sovereign", "project"))],
+    } as unknown as StandaloneContributionSnapshot;
 
-    const outcome = registry.apply(dataHello, [board], nothingDisabled);
+    registry.applyStandalone(malformed);
 
-    assert.deepEqual(
-      outcome.registered.map((registration) => registration.id),
-      ["hello.board"],
-    );
-    assert.deepEqual(
-      registry.resolved().map((registration) => registration.id),
-      ["hello.board"],
-    );
+    assert.deepEqual(registry.resolvedBase(), []);
   });
 
-  it("refuses an identifier that cannot be namespaced", () => {
+  it("filters project declarations before precedence and conflict resolution", () => {
     const registry = createContributionRegistry();
 
-    const outcome = registry.apply(dataHello, [custom({ id: "Board Panel" })], nothingDisabled);
+    registry.applyPlugin(builtinHello, [agent("built-in")], nothingDisabled);
+    registry.applyPlugin(dataHello, [agent("data")], nothingDisabled);
+    registry.applyPlugin(projectHello, [agent("project one")], nothingDisabled);
+    registry.applyPlugin(projectOtherHello, [agent("project two")], nothingDisabled);
 
-    assert.equal(outcome.registered.length, 0);
-    assert.equal(outcome.problems.length, 1);
-    assert.deepEqual(registry.resolved(), []);
+    assert.deepEqual(ids(registry.resolvedBase("agent")), ["hello.agent"]);
+    assert.deepEqual(ids(registry.resolvedForProject("p1", "agent")), ["hello.agent"]);
+    assert.equal(registry.resolvedBase("agent")[0]?.source, "data");
+    assert.equal(registry.resolvedForProject("p1", "agent")[0]?.source, "project:p1");
+    assert.equal(registry.resolvedForProject("p2", "agent")[0]?.source, "project:p2");
+    assert.deepEqual(registry.conflictsForProject("p1"), []);
   });
 
-  it("applies neither copy when one plugin declares an identifier twice", () => {
+  it("uses the same project applicability for custom and event declarations", () => {
     const registry = createContributionRegistry();
 
-    const outcome = registry.apply(
-      dataHello,
-      [board, custom({ id: "board", title: "Another board" })],
-      nothingDisabled,
-    );
-
-    assert.deepEqual(outcome.registered, []);
-    assert.match(outcome.problems[0] ?? "", /declared 2 times/);
-  });
-
-  it("applies neither contribution when two plugins of one source claim it", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board], nothingDisabled);
-    registry.apply({ ...dataNotes, id: "hello" }, [board], nothingDisabled);
-
-    assert.deepEqual(registry.resolved(), []);
-    assert.deepEqual(registry.conflicts(), [
-      { id: "hello.board", source: "data", plugins: ["data:hello", "data:notes"] },
-    ]);
-  });
-
-  it("lets the more specific source win over the built-in one", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(
-      builtinHello,
-      [custom({ id: "board", title: "Built-in board" })],
-      nothingDisabled,
-    );
-    registry.apply(
-      dataHello,
-      [custom({ id: "board", title: "Overriding board" })],
-      nothingDisabled,
-    );
-
-    assert.deepEqual(
-      registry.resolved().map((registration) => [registration.source, registration.title]),
-      [["data", "Overriding board"]],
-    );
-    assert.deepEqual(registry.conflicts(), []);
-  });
-
-  it("lets a project folder win over both", () => {
-    // Ранг источника проекта нельзя считать позицией в массиве: у параметризованного источника
-    // позиции нет, `indexOf` дал бы −1, и папка проекта проиграла бы встроенному.
-    const registry = createContributionRegistry();
-
-    registry.apply(builtinHello, [custom({ id: "board", title: "Built-in" })], nothingDisabled);
-    registry.apply(dataHello, [custom({ id: "board", title: "Data" })], nothingDisabled);
-    registry.apply(projectHello, [custom({ id: "board", title: "Project" })], nothingDisabled);
-
-    assert.deepEqual(
-      registry.resolved().map((registration) => [registration.source, registration.title]),
-      [["project:b7Kq3xv9pQdT", "Project"]],
-    );
-    assert.deepEqual(registry.conflicts(), []);
-  });
-
-  it("keeps a disabled contribution out of the resolution entirely", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(
-      builtinHello,
-      [custom({ id: "board", title: "Built-in board" })],
-      nothingDisabled,
-    );
-    registry.apply(dataHello, [board], new Set(["hello.board"]));
-
-    // Выключенный вклад не перекрывает встроенный: он не участвует ни в чём (docs/plugins.md).
-    assert.deepEqual(
-      registry.resolved().map((registration) => [registration.source, registration.title]),
-      [["builtin", "Built-in board"]],
-    );
-  });
-
-  it("remembers a switched off contribution with its title and kind", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(
-      dataHello,
-      [board, { kind: "event", id: "task.created", payloadSchema: {} }],
-      new Set(["hello.board"]),
-    );
-
-    // Интерфейсу нужен не идентификатор, а сам вклад: иначе переключатель нечем подписать.
-    assert.deepEqual(
-      registry.switchedOff().map((registration) => [registration.id, registration.title]),
-      [["hello.board", "Board"]],
-    );
-    assert.deepEqual(
-      registry.resolved().map((registration) => registration.id),
-      ["hello.task.created"],
-    );
-  });
-
-  it("returns a switched on contribution to the resolved set", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board], new Set(["hello.board"]));
-    registry.apply(dataHello, [board], nothingDisabled);
-
-    assert.deepEqual(registry.switchedOff(), []);
-    assert.deepEqual(
-      registry.resolved().map((registration) => registration.id),
-      ["hello.board"],
-    );
-  });
-
-  it("forgets both the resolved and the switched off contributions of a plugin that went away", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board, custom({ id: "panel" })], new Set(["hello.panel"]));
-    registry.remove("data:hello");
-
-    assert.deepEqual(registry.resolved(), []);
-    assert.deepEqual(registry.switchedOff(), []);
-  });
-
-  it("does not remember a contribution the registry refused as switched off", () => {
-    const registry = createContributionRegistry();
-
-    // Кривой вклад не «выключен», а не принят: включать его обратно нечем, пока плагин не исправлен.
-    registry.apply(dataHello, [custom({ id: "Board Panel" })], new Set(["hello.Board Panel"]));
-
-    assert.deepEqual(registry.switchedOff(), []);
-  });
-
-  it("replaces the whole set of a plugin at once", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
-    registry.apply(dataHello, [custom({ id: "panel" })], nothingDisabled);
-
-    assert.deepEqual(
-      registry.resolved().map((registration) => registration.id),
-      ["hello.panel"],
-    );
-  });
-
-  it("removes everything a plugin registered when it goes away", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
-    registry.remove("data:hello");
-
-    assert.deepEqual(registry.resolved(), []);
-  });
-
-  it("moves the revision only when the resolved set changed", () => {
-    const registry = createContributionRegistry();
-
-    registry.apply(dataHello, [board], nothingDisabled);
-    const afterFirst = registry.revision();
-
-    registry.apply(dataHello, [board], nothingDisabled);
-
-    assert.equal(registry.revision(), afterFirst);
-
-    registry.apply(dataHello, [board, custom({ id: "panel" })], nothingDisabled);
-
-    assert.equal(registry.revision(), afterFirst + 1);
-  });
-
-  it("registers an event with its schema alongside the general kind", () => {
-    const registry = createContributionRegistry();
-    const payloadSchema = { type: "object", properties: { id: { type: "string" } } };
-
-    const outcome = registry.apply(
-      dataHello,
-      [board, { kind: "event", id: "task.created", payloadSchema }],
-      nothingDisabled,
-    );
-
-    assert.deepEqual(
-      outcome.registered.map((registration) => [registration.kind, registration.id]),
+    registry.applyPlugin(
+      projectHello,
       [
-        ["custom", "hello.board"],
+        { kind: "custom", id: "panel" },
+        { kind: "event", id: "task.created", payloadSchema: {} },
+      ],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(ids(registry.resolvedBase()), []);
+    assert.deepEqual(
+      registry.resolvedForProject("p1").map((registration) => [registration.kind, registration.id]),
+      [
+        ["custom", "hello.panel"],
         ["event", "hello.task.created"],
       ],
     );
+    assert.deepEqual(ids(registry.resolvedForProject("p2")), []);
+  });
+
+  it("keeps standalone short identifiers distinct from plugin-qualified identifiers", () => {
+    const registry = createContributionRegistry();
+    const review = standaloneSkill("review", "sovereign", "user");
+
+    registry.applyStandalone(standalone("data:skills", 100, [file(review)]));
+    registry.applyPlugin(
+      { key: "data:github", id: "github", source: "data" },
+      [{ kind: "custom", id: "review" }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(ids(registry.resolvedBase()), ["github.review", "review"]);
+  });
+
+  it("lets the higher numeric precedence standalone root win", () => {
+    const registry = createContributionRegistry();
+
+    registry.applyStandalone(
+      standalone("home:agents:skills", 100, [
+        file(standaloneSkill("review", "agents", "user"), "/home/review/SKILL.md"),
+      ]),
+    );
+    registry.applyStandalone(
+      standalone("data:skills", 200, [
+        file(standaloneSkill("review", "sovereign", "user"), "/data/review/SKILL.md"),
+      ]),
+    );
+
+    assert.equal(registry.resolvedBase("skill")[0]?.source, "sovereign");
+  });
+
+  it("reports equal-rank standalone roots and marks both files invalid", () => {
+    const registry = createContributionRegistry();
+    const firstPath = "/project/.first/skills/review/SKILL.md";
+    const secondPath = "/project/.second/skills/review/SKILL.md";
+
+    registry.applyStandalone({
+      rootKey: "project:p1:skills:first",
+      source: "first",
+      scope: "project",
+      projectId: "p1",
+      precedence: 300,
+      contributions: [file(standaloneSkill("review", "first", "project", "p1"), firstPath)],
+    });
+    registry.applyStandalone({
+      rootKey: "project:p1:skills:second",
+      source: "second",
+      scope: "project",
+      projectId: "p1",
+      precedence: 300,
+      contributions: [file(standaloneSkill("review", "second", "project", "p1"), secondPath)],
+    });
+
+    assert.deepEqual(registry.resolvedForProject("p1", "skill"), []);
+    assert.deepEqual(registry.conflictsForProject("p1"), [
+      {
+        id: "review",
+        source: "first",
+        plugins: [],
+        standaloneRoots: ["project:p1:skills:first", "project:p1:skills:second"],
+      },
+    ]);
+    assert.deepEqual(registry.conflictsForProject("p2"), []);
+
+    const resources = registry.fileResourcesForProject("p1");
     assert.deepEqual(
-      registry.resolved().find((registration) => registration.kind === "event")?.payloadSchema,
-      payloadSchema,
+      resources.resources.map((resource) => [resource.path, resource.state]),
+      [
+        [firstPath, "invalid"],
+        [secondPath, "invalid"],
+      ],
+    );
+    assert.deepEqual(
+      resources.diagnostics.map((diagnostic) => [diagnostic.path, diagnostic.code]),
+      [
+        [firstPath, "duplicate-contribution"],
+        [secondPath, "duplicate-contribution"],
+      ],
     );
   });
 
-  it("registers an agent with its instructions and tool selection", () => {
+  it("resolves plugin project over data over built-in", () => {
     const registry = createContributionRegistry();
 
-    const outcome = registry.apply(
+    registry.applyPlugin(builtinHello, [agent("built-in")], nothingDisabled);
+    assert.equal(registry.resolvedForProject("p1", "agent")[0]?.source, "builtin");
+    registry.applyPlugin(dataHello, [agent("data")], nothingDisabled);
+    assert.equal(registry.resolvedForProject("p1", "agent")[0]?.source, "data");
+    registry.applyPlugin(projectHello, [agent("project")], nothingDisabled);
+    assert.equal(registry.resolvedForProject("p1", "agent")[0]?.source, "project:p1");
+  });
+
+  it("does not conflict equal identifiers of different kinds", () => {
+    const registry = createContributionRegistry();
+
+    registry.applyPlugin(
       dataHello,
       [
-        {
-          kind: "agent",
-          id: "agent",
-          instructions: "делай, что просят",
-          tools: { include: ["*"], exclude: ["bash"] },
-          model: "anthropic/claude",
-          thinkingLevel: "high",
-        },
+        { kind: "custom", id: "same" },
+        { kind: "event", id: "same", payloadSchema: {} },
       ],
       nothingDisabled,
     );
 
-    assert.deepEqual(outcome.problems, []);
-    assert.deepEqual(outcome.registered, [
-      {
-        kind: "agent",
-        id: "hello.agent",
-        declaredId: "agent",
-        pluginKey: "data:hello",
-        pluginId: "hello",
-        source: "data",
-        instructions: "делай, что просят",
-        tools: { include: ["*"], exclude: ["bash"] },
-        model: "anthropic/claude",
-        thinkingLevel: "high",
-        skills: [],
-      },
-    ]);
+    assert.deepEqual(
+      registry.resolvedBase().map((registration) => registration.kind),
+      ["custom", "event"],
+    );
+    assert.deepEqual(registry.conflictsForProject("p1"), []);
   });
 
-  it("refuses an agent whose declaration cannot be applied", () => {
+  it("excludes only a plugin identity duplicated by file and programmatic declarations", () => {
     const registry = createContributionRegistry();
-    const base = { kind: "agent", id: "agent", instructions: "делай" } as const;
-
-    for (const broken of [
-      { ...base, instructions: "   ", tools: { include: ["*"] } },
-      { ...base, tools: { include: "*" } },
-      { ...base, tools: { include: ["*"], exclude: [7] } },
-      { ...base, tools: { include: ["*"] }, thinkingLevel: "выше крыши" },
-      { ...base, tools: { include: ["*"] }, skills: "one" },
-    ]) {
-      const outcome = registry.apply(
-        dataHello,
-        [broken as unknown as PluginContribution],
-        nothingDisabled,
-      );
-
-      assert.deepEqual(outcome.registered, [], JSON.stringify(broken));
-      assert.equal(outcome.problems.length, 1, JSON.stringify(broken));
-    }
-  });
-
-  it("lets an agent of a more specific source override the built-in one", () => {
-    const registry = createContributionRegistry();
-    const agent = (instructions: string): PluginContribution => ({
+    const fileAgent: Extract<ContributionRegistration, { kind: "agent" }> = {
+      ownership: "plugin",
       kind: "agent",
-      id: "agent",
-      instructions,
-      tools: { include: ["*"] },
+      id: "hello.agent",
+      declaredId: "agent",
+      pluginKey: dataHello.key,
+      pluginId: dataHello.id,
+      source: dataHello.source,
+      instructions: "from file",
+      tools: { include: [], exclude: [] },
+      skills: { include: [], exclude: [] },
+    };
+    const fileSkill: Extract<ContributionRegistration, { kind: "skill" }> = {
+      ownership: "plugin",
+      kind: "skill",
+      id: "hello.review",
+      declaredId: "review",
+      pluginKey: dataHello.key,
+      pluginId: dataHello.id,
+      source: dataHello.source,
+      name: "review",
+      description: "Review changes",
+      location: "/plugins/hello/skills/review/SKILL.md",
+      disableModelInvocation: false,
+    };
+
+    const outcome = registry.applyPlugin({
+      plugin: dataHello,
+      contributions: [agent("programmatic")],
+      fileContributions: [file(fileAgent), file(fileSkill)],
+      disabledContributions: nothingDisabled,
     });
 
-    registry.apply(builtinHello, [agent("встроенные инструкции")], nothingDisabled);
-    registry.apply(dataHello, [agent("свои инструкции")], nothingDisabled);
+    assert.deepEqual(ids(outcome.registered), ["hello.review"]);
+    assert.match(outcome.problems[0] ?? "", /declared 2 times/);
+    assert.deepEqual(ids(registry.resolvedBase()), ["hello.review"]);
+    assert.equal(
+      registry
+        .fileResourcesForProject("p1")
+        .resources.find((resource) => resource.id === "hello.agent")?.state,
+      "invalid",
+    );
+  });
 
-    const resolved = registry.resolved().filter((registration) => registration.kind === "agent");
+  it("shows switched-off plugin files without resolving them", () => {
+    const registry = createContributionRegistry();
+    const registration: Extract<ContributionRegistration, { kind: "skill" }> = {
+      ownership: "plugin",
+      kind: "skill",
+      id: "hello.review",
+      declaredId: "review",
+      pluginKey: dataHello.key,
+      pluginId: dataHello.id,
+      source: dataHello.source,
+      name: "review",
+      description: "Review changes",
+      location: "/plugins/hello/skills/review/SKILL.md",
+      disableModelInvocation: false,
+    };
+
+    registry.applyPlugin({
+      plugin: dataHello,
+      contributions: [],
+      fileContributions: [file(registration, registration.location)],
+      disabledContributions: new Set([registration.id]),
+    });
+
+    assert.deepEqual(registry.resolvedBase("skill"), []);
+    assert.deepEqual(ids(registry.switchedOff()), ["hello.review"]);
+    assert.equal(registry.fileResourcesForProject("p1").resources[0]?.state, "switched-off");
+  });
+
+  it("keeps invalid and shadowed files visible in the project snapshot", () => {
+    const registry = createContributionRegistry();
+    const lower = standaloneSkill("review", "agents", "project", "p1");
+    const higher = standaloneSkill("review", "sovereign", "project", "p1");
+    const invalidDiagnostic: FileResourceDiagnostic = {
+      severity: "error",
+      code: "invalid-frontmatter",
+      message: "frontmatter is malformed",
+      path: "/project/.sovereign/skills/broken/SKILL.md",
+      kind: "skill",
+      id: "broken",
+    };
+
+    registry.applyStandalone(
+      standalone(
+        "project:p1:skills:agents",
+        300,
+        [file(lower, "/project/.agents/skills/review/SKILL.md")],
+        { scope: "project", projectId: "p1", source: "agents" },
+      ),
+    );
+    registry.applyStandalone(
+      standalone(
+        "project:p1:skills:sovereign",
+        400,
+        [
+          file(higher, "/project/.sovereign/skills/review/SKILL.md"),
+          {
+            path: invalidDiagnostic.path,
+            diagnostics: [invalidDiagnostic],
+            kind: "skill",
+            id: "broken",
+          },
+        ],
+        { scope: "project", projectId: "p1", source: "sovereign" },
+      ),
+    );
+
+    const snapshot = registry.fileResourcesForProject("p1");
 
     assert.deepEqual(
-      resolved.map((registration) => [registration.source, registration.instructions]),
-      [["data", "свои инструкции"]],
+      snapshot.resources.map((resource) => [resource.path, resource.state]),
+      [
+        ["/project/.agents/skills/review/SKILL.md", "shadowed"],
+        ["/project/.sovereign/skills/broken/SKILL.md", "invalid"],
+        ["/project/.sovereign/skills/review/SKILL.md", "active"],
+      ],
     );
+    assert.deepEqual(snapshot.diagnostics, [invalidDiagnostic]);
   });
 
-  it("refuses an event in the namespace of the core", () => {
+  it("moves revision for observable snapshot changes and explicit file events only", () => {
     const registry = createContributionRegistry();
-    const asCore: ContributingPlugin = { key: "data:core", id: "core", source: "data" };
+    const registration = standaloneAgent("code", "sovereign", "user");
+    const snapshot = standalone("data:agents", 100, [file(registration, "/data/code/AGENT.md")]);
 
-    const outcome = registry.apply(
-      asCore,
-      [{ kind: "event", id: "log", payloadSchema: {} }],
-      nothingDisabled,
+    registry.applyStandalone(snapshot);
+    const first = registry.revision();
+    registry.applyStandalone(snapshot);
+    assert.equal(registry.revision(), first);
+
+    registry.applyStandalone(snapshot, { resourceChanged: true });
+    assert.equal(registry.revision(), first + 1);
+
+    const diagnostic: FileResourceDiagnostic = {
+      severity: "warning",
+      code: "changed-warning",
+      message: "warning changed",
+      path: "/data/code/AGENT.md",
+      kind: "agent",
+      id: "code",
+    };
+    registry.applyStandalone(
+      standalone("data:agents", 100, [file(registration, "/data/code/AGENT.md", [diagnostic])]),
     );
+    assert.equal(registry.revision(), first + 2);
 
-    assert.deepEqual(outcome.registered, []);
-    assert.match(outcome.problems[0] ?? "", /namespace of the core/);
+    registry.removeStandalone("data:agents");
+    assert.equal(registry.revision(), first + 3);
   });
 
-  it("keeps a disabled event out, so publishing it has nothing to stand on", () => {
+  it("moves revision once for an explicit plugin file event with unchanged declarations", () => {
+    const registry = createContributionRegistry();
+    const snapshot = {
+      plugin: dataHello,
+      contributions: [agent("programmatic")],
+      fileContributions: [],
+      disabledContributions: nothingDisabled,
+    };
+
+    registry.applyPlugin(snapshot);
+    const beforeEvent = registry.revision();
+    registry.applyPlugin(snapshot, { resourceChanged: true });
+
+    assert.equal(registry.revision(), beforeEvent + 1);
+  });
+
+  it("validates malformed programmatic declarations without losing valid siblings", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(
+    const outcome = registry.applyPlugin(
       dataHello,
-      [{ kind: "event", id: "task.created", payloadSchema: {} }],
-      new Set(["hello.task.created"]),
+      [
+        { kind: "custom", id: "valid" },
+        { kind: "agent", id: "broken", instructions: "   " },
+      ],
+      nothingDisabled,
     );
 
-    assert.deepEqual(registry.resolved(), []);
+    assert.deepEqual(ids(outcome.registered), ["hello.valid"]);
+    assert.equal(outcome.problems.length, 1);
   });
 
-  it("brings the overridden contribution back when the overriding plugin leaves", () => {
+  it("removes plugin and standalone ownership snapshots atomically", () => {
     const registry = createContributionRegistry();
 
-    registry.apply(
-      builtinHello,
-      [custom({ id: "board", title: "Built-in board" })],
-      nothingDisabled,
+    registry.applyPlugin(dataHello, [{ kind: "custom", id: "panel" }], nothingDisabled);
+    registry.applyStandalone(
+      standalone("data:agents", 100, [file(standaloneAgent("code", "sovereign", "user"))]),
     );
-    registry.apply(
-      dataHello,
-      [custom({ id: "board", title: "Overriding board" })],
-      nothingDisabled,
-    );
-    registry.remove("data:hello");
+    registry.removePlugin(dataHello.key);
+    registry.removeStandalone("data:agents");
 
-    assert.deepEqual(
-      registry.resolved().map((registration) => registration.title),
-      ["Built-in board"],
-    );
+    assert.deepEqual(registry.resolvedBase(), []);
   });
 });
