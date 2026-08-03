@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-import { coreEventTypes } from "@sovereign/protocol";
+import { coreEventTypes, parseModelReference } from "@sovereign/protocol";
 
 import {
   authenticationRoutes,
@@ -10,7 +10,11 @@ import {
   createSessionCheck,
 } from "./authentication/public.ts";
 import { parseArguments } from "./platform/public.ts";
-import { createCredentialStore } from "./providers/public.ts";
+import {
+  createCredentialStore,
+  createUserProviderStore,
+  createUserProviders,
+} from "./providers/public.ts";
 import {
   archivedSessionsDirectoryName,
   ensureDataDirectory,
@@ -61,6 +65,7 @@ import { filesystemRoutes } from "./http/public.ts";
 import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./providers/public.ts";
 import { createProviderLogins } from "./providers/public.ts";
 import { providersRoutes } from "./providers/public.ts";
+import { userProviderRoutes } from "./providers/public.ts";
 import { createDaemonServer } from "./http/public.ts";
 import {
   appearancePreferencesRoutes,
@@ -134,6 +139,16 @@ const providers = createProviderCatalogue({
   credentials,
   catalogs: modelCatalogs,
   environment: processEnvironment(),
+});
+
+const userProviderStore = createUserProviderStore({ directory, logger });
+let hasActiveProviderSession = (_providerId: string): boolean => false;
+const userProviders = createUserProviders({
+  store: userProviderStore,
+  catalogue: providers,
+  credentials,
+  catalogs: modelCatalogs,
+  hasActiveSession: (providerId) => hasActiveProviderSession(providerId),
 });
 
 // Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
@@ -338,6 +353,14 @@ const sessions = createSessionService({
   compactionThreshold: () => settings.current().config.compactionThreshold,
 });
 
+hasActiveProviderSession = (providerId) =>
+  sessions
+    .list()
+    .some(
+      (session) =>
+        session.phase !== "idle" && parseModelReference(session.model)?.providerId === providerId,
+    );
+
 await Promise.all([initialPluginApplication, initialStandaloneApplication, sessions.refresh()]);
 
 pluginSessions.answer = createPluginSessions({ sessions }).answer;
@@ -358,7 +381,16 @@ loginSessions.subscribe((sessionId) => events.disconnect(sessionId));
 loginSessions.subscribe((sessionId) => providerLogins.cancelOwnedBy(sessionId));
 
 carryLoginSteps({ logins: providerLogins, events });
-publishLoginOutcomes({ logins: providerLogins, bus });
+publishLoginOutcomes({
+  logins: providerLogins,
+  bus,
+  onSucceeded: async (providerId) => {
+    if (userProviders.find(providerId) !== undefined) {
+      await userProviders.refresh(providerId);
+      bus.publish(coreEventTypes.providersChanged, {});
+    }
+  },
+});
 
 const server = createDaemonServer({
   logger,
@@ -387,6 +419,7 @@ const server = createDaemonServer({
     }),
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
+    ...userProviderRoutes({ providers: userProviders, logger, bus }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     ...filesystemRoutes(),
     events.route(),

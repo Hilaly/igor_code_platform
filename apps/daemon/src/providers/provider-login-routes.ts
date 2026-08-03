@@ -168,6 +168,8 @@ export function carryLoginSteps(options: CarryLoginStepsOptions): () => void {
 export type PublishLoginOutcomesOptions = {
   logins: ProviderLogins;
   bus: Pick<EventBus, "publish">;
+  /** Дополнительная работа после записи креда, например обновление каталога пользователя. */
+  onSucceeded?: (providerId: string) => void | Promise<void>;
 };
 
 /**
@@ -184,6 +186,7 @@ export function publishLoginOutcomes(options: PublishLoginOutcomesOptions): () =
         providerId: attempt.providerId,
         method: attempt.method,
       });
+      void options.onSucceeded?.(attempt.providerId);
     }
   });
 }
