@@ -22,11 +22,13 @@
 ### Task 1: Change protocol default to Imperium
 
 **Files:**
+
 - Modify: `packages/protocol/src/settings.ts`
 - Test: `packages/protocol/src/settings.test.ts`
 - Modify: `apps/daemon/src/settings/appearance-preferences.test.ts`
 
 **Interfaces:**
+
 - Produces `builtInColorScheme === "imperium"` and `defaultAppearance.colorScheme === "imperium"` for all consumers.
 
 - [ ] **Step 1: Write the failing test**
@@ -74,6 +76,7 @@ git commit -m "refactor(protocol): default appearance to imperium"
 ### Task 2: Reduce UI Kit shipped schemes and translations
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/tokens/schemes/shipped.ts`
 - Delete: `packages/ui-kit/src/tokens/schemes/base.ts`
 - Delete: `packages/ui-kit/src/tokens/schemes/neutral.ts`
@@ -87,6 +90,7 @@ git commit -m "refactor(protocol): default appearance to imperium"
 - Modify: `packages/ui-kit/src/components/primitives.stories.tsx`
 
 **Interfaces:**
+
 - `shippedSchemes` produces exactly `imperium`, `nord`, `oled`, `sage`, in that order.
 - `@sovereign/ui-kit` no longer exports deleted scheme modules.
 
@@ -128,6 +132,7 @@ git commit -m "refactor(ui-kit): remove obsolete color schemes"
 ### Task 3: Use Imperium as web fallback and update documentation
 
 **Files:**
+
 - Modify: `apps/web/src/appearance.ts`
 - Modify: `apps/web/src/appearance.test.ts`
 - Modify: `docs/data-directory.md`
@@ -138,6 +143,7 @@ git commit -m "refactor(ui-kit): remove obsolete color schemes"
 - Modify: `docs/backlog.md`
 
 **Interfaces:**
+
 - `applyAppearance` uses `imperiumScheme` when a requested scheme is absent or rejected.
 - Documentation describes four shipped schemes and Imperium as the built-in default.
 
@@ -171,6 +177,7 @@ git commit -m "refactor(web): use imperium appearance fallback"
 ### Task 4: Full verification
 
 **Files:**
+
 - Verify only; no source changes expected.
 
 - [ ] **Step 1: Run focused tests**

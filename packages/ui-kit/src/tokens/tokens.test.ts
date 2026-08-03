@@ -78,7 +78,9 @@ describe("resolveScheme", () => {
     const scheme: ColorScheme = { ...imperiumScheme, roleOverrides: { accent: "#123456" } };
     const outcome = resolveScheme(scheme, "dark");
 
-    expect(outcome.kind === "resolved" && outcome.roles.text).toBe(imperiumScheme.variants.dark.ink);
+    expect(outcome.kind === "resolved" && outcome.roles.text).toBe(
+      imperiumScheme.variants.dark.ink,
+    );
   });
 });
 

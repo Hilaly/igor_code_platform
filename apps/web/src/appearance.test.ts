@@ -77,7 +77,9 @@ describe("applyAppearance", () => {
       locale: "en",
     });
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.light.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(
+      imperiumScheme.variants.light.surface,
+    );
     expect(diagnostics.join("\n")).toMatch(/no colour scheme midnight/);
   });
 
@@ -87,7 +89,9 @@ describe("applyAppearance", () => {
       locale: "en",
     });
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.light.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(
+      imperiumScheme.variants.light.surface,
+    );
   });
 
   it("puts the chosen scale on the root as an attribute", () => {
