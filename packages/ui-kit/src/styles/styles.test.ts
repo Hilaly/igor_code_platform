@@ -53,6 +53,8 @@ describe("stylesheets of the kit", () => {
     const entry = readFileSync(join(kitRoot, "styles", "index.css"), "utf8");
     const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");
     const manifest = JSON.parse(readFileSync(join(kitRoot, "..", "package.json"), "utf8"));
+    const codeCss = readFileSync(join(kitRoot, "components", "code.module.css"), "utf8");
+    const sliderCss = readFileSync(join(kitRoot, "components", "slider.module.css"), "utf8");
 
     expect(entry).toContain("@fontsource-variable/source-serif-4/wght.css");
     expect(entry).toContain("@fontsource-variable/manrope/wght.css");
@@ -66,6 +68,8 @@ describe("stylesheets of the kit", () => {
       "@fontsource-variable/manrope": expect.any(String),
       "@fontsource/ibm-plex-mono": expect.any(String),
     });
+    expect(codeCss.match(/font-weight: 400;/g)).toHaveLength(2);
+    expect(sliderCss).toContain("font-weight: 500;");
   });
 
   it("uses Imperium as the catalogue fallback", () => {

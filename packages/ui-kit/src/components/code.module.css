@@ -10,6 +10,7 @@
   background: var(--sovereign-sunken-surface);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
+  font-weight: 400;
   font-size: var(--sovereign-font-size-xs);
   line-height: var(--sovereign-line-height-snug);
   /*
@@ -28,6 +29,7 @@
   background: var(--sovereign-sunken-surface);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
+  font-weight: 400;
   /*
    * Кегль в `em`, а не по шкале: строчный код стоит внутри чужого текста и обязан следовать его
    * размеру, иначе в подписи он оказывается крупнее самой подписи. Моноширинный шрифт при равном

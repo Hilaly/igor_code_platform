@@ -48,6 +48,7 @@
 
 .value {
   font-family: var(--sovereign-font-family-mono);
+  font-weight: 500;
   font-size: var(--sovereign-font-size-sm);
   color: var(--sovereign-text-muted);
   min-width: 2.5rem;
