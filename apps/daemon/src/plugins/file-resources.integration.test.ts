@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+/* This file is a composition test: it intentionally crosses daemon-area facades to exercise the
+ * complete lifecycle in one process. Production modules retain the normal boundary rules. */
+/* eslint-disable no-restricted-imports */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, request as sendRequest, type Server } from "node:http";
 import { once } from "node:events";
@@ -14,9 +17,7 @@ import {
   projectAgentsPath,
   projectFileResourcesPath,
   sessionTurnsPath,
-  sessionsPath,
   type BusEvent,
-  type ContributionRegistration,
   type ContributionsChanged,
   type PluginStatus,
 } from "@sovereign/protocol";
@@ -29,14 +30,18 @@ import { createStandaloneFileResourceService } from "./standalone-file-resources
 import { standaloneResourceRoots } from "./file-resource-roots.ts";
 import { defaultPluginRoots, discoverPlugins } from "./plugin-sources.ts";
 import { createPluginSupervisor } from "./plugin-supervisor.ts";
-import { createProjectStore } from "../projects/project-store.ts";
-import { createProjectLifecycle } from "../projects/project-lifecycle.ts";
-import { projectResourceRoutes } from "../projects/project-resources.ts";
-import { createDispatcher } from "../http/dispatcher.ts";
-import { createSessionService } from "../sessions/sessions.ts";
-import { coreToolSource } from "../sessions/core-tools.ts";
-import { createToolCollector } from "../sessions/tool-collection.ts";
-import { createTurnQueue } from "../sessions/turn-queue.ts";
+import {
+  createProjectLifecycle,
+  createProjectStore,
+  projectResourceRoutes,
+} from "../projects/public.ts";
+import { createDispatcher } from "../http/public.ts";
+import {
+  coreToolSource,
+  createSessionService,
+  createToolCollector,
+  createTurnQueue,
+} from "../sessions/public.ts";
 
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-file-resources-e2e-"));
 const logger = createLogger({ source: "core", level: () => "error", write: () => {} });
@@ -89,14 +94,6 @@ async function eventually<T>(
     await new Promise<void>((resolve) => setImmediate(resolve));
   }
   throw new Error(`timed out waiting for ${hint}`);
-}
-
-async function repeatUntilSeen(next: () => Promise<boolean>, change: () => void): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    change();
-    if (await next()) return;
-  }
-  throw new Error("the filesystem watcher never reported the change");
 }
 
 async function changeAndWait(
