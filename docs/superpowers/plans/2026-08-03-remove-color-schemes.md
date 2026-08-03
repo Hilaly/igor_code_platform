@@ -27,7 +27,7 @@
 - Modify: `apps/daemon/src/settings/appearance-preferences.test.ts`
 
 **Interfaces:**
-- Produces `baseColorScheme === "imperium"` and `defaultAppearance.colorScheme === "imperium"` for all consumers.
+- Produces `builtInColorScheme === "imperium"` and `defaultAppearance.colorScheme === "imperium"` for all consumers.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -35,7 +35,7 @@ Change the existing empty-preferences and missing-fields assertions from `base` 
 
 ```ts
 it("uses Imperium as the built-in appearance", () => {
-  assert.equal(baseColorScheme, "imperium");
+  assert.equal(builtInColorScheme, "imperium");
   assert.equal(defaultPreferences.appearance.colorScheme, "imperium");
 });
 ```
@@ -53,7 +53,7 @@ Expected: FAIL because the current built-in identifier is `base`.
 In `packages/protocol/src/settings.ts`, change only the built-in identifier:
 
 ```ts
-export const baseColorScheme = "imperium";
+export const builtInColorScheme = "imperium";
 ```
 
 Keep the exported name for the local constant to avoid an unrelated public API rename; update its comment to describe Imperium as the built-in scheme.

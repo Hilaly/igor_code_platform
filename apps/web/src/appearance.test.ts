@@ -1,5 +1,9 @@
-import { baseColorScheme, interfaceScales, type AppearancePreferences } from "@sovereign/protocol";
-import { baseScheme, checkScheme, rolePropertyName, scaleAttributeName } from "@sovereign/ui-kit";
+import {
+  builtInColorScheme,
+  interfaceScales,
+  type AppearancePreferences,
+} from "@sovereign/protocol";
+import { imperiumScheme, rolePropertyName, scaleAttributeName } from "@sovereign/ui-kit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -53,18 +57,18 @@ describe("resolveVariant", () => {
 describe("applyAppearance", () => {
   it("writes the palette of the chosen variant", () => {
     const { written, diagnostics } = applied({
-      appearance: { colorScheme: baseColorScheme, variant: "dark", scale: "default" },
+      appearance: { colorScheme: builtInColorScheme, variant: "dark", scale: "default" },
       locale: "en",
     });
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(baseScheme.variants.dark.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.dark.surface);
     expect(diagnostics).toEqual([]);
   });
 
   it("follows the system when the variant says so", () => {
     const { written } = applied(defaultAppearancePreferences, true);
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(baseScheme.variants.dark.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.dark.surface);
   });
 
   it("falls back to the built-in scheme and says the named one is gone", () => {
@@ -73,23 +77,23 @@ describe("applyAppearance", () => {
       locale: "en",
     });
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(baseScheme.variants.light.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.light.surface);
     expect(diagnostics.join("\n")).toMatch(/no colour scheme midnight/);
   });
 
-  it("applies the check scheme when it is chosen: it is a shipped scheme like any other", () => {
+  it("falls back to Imperium when a removed scheme is requested", () => {
     const { written } = applied({
-      appearance: { colorScheme: checkScheme.id, variant: "light", scale: "default" },
+      appearance: { colorScheme: "check", variant: "light", scale: "default" },
       locale: "en",
     });
 
-    expect(written.get(rolePropertyName("pageSurface"))).toBe(checkScheme.variants.light.surface);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(imperiumScheme.variants.light.surface);
   });
 
   it("puts the chosen scale on the root as an attribute", () => {
     for (const scale of interfaceScales) {
       const { attributes } = applied({
-        appearance: { colorScheme: baseColorScheme, variant: "light", scale },
+        appearance: { colorScheme: builtInColorScheme, variant: "light", scale },
         locale: "en",
       });
 
