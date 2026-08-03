@@ -18,7 +18,12 @@ const translator = createTranslator({
   },
 });
 
-const open = (id: string, loading: boolean, summary: OpenSession["summary"]): OpenSession => ({
+const open = (
+  id: string,
+  loading: boolean,
+  summary: OpenSession["summary"],
+  failure?: string,
+): OpenSession => ({
   id,
   loading,
   summary,
@@ -28,6 +33,22 @@ const open = (id: string, loading: boolean, summary: OpenSession["summary"]): Op
   labels: new Map(),
   branchEntryIds: new Set(),
   degradations: [],
+  ...(failure === undefined ? {} : { failure }),
+});
+
+it("shows a load failure instead of calling it a missing session", () => {
+  render(
+    <SessionRouteView
+      sessionId="broken"
+      open={open("broken", false, undefined, "daemon unavailable")}
+      translator={translator}
+    >
+      <div>chat</div>
+    </SessionRouteView>,
+  );
+
+  expect(screen.getByText(/daemon unavailable/)).toBeTruthy();
+  expect(screen.queryByText("Такой сессии нет")).toBeNull();
 });
 
 it("does not render the previous session while a new direct route loads", () => {

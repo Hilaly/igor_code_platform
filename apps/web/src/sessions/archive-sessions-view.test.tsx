@@ -110,3 +110,26 @@ it("shows a refusal when restoring an archived session fails", async () => {
 
   await waitFor(() => expect(screen.getByText(/session is busy/)).toBeTruthy());
 });
+
+it("keeps the delete confirmation open when deletion fails", async () => {
+  render(
+    <ArchiveSessionsView
+      sessions={[session]}
+      projects={[project]}
+      loaded
+      onOpen={vi.fn()}
+      onRestore={vi.fn().mockResolvedValue(undefined)}
+      onRemove={vi.fn().mockResolvedValue("session is busy")}
+      translator={translator}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /Действия над сессией Session A/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Удалить безвозвратно" }));
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Удалить безвозвратно" }),
+  );
+
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+  expect(screen.getByText(/session is busy/)).toBeTruthy();
+});

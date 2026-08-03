@@ -146,3 +146,28 @@ it("renames, archives, and removes a project through row actions", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Удалить безвозвратно" }));
   await waitFor(() => expect(onRemoveProject).toHaveBeenCalledWith("alpha"));
 });
+
+it("keeps a project rename dialog open when the write is refused", async () => {
+  values.clear();
+  show({ onUpdateProject: vi.fn().mockResolvedValue("project is busy") });
+
+  fireEvent.click(screen.getByRole("button", { name: "Действия над проектом Alpha" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Переименовать" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Имя" }), { target: { value: "Beta" } });
+  fireEvent.click(screen.getByRole("button", { name: "Переименовать" }));
+
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+  expect(screen.getByText(/project is busy/)).toBeTruthy();
+});
+
+it("keeps a project delete confirmation open when deletion is refused", async () => {
+  values.clear();
+  show({ onRemoveProject: vi.fn().mockResolvedValue("project is busy") });
+
+  fireEvent.click(screen.getByRole("button", { name: "Действия над проектом Alpha" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Удалить/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Удалить безвозвратно" }));
+
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+  expect(screen.getByText(/project is busy/)).toBeTruthy();
+});

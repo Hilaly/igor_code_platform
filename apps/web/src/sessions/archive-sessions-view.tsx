@@ -57,7 +57,7 @@ export function ArchiveSessionsView({
   const runAction = async (
     key: string,
     action: () => Promise<string | undefined>,
-  ): Promise<void> => {
+  ): Promise<string | undefined> => {
     setPendingAction(key);
     setActionFailure(undefined);
 
@@ -66,6 +66,7 @@ export function ArchiveSessionsView({
       if (reason !== undefined) {
         setActionFailure(reason);
       }
+      return reason;
     } finally {
       setPendingAction(undefined);
     }
@@ -143,9 +144,9 @@ export function ArchiveSessionsView({
         onConfirm={() => {
           if (removing !== undefined) {
             const target = removing;
-            void runAction(`remove:${target.id}`, () => onRemove(target.id)).then(() =>
-              setRemoving(undefined),
-            );
+            void runAction(`remove:${target.id}`, () => onRemove(target.id)).then((reason) => {
+              if (reason === undefined) setRemoving(undefined);
+            });
           }
         }}
         pending={pendingAction === (removing === undefined ? undefined : `remove:${removing.id}`)}

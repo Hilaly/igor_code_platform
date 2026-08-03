@@ -245,15 +245,21 @@ export function SidebarProjects(props: SidebarProjectsProps) {
 
       <Dialog
         open={renaming !== undefined}
-        onClose={() => setRenaming(undefined)}
+        onClose={() => {
+          if (pendingAction === undefined) setRenaming(undefined);
+        }}
         title={
           renaming?.kind === "project" ? t("projects.rename.title") : t("sessions.rename.title")
         }
         footer={
           <>
-            <Button onClick={() => setRenaming(undefined)}>{t("common.cancel")}</Button>
+            <Button onClick={() => setRenaming(undefined)} disabled={pendingAction !== undefined}>
+              {t("common.cancel")}
+            </Button>
             <Button
               tone="accent"
+              disabled={pendingAction !== undefined}
+              busy={pendingAction !== undefined}
               onClick={() => {
                 if (renaming?.kind === "project") {
                   const target = renaming;
@@ -262,7 +268,9 @@ export function SidebarProjects(props: SidebarProjectsProps) {
                       name: name.trim(),
                       archived: target.value.archived,
                     }),
-                  );
+                  ).then((reason) => {
+                    if (reason === undefined) setRenaming(undefined);
+                  });
                 } else if (renaming?.kind === "session") {
                   const target = renaming;
                   void runAction(`rename-session:${target.value.id}`, () =>
@@ -270,9 +278,10 @@ export function SidebarProjects(props: SidebarProjectsProps) {
                       archived: target.value.archived,
                       ...(name.trim() === "" ? {} : { title: name.trim() }),
                     }),
-                  );
+                  ).then((reason) => {
+                    if (reason === undefined) setRenaming(undefined);
+                  });
                 }
-                setRenaming(undefined);
               }}
             >
               {renaming?.kind === "project"
@@ -316,13 +325,17 @@ export function SidebarProjects(props: SidebarProjectsProps) {
             const target = removing;
             void runAction(`remove-project:${target.value.id}`, () =>
               props.onRemoveProject(target.value.id),
-            ).then(() => setRemoving(undefined));
+            ).then((reason) => {
+              if (reason === undefined) setRemoving(undefined);
+            });
           }
           if (removing?.kind === "session") {
             const target = removing;
             void runAction(`remove-session:${target.value.id}`, () =>
               props.onRemoveSession(target.value.id),
-            ).then(() => setRemoving(undefined));
+            ).then((reason) => {
+              if (reason === undefined) setRemoving(undefined);
+            });
           }
         }}
         pending={pendingAction !== undefined}

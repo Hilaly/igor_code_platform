@@ -1,4 +1,4 @@
-import { EmptyState, Spinner, type ScopedTranslator } from "@sovereign/ui-kit";
+import { EmptyState, Notice, Spinner, type ScopedTranslator } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import type { OpenSession } from "./state.ts";
@@ -19,6 +19,10 @@ export function SessionRouteView({ sessionId, open, children, translator }: Sess
   }
 
   if (open.summary === undefined) {
+    if (open.failure !== undefined) {
+      return <Notice tone="danger" title={open.failure} />;
+    }
+
     return (
       <div className="sessions-chat">
         <EmptyState title={t("sessions.gone.title")} hint={t("sessions.gone.hint")} />
