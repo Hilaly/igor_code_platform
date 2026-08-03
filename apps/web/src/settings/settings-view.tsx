@@ -50,26 +50,28 @@ export function SettingsView({
 
   return (
     <div className="settings">
-      <aside className="settings-sidebar">
-        <Heading level={1}>{t("settings.title")}</Heading>
-        <nav className="settings-nav" aria-label={t("settings.sections")}>
-          <List>
-            {settingsSections.map((candidate) => (
-              <ListRow
-                key={candidate}
-                selected={candidate === section}
-                onSelect={() => onSectionChange(candidate)}
-              >
-                <Text>{t(`settings.section.${candidate}`)}</Text>
-              </ListRow>
-            ))}
-          </List>
-        </nav>
-      </aside>
-      <section className="settings-content" aria-label={t(`settings.section.${section}`)}>
-        <Heading level={1}>{t(`settings.section.${section}`)}</Heading>
-        <div className="settings-content-body">{content}</div>
-      </section>
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          <Heading level={1}>{t("settings.title")}</Heading>
+          <nav className="settings-nav" aria-label={t("settings.sections")}>
+            <List>
+              {settingsSections.map((candidate) => (
+                <ListRow
+                  key={candidate}
+                  selected={candidate === section}
+                  onSelect={() => onSectionChange(candidate)}
+                >
+                  <Text>{t(`settings.section.${candidate}`)}</Text>
+                </ListRow>
+              ))}
+            </List>
+          </nav>
+        </aside>
+        <section className="settings-content" aria-label={t(`settings.section.${section}`)}>
+          <Heading level={1}>{t(`settings.section.${section}`)}</Heading>
+          <div className="settings-content-body">{content}</div>
+        </section>
+      </div>
     </div>
   );
 }

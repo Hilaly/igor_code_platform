@@ -47,7 +47,8 @@ function show(overrides: Partial<ShellProps> = {}) {
 
   return {
     onLayoutChange,
-    again: (layout: ShellLayout) => rerender(<Shell {...props} layout={layout} />),
+    again: (layout: ShellLayout, nextOverrides: Partial<ShellProps> = {}) =>
+      rerender(<Shell {...props} {...nextOverrides} layout={layout} />),
   };
 }
 
@@ -200,5 +201,35 @@ describe("hiding and restoring the panels", () => {
 
     expect(screen.getByRole("complementary", { name: "правая панель" })).toBeDefined();
     expect(screen.getByText("вкладок нет")).toBeDefined();
+  });
+
+  it("temporarily removes an unavailable right panel without changing its layout", () => {
+    const tabs = [{ id: "appearance", label: "Вид", content: <div>содержимое вида</div> }];
+    const { onLayoutChange } = show({
+      layout: rightVisible,
+      rightUnavailable: true,
+      tabs,
+    });
+
+    expect(screen.queryByRole("complementary", { name: "правая панель" })).toBeNull();
+    expect(screen.queryByRole("separator", { name: "правая панель" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "показать правую" })).toBeNull();
+    expect(screen.queryByText("содержимое вида")).toBeNull();
+    expect(onLayoutChange).not.toHaveBeenCalled();
+  });
+
+  it("restores the same right-panel content when it becomes available", () => {
+    const tabs = [{ id: "appearance", label: "Вид", content: <div>содержимое вида</div> }];
+    const { again } = show({
+      layout: rightVisible,
+      rightUnavailable: true,
+      tabs,
+    });
+
+    again(rightVisible, { rightUnavailable: false });
+
+    expect(screen.getByRole("complementary", { name: "правая панель" })).toBeDefined();
+    expect(screen.getByRole("separator", { name: "правая панель" })).toBeDefined();
+    expect(screen.getByText("содержимое вида")).toBeDefined();
   });
 });

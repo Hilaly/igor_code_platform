@@ -7,12 +7,18 @@
  */
 
 .settings {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.settings-layout {
   display: grid;
   grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   min-width: 0;
-  container-type: inline-size;
 }
 
 .settings-sidebar,
@@ -44,7 +50,7 @@
 }
 
 @container (width < 40rem) {
-  .settings {
+  .settings-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -64,7 +70,7 @@
 
   /* Прямой ребёнок — китовый `List`. Правило меняет только предметную геометрию и не зависит от
      хешированного имени класса UI kit. */
-  .settings-nav > * {
+  .settings-nav > ul {
     flex-direction: row;
     width: max-content;
   }
