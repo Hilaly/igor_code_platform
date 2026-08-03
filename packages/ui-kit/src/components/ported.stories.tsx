@@ -437,8 +437,13 @@ export const NavigationAndLayers = () => {
         items={[
           {
             id: "effects",
-            title: "Эффекты поверхности",
-            content: <Text tone="muted">Стекло, тень и градиент берутся из токенов схемы.</Text>,
+            title: "Иерархия поверхностей",
+            content: (
+              <Text tone="muted">
+                Семантический акцент обозначает выбор, а поднятый слой отделяют поверхность, граница
+                и сдержанная тень.
+              </Text>
+            ),
           },
           {
             id: "scale",

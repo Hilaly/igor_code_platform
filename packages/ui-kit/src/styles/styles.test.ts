@@ -90,6 +90,23 @@ describe("stylesheets of the kit", () => {
     expect(effects.match(/--sovereign-elevation-/g)).toHaveLength(3);
   });
 
+  it("describes public accents and elevation without obsolete decorative effects", () => {
+    const catalogue = readFileSync(join(kitRoot, "components", "ported.stories.tsx"), "utf8");
+    const palette = readFileSync(join(kitRoot, "tokens", "palette.ts"), "utf8");
+    const roles = readFileSync(join(kitRoot, "tokens", "roles.ts"), "utf8");
+    const publicContract = readFileSync(
+      join(kitRoot, "..", "..", "..", "docs", "public-contract.md"),
+      "utf8",
+    );
+    const publicGuidance = [catalogue, palette, roles, publicContract].join("\n");
+
+    expect(publicGuidance).not.toMatch(/gradient|hairline|glass|градиент|волосян|стекл/i);
+    expect(catalogue).toMatch(/семантическ(?:ий|ого) акцент/i);
+    expect(palette).toMatch(/смыслов(?:ая|ые|ых) (?:метка|метки|меток)/i);
+    expect(roles).toMatch(/нажат(?:ое|ого) состояни/i);
+    expect(publicContract).toMatch(/сдержанн(?:ая|ой) тень/i);
+  });
+
   it("keeps shared primitive geometry compact without shrinking row hit areas", () => {
     const buttonCss = readFileSync(join(kitRoot, "components", "button.module.css"), "utf8");
     const inputCss = readFileSync(join(kitRoot, "components", "input.module.css"), "utf8");
