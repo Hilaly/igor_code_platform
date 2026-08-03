@@ -755,6 +755,46 @@ describe("the session lifecycle from the view", () => {
     await waitFor(() => expect(onCompact).toHaveBeenCalledWith("сохрани решения"));
   });
 
+  it("cancels an open compaction when the saved agent disappears", () => {
+    const onCompact = vi.fn().mockResolvedValue(undefined);
+    const view = show(withOpen(), { onCompact });
+
+    fireEvent.click(screen.getByRole("button", { name: "Свернуть контекст" }));
+    expect(screen.getByRole("button", { name: "Свернуть" })).not.toBeNull();
+
+    view.rerender(
+      <SessionsView
+        state={withOpen([], { agentAvailable: false })}
+        onOpen={vi.fn()}
+        onStartCreating={vi.fn()}
+        onSubmit={vi.fn()}
+        onSendMessage={vi.fn()}
+        onInterrupt={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onFork={vi.fn()}
+        onCompact={onCompact}
+        onSetLabel={vi.fn()}
+        onNavigate={vi.fn()}
+        onShowArchived={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain("base-agent.agent");
+    expect(screen.getByRole("textbox", { name: "Сообщение агенту" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+
+    const confirm = screen.queryByRole("button", { name: "Свернуть" });
+    if (confirm !== null) {
+      fireEvent.click(confirm);
+    }
+
+    expect(confirm === null || confirm.hasAttribute("disabled")).toBe(true);
+    expect(onCompact).not.toHaveBeenCalled();
+  });
+
   it("folds by the prompt of the runtime when no instructions were given", async () => {
     const onCompact = vi.fn().mockResolvedValue(undefined);
 

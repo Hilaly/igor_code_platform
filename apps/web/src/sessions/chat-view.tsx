@@ -23,7 +23,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
@@ -62,6 +62,7 @@ export function ChatView(props: ChatViewProps) {
    */
   const [refusal, setRefusal] = useState<Refusal | undefined>(undefined);
   const busy = isBusy(open.summary);
+  const agentAvailable = open.summary?.agentAvailable !== false;
   const queues = open.queues;
   const waiting = [
     ...(queues?.steer ?? []),
@@ -72,6 +73,12 @@ export function ChatView(props: ChatViewProps) {
   const compact = async (): Promise<void> => {
     setCompacting(false);
 
+    // Обновление contribution может убрать сохранённого агента, пока подтверждение уже открыто.
+    // Кнопка ниже выключается сразу новым кадром, а эта проверка не выпускает устаревшее событие.
+    if (!agentAvailable) {
+      return;
+    }
+
     const asked = instructions.trim();
     const reason = await onCompact(asked === "" ? undefined : asked);
 
@@ -79,7 +86,12 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
-  const agentAvailable = open.summary?.agentAvailable !== false;
+
+  useEffect(() => {
+    if (!agentAvailable) {
+      setCompacting(false);
+    }
+  }, [agentAvailable]);
 
   return (
     <div className="sessions-chat">
@@ -202,13 +214,14 @@ export function ChatView(props: ChatViewProps) {
       </div>
 
       <ConfirmDialog
-        open={compacting}
+        open={compacting && agentAvailable}
         onClose={() => setCompacting(false)}
         title={t("chat.compact.title")}
         description={t("chat.compact.hint")}
         confirmLabel={t("chat.compact.confirm")}
         cancelLabel={t("common.cancel")}
         onConfirm={() => void compact()}
+        pending={!agentAvailable}
       >
         <Field label={t("chat.compact.instructions")} hint={t("chat.compact.instructions.hint")}>
           {(control) => <Input {...control} value={instructions} onChange={setInstructions} />}
