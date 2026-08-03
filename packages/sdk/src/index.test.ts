@@ -24,6 +24,7 @@ const anthropic: ProviderSummary = {
   auth: { kind: "configured", type: "api_key", source: "stored credential" },
   dynamic: false,
   custom: false,
+  origin: "builtin",
   modelCount: 12,
 };
 
