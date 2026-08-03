@@ -48,9 +48,10 @@ const logger = createLogger({ source: "core", level: () => "error", write: () =>
 
 after(() => rmSync(workspace, { recursive: true, force: true }));
 
-const validSkill = (description = "Review changes"): string =>
-  `---\nname: review\ndescription: ${description}\n---\nRead the change carefully.\n`;
-const validAgent = `---\nname: project-agent\ndescription: Project agent\ntools:\n  include: ["*"]\n  exclude: []\nskills:\n  include: [review]\n  exclude: []\n---\nWork in this project.\n`;
+const validSkill = (description = "Review changes", body = "Read the change carefully."): string =>
+  `---\nname: review\ndescription: ${description}\n---\n${body}\n`;
+const validAgent = (description = "Project agent"): string =>
+  `---\nname: project-agent\ndescription: ${description}\ntools:\n  include: ["*"]\n  exclude: []\nskills:\n  include: [review]\n  exclude: []\n---\nWork in this project.\n`;
 const malformedSkill = `---\nname: [review\n---\nBroken.\n`;
 
 type HttpAnswer = { status: number; body: Record<string, unknown> };
@@ -96,6 +97,19 @@ async function eventually<T>(
   throw new Error(`timed out waiting for ${hint}`);
 }
 
+async function waitFor<T>(
+  read: () => Promise<T>,
+  predicate: (value: T) => boolean,
+  hint: string,
+): Promise<T> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const value = await read();
+    if (predicate(value)) return value;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`timed out waiting for ${hint}`);
+}
+
 async function changeAndWait(
   bus: ReturnType<typeof createEventBus>,
   revision: number,
@@ -118,12 +132,13 @@ async function changeAndWait(
 function waitForRevision(
   bus: ReturnType<typeof createEventBus>,
   afterRevision: number,
+  timeoutMilliseconds = 2_000,
 ): Promise<number> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       unsubscribe();
       reject(new Error(`revision did not advance beyond ${afterRevision}`));
-    }, 2_000);
+    }, timeoutMilliseconds);
     const unsubscribe = bus.subscribe((event: BusEvent) => {
       if (isPluginBusEvent(event) || event.type !== coreEventTypes.contributionsChanged) return;
       const payload = event.payload as ContributionsChanged;
@@ -172,6 +187,7 @@ describe("file resources end to end", () => {
   it("reloads project skills and agents through sessions without a daemon restart", async () => {
     const dataDirectory = ensureDataDirectory(mkdtempSync(join(workspace, "data-")));
     const projectFolder = mkdtempSync(join(workspace, "project-"));
+    const otherProjectFolder = mkdtempSync(join(workspace, "other-project-"));
     const projectStore = createProjectStore({ directory: dataDirectory, logger });
     const projectOutcome = projectStore.create({
       name: "Project",
@@ -179,8 +195,14 @@ describe("file resources end to end", () => {
       folderKey: projectFolder,
     });
     assert.equal(projectOutcome.kind, "created");
-    assert.equal(projectOutcome.kind, "created");
     const project = projectOutcome.project;
+    const otherOutcome = projectStore.create({
+      name: "Other",
+      folder: otherProjectFolder,
+      folderKey: otherProjectFolder,
+    });
+    assert.equal(otherOutcome.kind, "created");
+    const other = otherOutcome.project;
     const projectSkills = join(projectFolder, ".sovereign", "skills");
     const projectAgents = join(projectFolder, ".sovereign", "agents");
     const skillDirectory = join(projectSkills, "review");
@@ -188,6 +210,20 @@ describe("file resources end to end", () => {
     const agentPath = join(projectAgents, "project-agent", "AGENT.md");
     mkdirSync(skillDirectory, { recursive: true });
     mkdirSync(join(projectAgents, "project-agent"), { recursive: true });
+    const otherSkillPath = join(otherProjectFolder, ".sovereign", "skills", "review", "SKILL.md");
+    const otherAgentPath = join(
+      otherProjectFolder,
+      ".sovereign",
+      "agents",
+      "project-agent",
+      "AGENT.md",
+    );
+    mkdirSync(join(otherProjectFolder, ".sovereign", "skills", "review"), { recursive: true });
+    mkdirSync(join(otherProjectFolder, ".sovereign", "agents", "project-agent"), {
+      recursive: true,
+    });
+    writeFileSync(otherSkillPath, validSkill("Other review", "Only the other project content."));
+    writeFileSync(otherAgentPath, validAgent("Other project agent"));
 
     const bus = createEventBus({
       onListenerError: (cause) => {
@@ -208,7 +244,7 @@ describe("file resources end to end", () => {
       roots: standaloneResourceRoots({
         dataDirectory,
         homeDirectory: workspace,
-        projects: [project],
+        projects: [project, other],
         availability: () => "available",
       }),
       registry,
@@ -225,6 +261,7 @@ describe("file resources end to end", () => {
         { text: "done" },
       ],
     });
+    const modelRequests = scripted.requests;
     const sessionStore: AgentSessionStore = {
       ...scripted.store,
       create: async (input) => {
@@ -294,14 +331,10 @@ describe("file resources end to end", () => {
         (ids) => ids.includes("base-agent.agent"),
         "built-in base agent",
       );
+      const initialAgents = (await requestJson(port, "GET", projectAgentsPath(project.id))).body
+        .agents as Array<{ id: string }>;
       assert.deepEqual(
-        (await requestJson(port, "GET", projectAgentsPath(project.id))).body.agents instanceof Array
-          ? (
-              (await requestJson(port, "GET", projectAgentsPath(project.id))).body.agents as Array<{
-                id: string;
-              }>
-            ).map((agent) => agent.id)
-          : [],
+        initialAgents.map((agent) => agent.id),
         ["base-agent.agent"],
       );
       const initialResources = (
@@ -323,10 +356,22 @@ describe("file resources end to end", () => {
       );
 
       const agentRevision = registry.revision();
-      await changeAndWait(bus, agentRevision, () => writeFileSync(agentPath, validAgent));
+      await changeAndWait(bus, agentRevision, () => writeFileSync(agentPath, validAgent()));
       assert.deepEqual(
         registry.resolvedForProject(project.id, "agent").map((agent) => agent.id),
         ["base-agent.agent", "project-agent"],
+      );
+      const projectAgentsResponse = (await requestJson(port, "GET", projectAgentsPath(project.id)))
+        .body.agents as Array<{ id: string; description?: string }>;
+      assert.equal(
+        projectAgentsResponse.find((agent) => agent.id === "project-agent")?.description,
+        "Project agent",
+      );
+      const otherAgentsResponse = (await requestJson(port, "GET", projectAgentsPath(other.id))).body
+        .agents as Array<{ id: string; description?: string }>;
+      assert.equal(
+        otherAgentsResponse.find((agent) => agent.id === "project-agent")?.description,
+        "Other project agent",
       );
 
       const fileResources = registry.fileResourcesForProject(project.id);
@@ -344,10 +389,43 @@ describe("file resources end to end", () => {
       const sessionId = created.kind === "created" ? created.session.id : "";
       const turn = await sessions.prompt({ sessionId, text: "read review" });
       assert.equal(turn.kind, "accepted");
+      await waitFor(
+        async () => modelRequests,
+        (requests) => requests.length >= 2,
+        "model request and read follow-up",
+      );
+      const firstPrompt = modelRequests[0]?.systemPrompt ?? "";
+      assert.match(firstPrompt, /<available_skills>/);
+      assert.match(firstPrompt, /<name>review<\/name>/);
+      assert.match(firstPrompt, /<description>Review changes<\/description>/);
+      assert.match(
+        firstPrompt,
+        new RegExp(`<location>${skillPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}<\\/location>`),
+      );
+      const readResult = JSON.stringify(modelRequests.flatMap((request) => request.messages));
+      assert.match(readResult, /Read the change carefully/);
       await eventually(
         () => appliedSkills,
         (skills) => skills.some((names) => names.includes("review")),
         "skill catalogue application",
+      );
+
+      const sibling = join(skillDirectory, "references", "checklist.md");
+      mkdirSync(join(skillDirectory, "references"), { recursive: true });
+      const siblingRevision = registry.revision();
+      await changeAndWait(bus, siblingRevision, () => writeFileSync(sibling, "first checklist\n"));
+      const parsedAfterSibling = registry
+        .resolvedForProject(project.id, "skill")
+        .find((skill) => skill.id === "review");
+      assert.equal(parsedAfterSibling?.description, "Review changes");
+      const siblingEditedRevision = registry.revision();
+      await changeAndWait(bus, siblingEditedRevision, () =>
+        writeFileSync(sibling, "edited checklist\n"),
+      );
+      assert.equal(
+        registry.resolvedForProject(project.id, "skill").find((skill) => skill.id === "review")
+          ?.description,
+        "Review changes",
       );
 
       const invalidRevision = registry.revision();
@@ -369,7 +447,19 @@ describe("file resources end to end", () => {
         invalidResources.find((resource) => resource.path === skillPath)?.state,
         "invalid",
       );
-      assert.ok(((await sessions.entries(sessionId))?.entries.length ?? 0) > 0);
+      const historyBeforeInvalid = await sessions.entries(sessionId);
+      assert.ok(historyBeforeInvalid !== undefined);
+      const agentsAfterInvalid = (await requestJson(port, "GET", projectAgentsPath(project.id)))
+        .body.agents as Array<{ id: string }>;
+      assert.equal(
+        agentsAfterInvalid.some((agent) => agent.id === "project-agent"),
+        true,
+      );
+      const sessionAfterInvalid = (await sessions.list(project.id)).find(
+        (session) => session.id === sessionId,
+      );
+      assert.equal(sessionAfterInvalid?.agentAvailable, true);
+      assert.deepEqual((await sessions.entries(sessionId))?.entries, historyBeforeInvalid.entries);
 
       const fixedRevision = registry.revision();
       await changeAndWait(bus, fixedRevision, () =>
@@ -391,22 +481,36 @@ describe("file resources end to end", () => {
       assert.equal(refusedTurn.status, 409);
 
       const restoredRevision = registry.revision();
-      await changeAndWait(bus, restoredRevision, () => writeFileSync(agentPath, validAgent));
+      await changeAndWait(bus, restoredRevision, () => writeFileSync(agentPath, validAgent()));
       assert.equal(
         (await requestJson(port, "POST", sessionTurnsPath(sessionId), { text: "again" })).status,
         200,
       );
 
-      const otherProjectFolder = mkdtempSync(join(workspace, "other-project-"));
-      const other = projectStore.create({
-        name: "Other",
-        folder: otherProjectFolder,
-        folderKey: otherProjectFolder,
-      });
-      assert.equal(other.kind, "created");
       assert.deepEqual(
-        registry.resolvedForProject(other.project.id, "agent").map((agent) => agent.id),
-        ["base-agent.agent"],
+        registry.resolvedForProject(other.id, "agent").map((agent) => agent.id),
+        ["base-agent.agent", "project-agent"],
+      );
+      assert.equal(
+        registry.resolvedForProject(other.id, "agent").find((agent) => agent.id === "project-agent")
+          ?.description,
+        "Other project agent",
+      );
+      assert.equal(
+        registry.resolvedForProject(other.id, "skill").find((skill) => skill.id === "review")
+          ?.description,
+        "Other review",
+      );
+      assert.equal(
+        registry.resolvedForProject(project.id, "skill").find((skill) => skill.id === "review")
+          ?.description,
+        "Fixed review",
+      );
+      const otherAgentsHttp = (await requestJson(port, "GET", projectAgentsPath(other.id))).body
+        .agents as Array<{ id: string; description?: string }>;
+      assert.equal(
+        otherAgentsHttp.find((agent) => agent.id === "project-agent")?.description,
+        "Other project agent",
       );
       assert.equal(
         events.some((event) => event.type === coreEventTypes.contributionsChanged),
@@ -424,6 +528,9 @@ describe("file resources end to end", () => {
           .some((status) => status.state === "running" || status.state === "starting"),
         false,
       );
+      const closedRevision = registry.revision();
+      writeFileSync(skillPath, validSkill("after close"));
+      await assert.rejects(waitForRevision(bus, closedRevision, 250), /revision did not advance/);
     }
   });
 });

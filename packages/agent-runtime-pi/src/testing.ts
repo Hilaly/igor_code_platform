@@ -344,6 +344,8 @@ export function scriptedSessionStore(options: {
   contextWindow: number;
   removeModel: () => void;
   restoreModel: () => void;
+  /** Контексты, отправленные двойнику модели; интеграционные тесты проверяют реальный prompt/tool flow. */
+  requests: Context[];
 } {
   const scripted = scriptedModelProvider({ turns: options.turns ?? [] });
   const models = createModels();
@@ -359,6 +361,7 @@ export function scriptedSessionStore(options: {
         options.compactionSettings ?? (() => ({ reserveTokens: 16384, keepRecentTokens: 20000 })),
     }),
     model: `${scripted.model.provider}/${scripted.model.id}`,
+    requests: scripted.requests,
     contextWindow: scripted.model.contextWindow,
     removeModel: () => models.deleteProvider(scripted.provider.id),
     restoreModel: () => models.setProvider(scripted.provider),
