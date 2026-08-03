@@ -453,7 +453,9 @@ export function App() {
           stream={stream}
           failure={failure}
           onOpenArchive={() => navigation.navigate({ kind: "session-archive" })}
-          onOpenSettings={() => navigation.navigate({ kind: "settings" })}
+          onOpenSettings={() =>
+            navigation.navigate({ kind: "settings", section: "appearance" })
+          }
           onLogOut={() => {
             void logOut().then(() => {
               setExpired(false);
@@ -580,7 +582,7 @@ export function App() {
         }
         settings={
           <SettingsView
-            section={page.kind === "settings" ? page.section : undefined}
+            section={page.kind === "settings" ? page.section : "appearance"}
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
             appearance={
               <AppearanceSection
