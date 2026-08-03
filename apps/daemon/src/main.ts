@@ -142,7 +142,7 @@ const providers = createProviderCatalogue({
 });
 
 const userProviderStore = createUserProviderStore({ directory, logger });
-let hasActiveProviderSession = (_providerId: string): boolean => false;
+let hasActiveProviderSession: (providerId: string) => boolean = () => false;
 const userProviders = createUserProviders({
   store: userProviderStore,
   catalogue: providers,

@@ -14,6 +14,8 @@ import {
   userProviderRefreshPath,
   userProvidersPath,
   type UserProviderDefinition,
+  type UserProviderDetails,
+  type UserProvidersSnapshot,
 } from "@sovereign/protocol";
 
 import { createDispatcher } from "../http/public.ts";
@@ -79,7 +81,11 @@ async function serve() {
   await once(server, "listening");
   const port = (server.address() as AddressInfo).port;
 
-  return (method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> =>
+  return (
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<{ status: number; body: unknown }> =>
     new Promise((resolve, reject) => {
       const request = sendRequest(
         { host: "127.0.0.1", port, method, path, headers: { "content-type": "application/json" } },
@@ -101,13 +107,14 @@ describe("the user provider HTTP API", () => {
   it("creates, reads, updates, refreshes, and deletes one definition", async () => {
     const call = await serve();
     assert.equal((await call("POST", userProvidersPath, definition())).status, 200);
-    assert.equal((await call("GET", userProvidersPath)).body.providers.length, 1);
-    assert.equal((await call("GET", userProviderPath("vendor"))).body.definition.id, "vendor");
-    assert.equal(
-      (await call("PUT", userProviderPath("vendor"), { ...definition(), name: "Renamed" })).body
-        .definition.name,
-      "Renamed",
-    );
+    const listed = (await call("GET", userProvidersPath)).body as UserProvidersSnapshot;
+    const found = (await call("GET", userProviderPath("vendor"))).body as UserProviderDetails;
+    assert.equal(listed.providers.length, 1);
+    assert.equal(found.definition.id, "vendor");
+    const updated = (
+      await call("PUT", userProviderPath("vendor"), { ...definition(), name: "Renamed" })
+    ).body as UserProviderDetails;
+    assert.equal(updated.definition.name, "Renamed");
     assert.equal((await call("POST", userProviderRefreshPath("vendor"))).status, 200);
     assert.deepEqual((await call("DELETE", userProviderPath("vendor"))).body, { id: "vendor" });
     assert.equal((await call("GET", userProviderPath("vendor"))).status, 404);

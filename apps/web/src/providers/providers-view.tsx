@@ -252,7 +252,9 @@ function UserProviderActions({
           disabled={busy}
           onClick={() => {
             setBusy(true);
-            void onRefresh(provider.id).finally(() => setBusy(false));
+            void onRefresh(provider.id)
+              .catch(() => undefined)
+              .finally(() => setBusy(false));
           }}
         >
           {t("providers.user.refresh")}
@@ -274,6 +276,7 @@ function UserProviderActions({
           setBusy(true);
           void onDelete(provider.id)
             .then(() => setConfirming(false))
+            .catch(() => undefined)
             .finally(() => setBusy(false));
         }}
       />

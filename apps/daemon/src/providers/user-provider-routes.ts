@@ -59,9 +59,11 @@ export function userProviderRoutes(options: {
       path: userProviderPathPattern,
       handle: ({ response, parameters }) => {
         const found = options.providers.find(parameters["providerId"] ?? "");
-        found === undefined
-          ? respondWithError(response, 404, "not found")
-          : respondWithJson(response, 200, found);
+        if (found === undefined) {
+          respondWithError(response, 404, "not found");
+        } else {
+          respondWithJson(response, 200, found);
+        }
       },
     },
     {
