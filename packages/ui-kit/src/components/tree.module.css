@@ -22,7 +22,6 @@
 
 .row {
   display: inline-flex;
-  width: 100%;
   min-height: var(--sovereign-row-height-compact);
   align-items: center;
   gap: var(--sovereign-space-2);
