@@ -10,12 +10,10 @@
  */
 
 :root {
-  --sovereign-font-family-display:
-    "Unbounded Variable", "IBM Plex Sans Variable", "Segoe UI", sans-serif;
+  --sovereign-font-family-display: "Source Serif 4 Variable", Georgia, serif;
   --sovereign-font-family-body:
-    "IBM Plex Sans Variable", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --sovereign-font-family-mono:
-    "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    "Manrope Variable", -apple-system, "Segoe UI", sans-serif;
+  --sovereign-font-family-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
 
   --sovereign-icon-xs: 0.75rem;
   --sovereign-icon-sm: 1rem;

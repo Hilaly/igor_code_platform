@@ -49,6 +49,25 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("ships the approved voice, interface, and machine fonts locally", () => {
+    const entry = readFileSync(join(kitRoot, "styles", "index.css"), "utf8");
+    const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");
+    const manifest = JSON.parse(readFileSync(join(kitRoot, "..", "package.json"), "utf8"));
+
+    expect(entry).toContain("@fontsource-variable/source-serif-4/wght.css");
+    expect(entry).toContain("@fontsource-variable/manrope/wght.css");
+    expect(entry).toContain("@fontsource/ibm-plex-mono/400.css");
+    expect(entry).toContain("@fontsource/ibm-plex-mono/500.css");
+    expect(tokens).toContain('"Source Serif 4 Variable"');
+    expect(tokens).toContain('"Manrope Variable"');
+    expect(tokens).toContain('"IBM Plex Mono"');
+    expect(manifest.dependencies).toMatchObject({
+      "@fontsource-variable/source-serif-4": expect.any(String),
+      "@fontsource-variable/manrope": expect.any(String),
+      "@fontsource/ibm-plex-mono": expect.any(String),
+    });
+  });
+
   it("uses Imperium as the catalogue fallback", () => {
     const catalogue = readFileSync(join(kitRoot, "..", ".ladle", "components.tsx"), "utf8");
 
