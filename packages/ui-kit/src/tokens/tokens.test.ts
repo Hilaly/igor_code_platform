@@ -31,6 +31,23 @@ describe("deriveRoles", () => {
   });
 });
 
+describe("imperiumScheme", () => {
+  it("separates the Refined Imperium surfaces", () => {
+    expect(imperiumScheme.variants.dark).toMatchObject({
+      surface: "#14100b",
+      surfaceRaised: "#201a13",
+      surfaceSunken: "#100d09",
+      border: "#3b2f21",
+    });
+    expect(imperiumScheme.variants.light).toMatchObject({
+      surface: "#f3ead8",
+      surfaceRaised: "#fffaf0",
+      surfaceSunken: "#e7dcc5",
+      border: "#d1bea0",
+    });
+  });
+});
+
 describe("rolePropertyName", () => {
   it("turns a role into a prefixed css variable", () => {
     expect(rolePropertyName("panelSurface")).toBe("--sovereign-panel-surface");
