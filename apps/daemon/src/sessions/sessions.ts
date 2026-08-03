@@ -1133,6 +1133,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: opened.reason };
     }
 
+    const prepared = await prepareForModel(opened.session, summary);
+
+    if (prepared.kind === "missing-agent") {
+      return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
+    }
+
     const outcome = await opened.session.message(wanted.text, wanted.mode);
 
     if (outcome.kind === "idle") {

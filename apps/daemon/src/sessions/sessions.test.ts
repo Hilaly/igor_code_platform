@@ -182,20 +182,29 @@ async function serve(
   const appliedInstructions: string[] = [];
   const appliedSkills: AgentSkill[][] = [];
   const appliedToolNames: string[][] = [];
+  const harnessCalls: string[] = [];
   const toolContexts: unknown[] = [];
   const observeSession = (session: AgentSession): AgentSession => ({
     ...session,
     setInstructions: (instructions) => {
+      harnessCalls.push("set-instructions");
       appliedInstructions.push(instructions);
       session.setInstructions(instructions);
     },
     setSkills: (skills) => {
+      harnessCalls.push("set-skills");
       appliedSkills.push(skills);
       session.setSkills(skills);
     },
     setTools: async (tools, activeToolNames) => {
+      harnessCalls.push("set-tools");
       appliedToolNames.push(activeToolNames);
       await session.setTools(tools, activeToolNames);
+    },
+    message: async (text, mode) => {
+      harnessCalls.push(`message:${mode}`);
+
+      return session.message(text, mode);
     },
   });
   const delayModelChange = (session: AgentSession): AgentSession => ({
@@ -346,6 +355,7 @@ async function serve(
     appliedInstructions,
     appliedSkills,
     appliedToolNames,
+    harnessCalls,
     toolContexts,
     start: async (body?: Record<string, unknown>) =>
       call("POST", sessionsPath, { projectId, agentId: baseAgent.id, model, ...body }),
@@ -1032,6 +1042,52 @@ describe("reading sessions", () => {
 
     assert.equal(answer.status, 409);
     assert.match(String(answer.body["error"]), /agent .* is not available/);
+  });
+
+  it("applies current agent definitions before every live message mode", async () => {
+    let contributions: ContributionRegistration[] = [baseAgent];
+    const { call, start, appliedInstructions, appliedSkills, appliedToolNames, harnessCalls } =
+      await serve({
+        contributions: { base: () => contributions, forProject: () => contributions },
+      });
+    const sessionId = String((await start()).body["id"]);
+
+    contributions = [
+      {
+        ...baseAgent,
+        instructions: "current instructions",
+        tools: { include: ["read", "write"], exclude: ["write"] },
+        skills: { include: ["review"], exclude: [] },
+      },
+      skill("review"),
+    ];
+
+    for (const [mode, status] of [
+      ["steer", 409],
+      ["follow-up", 409],
+      ["append", 200],
+      ["next-turn", 200],
+    ] as const) {
+      const answer = await call("POST", sessionMessagesPath(sessionId), {
+        text: "remember this",
+        mode,
+      });
+
+      assert.equal(answer.status, status);
+      assert.deepEqual(harnessCalls.slice(-4), [
+        "set-tools",
+        "set-instructions",
+        "set-skills",
+        `message:${mode}`,
+      ]);
+    }
+
+    assert.equal(appliedInstructions.at(-1), "current instructions");
+    assert.deepEqual(appliedToolNames.at(-1), ["read"]);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["review"],
+    );
   });
 
   it("answers 404 for a session nobody created", async () => {

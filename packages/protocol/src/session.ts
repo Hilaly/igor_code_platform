@@ -129,8 +129,9 @@ export type SessionPhase = (typeof sessionPhases)[number];
 
 export type Session = {
   id: string;
-  /** Проект, в папке которого идёт работа. Привязка выражена папкой (docs/sessions-and-projects.md). */
+  /** Идентичность проекта для разрешения вкладов и принадлежности сессии. */
   projectId: string;
+  /** Рабочий контекст рантайма и файловых инструментов; не заменяет идентичность проекта. */
   folder: string;
   agentId: string;
   /** Есть ли сохранённый агент в текущем разрешённом наборе именно этого проекта. */

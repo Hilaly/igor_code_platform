@@ -19,7 +19,9 @@ export type SessionPhase = "idle" | "queued" | "turn" | "compaction" | "branch-s
 
 export type Session = {
   id: string;
+  /** Идентичность проекта для разрешения вкладов и принадлежности сессии. */
   projectId: string;
+  /** Рабочий контекст рантайма и файловых инструментов; не заменяет идентичность проекта. */
   folder: string;
   agentId: string;
   agentAvailable: boolean;
