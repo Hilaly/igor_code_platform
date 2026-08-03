@@ -1,5 +1,6 @@
 import {
   agentsPath,
+  projectAgentsPath,
   sessionBranchPath,
   sessionCompactPath,
   sessionContextPath,
@@ -15,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSession,
   fetchAgents,
+  fetchProjectAgents,
   fetchBranch,
   fetchContextUsage,
   fetchEntries,
@@ -56,6 +58,29 @@ describe("reading sessions", () => {
 
     await expect(fetchAgents()).resolves.toEqual({ agents: [] });
     expect(calls[0]?.url).toBe(agentsPath);
+  });
+
+  it("asks for the agents resolved within one escaped project", async () => {
+    const calls = daemon({ status: 200, body: { agents: [{ id: "review" }] } });
+
+    await expect(fetchProjectAgents("p/1")).resolves.toEqual({ agents: [{ id: "review" }] });
+    expect(calls[0]?.url).toBe(projectAgentsPath("p/1"));
+    expect(calls[0]?.url).toBe("/api/projects/p%2F1/agents");
+  });
+
+  it("carries a missing project's reason from the project agents endpoint", async () => {
+    daemon({ status: 404, body: { error: "not found" } });
+
+    await expect(fetchProjectAgents("gone")).rejects.toThrow("not found");
+  });
+
+  it("forwards cancellation to the project agents request", async () => {
+    const calls = daemon({ status: 200, body: { agents: [] } });
+    const controller = new AbortController();
+
+    await fetchProjectAgents("p1", controller.signal);
+
+    expect(calls[0]?.init?.signal).toBe(controller.signal);
   });
 
   it("narrows the list to one project by a query parameter", async () => {

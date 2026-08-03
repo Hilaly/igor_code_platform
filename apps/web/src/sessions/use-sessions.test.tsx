@@ -12,6 +12,7 @@
 import {
   agentsPath,
   coreEventTypes,
+  projectAgentsPath,
   sessionBranchPath,
   sessionCompactPath,
   sessionContextPath,
@@ -45,6 +46,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   projectId: "b7Kq",
   folder: "/code/platform",
   agentId: "base-agent.agent",
+  agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",
   phase: "idle",
@@ -79,6 +81,8 @@ let context: SessionContextUsage = { sessionId: "0199", tokens: 0, threshold: 0 
 let delayedBranch: Promise<Response> | undefined;
 let delayedBranches: Promise<Response>[] | undefined;
 let delayedEntries: Promise<Response> | undefined;
+let projectAgents: Record<string, unknown[]> = {};
+let delayedProjectAgents: Record<string, Promise<Response>> = {};
 /** Ответ на всё, что не снимок: путь и код подставляет тест. */
 let refusals: Record<string, { status: number; body: unknown }> = {};
 
@@ -98,6 +102,8 @@ beforeEach(() => {
   delayedBranch = undefined;
   delayedBranches = undefined;
   delayedEntries = undefined;
+  projectAgents = {};
+  delayedProjectAgents = {};
 
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -121,6 +127,12 @@ beforeEach(() => {
 
     if (url === agentsPath) {
       return answer({ agents: [] });
+    }
+
+    for (const [projectId, agents] of Object.entries(projectAgents)) {
+      if (url === projectAgentsPath(projectId)) {
+        return delayedProjectAgents[projectId] ?? answer({ agents });
+      }
     }
 
     if (url === sessionPath("0199")) {
@@ -192,7 +204,7 @@ const asked = (url: string, method = "GET"): Call[] =>
   calls.filter((call) => call.url === url && call.method === method);
 
 describe("useSessions", () => {
-  it("asks for the sessions and the agents as soon as the stream is up", async () => {
+  it("asks for sessions but not the global agent catalogue as soon as the stream is up", async () => {
     const view = connect({ stream: "connecting" });
 
     expect(calls).toEqual([]);
@@ -200,7 +212,72 @@ describe("useSessions", () => {
     view.rerender({ stream: "open" });
 
     await waitFor(() => expect(view.result.current.state.sessions).toHaveLength(1));
-    expect(asked(agentsPath)).toHaveLength(1);
+    expect(asked(agentsPath)).toHaveLength(0);
+  });
+
+  it("loads only the agents resolved for the project selected in the draft", async () => {
+    projectAgents = { p1: [{ id: "p1-agent" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "p1-agent" }]),
+    );
+    expect(asked(projectAgentsPath("p1"))).toHaveLength(1);
+    expect(asked(agentsPath)).toHaveLength(0);
+  });
+
+  it("aborts and ignores a stale project agent answer after the project changes", async () => {
+    let resolveP1!: (response: Response) => void;
+    delayedProjectAgents.p1 = new Promise((resolve) => {
+      resolveP1 = resolve;
+    });
+    projectAgents = { p1: [], p2: [{ id: "p2-agent" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() => expect(asked(projectAgentsPath("p1"))).toHaveLength(1));
+    const p1Call = asked(projectAgentsPath("p1"))[0];
+
+    act(() => view.result.current.selectProject("p2"));
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "p2-agent" }]),
+    );
+    expect(p1Call?.signal?.aborted).toBe(true);
+
+    resolveP1(await answer({ agents: [{ id: "stale-p1-agent" }] }));
+    await act(async () => Promise.resolve());
+    expect(view.result.current.projectAgents).toMatchObject({
+      projectId: "p2",
+      agents: [{ id: "p2-agent" }],
+      loading: false,
+    });
+  });
+
+  it("refetches the current project agents when contributions change", async () => {
+    projectAgents = { p1: [{ id: "before" }] };
+    const view = connect();
+
+    act(() => view.result.current.selectProject("p1"));
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "before" }]),
+    );
+
+    projectAgents.p1 = [{ id: "after" }];
+    act(() => {
+      view.bus.publish({
+        index: 1,
+        time: "2026-07-29T00:00:00.000Z",
+        type: coreEventTypes.contributionsChanged,
+        payload: { revision: 2 },
+      } as never);
+    });
+
+    await waitFor(() =>
+      expect(view.result.current.projectAgents.agents).toEqual([{ id: "after" }]),
+    );
+    expect(asked(projectAgentsPath("p1"))).toHaveLength(2);
   });
 
   it("filters the sessions snapshot by the project from the address", async () => {

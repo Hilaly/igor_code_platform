@@ -27,6 +27,7 @@ const board: ContributionRegistration = {
   id: "hello.board",
   declaredId: "board",
   kind: "custom",
+  ownership: "plugin",
   pluginKey: "data:hello",
   pluginId: "hello",
   source: "data",

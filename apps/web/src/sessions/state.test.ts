@@ -28,6 +28,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   projectId: "b7Kq",
   folder: "/code/platform",
   agentId: "base-agent.agent",
+  agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",
   phase: "idle",

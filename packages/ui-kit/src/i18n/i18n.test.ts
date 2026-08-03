@@ -86,6 +86,15 @@ describe("createTranslator", () => {
     expect(kit.t("plugins.running", { count: 2, total: 1234 })).toBe("Работает 2 из 1\u00a0234");
   });
 
+  it("names the selected project in the empty agent catalogue message", () => {
+    expect(translator("ru").t("sessions.new.agents.empty", { project: "Платформа" })).toBe(
+      "В проекте «Платформа» нет доступных агентов.",
+    );
+    expect(translator("en").t("sessions.new.agents.empty", { project: "Platform" })).toBe(
+      "No agents are available in the project “Platform”.",
+    );
+  });
+
   it("reports a placeholder nobody filled instead of printing it as text", () => {
     const kit = translator("en", [
       { namespace: coreNamespace, locale: "en", messages: { greeting: "Hello, {name}" } },

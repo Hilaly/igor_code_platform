@@ -14,7 +14,6 @@ import {
   modelReference,
   parseModelReference,
   thinkingLevels,
-  type AgentSummary,
   type ModelSummary,
   type Project,
   type ProviderSummary,
@@ -37,14 +36,18 @@ import {
 import { useEffect, useState } from "react";
 
 import type { ModelsEntry } from "./state.ts";
+import type { ProjectAgentsState } from "./use-sessions.ts";
 
 export type NewSessionViewProps = {
   projects?: Project[];
-  agents?: AgentSummary[];
+  projectAgents: ProjectAgentsState;
   providers?: ProviderSummary[];
   models: Record<string, ModelsEntry>;
+  /** Проект из страницы проекта. Прямой адрес формы оставляет выбор пустым. */
+  initialProjectId?: string;
   /** Подготовить проекты и провайдеров. Зовётся на mount экрана, как прежде по открытию диалога. */
   onPrepareDraft: () => void;
+  onSelectProject: (projectId: string) => void;
   /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
   onPickProvider: (providerId: string) => void;
   /** Создать сессию. Возвращает идентификатор новой сессии или причину отказа. */
@@ -57,10 +60,10 @@ export type NewSessionViewProps = {
 };
 
 export function NewSessionView(props: NewSessionViewProps) {
-  const { projects, agents, providers, models, translator } = props;
+  const { projects, projectAgents, providers, models, translator } = props;
   const { t } = translator;
 
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(props.initialProjectId ?? "");
   const [agentId, setAgentId] = useState("");
   const [modelRef, setModelRef] = useState<string | undefined>(undefined);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
@@ -72,10 +75,40 @@ export function NewSessionView(props: NewSessionViewProps) {
   // сессий и переживают уход с экрана и возврат; запрос на mount лишь гарантирует их наличие.
   useEffect(() => {
     props.onPrepareDraft();
+
+    if (props.initialProjectId !== undefined) {
+      props.onSelectProject(props.initialProjectId);
+    }
+
+    return () => props.onSelectProject("");
     // Одноразовый: сам `onPrepareDraft` мемоизован контроллером, а зависимость от props избыточна.
   }, []);
 
+  const agents =
+    projectAgents.projectId === projectId && !projectAgents.loading
+      ? projectAgents.agents
+      : undefined;
+
+  const pickProject = (id: string): void => {
+    setProjectId(id);
+    setAgentId("");
+    setModelRef(undefined);
+    setThinkingLevel("medium");
+    setRefusal(undefined);
+    props.onSelectProject(id);
+  };
+
   const agent = agents?.find((candidate) => candidate.id === agentId);
+
+  // Hot reload вклада может убрать выбранного агента без смены проекта. Зависимые значения тогда
+  // уже не принадлежат действующему выбору и не должны оставить черновик готовым к отправке.
+  useEffect(() => {
+    if (agents !== undefined && agentId !== "" && agent === undefined) {
+      setAgentId("");
+      setModelRef(undefined);
+      setThinkingLevel("medium");
+    }
+  }, [agent, agentId, agents]);
 
   // Дефолты берутся из агента в момент его выбора: повторный выбор того же агента их не сбрасывает.
   const pickAgent = (id: string): void => {
@@ -133,7 +166,7 @@ export function NewSessionView(props: NewSessionViewProps) {
 
   // Готовность — проект и агент. Модель НЕ обязательна: у агента может быть дефолт, и тогда демон
   // возьмёт её сам. Первый текст необязателен тоже: создать пустую сессию — законное действие.
-  const ready = projectId !== "" && agentId !== "";
+  const ready = projectId !== "" && agent !== undefined;
 
   const create = (): void => {
     setBusy(true);
@@ -177,7 +210,7 @@ export function NewSessionView(props: NewSessionViewProps) {
         <Notice tone="danger" title={t("sessions.new.refused", { reason: refusal })} />
       )}
 
-      {projects === undefined || agents === undefined || providers === undefined ? (
+      {projects === undefined || providers === undefined ? (
         <Spinner label={t("state.loading")} />
       ) : undefined}
 
@@ -185,8 +218,30 @@ export function NewSessionView(props: NewSessionViewProps) {
         <Notice tone="warning" title={t("sessions.new.no-project")} />
       ) : undefined}
 
-      {agents?.length === 0 ? (
-        <Notice tone="warning" title={t("sessions.new.no-agent")}>
+      {projectId !== "" && projectAgents.projectId === projectId && projectAgents.loading ? (
+        <Spinner label={t("sessions.new.agents.loading")} />
+      ) : undefined}
+
+      {projectId !== "" &&
+      projectAgents.projectId === projectId &&
+      projectAgents.failure !== undefined ? (
+        <Notice
+          tone="danger"
+          title={t("sessions.new.agents.failed", { reason: projectAgents.failure })}
+        />
+      ) : undefined}
+
+      {projectId !== "" &&
+      projectAgents.projectId === projectId &&
+      !projectAgents.loading &&
+      projectAgents.failure === undefined &&
+      agents?.length === 0 ? (
+        <Notice
+          tone="warning"
+          title={t("sessions.new.agents.empty", {
+            project: projects?.find(({ id }) => id === projectId)?.name ?? projectId,
+          })}
+        >
           <Link href="/plugins">{t("nav.plugins")}</Link>
         </Notice>
       ) : undefined}
@@ -201,7 +256,7 @@ export function NewSessionView(props: NewSessionViewProps) {
         <Select
           label={t("sessions.new.project")}
           value={projectId}
-          onChange={setProjectId}
+          onChange={pickProject}
           options={(projects ?? []).map((project) => ({
             value: project.id,
             label: `${project.name} — ${project.folder}`,
@@ -213,12 +268,22 @@ export function NewSessionView(props: NewSessionViewProps) {
           label={t("sessions.new.agent")}
           value={agentId}
           onChange={pickAgent}
+          disabled={
+            projectId === "" ||
+            projectAgents.projectId !== projectId ||
+            projectAgents.loading ||
+            projectAgents.failure !== undefined
+          }
           options={(agents ?? []).map((candidate) => ({
             value: candidate.id,
             label: candidate.title ?? candidate.id,
           }))}
           placeholder={t("common.choose")}
         />
+
+        {projectId === "" ? (
+          <Text tone="muted">{t("sessions.new.agent.disabled")}</Text>
+        ) : undefined}
 
         <ModelPicker
           label={t("sessions.new.model")}

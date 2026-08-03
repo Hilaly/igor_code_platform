@@ -339,6 +339,10 @@ export const coreEnglish: CatalogRegistration = {
     "sessions.gone.title": "There is no such session",
     "sessions.new": "New session",
     "sessions.new.agent": "Agent",
+    "sessions.new.agent.disabled": "Pick a project first — its available agents depend on it.",
+    "sessions.new.agents.empty": "No agents are available in the project “{project}”.",
+    "sessions.new.agents.failed": "The project agents could not be read: {reason}",
+    "sessions.new.agents.loading": "Loading project agents…",
     "sessions.new.create": "Create",
     "sessions.new.first-message": "First message",
     "sessions.new.hint":

@@ -127,7 +127,7 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
   const { t } = translator;
   const preferences = snapshot.enablement[status.key];
   const mine = (registration: ContributionRegistration): boolean =>
-    registration.pluginKey === status.key;
+    registration.ownership === "plugin" && registration.pluginKey === status.key;
   const declared = [
     ...snapshot.contributions.filter(mine).map((registration) => ({ registration, off: false })),
     ...snapshot.switchedOffContributions

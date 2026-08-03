@@ -9,6 +9,7 @@
 
 import {
   agentsPath,
+  projectAgentsPath,
   sessionArchivedParameter,
   sessionBranchPath,
   sessionCompactPath,
@@ -46,6 +47,23 @@ import {
 
 export async function fetchAgents(signal?: AbortSignal): Promise<AgentsSnapshot> {
   const response = await fetch(agentsPath, signal === undefined ? {} : { signal });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as AgentsSnapshot;
+}
+
+/** Каталог для черновика сессии уже разрешён в контексте выбранного проекта. */
+export async function fetchProjectAgents(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<AgentsSnapshot> {
+  const response = await fetch(
+    projectAgentsPath(projectId),
+    signal === undefined ? {} : { signal },
+  );
 
   if (!response.ok) {
     throw new Error(await reasonOf(response));

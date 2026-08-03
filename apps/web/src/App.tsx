@@ -95,6 +95,7 @@ export function App() {
   const [health, setHealth] = useState<Health | undefined>(undefined);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [page, setPage] = useState<Page>(() => navigation.current());
+  const [draftProjectId, setDraftProjectId] = useState<string | undefined>(undefined);
   const [layout, setLayout] = useState<ShellLayout>(() => readLayout(localStorage));
   const [access, setAccess] = useState<Access>("asking");
   const [loginRefusal, setLoginRefusal] = useState<string | undefined>(undefined);
@@ -105,6 +106,14 @@ export function App() {
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
   useEffect(() => navigation.subscribe(setPage), [navigation]);
+
+  // Предвыбор живёт ровно один вход на экран. После mount локальное состояние формы уже его
+  // приняло, а следующий общий переход не должен унаследовать проект из прошлого маршрута.
+  useEffect(() => {
+    if (page.kind === "new-session" && draftProjectId !== undefined) {
+      setDraftProjectId(undefined);
+    }
+  }, [draftProjectId, page.kind]);
 
   // Состояние входа спрашивается до всего остального: почти все маршруты защищены (docs/web-api.md),
   // и открывать поток без сессии значит получить отказ и разбирать его вместо ответа.
@@ -492,12 +501,22 @@ export function App() {
             loaded={projects.state.snapshot !== undefined}
             failure={projects.state.failure}
             onBack={() => navigation.navigate({ kind: "projects" })}
-            onNewSession={() => navigation.navigate({ kind: "new-session" })}
+            onNewSession={() => {
+              if (page.kind === "project") {
+                setDraftProjectId(page.projectId);
+              }
+              navigation.navigate({ kind: "new-session" });
+            }}
             sessions={
               <SessionsView
                 state={sessions.state}
                 onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
-                onStartCreating={() => navigation.navigate({ kind: "new-session" })}
+                onStartCreating={() => {
+                  if (page.kind === "project") {
+                    setDraftProjectId(page.projectId);
+                  }
+                  navigation.navigate({ kind: "new-session" });
+                }}
                 onSubmit={sessions.submitTurn}
                 onSendMessage={sessions.sendMessage}
                 onInterrupt={sessions.interrupt}
@@ -536,7 +555,10 @@ export function App() {
           <SessionsView
             state={sessions.state}
             onOpen={(sessionId) => navigation.navigate({ kind: "sessions", sessionId })}
-            onStartCreating={() => navigation.navigate({ kind: "new-session" })}
+            onStartCreating={() => {
+              setDraftProjectId(undefined);
+              navigation.navigate({ kind: "new-session" });
+            }}
             onSubmit={sessions.submitTurn}
             onSendMessage={sessions.sendMessage}
             onInterrupt={sessions.interrupt}
@@ -568,15 +590,17 @@ export function App() {
         }
         newSession={
           <NewSessionView
+            {...(draftProjectId === undefined ? {} : { initialProjectId: draftProjectId })}
             {...(sessions.state.projects === undefined
               ? {}
               : { projects: sessions.state.projects })}
-            {...(sessions.state.agents === undefined ? {} : { agents: sessions.state.agents })}
+            projectAgents={sessions.projectAgents}
             {...(sessions.state.providers === undefined
               ? {}
               : { providers: sessions.state.providers })}
             models={sessions.state.models}
             onPrepareDraft={sessions.prepareDraft}
+            onSelectProject={sessions.selectProject}
             onPickProvider={sessions.loadModels}
             onCreate={async (draft) => {
               const outcome = await sessions.createSession(draft);
