@@ -117,4 +117,13 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });
+
+  it("keeps settings split by their container and scrolls the active content", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
+
+    expect(settings).toMatch(/\.settings\s*\{[^}]*grid-template-columns:[^;}]+;/s);
+    expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(settings).toMatch(/@container\s*\(width\s*<\s*40rem\)/);
+    expect(settings).not.toMatch(/\.settings-split/);
+  });
 });

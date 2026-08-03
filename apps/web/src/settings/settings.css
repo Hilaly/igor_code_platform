@@ -7,45 +7,72 @@
  */
 
 .settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-  /* Вью забирает высоту хоста целиком: раздел прокручивается внутри себя, а не вместе со страницей. */
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  height: 100%;
   min-height: 0;
   min-width: 0;
-  flex: 1;
   container-type: inline-size;
 }
 
-/*
- * Под-навигация фиксированной доли, раздел — всё остальное; на узком экране они встают в колонку:
- * то же поведение, что у мастер-детали сессий, и по той же причине.
- */
-.settings-split {
-  display: grid;
-  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+.settings-sidebar,
+.settings-content {
+  display: flex;
+  flex-direction: column;
   gap: var(--sovereign-space-3);
-  min-height: 0;
   min-width: 0;
-  flex: 1;
-}
-
-.settings-split > * {
-  min-width: 0;
-  /* Каждая панель забирает свою долю высоты, а не вырастает под содержимое: иначе длинный список
-     разделов или большой раздел толкал бы раскладку. */
   min-height: 0;
 }
 
-@container (width < 40rem) {
-  .settings-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.settings-sidebar {
+  padding-inline-end: var(--sovereign-space-4);
+  border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  overflow-y: auto;
+}
+
+.settings-content {
+  padding-inline-start: var(--sovereign-space-5);
 }
 
 .settings-nav {
-  overflow-y: auto;
   min-height: 0;
+}
+
+.settings-content-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@container (width < 40rem) {
+  .settings {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-sidebar {
+    padding-inline-end: 0;
+    padding-block-end: var(--sovereign-space-3);
+    border-inline-end: none;
+    border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+    overflow-y: visible;
+  }
+
+  .settings-nav {
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  /* Прямой ребёнок — китовый `List`. Правило меняет только предметную геометрию и не зависит от
+     хешированного имени класса UI kit. */
+  .settings-nav > * {
+    flex-direction: row;
+    width: max-content;
+  }
+
+  .settings-content {
+    padding-block-start: var(--sovereign-space-4);
+    padding-inline-start: 0;
+  }
 }
 
 .settings-appearance,
