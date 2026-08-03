@@ -74,6 +74,8 @@ export type CreatePluginSupervisorOptions = {
   registry: ContributionRegistry;
   /** Куда уходят переходы жизненного цикла и смена набора вкладов (docs/plugins.md). */
   bus: EventBus;
+  /** Общая инвалидация контекстных вкладов; дедупликация по revision живёт в composition root. */
+  publishContributionChanges?: () => void;
   /** Источник записи штампует ядро: плагин не может назваться чужим именем (docs/logging.md). */
   createPluginLogger: (source: LogSource) => Logger;
   now?: () => number;
@@ -210,28 +212,24 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     bus.publish(coreEventTypes.pluginLifecycle, status);
   };
 
-  /**
-   * Ревизия реестра растёт только при настоящем изменении набора, поэтому она же и решает, есть ли
-   * о чём сообщать: переприменение того же снимка никого не будит.
-   */
-  let publishedRevision = registry.revision();
-
-  const publishContributions = (): void => {
+  /** Plugin-specific событие следует только за мутацией плагина; standalone меняет тот же реестр. */
+  const publishContributions = (previousRevision: number): void => {
     const revision = registry.revision();
 
-    if (revision === publishedRevision) {
+    if (revision === previousRevision) {
       return;
     }
 
-    publishedRevision = revision;
     bus.publish(coreEventTypes.pluginContributions, {
       revision,
       contributions: registry.resolved(),
     });
+    options.publishContributionChanges?.();
   };
 
   /** Единственное место, где вклады плагина попадают в реестр: снимком, между activate и running. */
   const applyContributions = (entry: Supervised): void => {
+    const revision = registry.revision();
     const outcome = registry.applyPlugin(
       {
         plugin: entry.plugin,
@@ -279,10 +277,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       );
     }
 
-    publishContributions();
+    publishContributions(revision);
   };
 
   const dropContributions = (entry: Supervised, preserveSnapshot = false): void => {
+    const revision = registry.revision();
     entry.pending = [];
     entry.contributed = [];
     // Причина уходит вместе с вкладами: у выгруженного плагина объявленного нет вовсе.
@@ -298,7 +297,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // По той же причине здесь снимается и всё, что плагин занял у провайдеров: воркера больше нет,
     // а идущий вход держал бы провайдера занятым до перезапуска демона.
     options.onPluginGone?.(entry.plugin.key);
-    publishContributions();
+    publishContributions(revision);
   };
 
   const fail = (entry: Supervised, reason: string): void => {
@@ -725,8 +724,9 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         await stop(entry, "stopped", true);
         const refreshed = rediscoverPlugin(entry.plugin);
         if (refreshed === undefined) {
+          const revision = registry.revision();
           registry.removePlugin(entry.plugin.key);
-          publishContributions();
+          publishContributions(revision);
           supervised.delete(entry.plugin.key);
           continue;
         }

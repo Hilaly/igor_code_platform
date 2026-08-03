@@ -12,3 +12,4 @@ export {
   type StoredProject,
 } from "./project-store.ts";
 export { projectsRoutes, publishProjectChanges } from "./projects.ts";
+export { projectResourceRoutes, type ProjectResourceRouteOptions } from "./project-resources.ts";

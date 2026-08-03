@@ -1,6 +1,8 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 
+import { coreEventTypes } from "@sovereign/protocol";
+
 import {
   authenticationRoutes,
   createAccountStore,
@@ -44,7 +46,7 @@ import {
   type PluginRoot,
   type PluginSessions,
 } from "./plugins/public.ts";
-import { createProjectAvailabilityWatcher } from "./projects/public.ts";
+import { createProjectAvailabilityWatcher, projectResourceRoutes } from "./projects/public.ts";
 import { createProjectPathNormalizer } from "./projects/public.ts";
 import { createProjectStore } from "./projects/public.ts";
 import { createProjectLifecycle } from "./projects/public.ts";
@@ -155,6 +157,20 @@ const pluginRoots = (): PluginRoot[] => [
 
 const contributions = createContributionRegistry();
 
+// Единого снимка без project context нет: событие только инвалидирует выбранный проект. Оба
+// производителя зовут один publisher, а revision не даёт повторному scan разбудить клиентов.
+let publishedContributionRevision = contributions.revision();
+const publishContributionChanges = (): void => {
+  const revision = contributions.revision();
+
+  if (revision === publishedContributionRevision) {
+    return;
+  }
+
+  publishedContributionRevision = revision;
+  bus.publish(coreEventTypes.contributionsChanged, { revision });
+};
+
 const standaloneRoots = () =>
   standaloneResourceRoots({
     dataDirectory: directory,
@@ -167,6 +183,7 @@ const standaloneResources = createStandaloneFileResourceService({
   roots: standaloneRoots(),
   registry: contributions,
   logger,
+  publishContributionChanges,
 });
 
 // Мост провайдеров: единственная пара «запрос-ответ» в канале плагина
@@ -191,6 +208,7 @@ const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
   bus,
+  publishContributionChanges,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
   onRequest: async (plugin, request, call) => {
@@ -360,6 +378,12 @@ const server = createDaemonServer({
       availability: (project) => projectAvailability.of(project.id),
       sessionCount: (folderKey) => sessions.countByFolderKey(folderKey),
       projectLifecycle,
+    }),
+    ...projectResourceRoutes({
+      projects,
+      availability: (project) => projectAvailability.of(project.id),
+      agents: (projectId) => ({ agents: sessions.agentsForProject(projectId) }),
+      fileResources: (projectId) => contributions.fileResourcesForProject(projectId),
     }),
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),

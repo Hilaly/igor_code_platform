@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
+import type { BusEvent } from "@sovereign/protocol";
+
+import { createEventBus } from "../platform/public.ts";
 import { createLogger } from "../platform/public.ts";
 import { createContributionRegistry } from "./contribution-registry.ts";
 import type { StandaloneResourceRoot } from "./file-resource-roots.ts";
@@ -82,6 +85,9 @@ describe("createStandaloneFileResourceService", () => {
       );
     }
     const registry = createContributionRegistry();
+    const events: BusEvent[] = [];
+    const bus = createEventBus({ onListenerError: (cause) => void Promise.reject(cause) });
+    bus.subscribe((event) => events.push(event));
     const seen: string[][] = [];
     const originalApply = registry.applyStandalone;
     registry.applyStandalone = (snapshot, options) => {
@@ -92,6 +98,8 @@ describe("createStandaloneFileResourceService", () => {
       roots: [skillRoot(root)],
       registry,
       logger,
+      publishContributionChanges: () =>
+        bus.publish("core.contributions.changed", { revision: registry.revision() }),
     });
 
     await service.rescan();
@@ -103,6 +111,38 @@ describe("createStandaloneFileResourceService", () => {
       ["alpha", "beta"],
     ]);
     assert.equal(registry.revision(), revision);
+    assert.deepEqual(events, [{ type: "core.contributions.changed", payload: { revision } }]);
+    assert.equal(
+      events.some((event) => event.type === "core.plugin.contributions"),
+      false,
+    );
+    service.close();
+  });
+
+  it("publishes every changed root revision from one scan", async () => {
+    const roots = ["alpha", "beta"].map((name) => {
+      const root = join(workspace, "revision-per-root", name);
+      const definition = join(root, name);
+      mkdirSync(definition, { recursive: true });
+      writeFileSync(
+        join(definition, "SKILL.md"),
+        `---\nname: ${name}\ndescription: ${name} skill\n---\nUse ${name}.\n`,
+      );
+
+      return skillRoot(root, `project:p1:skills:${name}`);
+    });
+    const registry = createContributionRegistry();
+    const revisions: number[] = [];
+    const service = createStandaloneFileResourceService({
+      roots,
+      registry,
+      logger,
+      publishContributionChanges: () => revisions.push(registry.revision()),
+    });
+
+    await service.rescan();
+
+    assert.deepEqual(revisions, [1, 2]);
     service.close();
   });
 

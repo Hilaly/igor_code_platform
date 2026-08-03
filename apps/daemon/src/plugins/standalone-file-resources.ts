@@ -27,6 +27,8 @@ export type CreateStandaloneFileResourceServiceOptions = {
   roots: StandaloneResourceRoot[];
   registry: ContributionRegistry;
   logger: Logger;
+  /** Общая инвалидация контекстных вкладов; вызывается после атомарного применения scan. */
+  publishContributionChanges?: () => void;
   createWatcher?: (options: CreateFileResourceWatcherOptions) => FileResourceWatcher;
 };
 
@@ -48,15 +50,24 @@ export function createStandaloneFileResourceService(
     },
   });
 
+  const mutateRegistry = (mutation: () => void): void => {
+    const revision = options.registry.revision();
+    mutation();
+
+    if (options.registry.revision() !== revision) {
+      options.publishContributionChanges?.();
+    }
+  };
+
   const scan = (scanOptions?: { resourceChanged?: boolean }): void => {
     const revision = options.registry.revision();
     const nextKeys = new Set(roots.map((root) => root.key));
 
     for (const root of roots) {
-      options.registry.applyStandalone(snapshot(root));
+      mutateRegistry(() => options.registry.applyStandalone(snapshot(root)));
     }
     for (const key of appliedRootKeys) {
-      if (!nextKeys.has(key)) options.registry.removeStandalone(key);
+      if (!nextKeys.has(key)) mutateRegistry(() => options.registry.removeStandalone(key));
     }
     appliedRootKeys = nextKeys;
 
@@ -65,7 +76,9 @@ export function createStandaloneFileResourceService(
     if (scanOptions?.resourceChanged === true && options.registry.revision() === revision) {
       const first = roots[0];
       if (first !== undefined)
-        options.registry.applyStandalone(snapshot(first), { resourceChanged: true });
+        mutateRegistry(() =>
+          options.registry.applyStandalone(snapshot(first), { resourceChanged: true }),
+        );
     }
   };
 

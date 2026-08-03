@@ -287,6 +287,8 @@ describe("createPluginSupervisor", () => {
       bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
+      publishContributionChanges: () =>
+        recorded.bus.publish("core.contributions.changed", { revision: registry.revision() }),
     });
     running = supervisor;
 
@@ -301,6 +303,10 @@ describe("createPluginSupervisor", () => {
     assert.equal(last?.revision, registry.revision());
     assert.deepEqual(last?.contributions, registry.resolved());
     assert.equal((last?.contributions.length ?? 0) > 0, true);
+    assert.deepEqual(
+      recorded.events.filter((event) => event.type === "core.contributions.changed"),
+      [{ type: "core.contributions.changed", payload: { revision: registry.revision() } }],
+    );
   });
 
   it("puts an event published by a plugin on the bus with its namespace and origin", async () => {
@@ -623,6 +629,8 @@ describe("createPluginSupervisor", () => {
       bus: recorded.bus,
       createPluginLogger: recorded.pluginLogger,
       registry,
+      publishContributionChanges: () =>
+        recorded.bus.publish("core.contributions.changed", { revision: registry.revision() }),
     });
     running = supervisor;
 
@@ -632,6 +640,9 @@ describe("createPluginSupervisor", () => {
     const before = recorded.events.filter(
       (event) => event.type === "core.plugin.contributions",
     ).length;
+    const invalidationsBefore = recorded.events.filter(
+      (event) => event.type === "core.contributions.changed",
+    ).length;
 
     // Тот же набор предпочтений: плагин остаётся запущенным, реестр не трогается.
     await supervisor.apply(only("hello"), enabled("data:hello"));
@@ -639,6 +650,36 @@ describe("createPluginSupervisor", () => {
     assert.equal(
       recorded.events.filter((event) => event.type === "core.plugin.contributions").length,
       before,
+    );
+    assert.equal(
+      recorded.events.filter((event) => event.type === "core.contributions.changed").length,
+      invalidationsBefore,
+    );
+  });
+
+  it("does not publish the plugin snapshot for a standalone-only registry change", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    registry.applyStandalone({
+      rootKey: "user:skills:sovereign",
+      source: "sovereign",
+      precedence: 300,
+      scope: "user",
+      contributions: [],
+    });
+    await supervisor.apply(only("hello"), disabled("data:hello"));
+
+    assert.deepEqual(
+      recorded.events.filter((event) => event.type === "core.plugin.contributions"),
+      [],
     );
   });
 
