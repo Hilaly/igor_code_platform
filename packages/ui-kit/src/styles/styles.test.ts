@@ -49,6 +49,13 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("uses Imperium as the catalogue fallback", () => {
+    const catalogue = readFileSync(join(kitRoot, "..", ".ladle", "components.tsx"), "utf8");
+
+    expect(catalogue).toContain("imperiumScheme");
+    expect(catalogue).not.toContain("baseScheme");
+  });
+
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
   });
