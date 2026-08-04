@@ -900,20 +900,26 @@ describe("running a turn over http", () => {
   });
 
   it("waits in the queue when the limit is spent, and says so", async () => {
+    const blocker = gate();
     const { call, start } = await serve({
       limit: 1,
       turns: [{ text: "первый" }, { text: "второй" }],
+      operationGate: blocker,
     });
     const first = String((await start()).body["id"]);
     const second = String((await start()).body["id"]);
 
     const running = call("POST", sessionTurnsPath(first), { text: "первый" });
+
+    await blocker.entry;
+
     const queued = await call("POST", sessionTurnsPath(second), { text: "второй" });
 
     // Турн принят, но ещё не начат — это отдельное состояние, а не «работает» (docs/architecture.md).
     assert.equal(queued.status, 200);
     assert.equal(queued.body["phase"], "queued");
 
+    blocker.open();
     await running;
     await untilIdle(call, first);
     await untilIdle(call, second);
