@@ -5,8 +5,9 @@
 
 .root {
   color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-display);
   font-size: var(--sovereign-font-size-sm);
-  line-height: var(--sovereign-line-height-normal);
+  line-height: var(--sovereign-line-height-reading);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

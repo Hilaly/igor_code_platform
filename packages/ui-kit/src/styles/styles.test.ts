@@ -139,6 +139,23 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
   });
 
+  it("assigns editorial, human, and machine typography by message context", () => {
+    const feedCss = readFileSync(join(kitRoot, "components", "message-feed.module.css"), "utf8");
+    const markdownCss = readFileSync(join(kitRoot, "components", "markdown.module.css"), "utf8");
+    const streamingCss = readFileSync(
+      join(kitRoot, "components", "streaming-text.module.css"),
+      "utf8",
+    );
+
+    expect(feedCss).toMatch(/\[data-role="agent"\][\s\S]*--sovereign-font-family-display/);
+    expect(feedCss).toMatch(/\[data-role="human"\][\s\S]*--sovereign-font-family-body/);
+    expect(feedCss).toContain("max-width: var(--sovereign-reading-width)");
+    expect(feedCss).toContain("margin-inline: auto");
+    expect(feedCss).not.toMatch(/\.message\[data-role="service"\]\s*\{[^}]*max-width:\s*100%/);
+    expect(markdownCss).toContain("font-family: inherit");
+    expect(streamingCss).toContain("font-family: var(--sovereign-font-family-display)");
+  });
+
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
   });

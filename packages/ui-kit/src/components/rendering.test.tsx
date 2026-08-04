@@ -443,6 +443,8 @@ describe("feed of messages", () => {
     );
 
     expect(markup).not.toContain("undefined");
+    expect(markup).toContain('role="log"');
+    expect(markup).toContain('aria-live="polite"');
     expect(markup).toContain('data-role="human"');
     expect(markup).toContain('data-role="agent"');
     expect(markup).toContain('data-role="service"');
