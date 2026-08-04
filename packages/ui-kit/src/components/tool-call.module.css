@@ -39,14 +39,23 @@
   min-width: 0;
   align-items: baseline;
   gap: var(--sovereign-space-2);
+  overflow-x: auto;
   font-family: var(--sovereign-font-family-mono);
 }
 
+.identity > code {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .description {
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
   color: var(--sovereign-text-muted);
   font-size: var(--sovereign-font-size-xs);
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .outcome {

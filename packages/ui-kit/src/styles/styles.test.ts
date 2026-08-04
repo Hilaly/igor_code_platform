@@ -156,6 +156,22 @@ describe("stylesheets of the kit", () => {
     expect(streamingCss).toContain("font-family: var(--sovereign-font-family-display)");
   });
 
+  it("keeps disclosure controls sans and long tool summaries predictable", () => {
+    const disclosureCss = readFileSync(
+      join(kitRoot, "components", "disclosure.module.css"),
+      "utf8",
+    );
+    const toolCallCss = readFileSync(join(kitRoot, "components", "tool-call.module.css"), "utf8");
+
+    expect(disclosureCss).toMatch(
+      /\.summary\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
+    );
+    expect(toolCallCss).toMatch(/\.identity\s*\{[^}]*overflow-x:\s*auto;/s);
+    expect(toolCallCss).toMatch(
+      /\.description\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s,
+    );
+  });
+
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
   });

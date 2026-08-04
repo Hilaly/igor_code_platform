@@ -19,6 +19,7 @@
   min-height: var(--sovereign-control-height-sm);
   padding-inline: var(--sovereign-space-3);
   color: var(--sovereign-text-muted);
+  font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);
   font-weight: var(--sovereign-font-weight-medium);
   cursor: pointer;

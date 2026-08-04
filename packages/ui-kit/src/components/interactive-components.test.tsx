@@ -700,6 +700,30 @@ describe("interactive components", () => {
 });
 
 describe("tool call", () => {
+  it("keeps a complete technical summary available when its visible path is truncated", () => {
+    const completeSummary =
+      "apps/web/src/sessions/a-very-long-technical-directory/session-message-list.tsx";
+
+    render(
+      <ToolCall
+        icon="◇"
+        toolName="read_file"
+        summary={completeSummary}
+        duration="42 ms"
+        status="done"
+        statusLabel="Готово"
+        argumentsText={`{"path":"${completeSummary}"}`}
+      />,
+    );
+
+    const visibleSummary = screen.getByText(completeSummary);
+    const disclosureControl = visibleSummary.closest("summary");
+
+    expect(disclosureControl?.textContent).toContain(completeSummary);
+    expect(visibleSummary.getAttribute("aria-label")).toBe(completeSummary);
+    expect(visibleSummary.getAttribute("title")).toBe(completeSummary);
+  });
+
   it("keeps a rich execution summary visible while the details stay folded", () => {
     render(
       <ToolCall

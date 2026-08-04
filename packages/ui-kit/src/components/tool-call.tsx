@@ -62,7 +62,9 @@ export function ToolCall({
             <span className={styles.identity}>
               <Code>{toolName}</Code>
               {summary === undefined ? undefined : (
-                <span className={styles.description}>{summary}</span>
+                <span className={styles.description} aria-label={summary} title={summary}>
+                  {summary}
+                </span>
               )}
             </span>
             <span className={styles.outcome}>
