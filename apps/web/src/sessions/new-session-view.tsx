@@ -218,10 +218,10 @@ export function NewSessionView(props: NewSessionViewProps) {
 
   return (
     <section className="new-session" aria-label={t("sessions.new.title")}>
-      <hgroup className="new-session-head">
+      <header className="new-session-head">
         <Heading level={1}>{t("sessions.new.title")}</Heading>
         <Text>{t("sessions.new.hint")}</Text>
-      </hgroup>
+      </header>
 
       {refusal === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.new.refused", { reason: refusal })} />

@@ -133,6 +133,20 @@ describe("the screen that creates a session", () => {
     expect(region.querySelector("form")).not.toBeNull();
   });
 
+  it("uses a valid header composition for the page title and hint", () => {
+    show();
+
+    const region = screen.getByRole("region", { name: "Новая сессия" });
+    const header = region.querySelector("header");
+
+    expect(region.querySelector("hgroup")).toBeNull();
+    expect(header).not.toBeNull();
+    expect(within(header!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      within(header!).getByText("Выбери проект, агента и модель — и сразу напиши, с чего начать."),
+    ).not.toBeNull();
+  });
+
   it("prepares the draft on mount", () => {
     const onPrepareDraft = vi.fn();
     show({ onPrepareDraft });
