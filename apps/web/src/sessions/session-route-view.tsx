@@ -15,16 +15,24 @@ export function SessionRouteView({ sessionId, open, children, translator }: Sess
   const { t } = translator;
 
   if (open === undefined || open.id !== sessionId || open.loading) {
-    return <Spinner label={t("state.loading")} />;
+    return (
+      <div className="sessions session-route-state">
+        <Spinner label={t("state.loading")} />
+      </div>
+    );
   }
 
   if (open.summary === undefined) {
     if (open.failure !== undefined) {
-      return <Notice tone="danger" title={open.failure} />;
+      return (
+        <div className="sessions session-route-state">
+          <Notice tone="danger" title={open.failure} />
+        </div>
+      );
     }
 
     return (
-      <div className="sessions-chat">
+      <div className="sessions sessions-chat session-route-state">
         <EmptyState title={t("sessions.gone.title")} hint={t("sessions.gone.hint")} />
       </div>
     );

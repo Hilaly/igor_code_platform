@@ -48,6 +48,10 @@
   background: transparent;
 }
 
+.session-route-state {
+  justify-content: flex-start;
+}
+
 /*
  * Ввод прижат к низу панели и не уезжает вместе с лентой: он остаётся на месте, пока история
  * прокручивается над ним.
@@ -78,7 +82,7 @@
 .new-session {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-4);
+  gap: var(--sovereign-space-3);
   max-width: 40rem;
 }
 
@@ -91,25 +95,21 @@
 .new-session-form {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  gap: var(--sovereign-space-2);
 }
 
-.archive-sessions-groups,
 .archive-sessions-group {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  gap: var(--sovereign-space-2);
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.new-session-field {
+.archive-sessions-groups {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-1);
-}
-
-.new-session-label {
-  color: var(--sovereign-text-muted);
-  font-size: var(--sovereign-font-size-sm);
+  gap: var(--sovereign-space-3);
 }
 
 .new-session-actions {

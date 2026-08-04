@@ -49,6 +49,7 @@ it("shows a load failure instead of calling it a missing session", () => {
 
   expect(screen.getByText(/daemon unavailable/)).toBeTruthy();
   expect(screen.queryByText("Такой сессии нет")).toBeNull();
+  expect(screen.getByRole("alert")).toBeTruthy();
 });
 
 it("does not render the previous session while a new direct route loads", () => {
@@ -63,6 +64,7 @@ it("does not render the previous session while a new direct route loads", () => 
   );
 
   expect(screen.getByRole("status")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toContain("Загрузка…");
   expect(screen.queryByText("previous chat")).toBeNull();
 });
 
@@ -78,5 +80,6 @@ it("shows the gone state after the requested session resolves without a summary"
   );
 
   expect(screen.getByText("Такой сессии нет")).toBeTruthy();
+  expect(screen.getByText("Её удалили, или её проект ушёл в архив.")).toBeTruthy();
   expect(screen.queryByText("chat")).toBeNull();
 });

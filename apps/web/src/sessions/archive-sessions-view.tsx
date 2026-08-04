@@ -11,7 +11,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 export type ArchiveSessionsViewProps = {
   sessions: Session[] | undefined;
@@ -88,48 +88,17 @@ export function ArchiveSessionsView({
       ) : (
         <div className="archive-sessions-groups">
           {grouped.map(([projectId, projectSessions]) => (
-            <section key={projectId} className="archive-sessions-group">
-              <Heading level={2}>{projectNames.get(projectId) ?? projectId}</Heading>
-              <List>
-                {projectSessions.map((session) => (
-                  <ListRow
-                    key={session.id}
-                    onSelect={() => onOpen(session.id)}
-                    actions={
-                      <Menu
-                        label={t("sessions.actions", { name: session.title ?? session.id })}
-                        trigger="…"
-                        triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
-                        compact
-                        items={[
-                          {
-                            id: "restore",
-                            label: t("sessions.action.restore"),
-                            disabled: pendingAction !== undefined,
-                            onSelect: () =>
-                              void runAction(`restore:${session.id}`, () => onRestore(session)),
-                          },
-                          {
-                            id: "remove",
-                            label: t("sessions.action.remove"),
-                            tone: "danger",
-                            disabled: pendingAction !== undefined,
-                            onSelect: () => setRemoving(session),
-                          },
-                        ]}
-                      />
-                    }
-                  >
-                    <span className="sessions-row">
-                      <span className="sessions-row-facts">
-                        <Text>{session.title ?? t("sessions.untitled")}</Text>
-                        <Text tone="muted">{session.folder}</Text>
-                      </span>
-                    </span>
-                  </ListRow>
-                ))}
-              </List>
-            </section>
+            <ArchiveSessionsGroup
+              key={projectId}
+              projectName={projectNames.get(projectId) ?? projectId}
+              sessions={projectSessions}
+              pendingAction={pendingAction}
+              onOpen={onOpen}
+              onRestore={onRestore}
+              onRemoveRequest={setRemoving}
+              runAction={runAction}
+              translator={translator}
+            />
           ))}
         </div>
       )}
@@ -152,5 +121,80 @@ export function ArchiveSessionsView({
         pending={pendingAction === (removing === undefined ? undefined : `remove:${removing.id}`)}
       />
     </div>
+  );
+}
+
+type ArchiveSessionsGroupProps = {
+  projectName: string;
+  sessions: Session[];
+  pendingAction: string | undefined;
+  onOpen: (sessionId: string) => void;
+  onRestore: (session: Session) => Promise<string | undefined>;
+  onRemoveRequest: (session: Session) => void;
+  runAction: (
+    key: string,
+    action: () => Promise<string | undefined>,
+  ) => Promise<string | undefined>;
+  translator: ScopedTranslator;
+};
+
+function ArchiveSessionsGroup({
+  projectName,
+  sessions,
+  pendingAction,
+  onOpen,
+  onRestore,
+  onRemoveRequest,
+  runAction,
+  translator,
+}: ArchiveSessionsGroupProps) {
+  const { t } = translator;
+  const headingId = useId();
+
+  return (
+    <section className="archive-sessions-group" aria-labelledby={headingId}>
+      <hgroup id={headingId}>
+        <Heading level={2}>{projectName}</Heading>
+      </hgroup>
+      <List>
+        {sessions.map((session) => (
+          <ListRow
+            key={session.id}
+            onSelect={() => onOpen(session.id)}
+            actions={
+              <Menu
+                label={t("sessions.actions", { name: session.title ?? session.id })}
+                trigger="…"
+                triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
+                compact
+                items={[
+                  {
+                    id: "restore",
+                    label: t("sessions.action.restore"),
+                    disabled: pendingAction !== undefined,
+                    onSelect: () =>
+                      void runAction(`restore:${session.id}`, () => onRestore(session)),
+                  },
+                  {
+                    id: "remove",
+                    label: t("sessions.action.remove"),
+                    tone: "danger",
+                    disabled: pendingAction !== undefined,
+                    onSelect: () => onRemoveRequest(session),
+                  },
+                ]}
+              />
+            }
+          >
+            <span className="sessions-row">
+              <span className="sessions-row-facts">
+                <Text>{session.title ?? t("sessions.untitled")}</Text>
+                <Text tone="muted">{session.folder}</Text>
+              </span>
+            </span>
+          </ListRow>
+        ))}
+      </List>
+    </section>
   );
 }

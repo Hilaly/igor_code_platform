@@ -11,7 +11,7 @@
 
 import type { AgentSummary, ModelSummary, Project, ProviderSummary } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NewSessionView, type NewSessionViewProps } from "./new-session-view.tsx";
@@ -125,6 +125,14 @@ const pick = (label: string, option: string): void => {
 };
 
 describe("the screen that creates a session", () => {
+  it("exposes one named form region with its page heading", () => {
+    show();
+
+    const region = screen.getByRole("region", { name: "Новая сессия" });
+    expect(within(region).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(region.querySelector("form")).not.toBeNull();
+  });
+
   it("prepares the draft on mount", () => {
     const onPrepareDraft = vi.fn();
     show({ onPrepareDraft });

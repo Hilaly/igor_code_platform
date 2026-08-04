@@ -44,6 +44,43 @@ const session: Session = {
   createdAt: "2026-08-01T00:00:00.000Z",
 };
 
+it("exposes every project archive as a named section with one list", () => {
+  const secondSession = {
+    ...session,
+    id: "0200",
+    projectId: "beta",
+    folder: "/code/beta",
+    title: "Session B",
+  };
+  const secondProject = { ...project, id: "beta", name: "Beta" };
+
+  render(
+    <ArchiveSessionsView
+      sessions={[session, secondSession]}
+      projects={[project, secondProject]}
+      loaded
+      onOpen={vi.fn()}
+      onRestore={vi.fn()}
+      onRemove={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const sections = screen.getAllByRole("region");
+  expect(sections).toHaveLength(2);
+
+  for (const [name, archivedSession] of [
+    ["Alpha", session],
+    ["Beta", secondSession],
+  ] as const) {
+    const section = screen.getByRole("region", { name });
+    expect(within(section).getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    const list = within(section).getByRole("list");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(list).getByText(archivedSession.title ?? archivedSession.id)).toBeDefined();
+  }
+});
+
 it("groups archived sessions by project and opens their history", () => {
   const onOpen = vi.fn();
   render(

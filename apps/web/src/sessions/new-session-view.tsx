@@ -22,6 +22,8 @@ import {
 } from "@sovereign/protocol";
 import {
   Button,
+  Field,
+  Form,
   Heading,
   Link,
   ModelPicker,
@@ -215,11 +217,11 @@ export function NewSessionView(props: NewSessionViewProps) {
   };
 
   return (
-    <div className="new-session">
-      <div className="new-session-head">
+    <section className="new-session" aria-label={t("sessions.new.title")}>
+      <hgroup className="new-session-head">
         <Heading level={1}>{t("sessions.new.title")}</Heading>
         <Text>{t("sessions.new.hint")}</Text>
-      </div>
+      </hgroup>
 
       {refusal === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.new.refused", { reason: refusal })} />
@@ -267,83 +269,87 @@ export function NewSessionView(props: NewSessionViewProps) {
         </Notice>
       ) : undefined}
 
-      <div className="new-session-form">
-        <Select
-          label={t("sessions.new.project")}
-          value={projectId}
-          onChange={pickProject}
-          options={(projects ?? []).map((project) => ({
-            value: project.id,
-            label: `${project.name} — ${project.folder}`,
-          }))}
-          placeholder={t("common.choose")}
-        />
+      <div className="new-session-form-region">
+        <Form onSubmit={create} disabled={!ready || busy}>
+          <div className="new-session-form">
+            <Select
+              label={t("sessions.new.project")}
+              value={projectId}
+              onChange={pickProject}
+              options={(projects ?? []).map((project) => ({
+                value: project.id,
+                label: `${project.name} — ${project.folder}`,
+              }))}
+              placeholder={t("common.choose")}
+            />
 
-        <Select
-          label={t("sessions.new.agent")}
-          value={agentId}
-          onChange={pickAgent}
-          disabled={
-            projectId === "" ||
-            projectAgents.projectId !== projectId ||
-            projectAgents.loading ||
-            projectAgents.failure !== undefined
-          }
-          options={(agents ?? []).map((candidate) => ({
-            value: candidate.id,
-            label: candidate.title ?? candidate.id,
-          }))}
-          placeholder={t("common.choose")}
-        />
+            <Select
+              label={t("sessions.new.agent")}
+              value={agentId}
+              onChange={pickAgent}
+              disabled={
+                projectId === "" ||
+                projectAgents.projectId !== projectId ||
+                projectAgents.loading ||
+                projectAgents.failure !== undefined
+              }
+              options={(agents ?? []).map((candidate) => ({
+                value: candidate.id,
+                label: candidate.title ?? candidate.id,
+              }))}
+              placeholder={t("common.choose")}
+            />
 
-        {projectId === "" ? (
-          <Text tone="muted">{t("sessions.new.agent.disabled")}</Text>
-        ) : undefined}
+            {projectId === "" ? (
+              <Text tone="muted">{t("sessions.new.agent.disabled")}</Text>
+            ) : undefined}
 
-        <ModelPicker
-          label={t("sessions.new.model")}
-          groups={groups}
-          value={modelRef}
-          onChange={setModelRef}
-          onExpandGroup={props.onPickProvider}
-          placeholder={t("common.choose")}
-          emptyText={t("state.empty")}
-        />
+            <ModelPicker
+              label={t("sessions.new.model")}
+              groups={groups}
+              value={modelRef}
+              onChange={setModelRef}
+              onExpandGroup={props.onPickProvider}
+              placeholder={t("common.choose")}
+              emptyText={t("state.empty")}
+            />
 
-        <Select
-          label={t("sessions.new.thinking")}
-          value={reasoning ? thinkingLevel : "off"}
-          onChange={(value) => setThinkingLevel(value as ThinkingLevel)}
-          disabled={!reasoning}
-          options={thinkingLevels.map((level) => ({
-            value: level,
-            label: t(`thinking.${level}`),
-          }))}
-          placeholder={t("common.choose")}
-        />
+            <Select
+              label={t("sessions.new.thinking")}
+              value={reasoning ? thinkingLevel : "off"}
+              onChange={(value) => setThinkingLevel(value as ThinkingLevel)}
+              disabled={!reasoning}
+              options={thinkingLevels.map((level) => ({
+                value: level,
+                label: t(`thinking.${level}`),
+              }))}
+              placeholder={t("common.choose")}
+            />
 
-        {/* У `Textarea` подпись только для скринридера, поэтому видимая стоит рядом. */}
-        <div className="new-session-field">
-          <span className="new-session-label">{t("sessions.new.first-message")}</span>
-          <Textarea
-            value={firstMessage}
-            onChange={setFirstMessage}
-            placeholder={t("sessions.new.first-message")}
-            aria-label={t("sessions.new.first-message")}
-            autoGrow
-            rows={3}
-            maxRows={12}
-          />
-        </div>
-      </div>
+            <Field label={t("sessions.new.first-message")}>
+              {(control) => (
+                <Textarea
+                  {...control}
+                  value={firstMessage}
+                  onChange={setFirstMessage}
+                  placeholder={t("sessions.new.first-message")}
+                  autoGrow
+                  rows={3}
+                  maxRows={12}
+                />
+              )}
+            </Field>
+          </div>
 
-      <div className="new-session-actions">
-        <Button tone="accent" onClick={create} disabled={!ready} busy={busy}>
-          {t("sessions.new.create")}
-        </Button>
+          <div className="new-session-actions">
+            <Button type="submit" tone="accent" disabled={!ready} busy={busy}>
+              {t("sessions.new.create")}
+            </Button>
+          </div>
+        </Form>
       </div>
 
       {agent?.description === undefined ? undefined : <Text tone="muted">{agent.description}</Text>}
-    </div>
+    </section>
   );
 }
