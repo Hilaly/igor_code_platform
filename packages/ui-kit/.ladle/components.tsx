@@ -22,6 +22,7 @@ import {
   type PaletteVariant,
 } from "../src/index.ts";
 import "../src/styles/index.css";
+import styles from "./components.module.css";
 
 /**
  * Выбор каталога живёт в `localStorage`: переход между историями — полная перезагрузка страницы, и без
@@ -87,7 +88,11 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
       >
         <label>
           scheme{" "}
-          <select value={schemeId} onChange={(event) => setSchemeId(event.target.value)}>
+          <select
+            className={styles.control}
+            value={schemeId}
+            onChange={(event) => setSchemeId(event.target.value)}
+          >
             {shippedSchemes.map((scheme) => (
               <option key={scheme.id} value={scheme.id}>
                 {scheme.id}
@@ -98,6 +103,7 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
         <label>
           scale{" "}
           <select
+            className={styles.control}
             value={scale}
             onChange={(event) => setScale(event.target.value as InterfaceScale)}
           >

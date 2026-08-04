@@ -1,0 +1,19 @@
+.control {
+  min-height: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-2);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-control-surface);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+}
+
+.control:hover {
+  border-color: var(--sovereign-border-strong);
+  background: var(--sovereign-control-surface-hover);
+}
+
+.control:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-space-1);
+}
