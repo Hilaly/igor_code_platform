@@ -700,6 +700,26 @@ describe("interactive components", () => {
 });
 
 describe("tool call", () => {
+  it("keeps a rich execution summary visible while the details stay folded", () => {
+    render(
+      <ToolCall
+        icon="◇"
+        toolName="read_file"
+        summary="apps/web/src/App.tsx"
+        duration="42 ms"
+        status="done"
+        statusLabel="Готово"
+        argumentsText='{"path":"apps/web/src/App.tsx"}'
+      />,
+    );
+
+    expect(screen.getByText("◇")).toBeTruthy();
+    expect(screen.getByText("apps/web/src/App.tsx")).toBeTruthy();
+    expect(screen.getByText("42 ms")).toBeTruthy();
+    expect(screen.getByText("Готово")).toBeTruthy();
+    expect(screen.getByText(/"path"/).closest("details")?.open).toBe(false);
+  });
+
   it("keeps the arguments folded until they are asked for", () => {
     render(
       <ToolCall

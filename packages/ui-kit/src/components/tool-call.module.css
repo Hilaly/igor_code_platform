@@ -9,15 +9,52 @@
   background: var(--sovereign-panel-surface);
 }
 
+/* Идущий вызов заметен не только по переведённой подписи: акцентная кромка остаётся в ленте. */
+.root[data-status="running"] {
+  border-inline-start-color: var(--sovereign-accent-border);
+}
+
 /* Провалившийся вызов виден по краю, а не только по значку: цвет один, но опор для глаза две. */
 .root[data-status="failed"] {
   border-color: var(--sovereign-danger-border);
 }
 
 .summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  width: 100%;
+}
+
+.icon {
+  color: var(--sovereign-text-muted);
+  font-family: var(--sovereign-font-family-mono);
+  line-height: var(--sovereign-line-height-none);
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sovereign-space-2);
+  font-family: var(--sovereign-font-family-mono);
+}
+
+.description {
+  min-width: 0;
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.outcome {
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-2);
+  /* Переведённое состояние остаётся интерфейсным текстом даже внутри serif-реплики агента. */
+  font-family: var(--sovereign-font-family-body);
 }
 
 .outputLabel {

@@ -5,6 +5,8 @@
  * интересны, когда что-то пошло не так, а исход виден и без разворачивания — значком в подписи.
  */
 
+import type { ReactNode } from "react";
+
 import { Badge, type BadgeTone } from "./badge.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { Disclosure } from "./disclosure.tsx";
@@ -19,7 +21,13 @@ const tones: Record<ToolCallStatus, BadgeTone> = {
 };
 
 export type ToolCallProps = {
+  /** Необязательный знак типа инструмента; его форму выбирает вызывающий. */
+  icon?: ReactNode;
   toolName: string;
+  /** Короткое техническое описание цели вызова, например путь к файлу. */
+  summary?: string;
+  /** Уже отформатированная длительность выполнения. */
+  duration?: string;
   status: ToolCallStatus;
   /** Подпись состояния, уже переведённая. */
   statusLabel: string;
@@ -35,7 +43,10 @@ export type ToolCallProps = {
 };
 
 export function ToolCall({
+  icon,
   toolName,
+  summary,
+  duration,
   status,
   statusLabel,
   argumentsText,
@@ -47,8 +58,17 @@ export function ToolCall({
       <Disclosure
         summary={
           <span className={styles.summary}>
-            <Code>{toolName}</Code>
-            <Badge tone={tones[status]}>{statusLabel}</Badge>
+            {icon === undefined ? undefined : <span className={styles.icon}>{icon}</span>}
+            <span className={styles.identity}>
+              <Code>{toolName}</Code>
+              {summary === undefined ? undefined : (
+                <span className={styles.description}>{summary}</span>
+              )}
+            </span>
+            <span className={styles.outcome}>
+              {duration === undefined ? undefined : <Code>{duration}</Code>}
+              <Badge tone={tones[status]}>{statusLabel}</Badge>
+            </span>
           </span>
         }
       >

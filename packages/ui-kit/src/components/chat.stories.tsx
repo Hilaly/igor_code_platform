@@ -63,24 +63,53 @@ export const Feed = () => (
       </Message>
       <Message role="agent">
         <ToolCall
-          toolName="write_file"
+          icon="◇"
+          toolName="search_files"
+          summary="apps/daemon/src/sessions/session-runtime-coordinator/session-runtime-coordinator.ts"
+          status="running"
+          statusLabel="Выполняется"
+          argumentsText={'{\n  "path": "apps/daemon/src/sessions",\n  "query": "queue.stateOf"\n}'}
+        />
+      </Message>
+      <Message role="agent">
+        <Markdown text="Нашёл место, где очередь сравнивается с состоянием рантайма. Читаю соседние ветки." />
+      </Message>
+      <Message role="agent">
+        <ToolCall
+          icon="↳"
+          toolName="read_file"
+          summary="apps/daemon/src/sessions/session-runtime-coordinator/session-runtime-coordinator.ts"
+          duration="42 ms"
           status="done"
           statusLabel="Готово"
-          argumentsText={'{\n  "path": "hello.txt",\n  "text": "привет"\n}'}
-          output="Записано 6 байт."
+          argumentsText={
+            '{\n  "path": "apps/daemon/src/sessions/session-runtime-coordinator/session-runtime-coordinator.ts",\n  "line": 118\n}'
+          }
+          output={
+            '118  const queued = queue.stateOf(sessionId) === "queued";\n119  const phase = queued ? "queued" : runtime.phase();\n120  return { phase };'
+          }
           outputLabel="Вывод"
         />
       </Message>
       <Message role="agent">
+        <Markdown text="Проверю старый путь, чтобы исключить вторую реализацию." />
+      </Message>
+      <Message role="agent">
         <ToolCall
+          icon="!"
           toolName="read_file"
+          summary="apps/daemon/src/sessions/legacy/session-phase.ts"
+          duration="8 ms"
           status="failed"
           statusLabel="Не удалось"
-          argumentsText={'{\n  "path": "нет-такого.txt"\n}'}
+          argumentsText={'{\n  "path": "apps/daemon/src/sessions/legacy/session-phase.ts"\n}'}
         />
       </Message>
-      <Message role="service">Модель сменилась на anthropic/claude-opus-4-5</Message>
       <Message role="agent" header="10:12">
+        <Markdown text="Второй реализации нет. Очередь намеренно имеет приоритет над фазой рантайма." />
+      </Message>
+      <Message role="service">Модель сменилась на anthropic/claude-opus-4-5</Message>
+      <Message role="agent" header="10:13">
         <StreamingText text="Проверяю по коду очереди" streaming />
       </Message>
     </MessageFeed>
