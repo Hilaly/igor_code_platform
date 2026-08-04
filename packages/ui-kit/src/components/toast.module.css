@@ -19,8 +19,8 @@
   gap: var(--sovereign-space-3);
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
   background: var(--sovereign-panel-surface);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  border-radius: var(--sovereign-radius-md);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  border-radius: var(--sovereign-radius-sm);
   box-shadow: var(--sovereign-elevation-2);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
@@ -29,16 +29,19 @@
 }
 
 .normal {
-  border-left: 4px solid var(--sovereign-accent);
+  border-color: var(--sovereign-accent-border);
 }
+
 .success {
-  border-left: 4px solid var(--sovereign-success);
+  border-color: var(--sovereign-success-border);
 }
+
 .warning {
-  border-left: 4px solid var(--sovereign-warning);
+  border-color: var(--sovereign-warning-border);
 }
+
 .danger {
-  border-left: 4px solid var(--sovereign-danger);
+  border-color: var(--sovereign-danger-border);
 }
 
 .close {

@@ -139,6 +139,63 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
   });
 
+  it("keeps shared application states flat and elevates only overlays", () => {
+    const dialogCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "dialog.module.css"), "utf8"),
+    );
+    const noticeCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "notice.module.css"), "utf8"),
+    );
+    const stateCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "state.module.css"), "utf8"),
+    );
+    const toastCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "toast.module.css"), "utf8"),
+    );
+    const sharedStates = [dialogCss, noticeCss, stateCss, toastCss].join("\n");
+
+    expect(sharedStates).not.toMatch(/gradient|backdrop-filter|\bfilter\s*:/);
+    expect(dialogCss).toMatch(
+      /\.surface\s*\{[^}]*border:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-strong\);/s,
+    );
+    expect(dialogCss).toMatch(
+      /\.surface\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);[^}]*box-shadow:\s*var\(--sovereign-elevation-3\);/s,
+    );
+    expect(dialogCss).toMatch(/\.modal\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-md\);/s);
+    expect(noticeCss).toMatch(/\.notice\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-sm\);/s);
+    expect(noticeCss).not.toMatch(/box-shadow/);
+    expect(stateCss).toMatch(/\.empty\s*\{(?![^}]*(?:background|border|box-shadow)\s*:)[^}]*\}/s);
+    expect(toastCss).toMatch(
+      /\.toast\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);[^}]*border:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-strong\);[^}]*border-radius:\s*var\(--sovereign-radius-sm\);[^}]*box-shadow:\s*var\(--sovereign-elevation-2\);/s,
+    );
+    expect(toastCss).toMatch(
+      /\.normal\s*\{[^}]*border-color:\s*var\(--sovereign-accent-border\);/s,
+    );
+    expect(toastCss).toMatch(
+      /\.success\s*\{[^}]*border-color:\s*var\(--sovereign-success-border\);/s,
+    );
+    expect(toastCss).toMatch(
+      /\.warning\s*\{[^}]*border-color:\s*var\(--sovereign-warning-border\);/s,
+    );
+    expect(toastCss).toMatch(
+      /\.danger\s*\{[^}]*border-color:\s*var\(--sovereign-danger-border\);/s,
+    );
+    expect(noticeCss + stateCss).not.toMatch(/--sovereign-elevation-/);
+  });
+
+  it("catalogues the canonical shared system states on the page surface", () => {
+    const catalogue = readFileSync(join(kitRoot, "components", "primitives.stories.tsx"), "utf8");
+    const systemStates = catalogue.slice(catalogue.indexOf("export const SystemStates"));
+
+    expect(catalogue).toContain('background: "var(--sovereign-page-surface)"');
+    expect(systemStates).toContain("style={statePage}");
+    expect(systemStates).toMatch(/<Spinner\b/);
+    expect(systemStates).toMatch(/<EmptyState\b/);
+    expect(systemStates).toMatch(/<Notice\s+tone="danger"/);
+    expect(systemStates).toMatch(/<ConfirmDialog\b/);
+    expect(systemStates).toMatch(/toast\(\{/);
+  });
+
   it("assigns editorial, human, and machine typography by message context", () => {
     const feedCss = readFileSync(join(kitRoot, "components", "message-feed.module.css"), "utf8");
     const markdownCss = readFileSync(join(kitRoot, "components", "markdown.module.css"), "utf8");
@@ -236,6 +293,7 @@ describe("stylesheets of the kit", () => {
       ["components/panel.module.css", "--sovereign-elevation-1"],
       ["components/popover.module.css", "--sovereign-elevation-2"],
       ["components/raised-surface.module.css", "--sovereign-elevation-1"],
+      ["components/toast.module.css", "--sovereign-elevation-2"],
     ]);
 
     for (const [relativePath, elevation] of elevatedSurfaces) {

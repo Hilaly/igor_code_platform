@@ -12,7 +12,7 @@
   gap: var(--sovereign-space-1);
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
   border: var(--sovereign-stroke-thin) solid transparent;
-  border-radius: var(--sovereign-radius-md);
+  border-radius: var(--sovereign-radius-sm);
   font-size: var(--sovereign-font-size-sm);
 }
 

@@ -50,7 +50,7 @@ function show(overrides: Partial<LoginViewProps> = {}) {
 }
 
 const passwords = (): HTMLInputElement[] =>
-  screen.getAllByLabelText(/пароль/i) as HTMLInputElement[];
+  screen.getAllByLabelText(/пароль/i, { selector: "input" }) as HTMLInputElement[];
 
 const submitButton = (): HTMLButtonElement =>
   screen.getByRole("button", { name: /вой|создать/i }) as HTMLButtonElement;
@@ -62,6 +62,15 @@ const type = (field: HTMLInputElement, value: string): void => {
 const long = "a".repeat(minimumPasswordLength);
 
 describe("LoginView", () => {
+  it("exposes one named form inside one standalone surface", () => {
+    show();
+
+    const form = screen.getByRole("form", { name: translator.t("login.title") });
+
+    expect(document.querySelectorAll("form")).toHaveLength(1);
+    expect(form.closest("section")).not.toBeNull();
+  });
+
   it("puts the cursor in the password field: the form is one field long", () => {
     show();
 
@@ -139,7 +148,6 @@ describe("LoginView", () => {
     expect(passwords()).toHaveLength(1);
 
     cleanup();
-
     show({ registering: true });
     expect(passwords()).toHaveLength(2);
   });
@@ -147,8 +155,11 @@ describe("LoginView", () => {
   it("shows the refusal of the daemon and the expired session together", () => {
     show({ refusal: "the password is not the one", expired: true });
 
-    expect(screen.getByText("the password is not the one")).toBeDefined();
-    expect(screen.getByText(translator.t("login.expired"))).toBeDefined();
+    const alerts = screen.getAllByRole("alert");
+
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0]?.textContent).toBe(translator.t("login.expired"));
+    expect(alerts[1]?.textContent).toBe("the password is not the one");
   });
 
   it("locks the whole form while the request is in flight", () => {

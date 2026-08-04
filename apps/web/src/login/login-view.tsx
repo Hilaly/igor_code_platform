@@ -11,7 +11,6 @@ import { minimumPasswordLength } from "@sovereign/protocol";
 import {
   Button,
   Field,
-  Form,
   Heading,
   Input,
   Notice,
@@ -19,7 +18,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { checkCredentials, type CredentialsProblem } from "./credentials.ts";
 
@@ -64,17 +63,21 @@ export function LoginView({
     onSubmit(password);
   };
 
+  const title = t(registering ? "login.registration.title" : "login.title");
+
   return (
     <main className="login">
-      <Form onSubmit={submit} disabled={check.kind !== "ready" || busy}>
-        {/* Раскладку держит внутренний контейнер: кит-`Form` не принимает `className`, а её
-            `display: contents` вынимает форму из потока. */}
-        <div className="login-form">
-          <Panel>
+      <div className="login-form">
+        <Panel>
+          <form
+            aria-label={title}
+            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
             <div className="login-body">
-              <Heading level={1}>
-                {t(registering ? "login.registration.title" : "login.title")}
-              </Heading>
+              <Heading level={1}>{title}</Heading>
               <Text tone="muted">{t(registering ? "login.registration.hint" : "login.hint")}</Text>
 
               {expired ? <Notice tone="warning" title={t("login.expired")} /> : undefined}
@@ -124,9 +127,9 @@ export function LoginView({
                 {t(registering ? "login.registration.submit" : "login.submit")}
               </Button>
             </div>
-          </Panel>
-        </div>
-      </Form>
+          </form>
+        </Panel>
+      </div>
     </main>
   );
 }

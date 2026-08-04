@@ -22,12 +22,12 @@
 .surface {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-5);
+  gap: var(--sovereign-space-4);
   width: 100%;
   max-height: calc(100% - var(--sovereign-space-12));
-  padding: var(--sovereign-space-6);
+  padding: var(--sovereign-space-5);
   overflow: hidden;
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
   background: var(--sovereign-panel-surface);
   color: var(--sovereign-text);
   box-shadow: var(--sovereign-elevation-3);
@@ -45,7 +45,7 @@
 .modal {
   /* Предел ширины: дальше строка перестаёт читаться. Это мера текста, а не шаг отступа. */
   max-width: 36rem;
-  border-radius: var(--sovereign-radius-xl);
+  border-radius: var(--sovereign-radius-md);
 }
 
 .drawer {
@@ -98,7 +98,7 @@
   justify-content: flex-end;
   align-items: center;
   gap: var(--sovereign-space-3);
-  padding-top: var(--sovereign-space-4);
+  padding-top: var(--sovereign-space-3);
   border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 

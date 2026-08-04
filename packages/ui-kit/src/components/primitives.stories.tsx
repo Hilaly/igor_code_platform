@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "./badge.tsx";
 import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
+import { ConfirmDialog } from "./dialog.tsx";
 import { Disclosure } from "./disclosure.tsx";
 import { Input } from "./input.tsx";
 import { Link } from "./link.tsx";
@@ -23,6 +24,7 @@ import { EmptyState, Spinner } from "./state.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { Heading, Text } from "./text.tsx";
 import { Toggle } from "./toggle.tsx";
+import { ToastProvider, useToast } from "./toast.tsx";
 
 const column = {
   display: "flex",
@@ -254,3 +256,51 @@ export const States = () => (
     <Spinner label="Снимок состояния запрашивается" />
   </div>
 );
+
+const statePage = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--sovereign-space-5)",
+  minHeight: "32rem",
+  padding: "var(--sovereign-space-5)",
+  background: "var(--sovereign-page-surface)",
+} as const;
+
+export const SystemStates = () => (
+  <ToastProvider>
+    <SystemStateExamples />
+  </ToastProvider>
+);
+
+function SystemStateExamples() {
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const { toast } = useToast();
+
+  return (
+    <div style={statePage}>
+      <Heading level={1}>Системные состояния</Heading>
+      <Spinner label="Состояние загружается" />
+      <EmptyState title="Данных пока нет" hint="Они появятся после первого действия" />
+      <Notice tone="danger" title="Состояние недоступно">
+        Повтори попытку или проверь подключение.
+      </Notice>
+      <div style={row}>
+        <Button onClick={() => setConfirmationOpen(true)}>Открыть подтверждение</Button>
+        <Button
+          onClick={() => toast({ title: "Изменения сохранены", tone: "success", durationMs: 0 })}
+        >
+          Показать уведомление
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirmationOpen}
+        onClose={() => setConfirmationOpen(false)}
+        title="Подтвердить действие"
+        description="Диалог остаётся отдельным слоем над поверхностью страницы."
+        confirmLabel="Подтвердить"
+        cancelLabel="Отмена"
+        onConfirm={() => setConfirmationOpen(false)}
+      />
+    </div>
+  );
+}
