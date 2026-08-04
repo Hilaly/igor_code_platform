@@ -106,12 +106,7 @@ const openNewProject = (): void => {
 
 describe("ProjectsView", () => {
   it("exposes active projects as one named list with separate row actions", () => {
-    show(
-      withProjects([
-        project("alpha", { name: "Alpha" }),
-        project("beta", { name: "Beta" }),
-      ]),
-    );
+    show(withProjects([project("alpha", { name: "Alpha" }), project("beta", { name: "Beta" })]));
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("toolbar", { name: "Проекты" })).toBeDefined();
@@ -186,20 +181,29 @@ describe("ProjectsView", () => {
   it("asks before deleting and says the sessions are not counted yet", () => {
     // Подтверждение обязано называть, сколько сессий пропадёт, а не спрашивать «вы уверены»
     // (docs/sessions-and-projects.md). Считалки ещё нет — и текст говорит об этом прямо.
-    const { onRemove } = show(withProjects([project("a")]));
+    const { onRemove, onOpen } = show(withProjects([project("a")]));
 
     openActions("a");
     fireEvent.click(screen.getByRole("menuitem", { name: "Удалить безвозвратно" }));
 
     expect(onRemove).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
     expect(screen.getByText(/Сессий у проекта нет/)).toBeDefined();
     expect(screen.getByText(/Папку на диске платформа не трогает/)).toBeDefined();
 
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Отмена" }));
+
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+
+    openActions("a");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Удалить безвозвратно" }));
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: "Удалить безвозвратно" }),
     );
 
     expect(onRemove).toHaveBeenCalledWith("a");
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("counts the sessions once there are any", () => {
@@ -212,17 +216,35 @@ describe("ProjectsView", () => {
   });
 
   it("renames through the confirmation dialog, not in place", () => {
-    const { onUpdate } = show(withProjects([project("a", { archived: false })]));
+    const { onUpdate, onOpen } = show(withProjects([project("a", { archived: false })]));
 
     openActions("a");
     fireEvent.click(screen.getByRole("menuitem", { name: "Переименовать" }));
 
-    const dialog = screen.getByRole("dialog");
+    expect(onOpen).not.toHaveBeenCalled();
+
+    let dialog = screen.getByRole("dialog");
+    const name = within(dialog).getByLabelText("Имя");
+
+    fireEvent.click(name);
+    fireEvent.change(name, { target: { value: "Отменённое имя" } });
+
+    expect(onOpen).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Отмена" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+
+    openActions("a");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Переименовать" }));
+    dialog = screen.getByRole("dialog");
 
     fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Другое" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Переименовать" }));
 
     expect(onUpdate).toHaveBeenCalledWith("a", { name: "Другое", archived: false });
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("marks the project that took the folder, not just the text of the refusal", () => {

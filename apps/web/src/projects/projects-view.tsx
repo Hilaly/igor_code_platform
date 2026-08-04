@@ -363,27 +363,29 @@ function ProjectRow({
       ];
 
   return (
-    <ListRow
-      onSelect={onOpen}
-      actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
-    >
-      <div className="projects-row">
-        <div className="projects-row-facts">
-          <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-          <Code>{project.folder}</Code>
-        </div>
+    <>
+      <ListRow
+        onSelect={onOpen}
+        actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
+      >
+        <div className="projects-row">
+          <div className="projects-row-facts">
+            <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
+            <Code>{project.folder}</Code>
+          </div>
 
-        <div className="projects-row-marks">
-          {project.availability === "missing" ? (
-            <Badge tone="warning">{t("projects.availability.missing")}</Badge>
-          ) : undefined}
-          {project.ephemeral ? (
-            <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
-          ) : undefined}
-          {conflicting ? <Badge tone="warning">{t("projects.conflict.mark")}</Badge> : undefined}
-          {onOpen === undefined && actions.length > 0 ? <ProjectMenu /> : undefined}
+          <div className="projects-row-marks">
+            {project.availability === "missing" ? (
+              <Badge tone="warning">{t("projects.availability.missing")}</Badge>
+            ) : undefined}
+            {project.ephemeral ? (
+              <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
+            ) : undefined}
+            {conflicting ? <Badge tone="warning">{t("projects.conflict.mark")}</Badge> : undefined}
+            {onOpen === undefined && actions.length > 0 ? <ProjectMenu /> : undefined}
+          </div>
         </div>
-      </div>
+      </ListRow>
 
       <ConfirmDialog
         open={dialog === "rename"}
@@ -423,7 +425,7 @@ function ProjectRow({
       >
         <Text tone="muted">{t("projects.remove.folder")}</Text>
       </ConfirmDialog>
-    </ListRow>
+    </>
   );
 
   function ProjectMenu() {
