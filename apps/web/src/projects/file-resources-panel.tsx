@@ -8,14 +8,13 @@ import {
   Code,
   EmptyState,
   Heading,
-  List,
   ListRow,
   Notice,
-  Panel,
   Spinner,
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
+import { useId } from "react";
 
 import type { FileResourcesState } from "./file-resources-state.ts";
 
@@ -63,25 +62,26 @@ function problemsOf(state: FileResourcesState): Problem[] {
 
 export function FileResourcesPanel({ state, translator }: FileResourcesPanelProps) {
   const { t } = translator;
+  const headingId = useId();
 
   return (
-    <Panel>
-      <div className="project-resources-panel">
+    <section className="project-resources" aria-labelledby={headingId}>
+      <hgroup id={headingId}>
         <Heading level={2}>{t("projects.resources.title")}</Heading>
-        {state.snapshot === undefined ? (
-          state.failure === undefined ? (
-            <Spinner label={t("projects.resources.loading")} />
-          ) : (
-            <Notice
-              tone="danger"
-              title={t("projects.resources.failed", { reason: state.failure })}
-            />
-          )
+      </hgroup>
+      {state.snapshot === undefined ? (
+        state.failure === undefined ? (
+          <Spinner label={t("projects.resources.loading")} />
         ) : (
-          <ResourcesContent state={state} translator={translator} />
-        )}
-      </div>
-    </Panel>
+          <Notice
+            tone="danger"
+            title={t("projects.resources.failed", { reason: state.failure })}
+          />
+        )
+      ) : (
+        <ResourcesContent state={state} translator={translator} />
+      )}
+    </section>
   );
 }
 
@@ -93,6 +93,7 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
     ({ state: resourceState }) => resourceState === "active",
   );
   const problems = problemsOf(state);
+  const problemsHeadingId = useId();
 
   return (
     <>
@@ -112,12 +113,17 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
           })}
         </Text>
       </div>
-      <Heading level={3}>{t("projects.resources.problems.title")}</Heading>
-      {problems.length === 0 ? (
-        <EmptyState title={t("projects.resources.problems.empty")} />
-      ) : (
-        <div role="list" aria-label={t("projects.resources.problems.label")}>
-          <List>
+      <section className="project-resources-problems" aria-labelledby={problemsHeadingId}>
+        <hgroup id={problemsHeadingId}>
+          <Heading level={3}>{t("projects.resources.problems.title")}</Heading>
+        </hgroup>
+        {problems.length === 0 ? (
+          <EmptyState title={t("projects.resources.problems.empty")} />
+        ) : (
+          <ul
+            className="projects-list"
+            aria-label={t("projects.resources.problems.label")}
+          >
             {problems.map((problem, index) => (
               <ProblemRow
                 key={`${problem.category}:${pathOf(problem)}:${String(index)}`}
@@ -125,9 +131,9 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
                 translator={translator}
               />
             ))}
-          </List>
-        </div>
-      )}
+          </ul>
+        )}
+      </section>
     </>
   );
 }

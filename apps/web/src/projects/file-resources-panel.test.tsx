@@ -91,6 +91,28 @@ const snapshot: FileResourcesSnapshot = {
 };
 
 describe("FileResourcesPanel", () => {
+  it("groups the resource summary and its problems into named semantic sections", () => {
+    render(
+      <FileResourcesPanel
+        state={applyFileResourcesSnapshot(initialFileResourcesState, snapshot)}
+        translator={translator}
+      />,
+    );
+
+    const resources = screen.getByRole("region", { name: "Файловые ресурсы" });
+    const problemsSection = within(resources).getByRole("region", {
+      name: "Проблемы и неактивные ресурсы",
+    });
+    const problemLists = within(problemsSection).getAllByRole("list");
+
+    expect(
+      resources.parentElement?.closest("section:not([aria-label]):not([aria-labelledby])"),
+    ).toBeNull();
+    expect(problemLists).toHaveLength(1);
+    expect(problemLists[0]?.getAttribute("aria-label")).toBe("Проблемы файловых ресурсов");
+    expect(within(problemLists[0] as HTMLElement).getAllByRole("listitem")).toHaveLength(5);
+  });
+
   it("counts only active agents and skills and shows every diagnostic and inactive state", () => {
     render(
       <FileResourcesPanel

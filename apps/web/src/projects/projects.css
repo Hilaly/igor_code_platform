@@ -21,6 +21,7 @@
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);
+  flex-wrap: wrap;
 }
 
 .projects-toolbar > :first-child {
@@ -59,12 +60,21 @@
   min-width: 0;
 }
 
-.project-resources-panel,
+.project-resources,
+.project-resources-problems,
 .project-resource-problem {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
   min-width: 0;
+}
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sovereign-space-0);
+  margin: var(--sovereign-space-0);
+  list-style: none;
 }
 
 .project-resources-counts,
@@ -85,17 +95,17 @@
  * края распором между ними, а не селектором по классу примитива: имена классов кита хешируются
  * модулями, и цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
  *
- * Отступ тоже здесь, а не из кита: `ListRow` даёт его только выбираемой строке, а строка проекта не
- * выбирается — по ней ничего не открывается, действия живут в меню.
+ * Внутренняя строка остаётся компактной: внешний `ListRow` уже владеет интерактивным отступом и
+ * разделителем, прикладной CSS только раскладывает факты и пометки.
  */
 .projects-row {
   display: flex;
-  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
   align-items: center;
   justify-content: space-between;
   gap: var(--sovereign-space-3);
   flex-wrap: wrap;
-  min-height: var(--sovereign-control-height-lg);
+  min-height: var(--sovereign-row-height-compact);
 }
 
 .projects-row-facts {

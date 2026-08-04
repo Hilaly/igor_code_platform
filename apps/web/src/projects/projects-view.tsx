@@ -19,7 +19,6 @@ import {
   Form,
   Heading,
   Input,
-  List,
   ListRow,
   Menu,
   Notice,
@@ -77,7 +76,7 @@ export function ProjectsView(props: ProjectsViewProps) {
         <Notice tone="danger" title={t("projects.write.failed", { reason: state.failure })} />
       )}
 
-      <div className="projects-toolbar">
+      <div className="projects-toolbar" role="toolbar" aria-label={t("page.projects.title")}>
         <Input
           value={query}
           onChange={setQuery}
@@ -111,17 +110,33 @@ export function ProjectsView(props: ProjectsViewProps) {
         />
       ) : undefined}
 
-      {/* Список — в панели, как и каждый плагин во вью плагинов: без неё строки лежат прямо на
-          фоне страницы и не читаются блоком. */}
+      {snapshot.projects.length === 0 ? (
+        <EmptyState title={t("projects.empty")} hint={t("projects.empty.hint")} />
+      ) : filterProjects(snapshot.projects, query).length === 0 ? (
+        <EmptyState title={t("projects.search.empty")} hint={t("projects.search.empty.hint")} />
+      ) : (
+        <ul className="projects-list" aria-label={t("page.projects.title")}>
+          {filterProjects(snapshot.projects, query).map((project) => (
+            <ProjectRow
+              key={project.id}
+              project={project}
+              conflicting={state.conflict?.project.id === project.id}
+              onUpdate={props.onUpdate}
+              onRemove={props.onRemove}
+              onOpen={props.onOpen === undefined ? undefined : () => props.onOpen?.(project.id)}
+              translator={translator}
+            />
+          ))}
+        </ul>
+      )}
 
-      <Panel>
-        {snapshot.projects.length === 0 ? (
-          <EmptyState title={t("projects.empty")} hint={t("projects.empty.hint")} />
-        ) : filterProjects(snapshot.projects, query).length === 0 ? (
-          <EmptyState title={t("projects.search.empty")} hint={t("projects.search.empty.hint")} />
-        ) : (
-          <List>
-            {filterProjects(snapshot.projects, query).map((project) => (
+      {snapshot.archived.length === 0 ? undefined : (
+        <Disclosure summary={t("projects.archived", { count: snapshot.archived.length })}>
+          <ul
+            className="projects-list"
+            aria-label={t("projects.archived", { count: snapshot.archived.length })}
+          >
+            {filterProjects(snapshot.archived, query).map((project) => (
               <ProjectRow
                 key={project.id}
                 project={project}
@@ -132,27 +147,7 @@ export function ProjectsView(props: ProjectsViewProps) {
                 translator={translator}
               />
             ))}
-          </List>
-        )}
-      </Panel>
-
-      {snapshot.archived.length === 0 ? undefined : (
-        <Disclosure summary={t("projects.archived", { count: snapshot.archived.length })}>
-          <Panel>
-            <List>
-              {filterProjects(snapshot.archived, query).map((project) => (
-                <ProjectRow
-                  key={project.id}
-                  project={project}
-                  conflicting={state.conflict?.project.id === project.id}
-                  onUpdate={props.onUpdate}
-                  onRemove={props.onRemove}
-                  onOpen={props.onOpen === undefined ? undefined : () => props.onOpen?.(project.id)}
-                  translator={translator}
-                />
-              ))}
-            </List>
-          </Panel>
+          </ul>
         </Disclosure>
       )}
     </div>

@@ -105,6 +105,38 @@ const openNewProject = (): void => {
 };
 
 describe("ProjectsView", () => {
+  it("exposes active projects as one named list with separate row actions", () => {
+    show(
+      withProjects([
+        project("alpha", { name: "Alpha" }),
+        project("beta", { name: "Beta" }),
+      ]),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("toolbar", { name: "Проекты" })).toBeDefined();
+
+    const projects = screen.getByRole("list", { name: "Проекты" });
+    const rows = within(projects).getAllByRole("listitem");
+
+    expect(rows).toHaveLength(2);
+    expect(
+      projects.parentElement?.closest("section:not([aria-label]):not([aria-labelledby])"),
+    ).toBeNull();
+
+    for (const row of rows) {
+      const actions = within(row).getByRole("button", { name: /Действия/ });
+      const selectable = within(row)
+        .getAllByRole("button")
+        .find((button) => button !== actions);
+
+      expect(selectable).toBeDefined();
+      expect(selectable?.parentElement).toBe(row);
+      expect(actions.closest("li")).toBe(row);
+      expect(selectable?.contains(actions)).toBe(false);
+    }
+  });
+
   it("waits for the first snapshot instead of showing an empty list", () => {
     show(initialProjectsState);
 
@@ -385,6 +417,20 @@ describe("ProjectsView", () => {
   it("puts the archived projects behind a disclosure, out of the working list", () => {
     show(withProjects([project("a")], [project("gone", { archived: true })]));
 
-    expect(screen.getByText("Архив: 1 проект")).toBeDefined();
+    const summary = screen.getByText("Архив: 1 проект");
+    const disclosure = summary.closest("details");
+
+    expect(disclosure).not.toBeNull();
+    expect(within(screen.getByRole("list", { name: "Проекты" })).queryByText("gone")).toBeNull();
+
+    const archived = within(disclosure as HTMLElement).getByRole("list", {
+      name: "Архив: 1 проект",
+    });
+
+    expect(within(archived).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(archived).getByText("gone")).toBeDefined();
+    expect(
+      archived.parentElement?.closest("section:not([aria-label]):not([aria-labelledby])"),
+    ).toBeNull();
   });
 });

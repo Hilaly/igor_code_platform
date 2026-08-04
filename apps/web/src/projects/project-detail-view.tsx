@@ -51,7 +51,11 @@ export function ProjectDetailView({
 
   return (
     <div className="project-detail">
-      <div className="project-detail-topbar">
+      <div
+        className="project-detail-topbar"
+        role="toolbar"
+        aria-label={t("page.projects.title")}
+      >
         <Button onClick={onBack}>{t("projects.back")}</Button>
         <Button tone="accent" onClick={onNewSession}>
           {t("sessions.new")}
