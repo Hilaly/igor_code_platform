@@ -214,6 +214,7 @@ describe("stylesheets of the kit", () => {
   });
 
   it("keeps disclosure controls sans and long tool summaries predictable", () => {
+    const badgeCss = readFileSync(join(kitRoot, "components", "badge.module.css"), "utf8");
     const disclosureCss = readFileSync(
       join(kitRoot, "components", "disclosure.module.css"),
       "utf8",
@@ -223,9 +224,15 @@ describe("stylesheets of the kit", () => {
     expect(disclosureCss).toMatch(
       /\.summary\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
     );
+    expect(badgeCss).toMatch(
+      /\.badge\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
+    );
     expect(toolCallCss).toMatch(/\.identity\s*\{[^}]*overflow-x:\s*auto;/s);
     expect(toolCallCss).toMatch(
       /\.description\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s,
+    );
+    expect(toolCallCss).toMatch(
+      /\.outputLabel\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
     );
   });
 

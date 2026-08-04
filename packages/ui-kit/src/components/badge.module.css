@@ -14,6 +14,7 @@
   padding-inline: var(--sovereign-space-2);
   border: var(--sovereign-stroke-thin) solid transparent;
   border-radius: var(--sovereign-radius-full);
+  font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
   font-weight: var(--sovereign-font-weight-medium);
   line-height: var(--sovereign-line-height-none);

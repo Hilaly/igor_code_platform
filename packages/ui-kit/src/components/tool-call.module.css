@@ -69,5 +69,6 @@
 .outputLabel {
   margin-block-start: var(--sovereign-space-2);
   color: var(--sovereign-text-muted);
+  font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
 }
