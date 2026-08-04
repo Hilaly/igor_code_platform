@@ -11,6 +11,7 @@ import { minimumPasswordLength } from "@sovereign/protocol";
 import {
   Button,
   Field,
+  Form,
   Heading,
   Input,
   Notice,
@@ -18,7 +19,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { checkCredentials, type CredentialsProblem } from "./credentials.ts";
 
@@ -55,25 +56,17 @@ export function LoginView({
 
   const check = checkCredentials(password, registering ? confirmation : undefined);
 
-  const submit = (): void => {
-    if (check.kind !== "ready" || busy) {
-      return;
-    }
-
-    onSubmit(password);
-  };
-
   const title = t(registering ? "login.registration.title" : "login.title");
 
   return (
     <main className="login">
       <div className="login-form">
         <Panel>
-          <form
-            aria-label={title}
-            onSubmit={(event: FormEvent<HTMLFormElement>) => {
-              event.preventDefault();
-              submit();
+          <Form
+            label={title}
+            disabled={check.kind !== "ready" || busy}
+            onSubmit={() => {
+              onSubmit(password);
             }}
           >
             <div className="login-body">
@@ -127,7 +120,7 @@ export function LoginView({
                 {t(registering ? "login.registration.submit" : "login.submit")}
               </Button>
             </div>
-          </form>
+          </Form>
         </Panel>
       </div>
     </main>

@@ -159,17 +159,18 @@ describe("markup of the ported primitives", () => {
     ).toBe("");
   });
 
-  it("form renders its children and stays put without an undefined leak", () => {
-    // Форма — тонкая обёртка над `<form>`, и проверять в ней особенно нечего: ни состояний, ни ARIA.
-    // Полезно одно — что класс модуля не оказался `undefined` и дети доехали как есть.
+  it("form gives its semantic group the caller-provided accessible name", () => {
+    // Название формы знает вызывающий: UI kit не может догадаться, это вход, создание проекта или
+    // ещё одна композиция. Без имени скринридер не отличит форму от соседней.
     const markup = renderToStaticMarkup(
-      <Form onSubmit={() => {}}>
+      <Form onSubmit={() => {}} label="Вход в Sovereign">
         <span>поле</span>
       </Form>,
     );
 
     expect(markup).not.toContain("undefined");
     expect(markup).toContain("поле");
+    expect(markup).toContain('aria-label="Вход в Sovereign"');
   });
 
   it("file picker stays out of the markup without a document too", () => {
