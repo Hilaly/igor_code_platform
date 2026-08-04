@@ -102,6 +102,83 @@ describe("the session message list", () => {
     expect(pendingNode.compareDocumentPosition(liveNode)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it("shows a path and command in persisted and live tool summaries", () => {
+    const persisted: SessionEntry = {
+      id: "m1",
+      time: "2026-07-29T00:00:00.000Z",
+      kind: "message",
+      role: "agent",
+      content: [
+        {
+          kind: "tool-call",
+          toolCallId: "tool-1",
+          toolName: "write_file",
+          input: { path: "hello.txt", file: "ignored.txt", command: "echo ignored" },
+        },
+      ],
+    };
+    const outcome: SessionEntry = {
+      id: "r1",
+      time: "2026-07-29T00:00:01.000Z",
+      kind: "tool-result",
+      toolCallId: "tool-1",
+      toolName: "write_file",
+      text: "written",
+      failed: false,
+    };
+
+    show(
+      openSession({
+        entries: [persisted, outcome],
+        branchEntryIds: new Set([persisted.id, outcome.id]),
+        live: {
+          turnId: "turn-1",
+          order: ["turn-1:tool"],
+          items: {
+            "turn-1:tool": {
+              kind: "tool",
+              toolCallId: "tool-2",
+              toolName: "bash",
+              input: { command: "pwd" },
+              done: false,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(screen.getByText("write_file")).toBeTruthy();
+    expect(screen.getByText("hello.txt")).toBeTruthy();
+    expect(screen.getByText("Готово")).toBeTruthy();
+    expect(screen.getByText("bash")).toBeTruthy();
+    expect(screen.getByText("pwd")).toBeTruthy();
+  });
+
+  it("falls back to an unknown tool name when its input has no supported summary", () => {
+    show(
+      openSession({
+        live: {
+          turnId: "turn-1",
+          order: ["turn-1:tool"],
+          items: {
+            "turn-1:tool": {
+              kind: "tool",
+              toolCallId: "tool-1",
+              toolName: "unknown_tool",
+              input: { path: "", file: 4, command: "" },
+              done: true,
+              failed: false,
+            },
+          },
+        },
+      }),
+    );
+
+    const summary = screen.getByText("unknown_tool").closest("summary");
+
+    expect(summary?.textContent).toBe("◇unknown_toolГотово");
+  });
+
   it("deduplicates the persisted first prompt but keeps repeated steering", () => {
     const persisted = message("m1", "привет", "user");
 

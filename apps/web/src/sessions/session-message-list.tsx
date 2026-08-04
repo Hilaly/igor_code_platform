@@ -51,6 +51,24 @@ const outcomesOf = (entries: SessionEntry[]): Map<string, ToolOutcome> =>
       .map((entry) => [entry.toolCallId, { text: entry.text, failed: entry.failed }]),
   );
 
+function toolSummary(toolName: string, input: unknown): string | undefined {
+  void toolName;
+
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  for (const key of ["path", "file", "command"]) {
+    const value = input[key as keyof typeof input];
+
+    if (typeof value === "string" && value !== "") {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 export function SessionMessageList(props: SessionMessageListProps): React.JSX.Element {
   const {
     open,
@@ -328,7 +346,9 @@ function ContentBlock(props: {
 
   return (
     <ToolCall
+      icon="◇"
       toolName={block.toolName}
+      summary={toolSummary(block.toolName, block.input)}
       status={status}
       statusLabel={t(`chat.tool.${status}`)}
       argumentsText={JSON.stringify(block.input, undefined, 2) ?? ""}
@@ -349,7 +369,9 @@ function LiveMessage(props: { item: StreamedItem; translator: ScopedTranslator }
 
     return (
       <ToolCall
+        icon="◇"
         toolName={item.toolName}
+        summary={toolSummary(item.toolName, item.input)}
         status={status}
         statusLabel={t(`chat.tool.${status}`)}
         argumentsText={JSON.stringify(item.input, undefined, 2) ?? ""}
