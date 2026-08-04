@@ -84,3 +84,49 @@ it("presents each plugin as one section with a semantic contribution list", () =
     disabledContributions: ["example.action"],
   });
 });
+
+it("labels every shipped contribution kind without reporting a missing translation", () => {
+  const completeSnapshot: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      ...snapshot.contributions,
+      {
+        kind: "agent",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.agent",
+        declaredId: "agent",
+        title: "Example agent",
+        instructions: "Work carefully.",
+        tools: { include: ["*"], exclude: [] },
+        skills: { include: ["*"], exclude: [] },
+      },
+      {
+        kind: "skill",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.skill",
+        declaredId: "skill",
+        title: "Example skill",
+        name: "example-skill",
+        location: "/plugins/example/skills/example",
+        disableModelInvocation: false,
+      },
+    ],
+  };
+
+  render(
+    <PluginsView
+      state={{ snapshot: completeSnapshot, stale: false }}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("agent")).toBeTruthy();
+  expect(screen.getByText("skill")).toBeTruthy();
+});
