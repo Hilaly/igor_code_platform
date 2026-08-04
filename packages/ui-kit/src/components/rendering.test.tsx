@@ -21,12 +21,24 @@ import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
 import { Message, MessageFeed } from "./message-feed.tsx";
 import { Progress } from "./progress.tsx";
+import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("raised surface preserves its content without inventing a document section", () => {
+    const markup = renderToStaticMarkup(
+      <RaisedSurface>
+        <span>Редактируемый запрос</span>
+      </RaisedSurface>,
+    );
+
+    expect(markup).not.toContain("undefined");
+    expect(markup).toMatch(/^<div class="[^"]+"><span>Редактируемый запрос<\/span><\/div>$/);
+  });
+
   it("input", () => {
     const markup = renderToStaticMarkup(
       <Input value="a" onChange={() => {}} invalid id="x" describedBy="y" type="search" />,

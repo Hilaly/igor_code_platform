@@ -22,6 +22,7 @@ import { MultiSelect } from "./multi-select.tsx";
 import { Popover } from "./popover.tsx";
 import { Progress } from "./progress.tsx";
 import { RadioGroup } from "./radio-group.tsx";
+import { RaisedSurface } from "./raised-surface.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Slider } from "./slider.tsx";
 import { Skeleton } from "./skeleton.tsx";
@@ -242,6 +243,20 @@ export const PanelMenu = () => (
         { id: "log-out", label: "Выйти", tone: "danger", onSelect: () => {} },
       ]}
     />
+  </div>
+);
+
+/** Общая поднятая поверхность остаётся нейтральной к содержимому и предметной раскладке. */
+export const RaisedSurfaceStory = () => (
+  <div style={column}>
+    <RaisedSurface>
+      <Textarea
+        value="Проверь изменения перед отправкой."
+        onChange={() => {}}
+        rows={2}
+        aria-label="Сообщение агенту"
+      />
+    </RaisedSurface>
   </div>
 );
 

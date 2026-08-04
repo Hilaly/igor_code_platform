@@ -219,6 +219,7 @@ describe("stylesheets of the kit", () => {
       ["components/menu.module.css", "--sovereign-elevation-2"],
       ["components/panel.module.css", "--sovereign-elevation-1"],
       ["components/popover.module.css", "--sovereign-elevation-2"],
+      ["components/raised-surface.module.css", "--sovereign-elevation-1"],
     ]);
 
     for (const [relativePath, elevation] of elevatedSurfaces) {
@@ -228,6 +229,20 @@ describe("stylesheets of the kit", () => {
         expect.arrayContaining(["--sovereign-panel-surface", elevation]),
       );
     }
+  });
+
+  it("owns the compact raised-surface visual contract", () => {
+    const source = withoutComments(
+      readFileSync(join(kitRoot, "components", "raised-surface.module.css"), "utf8"),
+    );
+
+    expect(source).toMatch(/\.surface\s*\{[^}]*padding:\s*var\(--sovereign-space-3\);/s);
+    expect(source).toMatch(
+      /\.surface\s*\{[^}]*border:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-strong\);/s,
+    );
+    expect(source).toMatch(/\.surface\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-md\);/s);
+    expect(source).toMatch(/\.surface\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);/s);
+    expect(source).toMatch(/\.surface\s*\{[^}]*box-shadow:\s*var\(--sovereign-elevation-1\);/s);
   });
 
   it("dresses every primitive it ships", () => {

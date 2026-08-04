@@ -39,6 +39,7 @@ export * from "./components/panel.tsx";
 export * from "./components/popover.tsx";
 export * from "./components/progress.tsx";
 export * from "./components/radio-group.tsx";
+export * from "./components/raised-surface.tsx";
 export * from "./components/segmented-control.tsx";
 export * from "./components/select.tsx";
 export * from "./components/skeleton.tsx";
