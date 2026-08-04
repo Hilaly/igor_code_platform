@@ -183,6 +183,7 @@ describe("contrast", () => {
     ["textSubtle", "panelSurface"],
     ["accentText", "panelSurface"],
     ["dangerText", "panelSurface"],
+    ["warningText", "panelSurface"],
     ["text", "sunkenSurface"],
     ["textMuted", "sunkenSurface"],
     ["textSubtle", "sunkenSurface"],
@@ -204,6 +205,10 @@ describe("contrast", () => {
     ["textOnAccent", "accentStrong"],
     ["textOnDanger", "danger"],
   ] as const satisfies readonly (readonly [RoleName, RoleName])[];
+
+  it("includes warning text rendered inside plugin panels", () => {
+    expect(rolePairs).toContainEqual(["warningText", "panelSurface"]);
+  });
 
   it("keeps every consumed text role legible on its actual surface", () => {
     const failures: string[] = [];
