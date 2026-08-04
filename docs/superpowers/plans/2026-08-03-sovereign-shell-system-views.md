@@ -8,6 +8,13 @@
 
 **Tech Stack:** React 19, TypeScript, CSS, UI Kit, Vitest, Testing Library, pnpm workspace.
 
+## Статус выполнения
+
+План завершён: выполнены 5 задач и все 24 шага. Основной диапазон — `a76a70c..6d504e9`, последующие
+`48f677d`, `c129ddc`, `0bd9874` и `72abc84` закрыли замечания task-review. Каждый task и весь срез
+прошли независимое ревью без оставшихся findings. Финальная проверка всего репозитория повторно
+подтвердила тесты, typecheck, ESLint, Prettier и production-build Ladle и web.
+
 ## Global Constraints
 
 - Start from the completed and reviewed Sovereign visual-foundation slice.
@@ -52,7 +59,7 @@
 - Preserves: all `ShellProps`, resizers, restore buttons, and panel visibility behavior.
 - Produces: sidebar = panel surface, central page = page surface, right panel = sunken surface.
 
-- [ ] **Step 1: Write failing shell-style assertions**
+- [x] **Step 1: Write failing shell-style assertions**
 
 Extend `styles.test.ts`:
 
@@ -65,26 +72,26 @@ expect(shell).toMatch(/\.shell-left\s*\{[^}]*gap:\s*var\(--sovereign-space-2\);/
 
 Keep existing shrink/scroll and settings-layout assertions.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- styles.test.ts shell.test.tsx`
 
 Expected: FAIL because the right panel still shares the sidebar surface and shell spacing is broader.
 
-- [ ] **Step 3: Implement geometry-only shell changes**
+- [x] **Step 3: Implement geometry-only shell changes**
 
 Use compact gaps/padding for `.shell-left`, `.shell-left-main`, `.shell-nav`, `.shell-projects`, and
 account bottom. Give `.shell-page` a plain page surface and keep `min-width`, overflow, resizers, and
 restore positioning unchanged. Keep the right panel visually secondary with `sunkenSurface` or
 `panelSurface` plus the existing subtle divider.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run: `pnpm --filter @sovereign/web test -- styles.test.ts shell.test.tsx`
 
 Expected: PASS with no behavioral shell test changes except intentional semantic-wrapper queries.
 
-- [ ] **Step 5: Commit shell hierarchy**
+- [x] **Step 5: Commit shell hierarchy**
 
 ```bash
 git add apps/web/src/shell/shell.css apps/web/src/shell/styles.test.ts apps/web/src/shell/shell.test.tsx
@@ -106,31 +113,31 @@ git commit -m "style(web): refine shell surface hierarchy"
 - Preserves: controlled expansion, selected session route, project/session actions, daemon status dot, and account menu.
 - Produces: compact row height, always-readable selection marker, actions revealed without changing tab order, and full names exposed by accessible labels/title.
 
-- [ ] **Step 1: Add failing behavior/accessibility tests**
+- [x] **Step 1: Add failing behavior/accessibility tests**
 
 Add a long project and session name; require the rendered tree item and action labels to expose the
 complete text even when CSS truncates it. Keep assertions that action clicks do not select or expand
 the node. In the account test, require exactly one status dot and one account trigger.
 
-- [ ] **Step 2: Run focused tests and verify RED where markup is missing**
+- [x] **Step 2: Run focused tests and verify RED where markup is missing**
 
 Run: `pnpm --filter @sovereign/web test -- sidebar-projects.test.tsx account-control.test.tsx`
 
 Expected: FAIL on missing full-name title/accessible contract; existing behavior assertions remain green.
 
-- [ ] **Step 3: Implement compact semantic rows**
+- [x] **Step 3: Implement compact semantic rows**
 
 Add only `title`/`aria-label` data needed for truncation. Use shell geometry to align project actions,
 keep them compact, and apply the UI Kit selected state instead of creating an application-owned
 colour. Do not hide keyboard-focusable actions with `display: none`.
 
-- [ ] **Step 4: Run sidebar and shell tests**
+- [x] **Step 4: Run sidebar and shell tests**
 
 Run: `pnpm --filter @sovereign/web test -- sidebar-projects.test.tsx account-control.test.tsx shell.test.tsx styles.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the sidebar density**
+- [x] **Step 5: Commit the sidebar density**
 
 ```bash
 git add apps/web/src/sessions/sidebar-projects.tsx apps/web/src/sessions/sidebar-projects.test.tsx apps/web/src/shell/account-control.tsx apps/web/src/shell/account-control.test.tsx apps/web/src/shell/shell.css
@@ -151,31 +158,31 @@ git commit -m "style(web): compact sidebar session navigation"
 - Preserves: required URL-driven `section`, five sections, active content, and narrow horizontal navigation.
 - Produces: compact sidebar, serif page/section headings through UI Kit, and divided rows without nested card chrome.
 
-- [ ] **Step 1: Write failing structure and style tests**
+- [x] **Step 1: Write failing structure and style tests**
 
 Require one `h1` for the active section, navigation with `aria-current`, and one active content node.
 Assert CSS uses the compact row token for settings nav, subtle dividers for setting groups, and no
 `.settings` descendant uses elevation or a panel-style outer radius.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- settings-view.test.tsx styles.test.ts`
 
 Expected: FAIL on compact/divider rules and any duplicate page-heading structure that remains.
 
-- [ ] **Step 3: Implement the flat settings composition**
+- [x] **Step 3: Implement the flat settings composition**
 
 Keep the existing two-column markup and route mapping. Use a small navigation column, compact rows,
 one divider between master/detail, and a readable content width. Group appearance and daemon fields
 with spacing and separators; do not wrap every control in `Panel`.
 
-- [ ] **Step 4: Verify wide and narrow behavior**
+- [x] **Step 4: Verify wide and narrow behavior**
 
 Run: `pnpm --filter @sovereign/web test -- settings-view.test.tsx styles.test.ts`
 
 Expected: PASS for both grid and `<40rem` horizontal-navigation contract.
 
-- [ ] **Step 5: Commit settings visuals**
+- [x] **Step 5: Commit settings visuals**
 
 ```bash
 git add apps/web/src/settings/settings-view.tsx apps/web/src/settings/settings-view.test.tsx apps/web/src/settings/settings.css apps/web/src/shell/styles.test.ts
@@ -198,7 +205,7 @@ git commit -m "style(web): flatten settings composition"
 - Preserves: provider detail routes, login/logout controls, plugin toggles, contribution toggles, failures, and diagnostics.
 - Produces: coherent list/section surfaces with cards only around independently addressable provider/plugin objects.
 
-- [ ] **Step 1: Add failing semantic-list tests**
+- [x] **Step 1: Add failing semantic-list tests**
 
 For providers, assert the list remains navigable as whole rows and detail actions are not nested in
 the row button. Create a jsdom plugin-view test with the strict core translator and this minimum
@@ -238,19 +245,19 @@ Assert one plugin section/heading, one contribution list item, visible running s
 and working plugin/contribution toggles. Extend `styles.test.ts` with compact plugin-layout rules;
 this style assertion is the intentional RED condition, while the new DOM test locks existing behavior.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- providers-view.test.tsx plugins-view.test.tsx styles.test.ts`
 
 Expected: existing behavior stays green; new list-structure assertions fail on panel-heavy markup.
 
-- [ ] **Step 3: Flatten only repeated inner surfaces**
+- [x] **Step 3: Flatten only repeated inner surfaces**
 
 Keep a boundary around one provider/plugin when it is a standalone object. Replace nested panels for
 contributions, facts, or controls with list rows, dividers, and headings. Use existing UI Kit `List`,
 `ListRow`, `Text`, `Heading`, `Badge`, `Toggle`, and `Notice`; add no application primitive.
 
-- [ ] **Step 4: Run system-view verification**
+- [x] **Step 4: Run system-view verification**
 
 Run:
 
@@ -261,7 +268,7 @@ pnpm --filter @sovereign/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit providers and plugins**
+- [x] **Step 5: Commit providers and plugins**
 
 ```bash
 git add apps/web/src/providers apps/web/src/plugins apps/web/src/shell/shell.css
@@ -280,12 +287,12 @@ git commit -m "style(web): refine system management lists"
 - Documents: implemented shell hierarchy, compact sidebar, settings rows, provider/plugin boundaries, and rejected per-view styling.
 - Produces: reviewed base for the agent-session slice.
 
-- [ ] **Step 1: Update documentation and plan index**
+- [x] **Step 1: Update documentation and plan index**
 
 Rewrite the shell/settings/provider/plugin visual descriptions in `docs/ui-kit.md` to match the
 implemented flat composition. Record why card boundaries remain only for standalone objects.
 
-- [ ] **Step 2: Run complete web verification**
+- [x] **Step 2: Run complete web verification**
 
 Run:
 
@@ -300,14 +307,14 @@ git diff --check
 
 Expected: all commands exit 0 with no new warnings.
 
-- [ ] **Step 3: Commit documentation**
+- [x] **Step 3: Commit documentation**
 
 ```bash
 git add docs/ui-kit.md docs/README.md
 git commit -m "docs(web): record refined system views"
 ```
 
-- [ ] **Step 4: Request independent review**
+- [x] **Step 4: Request independent review**
 
 Dispatch a reviewer subagent with the spec, the foundation plan/commit, this plan, and the full diff.
 Fix findings with focused tests and repeat review until no findings remain.

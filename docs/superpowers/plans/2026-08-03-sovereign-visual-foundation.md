@@ -8,6 +8,14 @@
 
 **Tech Stack:** React 19, TypeScript, CSS Modules, Fontsource, Vitest, Testing Library, Ladle, pnpm workspace.
 
+## Статус выполнения
+
+План завершён: выполнены 5 задач и все 26 шагов. Основание внесли коммиты
+`d52ef7c..a97376d` с корректировками `baeb107`, `957dda2`, `cddb16a` и `86fac53`. Каждый task прошёл
+независимое ревью, итоговый review среза был чистым; после whole-branch review контракт дополнительно
+усилен в `7557a88..49d0874`. Финальная проверка всего репозитория повторно подтвердила тесты,
+typecheck, ESLint, Prettier и production-build Ladle и web.
+
 ## Global Constraints
 
 - Work in an isolated feature worktree branched from the commit containing `36a1b97` and all subsequently approved plan documents.
@@ -54,7 +62,7 @@
 - Produces: display = Source Serif 4, body = Manrope, mono = IBM Plex Mono.
 - Consumed later: agent messages use display, all controls use body, and machine blocks use mono.
 
-- [ ] **Step 1: Write the failing font contract test**
+- [x] **Step 1: Write the failing font contract test**
 
 Add a test that reads `styles/index.css`, `styles/tokens.css`, and `package.json`:
 
@@ -79,13 +87,13 @@ it("ships the approved voice, interface, and machine fonts locally", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- styles.test.ts`
 
 Expected: FAIL because UI Kit still imports IBM Plex Sans, Unbounded, and JetBrains Mono.
 
-- [ ] **Step 3: Replace the packages and token values**
+- [x] **Step 3: Replace the packages and token values**
 
 Run:
 
@@ -104,13 +112,13 @@ Import the exact four CSS entries asserted above. Set the family tokens to:
 
 Use font weights 400 and 500 for machine text; do not request unavailable IBM Plex Mono variable axes.
 
-- [ ] **Step 4: Run tests and typecheck, verify GREEN**
+- [x] **Step 4: Run tests and typecheck, verify GREEN**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- styles.test.ts && pnpm --filter @sovereign/ui-kit typecheck`
 
 Expected: PASS and no references to the removed packages in `pnpm-lock.yaml`.
 
-- [ ] **Step 5: Commit the font foundation**
+- [x] **Step 5: Commit the font foundation**
 
 ```bash
 git add packages/ui-kit/package.json packages/ui-kit/src/styles/index.css packages/ui-kit/src/styles/tokens.css packages/ui-kit/src/styles/styles.test.ts pnpm-lock.yaml
@@ -144,7 +152,7 @@ git commit -m "feat(ui-kit): adopt Sovereign typography families"
 - Preserves: `--sovereign-elevation-1..3` as the only elevation tokens.
 - Removes from consumers: gradient, glow, glass, blur, and decorative hairline tokens.
 
-- [ ] **Step 1: Write failing tests for density and restrained effects**
+- [x] **Step 1: Write failing tests for density and restrained effects**
 
 Add assertions:
 
@@ -164,13 +172,13 @@ it("defines contextual density and no decorative effect tokens", () => {
 Replace the existing glass-treatment test with one that requires `Panel`, `Dialog`, `Menu`, and
 `Popover` to use only a semantic surface and the appropriate elevation.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- styles.test.ts`
 
 Expected: FAIL on missing density tokens and existing gradient/glass effects.
 
-- [ ] **Step 3: Implement the minimal shared tokens**
+- [x] **Step 3: Implement the minimal shared tokens**
 
 Add scale-derived values in `tokens.css`:
 
@@ -188,7 +196,7 @@ backdrops with `var(--sovereign-page-surface)`. Remove the obsolete
 `usedOutsideTheKit = ["--sovereign-gradient-backdrop"]` exception so the no-dead-token test remains
 meaningful.
 
-- [ ] **Step 4: Run the complete stylesheet contract**
+- [x] **Step 4: Run the complete stylesheet contract**
 
 Run:
 
@@ -199,7 +207,7 @@ pnpm --filter @sovereign/web test -- styles.test.ts
 
 Expected: PASS, including no unknown/unused tokens and no removed backdrop reference in the app.
 
-- [ ] **Step 5: Commit restrained effects and density**
+- [x] **Step 5: Commit restrained effects and density**
 
 ```bash
 git add packages/ui-kit/src/styles packages/ui-kit/src/components/button.module.css packages/ui-kit/src/components/combobox.module.css packages/ui-kit/src/components/dialog.module.css packages/ui-kit/src/components/menu.module.css packages/ui-kit/src/components/model-picker.module.css packages/ui-kit/src/components/multi-select.module.css packages/ui-kit/src/components/panel.module.css packages/ui-kit/src/components/popover.module.css packages/ui-kit/src/components/select.module.css packages/ui-kit/src/components/toast.module.css packages/ui-kit/src/components/toggle.module.css apps/web/src/shell/shell.css apps/web/src/login/login.css
@@ -219,7 +227,7 @@ git commit -m "refactor(ui-kit): establish contextual density effects"
 - Produces dark surfaces: page `#14100b`, raised `#201a13`, sunken `#100d09`, border `#3b2f21`.
 - Produces light surfaces: page `#f3ead8`, raised `#fffaf0`, sunken `#e7dcc5`, border `#d1bea0`.
 
-- [ ] **Step 1: Write the failing palette assertion**
+- [x] **Step 1: Write the failing palette assertion**
 
 ```ts
 it("separates the Refined Imperium surfaces", () => {
@@ -238,24 +246,24 @@ it("separates the Refined Imperium surfaces", () => {
 });
 ```
 
-- [ ] **Step 2: Run token tests and verify RED**
+- [x] **Step 2: Run token tests and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- tokens.test.ts`
 
 Expected: FAIL with the old Imperium values.
 
-- [ ] **Step 3: Update only the four surface values per variant**
+- [x] **Step 3: Update only the four surface values per variant**
 
 Keep ink, muted ink, purple accent, gold secondary, danger, warning, success, overlay, and shadow
 unchanged in this task. This isolates surface hierarchy from semantic-colour tuning.
 
-- [ ] **Step 4: Run token tests and verify GREEN**
+- [x] **Step 4: Run token tests and verify GREEN**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- tokens.test.ts`
 
 Expected: PASS, including existing contrast checks.
 
-- [ ] **Step 5: Commit the palette refinement**
+- [x] **Step 5: Commit the palette refinement**
 
 ```bash
 git add packages/ui-kit/src/tokens/schemes/imperium.ts packages/ui-kit/src/tokens/tokens.test.ts
@@ -280,7 +288,7 @@ git commit -m "style(ui-kit): refine Imperium surfaces"
 - Consumes: font and density tokens from Tasks 1–2.
 - Produces: compact rows/controls, moderate radii, flat panels, Source Serif headings, and unchanged component TypeScript APIs.
 
-- [ ] **Step 1: Add failing CSS contract assertions**
+- [x] **Step 1: Add failing CSS contract assertions**
 
 Require:
 
@@ -295,20 +303,20 @@ expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
 Also assert that the compact visual row retains padding or a pseudo-element hit area sufficient for
 the current keyboard/click contract; do not reduce semantic controls to icon-sized targets.
 
-- [ ] **Step 2: Run stylesheet tests and verify RED**
+- [x] **Step 2: Run stylesheet tests and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- styles.test.ts`
 
 Expected: FAIL because primitives still use the old control heights, broad radii, and glass panel.
 
-- [ ] **Step 3: Apply the compact geometry**
+- [x] **Step 3: Apply the compact geometry**
 
 Use `--sovereign-row-height-compact` for list/tree rows and small navigation controls. Reduce default
 panel radius to `--sovereign-radius-sm`, use one subtle border and `--sovereign-elevation-1`, and
 remove backdrop filtering. Keep button/input APIs and focus/disabled semantics unchanged. Use
 display/Source Serif only for `Heading`; controls and rows stay body/Manrope.
 
-- [ ] **Step 4: Add the dense foundation Ladle scenario**
+- [x] **Step 4: Add the dense foundation Ladle scenario**
 
 In `primitives.stories.tsx`, add `VisualFoundation` with:
 
@@ -329,7 +337,7 @@ In `primitives.stories.tsx`, add `VisualFoundation` with:
 Include long labels and disabled/focused states already supported by the primitives; do not invent
 application data.
 
-- [ ] **Step 5: Run UI Kit verification**
+- [x] **Step 5: Run UI Kit verification**
 
 Run:
 
@@ -341,7 +349,7 @@ pnpm --filter @sovereign/ui-kit exec ladle build
 
 Expected: 141 or more tests PASS, typecheck PASS, catalogue build PASS.
 
-- [ ] **Step 6: Commit primitive geometry**
+- [x] **Step 6: Commit primitive geometry**
 
 ```bash
 git add packages/ui-kit/src/components packages/ui-kit/src/styles/styles.test.ts
@@ -360,17 +368,17 @@ git commit -m "style(ui-kit): compact shared primitive geometry"
 - Documents: approved fonts, local delivery, contextual density tokens, restrained effects, Imperium surface levels, and rejected decorative alternatives.
 - Produces: a clean base commit for the shell/system-view plan.
 
-- [ ] **Step 1: Update durable UI Kit documentation**
+- [x] **Step 1: Update durable UI Kit documentation**
 
 Replace the current font paragraph and obsolete Unbounded decision. Replace the effects description
 that promises gradients, glow, glass, and backdrop blur. Record why the three font roles and flat
 effects were selected, including the Fontsource static IBM Plex Mono constraint.
 
-- [ ] **Step 2: Index this plan in `docs/README.md`**
+- [x] **Step 2: Index this plan in `docs/README.md`**
 
 Add the plan next to the visual-language spec and describe it as the first implementation slice.
 
-- [ ] **Step 3: Run final foundation verification**
+- [x] **Step 3: Run final foundation verification**
 
 Run:
 
@@ -385,14 +393,14 @@ git diff --check
 
 Expected: all commands exit 0; generated Ladle output remains untracked/ignored.
 
-- [ ] **Step 4: Commit documentation**
+- [x] **Step 4: Commit documentation**
 
 ```bash
 git add docs/ui-kit.md docs/README.md
 git commit -m "docs(ui-kit): record visual foundation"
 ```
 
-- [ ] **Step 5: Request an independent review before integration**
+- [x] **Step 5: Request an independent review before integration**
 
 Dispatch a reviewer subagent with the visual-language spec, this plan, and the full branch diff. Fix
 all actionable findings with focused tests, rerun the verification above, and repeat review until the

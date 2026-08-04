@@ -8,6 +8,19 @@
 
 **Tech Stack:** React 19, TypeScript, CSS Modules, UI Kit, Vitest, Testing Library, Ladle, pnpm workspace.
 
+## Статус выполнения
+
+План завершён: выполнены 5 задач и все 26 шагов. Основной диапазон —
+`237dcd9..20f9018`: голос агента (`237dcd9`), `ToolCall` (`778362c`), сводки сессии (`6569d50`),
+поверхность чата (`e9d67a0`) и документация (`20f9018`); поднятая поверхность композера вынесена в
+UI Kit отдельным `6bb05ab`. Полная проверка после последующего ревью зафиксирована в `docs/ui-kit.md`
+и коммитах `7557a88..49d0874` (тесты, typecheck, ESLint, Prettier, Ladle, web build, `git diff --check`).
+
+Каждый task и весь срез прошли независимое ревью без оставшихся findings. В Task 4 поднятая геометрия
+композера реализована через новый публичный примитив `RaisedSurface`, а не дублированием визуальных
+свойств в `.sessions-composer`: результат плана сохранён, а граница UI Kit стала строже. Это
+проверенное улучшение реализации, исходные требования плана ниже оставлены без переписывания.
+
 ## Global Constraints
 
 - Start from the completed and reviewed visual-foundation and shell/system-view slices.
@@ -54,7 +67,7 @@
 - Preserves: `MessageFeedProps`, `MessageProps`, `MarkdownProps`, and `StreamingTextProps`.
 - Produces: centred readable width, agent display/serif role, human body role, and machine code mono role.
 
-- [ ] **Step 1: Add failing typography-role tests**
+- [x] **Step 1: Add failing typography-role tests**
 
 In the stylesheet contract, require:
 
@@ -68,13 +81,13 @@ expect(streamingCss).toContain("font-family: var(--sovereign-font-family-display
 In `rendering.test.tsx`, render one human, agent, and service message and assert the unchanged
 `data-role` hooks and semantic `role="log"`/`aria-live` structure.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- rendering.test.tsx styles.test.ts`
 
 Expected: FAIL because all message bodies currently use the same body font and width.
 
-- [ ] **Step 3: Implement contextual message typography**
+- [x] **Step 3: Implement contextual message typography**
 
 Constrain the feed content to `--sovereign-reading-width` and centre it while keeping the scroll
 container full width. Agent message body uses display/Source Serif and reading line height; human
@@ -82,13 +95,13 @@ message uses body/Manrope and a compact raised surface; service rows stay body/M
 inherits the agent voice, but its `code`, `pre`, and technical table identifiers continue to use the
 existing `Code`/mono styles.
 
-- [ ] **Step 4: Run UI Kit message tests**
+- [x] **Step 4: Run UI Kit message tests**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- message-feed.test.ts rendering.test.tsx styles.test.ts`
 
 Expected: PASS, including unchanged stick-to-bottom behavior.
 
-- [ ] **Step 5: Commit the agent voice**
+- [x] **Step 5: Commit the agent voice**
 
 ```bash
 git add packages/ui-kit/src/components/message-feed.module.css packages/ui-kit/src/components/markdown.module.css packages/ui-kit/src/components/streaming-text.module.css packages/ui-kit/src/components/rendering.test.tsx packages/ui-kit/src/styles/styles.test.ts
@@ -111,7 +124,7 @@ git commit -m "style(ui-kit): add editorial agent voice"
 - Preserves optional output: `output?: string`, `outputLabel?: string`.
 - Produces a folded summary containing icon/type, technical name/summary, visible status, and duration.
 
-- [ ] **Step 1: Write failing primitive tests**
+- [x] **Step 1: Write failing primitive tests**
 
 Add:
 
@@ -137,13 +150,13 @@ expect(screen.getByText(/\"path\"/).closest("details")?.open).toBe(false);
 
 Keep and rerun the existing failure-without-unfolding and late-output tests.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- interactive-components.test.tsx`
 
 Expected: TypeScript/test FAIL because the optional summary fields do not exist.
 
-- [ ] **Step 3: Extend the primitive minimally**
+- [x] **Step 3: Extend the primitive minimally**
 
 Import `ReactNode`, add the three optional props, and render a summary grid:
 
@@ -165,12 +178,12 @@ Use mono for identity/duration/details, body font for translated status. Express
 both failure text and danger border; running with visible text and an accent marker; done with
 visible text and success/neutral semantics.
 
-- [ ] **Step 4: Update the canonical chat story**
+- [x] **Step 4: Update the canonical chat story**
 
 Show running, done with output, and failed tool calls between agent text blocks. Include a long path,
 multiline output, and all three status labels.
 
-- [ ] **Step 5: Run primitive verification**
+- [x] **Step 5: Run primitive verification**
 
 Run:
 
@@ -182,7 +195,7 @@ pnpm --filter @sovereign/ui-kit exec ladle build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit ToolCall evolution**
+- [x] **Step 6: Commit ToolCall evolution**
 
 ```bash
 git add packages/ui-kit/src/components/tool-call.tsx packages/ui-kit/src/components/tool-call.module.css packages/ui-kit/src/components/interactive-components.test.tsx packages/ui-kit/src/components/chat.stories.tsx
@@ -202,7 +215,7 @@ git commit -m "feat(ui-kit): refine tool execution blocks"
 - Preserves: session state shape and order.
 - Produces: stable human-readable summaries derived only from already available tool name/input/output.
 
-- [ ] **Step 1: Add failing session rendering tests**
+- [x] **Step 1: Add failing session rendering tests**
 
 Create persisted/live tool entries already supported by the state and assert:
 
@@ -215,13 +228,13 @@ expect(screen.getByText("Готово")).toBeTruthy();
 For an unknown tool/input shape, assert fallback to the tool name without throwing or inventing a
 summary. Keep the existing ordering and message-action tests in the same run.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- session-message-list.test.tsx`
 
 Expected: FAIL because the folded row exposes only the tool name/status.
 
-- [ ] **Step 3: Add a pure local summary helper**
+- [x] **Step 3: Add a pure local summary helper**
 
 Inside `session-message-list.tsx`, add:
 
@@ -233,18 +246,18 @@ Return a path/command only when the existing input is a record with a non-empty 
 `file`, or `command`, in that order. Return `undefined` otherwise. Do not add domain-specific parsing
 for tools not represented in the current data.
 
-- [ ] **Step 4: Pass the summary and stable icon**
+- [x] **Step 4: Pass the summary and stable icon**
 
 Use one neutral machine-work icon such as `◇` for now; status and failure remain textual. Do not
 invent duration because current events do not provide it.
 
-- [ ] **Step 5: Run session tests and typecheck**
+- [x] **Step 5: Run session tests and typecheck**
 
 Run: `pnpm --filter @sovereign/web test -- session-message-list.test.tsx state.test.ts && pnpm --filter @sovereign/web typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit integration**
+- [x] **Step 6: Commit integration**
 
 ```bash
 git add apps/web/src/sessions/session-message-list.tsx apps/web/src/sessions/session-message-list.test.tsx
@@ -263,7 +276,7 @@ git commit -m "feat(web): summarize session tool execution"
 - Preserves: composer props, controlled draft, submit/append/follow-up/steer modes, interrupt action, statistics, queues, and session actions.
 - Produces: chat with no enclosing card, compact metadata strips, readable feed, and elevated composer surface.
 
-- [ ] **Step 1: Write failing session-layout assertions**
+- [x] **Step 1: Write failing session-layout assertions**
 
 Replace the old card contract with:
 
@@ -291,21 +304,21 @@ it.each(sheets)("$name leaves visual-system properties to UI Kit", ({ styles }) 
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- styles.test.ts message-composer.test.tsx`
 
 Expected: FAIL because the entire chat is currently one bordered/radius panel and the composer is
 only a top strip.
 
-- [ ] **Step 3: Implement the session geometry**
+- [x] **Step 3: Implement the session geometry**
 
 Remove border/radius/panel background from `.sessions-chat`. Give metadata strips compact padding and
 subtle separators. Give `.sessions-composer` panel surface, one strong border, moderate radius,
 elevation 1, and an inline margin so it reads as the principal raised surface. Preserve wrapping and
 first-child flex behavior.
 
-- [ ] **Step 4: Run behavior and style verification**
+- [x] **Step 4: Run behavior and style verification**
 
 Run:
 
@@ -316,7 +329,7 @@ pnpm --filter @sovereign/web typecheck
 
 Expected: PASS with unchanged composer interactions.
 
-- [ ] **Step 5: Commit the session surface**
+- [x] **Step 5: Commit the session surface**
 
 ```bash
 git add apps/web/src/sessions/sessions.css apps/web/src/shell/styles.test.ts
@@ -335,12 +348,12 @@ git commit -m "style(web): focus the agent session surface"
 - Documents: voice/interface/machine typography in the real session, ToolCall summary contract, open feed, and elevated composer.
 - Produces: reviewed base for final application alignment.
 
-- [ ] **Step 1: Update durable chat documentation**
+- [x] **Step 1: Update durable chat documentation**
 
 Describe the visual/semantic roles without changing the already documented session data flow. Record
 why agent text is serif, why human text remains sans, and why technical blocks alone use mono.
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 Run:
 
@@ -358,14 +371,14 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 3: Commit documentation**
+- [x] **Step 3: Commit documentation**
 
 ```bash
 git add docs/ui-kit.md docs/README.md
 git commit -m "docs(chat): record refined agent session"
 ```
 
-- [ ] **Step 4: Request independent review**
+- [x] **Step 4: Request independent review**
 
 Dispatch a reviewer subagent with the spec, prerequisite slice commits, this plan, and the full diff.
 Fix findings with focused tests and repeat review until no findings remain.

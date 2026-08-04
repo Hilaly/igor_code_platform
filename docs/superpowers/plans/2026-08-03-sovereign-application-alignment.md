@@ -8,6 +8,14 @@
 
 **Tech Stack:** React 19, TypeScript, CSS, UI Kit, Vitest, Testing Library, Ladle, pnpm workspace.
 
+## Статус выполнения
+
+План завершён: выполнены 4 задачи и все 20 шагов. Прикладные изменения находятся в коммитах
+`a168701..3b1f554`, исходное завершение среза задокументировано в `f5557ec`, а замечания финального
+ревью закрыты в `7557a88..49d0874`. Live QA повторён после исправления тёмных контролов каталога;
+полная матрица `test`, `typecheck`, ESLint, Prettier, Ladle build, web build и `git diff --check`
+пройдена на итоговом дереве. Независимый scoped re-review не оставил открытых замечаний.
+
 ## Global Constraints
 
 - Start from the completed and reviewed first three visual-language slices.
@@ -58,25 +66,25 @@ its focused view tests.
 - Preserves: project search, creation, conflicts, archive/remove/rename, detail navigation, session count, agents/skills/resources, and loading/failure states.
 - Produces: one page heading, one compact toolbar, list rows for repeated projects/resources, and cards only for standalone create/conflict/detail objects.
 
-- [ ] **Step 1: Add failing semantic composition tests**
+- [x] **Step 1: Add failing semantic composition tests**
 
 Assert the active project list is one named list, each project remains one selectable row with a
 separate actions menu, archived projects remain inside their disclosure, and file resources are
 grouped by semantic section rather than nested unnamed panels. Keep all existing interaction tests.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- projects-view.test.tsx project-detail-view.test.tsx file-resources-panel.test.tsx`
 
 Expected: new structure assertions fail on panel-heavy markup; behavior tests stay green.
 
-- [ ] **Step 3: Flatten repeated project/resource structures**
+- [x] **Step 3: Flatten repeated project/resource structures**
 
 Remove the `Panel` around the ordinary project list unless the list itself is the only standalone
 object on the page; use a section label and dividers instead. Keep conflict/create surfaces bounded
 because they are temporary independent tasks. Apply the same rule to project detail resources.
 
-- [ ] **Step 4: Run project verification**
+- [x] **Step 4: Run project verification**
 
 Run:
 
@@ -87,7 +95,7 @@ pnpm --filter @sovereign/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit project alignment**
+- [x] **Step 5: Commit project alignment**
 
 ```bash
 git add apps/web/src/projects apps/web/src/shell/styles.test.ts
@@ -111,31 +119,31 @@ git commit -m "style(web): align project views"
 - Preserves: separate new-session route, project/agent/model/thinking selection, first prompt, archive grouping, restore/remove/open, direct archived chat, and all refusals.
 - Produces: readable page headings, compact form rhythm, flat archive group lists, and consistent states.
 
-- [ ] **Step 1: Add failing layout-semantic tests**
+- [x] **Step 1: Add failing layout-semantic tests**
 
 Require one form heading and one form region for new session; each archive project is a section with
 one heading and one list; loading/empty/error states keep the same accessible labels. Do not assert
 CSS hashes or visual text not supplied by translations.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- new-session-view.test.tsx archive-sessions-view.test.tsx session-route-view.test.tsx`
 
 Expected: new semantic-region assertions fail where wrappers are generic.
 
-- [ ] **Step 3: Implement compact form/list composition**
+- [x] **Step 3: Implement compact form/list composition**
 
 Use existing UI Kit `Form`, `Field`, `List`, `ListRow`, `Heading`, `Notice`, and state components.
 Keep the form width readable, tighten vertical rhythm, and use dividers rather than group cards in
 the archive. Do not change any form readiness or action flow.
 
-- [ ] **Step 4: Run session-page verification**
+- [x] **Step 4: Run session-page verification**
 
 Run: `pnpm --filter @sovereign/web test -- new-session-view.test.tsx archive-sessions-view.test.tsx session-route-view.test.tsx styles.test.ts && pnpm --filter @sovereign/web typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit session-page alignment**
+- [x] **Step 5: Commit session-page alignment**
 
 ```bash
 git add apps/web/src/sessions apps/web/src/shell/styles.test.ts
@@ -161,25 +169,25 @@ git commit -m "style(web): align session management pages"
 - Preserves: login submission, validation/failure, dialogs, notices, empty/loading states, and toast behavior.
 - Produces: one restrained standalone login surface and consistent flat shared states across all views.
 
-- [ ] **Step 1: Add failing canonical-state assertions**
+- [x] **Step 1: Add failing canonical-state assertions**
 
 In login tests, require one named form and unchanged failure alert. In Ladle, add one `SystemStates`
 story that renders loading, empty, danger notice, confirmation dialog trigger, and toast trigger on
 the page surface. Extend stylesheet tests to require plain semantic surfaces and no removed effects.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @sovereign/ui-kit test -- styles.test.ts rendering.test.tsx && pnpm --filter @sovereign/web test -- login-view.test.tsx styles.test.ts`
 
 Expected: FAIL on story/style contracts that still assume decorative panels/effects.
 
-- [ ] **Step 3: Align shared-state primitives**
+- [x] **Step 3: Align shared-state primitives**
 
 Use moderate radii, semantic borders, and elevation only where the state is actually overlaid. Keep
 the login form as one standalone bounded surface; do not add decorative background layers. Preserve
 focus traps, alert roles, toast live regions, and button behavior.
 
-- [ ] **Step 4: Run shared-state verification**
+- [x] **Step 4: Run shared-state verification**
 
 Run:
 
@@ -193,7 +201,7 @@ pnpm --filter @sovereign/ui-kit exec ladle build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit shared states**
+- [x] **Step 5: Commit shared states**
 
 ```bash
 git add apps/web/src/login packages/ui-kit/src/components packages/ui-kit/src/styles/styles.test.ts
@@ -213,19 +221,19 @@ git commit -m "style(ui-kit): align shared application states"
 - Documents: completed visual-language rollout and any measured deferrals.
 - Produces: branch ready for final independent review and integration.
 
-- [ ] **Step 1: Perform live visual QA before documenting completion**
+- [x] **Step 1: Perform live visual QA before documenting completion**
 
 Run the web app and Ladle. Check dark and light Imperium, Nord, OLED, and Sage at smaller/default/larger
 scale for: sidebar selection, settings, provider/plugin lists, session chat/tool blocks/composer,
 projects, new/archive sessions, login, dialogs, notices, and narrow containers. Record only real
 remaining defects in `docs/backlog.md`; do not write speculative polish tasks.
 
-- [ ] **Step 2: Update durable documentation**
+- [x] **Step 2: Update durable documentation**
 
 Rewrite any remaining obsolete card/glass/Unbounded descriptions in `docs/ui-kit.md`. State that the
 four-slice rollout is complete and link the spec plus all plans from `docs/README.md`.
 
-- [ ] **Step 3: Run full repository verification**
+- [x] **Step 3: Run full repository verification**
 
 Run:
 
@@ -241,14 +249,14 @@ git diff --check
 
 Expected: all commands exit 0 with no new warnings; build artifacts remain ignored and untracked.
 
-- [ ] **Step 4: Commit final documentation**
+- [x] **Step 4: Commit final documentation**
 
 ```bash
 git add docs/ui-kit.md docs/README.md docs/backlog.md
 git commit -m "docs(ui-kit): complete visual language rollout"
 ```
 
-- [ ] **Step 5: Request independent review and repeat until clean**
+- [x] **Step 5: Request independent review and repeat until clean**
 
 Dispatch a reviewer subagent with the original visual-language spec, all four plans, live-QA notes,
 and the complete diff from the pre-rollout base. Fix every actionable finding with a focused test,
