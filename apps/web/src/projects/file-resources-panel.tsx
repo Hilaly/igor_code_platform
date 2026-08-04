@@ -73,10 +73,7 @@ export function FileResourcesPanel({ state, translator }: FileResourcesPanelProp
         state.failure === undefined ? (
           <Spinner label={t("projects.resources.loading")} />
         ) : (
-          <Notice
-            tone="danger"
-            title={t("projects.resources.failed", { reason: state.failure })}
-          />
+          <Notice tone="danger" title={t("projects.resources.failed", { reason: state.failure })} />
         )
       ) : (
         <ResourcesContent state={state} translator={translator} />
@@ -120,10 +117,7 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
         {problems.length === 0 ? (
           <EmptyState title={t("projects.resources.problems.empty")} />
         ) : (
-          <ul
-            className="projects-list"
-            aria-label={t("projects.resources.problems.label")}
-          >
+          <ul className="projects-list" aria-label={t("projects.resources.problems.label")}>
             {problems.map((problem, index) => (
               <ProblemRow
                 key={`${problem.category}:${pathOf(problem)}:${String(index)}`}
