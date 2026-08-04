@@ -1,9 +1,10 @@
+import { convert, resolve } from "@asamuzakjp/css-color";
 import { interfaceScales } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
 import { paletteKeys, paletteVariants, type Palette } from "./palette.ts";
-import { deriveRoles, roleNames, rolePropertyName } from "./roles.ts";
+import { deriveRoles, roleNames, rolePropertyName, type RoleName } from "./roles.ts";
 import { resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
 import { imperiumScheme } from "./schemes/imperium.ts";
 import { shippedSchemes } from "./schemes/shipped.ts";
@@ -169,6 +170,92 @@ describe("contrast", () => {
     }
   });
 
+  const rolePairs = [
+    ["text", "pageSurface"],
+    ["textMuted", "pageSurface"],
+    ["textSubtle", "pageSurface"],
+    ["accentText", "pageSurface"],
+    ["dangerText", "pageSurface"],
+    ["warningText", "pageSurface"],
+    ["successText", "pageSurface"],
+    ["text", "panelSurface"],
+    ["textMuted", "panelSurface"],
+    ["textSubtle", "panelSurface"],
+    ["accentText", "panelSurface"],
+    ["dangerText", "panelSurface"],
+    ["text", "sunkenSurface"],
+    ["textMuted", "sunkenSurface"],
+    ["textSubtle", "sunkenSurface"],
+    ["text", "controlSurface"],
+    ["textMuted", "controlSurface"],
+    ["text", "controlSurfaceHover"],
+    ["textMuted", "controlSurfaceHover"],
+    ["accentText", "controlSurfaceHover"],
+    ["text", "fillSurface"],
+    ["textMuted", "fillSurface"],
+    ["text", "accentSurface"],
+    ["accentText", "accentSurface"],
+    ["dangerText", "dangerSurface"],
+    ["warningText", "warningSurface"],
+    ["successText", "successSurface"],
+    ["infoText", "infoSurface"],
+    ["textOnAccent", "accent"],
+    ["textOnAccent", "accentHover"],
+    ["textOnAccent", "accentStrong"],
+    ["textOnDanger", "danger"],
+  ] as const satisfies readonly (readonly [RoleName, RoleName])[];
+
+  it("keeps every consumed text role legible on its actual surface", () => {
+    const failures: string[] = [];
+
+    for (const scheme of shippedSchemes) {
+      for (const variant of paletteVariants) {
+        const roles = deriveRoles(scheme.variants[variant]);
+
+        for (const [text, background] of rolePairs) {
+          const ratio = contrastRatio(roles[text], roles[background]);
+
+          if (ratio < 4.5) {
+            failures.push(
+              `${scheme.id} ${variant}: ${text} on ${background} is ${ratio.toFixed(2)}:1`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
+  it("keeps the translucent Notice body legible after alpha composition", () => {
+    const noticePairs = [
+      ["infoText", "infoSurface"],
+      ["warningText", "warningSurface"],
+      ["dangerText", "dangerSurface"],
+    ] as const satisfies readonly (readonly [RoleName, RoleName])[];
+
+    const failures: string[] = [];
+
+    for (const scheme of shippedSchemes) {
+      for (const variant of paletteVariants) {
+        const roles = deriveRoles(scheme.variants[variant]);
+
+        for (const [text, background] of noticePairs) {
+          const translucentText = `color-mix(in srgb, ${resolvedColor(roles[text])} 82%, transparent)`;
+          const ratio = contrastRatio(translucentText, roles[background]);
+
+          if (ratio < 4.5) {
+            failures.push(
+              `${scheme.id} ${variant}: translucent ${text} on ${background} is ${ratio.toFixed(2)}:1`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
   it("covers the whole palette between the pairs and what is not text", () => {
     // Второй акцент здесь не проверяется намеренно: он служит смысловым меткам и надзаголовкам, а не
     // тексту на фоне, поэтому к нему неприменима эта проверка контраста текстовых пар.
@@ -195,18 +282,52 @@ describe("contrast", () => {
 });
 
 function contrastRatio(first: string, second: string): number {
-  const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort(
+  const background = rgbChannels(second);
+  const foreground = composite(rgbChannels(first), background);
+  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
     (left, right) => right - left,
   );
 
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
 
-/** WCAG 2.1, относительная яркость. Прозрачность в этих парах не участвует. */
-function relativeLuminance(color: string): number {
-  const channels = [1, 3, 5]
-    .map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255)
-    .map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+type Rgba = readonly [number, number, number, number];
+
+function resolvedColor(color: string): string {
+  const resolved = resolve(color);
+
+  expect(resolved, `CSS color must resolve: ${color}`).not.toBeNull();
+  return resolved ?? "";
+}
+
+function rgbChannels(color: string): Rgba {
+  const channels = convert.colorToRgb(resolvedColor(color));
+
+  expect(channels, `CSS color must convert to RGB: ${color}`).toHaveLength(4);
+  return [
+    (channels[0] ?? 0) / 255,
+    (channels[1] ?? 0) / 255,
+    (channels[2] ?? 0) / 255,
+    channels[3] ?? 1,
+  ];
+}
+
+function composite(foreground: Rgba, background: Rgba): Rgba {
+  const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+
+  return [
+    (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) / alpha,
+    (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) / alpha,
+    (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) / alpha,
+    alpha,
+  ];
+}
+
+/** WCAG 2.1 relative luminance from standards-aware, resolved sRGB channels. */
+function relativeLuminance(color: Rgba): number {
+  const channels = color
+    .slice(0, 3)
+    .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
 
   return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
 }

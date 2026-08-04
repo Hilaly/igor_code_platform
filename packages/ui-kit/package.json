@@ -26,6 +26,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@asamuzakjp/css-color": "6.0.5",
     "@ladle/react": "^5.0.5",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.0.0",

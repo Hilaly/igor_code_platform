@@ -85,9 +85,12 @@ export function deriveRoles(palette: Palette): Roles {
   /** Граница заливки: тот же цвет прозрачностью, поэтому она ложится на любую поверхность под ней. */
   const softBorder = (color: string): string => `color-mix(in oklab, ${color} 30%, transparent)`;
 
-  /** Цветной текст: уведён к основному, иначе на светлой поверхности он перестаёт читаться. */
+  /** Цветной текст: цвет остаётся различим, но основной текст даёт ему рабочий контраст. */
   const readableText = (color: string): string =>
-    `color-mix(in oklab, ${color} 78%, ${palette.ink} 22%)`;
+    `color-mix(in oklab, ${color} 25%, ${palette.ink} 75%)`;
+
+  /** Второстепенный текст чуть сдвинут к основному ради утопленной поверхности полей. */
+  const readableMuted = `color-mix(in oklab, ${palette.inkMuted} 96%, ${palette.ink} 4%)`;
 
   // Своего значения у «к сведению» в палитре нет: акцент, сведённый к второстепенному тексту.
   const info = `color-mix(in oklab, ${palette.accent} 55%, ${palette.inkMuted} 45%)`;
@@ -102,8 +105,8 @@ export function deriveRoles(palette: Palette): Roles {
     borderStrong: `color-mix(in oklab, ${palette.border} 65%, ${palette.inkMuted} 35%)`,
     borderSubtle: softBorder(palette.border),
     text: palette.ink,
-    textMuted: palette.inkMuted,
-    textSubtle: `color-mix(in oklab, ${palette.inkMuted} 70%, ${palette.surface} 30%)`,
+    textMuted: readableMuted,
+    textSubtle: readableMuted,
     textOnAccent: palette.accentInk,
     accent: palette.accent,
     accentHover: towardsInk(palette.accent, hoverShift),
