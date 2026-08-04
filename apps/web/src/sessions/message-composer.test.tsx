@@ -54,6 +54,17 @@ function ComposerHarness({
 }
 
 describe("the session message composer", () => {
+  it("uses the UI Kit raised surface as the composer boundary", () => {
+    const { container } = render(<ComposerHarness />);
+    const composer = container.querySelector(".sessions-composer");
+
+    expect(composer).not.toBeNull();
+    expect(composer?.parentElement?.className).toMatch(/surface/);
+    expect(
+      composer?.parentElement?.parentElement?.classList.contains("sessions-composer-surface"),
+    ).toBe(true);
+  });
+
   it("reports draft changes through its controlled interface", () => {
     render(<ComposerHarness />);
 

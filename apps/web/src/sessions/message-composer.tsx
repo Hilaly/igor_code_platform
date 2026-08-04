@@ -1,5 +1,11 @@
 import type { SessionMessage, SessionMessageMode } from "@sovereign/protocol";
-import { Button, SegmentedControl, Textarea, type ScopedTranslator } from "@sovereign/ui-kit";
+import {
+  Button,
+  RaisedSurface,
+  SegmentedControl,
+  Textarea,
+  type ScopedTranslator,
+} from "@sovereign/ui-kit";
 import { useState } from "react";
 
 export type MessageComposerProps = {
@@ -66,41 +72,45 @@ export function MessageComposer({
         </div>
       ) : undefined}
 
-      <div className="sessions-composer">
-        <Textarea
-          value={draft}
-          onChange={onDraftChange}
-          onSubmit={send}
-          placeholder={t("chat.compose.placeholder")}
-          aria-label={t("chat.compose.label")}
-          autoGrow
-          rows={2}
-          maxRows={12}
-          disabled={disabled}
-        />
-        <Button tone="accent" onClick={send} disabled={disabled || draft.trim() === ""}>
-          {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
-        </Button>
-        {!busy ? (
-          <Button
-            onClick={() => {
-              if (draft.trim() === "") {
-                return;
-              }
+      <div className="sessions-composer-surface">
+        <RaisedSurface>
+          <div className="sessions-composer">
+            <Textarea
+              value={draft}
+              onChange={onDraftChange}
+              onSubmit={send}
+              placeholder={t("chat.compose.placeholder")}
+              aria-label={t("chat.compose.label")}
+              autoGrow
+              rows={2}
+              maxRows={12}
+              disabled={disabled}
+            />
+            <Button tone="accent" onClick={send} disabled={disabled || draft.trim() === ""}>
+              {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
+            </Button>
+            {!busy ? (
+              <Button
+                onClick={() => {
+                  if (draft.trim() === "") {
+                    return;
+                  }
 
-              void onSendMessage({ text: draft, mode: "append" });
-              onDraftChange("");
-            }}
-            disabled={disabled || draft.trim() === ""}
-          >
-            {t("chat.append")}
-          </Button>
-        ) : undefined}
-        {busy ? (
-          <Button tone="danger" onClick={onInterrupt}>
-            {t("chat.stop")}
-          </Button>
-        ) : undefined}
+                  void onSendMessage({ text: draft, mode: "append" });
+                  onDraftChange("");
+                }}
+                disabled={disabled || draft.trim() === ""}
+              >
+                {t("chat.append")}
+              </Button>
+            ) : undefined}
+            {busy ? (
+              <Button tone="danger" onClick={onInterrupt}>
+                {t("chat.stop")}
+              </Button>
+            ) : undefined}
+          </div>
+        </RaisedSurface>
       </div>
     </>
   );

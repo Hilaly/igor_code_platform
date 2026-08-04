@@ -111,6 +111,14 @@ describe("the style sheets of the application", () => {
     expect(styles).not.toMatch(/\.sv-/);
   });
 
+  it.each(sheets)("$name leaves visual-system properties to UI Kit", ({ styles }) => {
+    expect(styles).not.toMatch(/\bfont-family\s*:/);
+    expect(styles).not.toMatch(/\bborder-radius\s*:/);
+    expect(styles).not.toMatch(/\bbox-shadow\s*:/);
+    expect(styles).not.toMatch(/(?:linear|radial|conic)-gradient\(/);
+    expect(styles).not.toMatch(/\bbackdrop-filter\s*:/);
+  });
+
   it("allows the shell page, sidebar tree, and direct chat to shrink or scroll", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
@@ -139,6 +147,19 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-height:\s*0;/s);
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
+  });
+
+  it("opens the chat and leaves composer elevation to UI Kit", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*background:\s*transparent;/s);
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*border:\s*none;/s);
+    expect(sessions).toMatch(
+      /\.sessions-composer-surface\s*\{[^}]*margin-inline:\s*var\(--sovereign-space-3\);/s,
+    );
+    expect(sessions).not.toMatch(
+      /\.sessions-composer(?:-surface)?\s*\{[^}]*(?:background|border(?:-radius)?|box-shadow)\s*:/s,
+    );
   });
 
   it("keeps settings split by their container and scrolls the active content", () => {

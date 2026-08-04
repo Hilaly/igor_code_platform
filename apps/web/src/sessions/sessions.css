@@ -44,9 +44,8 @@
   gap: var(--sovereign-space-3);
   min-height: 0;
   min-width: 0;
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  border-radius: var(--sovereign-radius-md);
-  background: var(--sovereign-panel-surface);
+  border: none;
+  background: transparent;
 }
 
 /*
@@ -59,8 +58,11 @@
   gap: var(--sovereign-space-2);
   flex-wrap: wrap;
   min-width: 0;
-  padding: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.sessions-composer-surface {
+  min-width: 0;
+  margin-inline: var(--sovereign-space-3);
 }
 
 .sessions-composer > :first-child {
@@ -130,8 +132,16 @@
   align-items: center;
   gap: var(--sovereign-space-2);
   padding-inline: var(--sovereign-space-3);
-  padding-block-start: var(--sovereign-space-2);
+  padding-block: var(--sovereign-space-1);
   flex-wrap: wrap;
+}
+
+.sessions-stats,
+.sessions-context,
+.sessions-queues,
+.sessions-modes,
+.sessions-session-actions {
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 /* Полоса заполнения тянется на свободное место: подписи по краям от неё читаются, а она — шкала. */
@@ -144,7 +154,6 @@
 .sessions-chat-head {
   justify-content: flex-end;
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  padding-block-end: var(--sovereign-space-2);
 }
 
 /*
