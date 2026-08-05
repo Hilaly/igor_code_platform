@@ -44,6 +44,7 @@ export const coreEnglish: CatalogRegistration = {
     "chat.compact.refused": "The context was not folded: {reason}",
     "chat.compact.title": "Fold the context of this session?",
     "chat.compaction": "The context was folded; {tokens} tokens went into it",
+    "chat.actions": "Message actions",
     "chat.copy": "Copy",
     "chat.copy.done": "Copied",
     "chat.copy.refused": "The message could not be copied: {reason}",

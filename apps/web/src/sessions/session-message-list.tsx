@@ -30,6 +30,7 @@ import {
   Tooltip,
   ToolCall,
   type ScopedTranslator,
+  type TooltipSide,
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -93,6 +94,7 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
   const [copiedEntryId, setCopiedEntryId] = useState<string | undefined>(undefined);
   const [copyRefusal, setCopyRefusal] = useState<string | undefined>(undefined);
   const copyConfirmationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const copyRequest = useRef(0);
   const outcomes = outcomesOf(open.entries);
   const activeEntries = open.entries.filter(({ id }) => open.branchEntryIds.has(id));
   const shown = activeEntries.filter(isFeedEntry);
@@ -130,20 +132,37 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
   };
 
   const copy = async (entryId: string, text: string): Promise<void> => {
+    const request = ++copyRequest.current;
+
     if (copyConfirmationTimer.current !== undefined) {
       clearTimeout(copyConfirmationTimer.current);
+      copyConfirmationTimer.current = undefined;
     }
 
+    setCopiedEntryId(undefined);
     setCopyRefusal(undefined);
 
     try {
       await navigator.clipboard.writeText(text);
+
+      if (copyRequest.current !== request) {
+        return;
+      }
+
       setCopiedEntryId(entryId);
       copyConfirmationTimer.current = setTimeout(() => {
+        if (copyRequest.current !== request) {
+          return;
+        }
+
         setCopiedEntryId(undefined);
         copyConfirmationTimer.current = undefined;
       }, 2000);
     } catch (cause) {
+      if (copyRequest.current !== request) {
+        return;
+      }
+
       setCopiedEntryId(undefined);
       setCopyRefusal(cause instanceof Error ? cause.message : String(cause));
     }
@@ -151,6 +170,8 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 
   useEffect(
     () => () => {
+      copyRequest.current += 1;
+
       if (copyConfirmationTimer.current !== undefined) {
         clearTimeout(copyConfirmationTimer.current);
       }
@@ -328,6 +349,7 @@ function EntryMessage(props: {
 
   const role = entry.role === "user" ? "human" : "agent";
   const shownTime = formatEntryTime(entry.time);
+  const hasEnabledAction = copying !== undefined || !forking.busy || marking?.busy === false;
 
   return (
     <div className="sessions-entry-message" data-role={role}>
@@ -342,13 +364,19 @@ function EntryMessage(props: {
           />
         ))}
       </Message>
-      <div className="sessions-entry-meta">
+      <div
+        className="sessions-entry-meta"
+        role="group"
+        aria-label={t("chat.actions")}
+        {...(hasEnabledAction ? {} : { tabIndex: 0 })}
+      >
         {shownTime === undefined ? undefined : <time dateTime={entry.time}>{shownTime}</time>}
         {copying === undefined ? undefined : (
           <MessageAction
             label={t(copying.copied ? "chat.copy.done" : "chat.copy")}
             disabled={false}
             onClick={copying.onCopy}
+            {...(role === "agent" ? { side: "right" as const } : {})}
           >
             <CopyIcon size="sm" />
           </MessageAction>
@@ -362,7 +390,16 @@ function EntryMessage(props: {
             <ForkBeforeIcon size="sm" />
           </MessageAction>
         )}
-        <MessageAction label={t("chat.fork.at")} disabled={forking.busy} onClick={forking.onForkAt}>
+        <MessageAction
+          label={t("chat.fork.at")}
+          disabled={forking.busy}
+          onClick={forking.onForkAt}
+          {...(role === "agent" && copying === undefined
+            ? { side: "right" as const }
+            : role === "human" && marking === undefined
+              ? { side: "left" as const }
+              : {})}
+        >
           <ForkThroughIcon size="sm" />
         </MessageAction>
         {marking === undefined ? undefined : (
@@ -378,6 +415,7 @@ function EntryMessage(props: {
               label={t("chat.label.clear")}
               disabled={marking.busy || label === undefined}
               onClick={marking.onClearLabel}
+              {...(role === "human" ? { side: "left" as const } : {})}
             >
               <ClearLabelIcon size="sm" />
             </MessageAction>
@@ -392,12 +430,13 @@ function MessageAction(props: {
   label: string;
   disabled: boolean;
   onClick: () => void;
+  side?: TooltipSide;
   children: ReactNode;
 }) {
-  const { label, disabled, onClick, children } = props;
+  const { label, disabled, onClick, side, children } = props;
 
   return (
-    <Tooltip content={label}>
+    <Tooltip content={label} {...(side === undefined ? {} : { side })}>
       <Button size="sm" iconOnly aria-label={label} disabled={disabled} onClick={onClick}>
         {children}
       </Button>

@@ -40,6 +40,7 @@ export const coreRussian: CatalogRegistration = {
     "chat.compact.refused": "Свернуть контекст не вышло: {reason}",
     "chat.compact.title": "Свернуть контекст этой сессии?",
     "chat.compaction": "Контекст свёрнут, в него ушло {tokens} токенов",
+    "chat.actions": "Действия сообщения",
     "chat.copy": "Копировать",
     "chat.copy.done": "Скопировано",
     "chat.copy.refused": "Скопировать не вышло: {reason}",
