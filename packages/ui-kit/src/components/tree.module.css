@@ -21,6 +21,7 @@
 .row {
   display: flex;
   grid-column: 1 / -1;
+  grid-row: 1;
   min-height: var(--sovereign-row-height-compact);
   align-items: center;
   gap: var(--sovereign-space-2);
@@ -131,5 +132,6 @@
 .children {
   display: flex;
   grid-column: 1 / -1;
+  grid-row: 2;
   flex-direction: column;
 }

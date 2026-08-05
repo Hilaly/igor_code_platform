@@ -98,7 +98,9 @@ describe("stylesheets of the kit", () => {
     expect(tree).toMatch(/\.item\s*\{[^}]*display:\s*grid;/s);
     expect(tree).toMatch(/\.node\s*\{[^}]*display:\s*contents;/s);
     expect(tree).toMatch(/\.actions\s*\{[^}]*grid-column:\s*2;/s);
+    expect(tree).toMatch(/\.row\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*grid-row:\s*1;/s);
     expect(tree).toMatch(/\.children\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
+    expect(tree).toMatch(/\.children\s*\{[^}]*grid-row:\s*2;/s);
     expect(tree).not.toMatch(/\.children\s*\{[^}]*padding-left:/s);
     expect(tree).toMatch(
       /\.indent\s*\{[^}]*flex:\s*0\s+0\s+var\(--sovereign-space-4\);/s,
