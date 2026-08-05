@@ -11,7 +11,10 @@ import type { OpenSession } from "./state.ts";
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const translator = createTranslator({
   locale: "ru",
@@ -325,5 +328,60 @@ describe("the session message list", () => {
     expect(screen.getByRole("button", { name: "Форк по эту запись" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Пометить запись" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Снять метку" })).toBeNull();
+  });
+
+  it("copies only the text blocks of the selected message", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const entry: SessionEntry = {
+      id: "m1",
+      time: "2026-07-29T00:00:00.000Z",
+      kind: "message",
+      role: "agent",
+      content: [
+        { kind: "text", text: "первая часть" },
+        { kind: "reasoning", text: "скрытая мысль" },
+        { kind: "tool-call", toolCallId: "tool-1", toolName: "read", input: {} },
+        { kind: "text", text: "вторая часть" },
+      ],
+    };
+
+    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Копировать" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("первая часть\n\nвторая часть"));
+    expect(screen.getByRole("button", { name: "Скопировано" })).toBeTruthy();
+  });
+
+  it("does not offer copying when a message has no text blocks", () => {
+    const entry: SessionEntry = {
+      id: "m1",
+      time: "2026-07-29T00:00:00.000Z",
+      kind: "message",
+      role: "agent",
+      content: [
+        { kind: "reasoning", text: "скрытая мысль" },
+        { kind: "tool-call", toolCallId: "tool-1", toolName: "read", input: {} },
+      ],
+    };
+
+    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }));
+
+    expect(screen.queryByRole("button", { name: "Копировать" })).toBeNull();
+  });
+
+  it("reports clipboard refusal without claiming that the text was copied", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const entry = message("m1", "не копируется");
+
+    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Копировать" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("denied"));
+    expect(screen.getByRole("button", { name: "Копировать" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Скопировано" })).toBeNull();
   });
 });
