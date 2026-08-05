@@ -5,9 +5,14 @@
  */
 
 import { Button } from "@sovereign/ui-kit";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import { clampPanelWidth, panelWidthLimits, type ShellLayout } from "./layout.ts";
+import {
+  clampPanelWidth,
+  maximumPanelWidth,
+  panelWidthLimits,
+  type ShellLayout,
+} from "./layout.ts";
 
 export type ShellTabDescription = {
   id: string;
@@ -48,16 +53,24 @@ export function Shell({
 }: ShellProps) {
   const open = tabs.find((tab) => tab.id === layout.openTab);
   const rightVisible = !rightUnavailable && !layout.rightHidden;
+  const viewportWidth = useViewportWidth();
+  const leftWidthBeforeRight = clampPanelWidth(
+    layout.leftWidth,
+    maximumPanelWidth(viewportWidth, rightVisible ? panelWidthLimits.minimum : undefined),
+  );
+  const rightMaximum = maximumPanelWidth(
+    viewportWidth,
+    layout.leftHidden ? undefined : leftWidthBeforeRight,
+  );
+  const rightWidth = clampPanelWidth(layout.rightWidth, rightMaximum);
+  const leftMaximum = maximumPanelWidth(viewportWidth, rightVisible ? rightWidth : undefined);
+  const leftWidth = clampPanelWidth(layout.leftWidth, leftMaximum);
 
   return (
     <div className="shell">
       {layout.leftHidden ? undefined : (
         <>
-          <nav
-            className="shell-left"
-            aria-label={labels.left}
-            style={{ width: `${layout.leftWidth}px` }}
-          >
+          <nav className="shell-left" aria-label={labels.left} style={{ width: `${leftWidth}px` }}>
             {/* Шапка панели: одна кнопка «скрыть», прижатая к правому краю. Заголовок навигации
                 приходит внутри `navigation` ниже, и совать кнопку в чужое содержимое не нужно. Стрелка
                 скрытия смотрит наружу — туда, куда панель свернётся. */}
@@ -77,7 +90,8 @@ export function Shell({
           </nav>
           <PanelResizer
             edge="left"
-            width={layout.leftWidth}
+            width={leftWidth}
+            maximum={leftMaximum}
             label={labels.left}
             onWidth={(leftWidth) => onLayoutChange({ ...layout, leftWidth })}
           />
@@ -122,14 +136,15 @@ export function Shell({
         <>
           <PanelResizer
             edge="right"
-            width={layout.rightWidth}
+            width={rightWidth}
+            maximum={rightMaximum}
             label={labels.right}
             onWidth={(rightWidth) => onLayoutChange({ ...layout, rightWidth })}
           />
           <aside
             className="shell-right"
             aria-label={labels.right}
-            style={{ width: `${layout.rightWidth}px` }}
+            style={{ width: `${rightWidth}px` }}
           >
             <div className="shell-right-head">
               <div className="shell-tabs" role="tablist">
@@ -175,6 +190,8 @@ type PanelResizerProps = {
   edge: "left" | "right";
   /** Текущая ширина панели. Пришедшая пропом, а не запомненная при нажатии — от неё же считает клавиатура. */
   width: number;
+  /** Максимум текущего окна: одинаков для жеста, клавиатуры и доступного диапазона. */
+  maximum: number;
   /** Имя панели: у самой границы подписи нет, а `aria-valuenow` без имени говорит только число. */
   label: string;
   onWidth: (width: number) => void;
@@ -189,7 +206,7 @@ type PanelResizerProps = {
  * складывался бы поверх состояния, которое уже устарело в момент нажатия, — панель дёргалась к стартовой
  * ширине на каждом кадре и не оставалась там, куда её потянули.
  */
-function PanelResizer({ edge, width, label, onWidth }: PanelResizerProps) {
+function PanelResizer({ edge, width, maximum, label, onWidth }: PanelResizerProps) {
   const sign = edge === "left" ? 1 : -1;
 
   return (
@@ -199,7 +216,7 @@ function PanelResizer({ edge, width, label, onWidth }: PanelResizerProps) {
       aria-orientation="vertical"
       aria-label={label}
       aria-valuemin={panelWidthLimits.minimum}
-      aria-valuemax={panelWidthLimits.maximum}
+      aria-valuemax={maximum}
       aria-valuenow={width}
       tabIndex={0}
       onPointerDown={(event) => {
@@ -214,7 +231,7 @@ function PanelResizer({ edge, width, label, onWidth }: PanelResizerProps) {
         // Слушает окно, а не сама граница: курсор во время протаскивания уходит с неё, и события
         // после этого приходят другому элементу.
         const move = (moved: PointerEvent): void => {
-          onWidth(clampPanelWidth(startWidth + (moved.clientX - startX) * sign));
+          onWidth(clampPanelWidth(startWidth + (moved.clientX - startX) * sign, maximum));
         };
         const drop = (): void => {
           window.removeEventListener("pointermove", move);
@@ -231,13 +248,26 @@ function PanelResizer({ edge, width, label, onWidth }: PanelResizerProps) {
       }}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
-          onWidth(clampPanelWidth(width - sign * 16));
+          onWidth(clampPanelWidth(width - sign * 16, maximum));
         }
 
         if (event.key === "ArrowRight") {
-          onWidth(clampPanelWidth(width + sign * 16));
+          onWidth(clampPanelWidth(width + sign * 16, maximum));
         }
       }}
     />
   );
+}
+
+function useViewportWidth(): number {
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+
+  useEffect(() => {
+    const update = (): void => setViewportWidth(window.innerWidth);
+
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return viewportWidth;
 }

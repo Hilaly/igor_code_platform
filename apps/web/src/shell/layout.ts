@@ -29,20 +29,36 @@ export const defaultLayout: ShellLayout = {
   rightHidden: true,
 };
 
-/** Пределы: панель, утянутую в ноль, из интерфейса уже не возвращается. */
-export const panelWidthLimits = { minimum: 180, maximum: 560 };
+/** Минимум: панель, утянутую в ноль, из интерфейса уже не возвращается. */
+export const panelWidthLimits = { minimum: 160 };
+export const shellCenterMinimumWidth = 320;
+export const shellResizerWidth = 5;
 
 export type LayoutStorage = {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
 };
 
-export function clampPanelWidth(width: number): number {
+export function maximumPanelWidth(viewportWidth: number, oppositePanelWidth = 0): number {
+  const visibleResizerCount = oppositePanelWidth > 0 ? 2 : 1;
+
+  return Math.max(
+    panelWidthLimits.minimum,
+    Math.floor(
+      viewportWidth -
+        oppositePanelWidth -
+        shellCenterMinimumWidth -
+        shellResizerWidth * visibleResizerCount,
+    ),
+  );
+}
+
+export function clampPanelWidth(width: number, maximum = Number.POSITIVE_INFINITY): number {
   if (!Number.isFinite(width)) {
     return defaultLayout.leftWidth;
   }
 
-  return Math.min(panelWidthLimits.maximum, Math.max(panelWidthLimits.minimum, Math.round(width)));
+  return Math.min(maximum, Math.max(panelWidthLimits.minimum, Math.round(width)));
 }
 
 /** Испорченная запись не роняет оболочку: раскладка — удобство, а не состояние предметной области. */

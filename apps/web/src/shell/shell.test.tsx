@@ -7,7 +7,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Shell, type ShellProps } from "./shell.tsx";
 import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
@@ -16,6 +16,10 @@ import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
   true;
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+});
 
 const labels = {
   left: "левая панель",
@@ -131,13 +135,58 @@ describe("PanelResizer", () => {
     });
   });
 
-  it("announces its range for a screen reader", () => {
-    show();
+  it("announces and applies the viewport maximum", () => {
+    const { onLayoutChange } = show();
     const left = screen.getByRole("separator", { name: "левая панель" });
 
     expect(left.getAttribute("aria-valuemin")).toBe(String(panelWidthLimits.minimum));
-    expect(left.getAttribute("aria-valuemax")).toBe(String(panelWidthLimits.maximum));
+    expect(left.getAttribute("aria-valuemax")).toBe("1115");
     expect(left.getAttribute("aria-valuenow")).toBe(String(defaultLayout.leftWidth));
+
+    drag(left, 100, [5000]);
+
+    expect(onLayoutChange).toHaveBeenLastCalledWith({ ...defaultLayout, leftWidth: 1115 });
+  });
+
+  it("subtracts the visible opposite panel from each maximum", () => {
+    show({ layout: rightVisible });
+
+    expect(
+      screen.getByRole("separator", { name: "левая панель" }).getAttribute("aria-valuemax"),
+    ).toBe("790");
+    expect(
+      screen.getByRole("separator", { name: "правая панель" }).getAttribute("aria-valuemax"),
+    ).toBe("850");
+  });
+
+  it("temporarily clamps rendered widths after a viewport resize", () => {
+    show({ layout: { ...defaultLayout, leftWidth: 900 } });
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    fireEvent(window, new Event("resize"));
+
+    expect(
+      screen.getByRole("navigation", { name: "левая панель" }).getAttribute("style"),
+    ).toContain("width: 475px");
+  });
+
+  it("shrinks the secondary panel first when both preferences exceed the viewport", () => {
+    show({
+      layout: { ...rightVisible, leftWidth: 900, rightWidth: 900 },
+    });
+
+    expect(
+      screen.getByRole("navigation", { name: "левая панель" }).getAttribute("style"),
+    ).toContain("width: 900px");
+    expect(
+      screen.getByRole("complementary", { name: "правая панель" }).getAttribute("style"),
+    ).toContain("width: 210px");
+    expect(
+      screen.getByRole("separator", { name: "левая панель" }).getAttribute("aria-valuemax"),
+    ).toBe("900");
+    expect(
+      screen.getByRole("separator", { name: "правая панель" }).getAttribute("aria-valuemax"),
+    ).toBe("210");
   });
 });
 
