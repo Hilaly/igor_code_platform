@@ -93,6 +93,16 @@ export function isInterceptingHookName(value: unknown): boolean {
 export type RuntimeHookRefusal = { contributionId: string; reason: string };
 
 /**
+ * Кому принадлежит сессия. Шов берёт это один раз на сессию: подписка плагина проекта не касается
+ * чужого проекта, а хук разрешения несёт сессию и папку — у события Pi их нет вовсе (docs/hooks.md).
+ */
+export type SessionHookContext = {
+  sessionId: string;
+  projectId: string;
+  folder: string;
+};
+
+/**
  * Шов подписок: сведение ответов живёт в ядре, а зовёт хуки этот пакет. Внедряется, потому что
  * граница пакетов запрещает знать о демоне, а собирать правила слияния во втором месте значило бы
  * иметь два ответа на один вопрос.
@@ -100,6 +110,11 @@ export type RuntimeHookRefusal = { contributionId: string; reason: string };
  * Нагрузка уходит непрозрачной: за её форму отвечает контракт Pi, и переписывать его здесь незачем.
  */
 export type RuntimeHookSeam = {
+  /** Шов сессии. Берётся при подъёме harness: контекст сессии от события к событию не меняется. */
+  for: (session: SessionHookContext) => SessionHookSeam;
+};
+
+export type SessionHookSeam = {
   /** Есть ли кого спрашивать. Без подписчиков рантайм не платит за вызов вовсе. */
   subscribed: (event: RuntimeHookName) => boolean;
   observe: (event: RuntimeHookName, payload: unknown) => void;
@@ -113,4 +128,12 @@ export type RuntimeHookSeam = {
     /** Критичный подписчик не ответил: турн обрывает рантайм, потому что способ обрыва его. */
     aborted?: RuntimeHookRefusal;
   }>;
+  /**
+   * Разрешение на вызов инструмента — хук платформы, а не событие Pi: у `tool_call` нет ни сессии, ни
+   * проекта, ни папки. Спрашивается рядом с `tool_call`, и отказы сводятся вместе (docs/hooks.md).
+   */
+  permission: (call: {
+    tool: string;
+    arguments: unknown;
+  }) => Promise<{ refusals: RuntimeHookRefusal[] }>;
 };

@@ -15,6 +15,7 @@
 import {
   coreEventTypes,
   pluginSourceRank,
+  projectOfPluginSource,
   type HookCriticality,
   type HookRefusal,
   type PluginSource,
@@ -51,6 +52,13 @@ export type HookSubscription = {
   invoke: (payload: unknown, timeoutMilliseconds: number) => Promise<HookAnswer>;
 };
 
+/**
+ * Кого спрашивают. Проект обязателен: подписка плагина, поставленного в папку проекта, не касается
+ * сессий чужого проекта — это то же правило применимости, по которому реестр разрешает вклады
+ * (docs/plugins.md).
+ */
+export type HookAudience = { projectId: string };
+
 /** Исход решающего хука. Разрешение — это пустой список, а не чей-то голос «за» (docs/hooks.md). */
 export type HookDecision = { refusals: HookRefusal[] };
 
@@ -73,18 +81,19 @@ export type HookDispatcher = {
   /** Возвращает снятие: подписка исчезает вместе с плагином, который её завёл. */
   register: (subscription: HookSubscription) => () => void;
   /** Есть ли кого спрашивать. Рантайм по этому решает, звать ли диспетчер вовсе. */
-  subscribed: (event: string) => boolean;
+  subscribed: (event: string, audience: HookAudience) => boolean;
   /**
    * Наблюдательный хук: ядро **не ждёт** ответа. Отсюда то, чего иначе не получить, — наблюдатель
    * плагина не задерживает возврат сессии в `idle` и не может уронить турн (docs/hooks.md).
    */
-  observe: (event: string, payload: unknown) => void;
+  observe: (event: string, payload: unknown, audience: HookAudience) => void;
   /** Решающий хук: опрашиваются все, отказы собираются списком. */
-  decide: (event: string, payload: unknown) => Promise<HookDecision>;
+  decide: (event: string, payload: unknown, audience: HookAudience) => Promise<HookDecision>;
   /** Перезаписывающий хук: цепочка, где каждый видит нагрузку в том виде, в каком её оставил предыдущий. */
   rewrite: <Payload extends object>(
     event: string,
     payload: Payload,
+    audience: HookAudience,
   ) => Promise<HookRewrite<Payload>>;
 };
 
@@ -100,8 +109,10 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
   const { logger, bus } = options;
   const subscriptions = new Set<HookSubscription>();
 
-  const forEvent = (event: string): HookSubscription[] =>
-    [...subscriptions].filter((subscription) => subscription.event === event).sort(byRankThenId);
+  const forEvent = (event: string, audience: HookAudience): HookSubscription[] =>
+    [...subscriptions]
+      .filter((subscription) => subscription.event === event && applies(subscription, audience))
+      .sort(byRankThenId);
 
   const reportTimeout = (
     subscription: HookSubscription,
@@ -153,11 +164,11 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
 
       return () => subscriptions.delete(subscription);
     },
-    subscribed: (event) => forEvent(event).length > 0,
-    observe: (event, payload) => {
+    subscribed: (event, audience) => forEvent(event, audience).length > 0,
+    observe: (event, payload, audience) => {
       const timeoutMilliseconds = options.timeoutMilliseconds();
 
-      for (const subscription of forEvent(event)) {
+      for (const subscription of forEvent(event, audience)) {
         // Ответ никого не интересует, а вот сбой интересует: наблюдатель, который падает молча,
         // выглядит как наблюдатель, которого не звали.
         void ask(subscription, payload, timeoutMilliseconds).then((answer) => {
@@ -167,9 +178,9 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
         });
       }
     },
-    decide: async (event, payload) => {
+    decide: async (event, payload, audience) => {
       const timeoutMilliseconds = options.timeoutMilliseconds();
-      const asked = forEvent(event);
+      const asked = forEvent(event, audience);
       // Опрашиваются все и одновременно: последовательный опрос складывал бы ожидания подписчиков.
       const answers = await Promise.all(
         asked.map((subscription) => ask(subscription, payload, timeoutMilliseconds)),
@@ -208,12 +219,12 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
 
       return { refusals };
     },
-    rewrite: async (event, payload) => {
+    rewrite: async (event, payload, audience) => {
       const timeoutMilliseconds = options.timeoutMilliseconds();
       let current = payload;
       let patch: Record<string, unknown> | undefined;
 
-      for (const subscription of forEvent(event)) {
+      for (const subscription of forEvent(event, audience)) {
         const answer = await ask(subscription, current, timeoutMilliseconds);
 
         if (answer.kind === "timed-out") {
@@ -264,6 +275,16 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
       return { payload: current, patch };
     },
   };
+}
+
+/**
+ * Подписка плагина проекта применима только к сессиям своего проекта. Непроектный источник —
+ * встроенный и папка данных — применим ко всем: это та же применимость, что у остальных вкладов.
+ */
+function applies(subscription: HookSubscription, audience: HookAudience): boolean {
+  const project = projectOfPluginSource(subscription.source);
+
+  return project === undefined || project === audience.projectId;
 }
 
 /** Порядок цепочки: ранг источника, затем идентификатор вклада (docs/hooks.md). */

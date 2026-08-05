@@ -15,7 +15,12 @@ import {
   type AgentSessionStore,
   type CompactionTuning,
 } from "./agent-session.ts";
-import type { RuntimeHookName, RuntimeHookSeam } from "./hook-events.ts";
+import type {
+  RuntimeHookName,
+  RuntimeHookSeam,
+  SessionHookContext,
+  SessionHookSeam,
+} from "./hook-events.ts";
 import { scriptedModelProvider, type ScriptedTurn } from "./testing.ts";
 
 const folders: string[] = [];
@@ -1123,35 +1128,55 @@ function hookSeam(answers: {
   rewrite?: (
     event: RuntimeHookName,
     payload: object,
-  ) => Awaited<ReturnType<RuntimeHookSeam["rewrite"]>>;
+  ) => Awaited<ReturnType<SessionHookSeam["rewrite"]>>;
   decide?: (
     event: RuntimeHookName,
     payload: unknown,
-  ) => Awaited<ReturnType<RuntimeHookSeam["decide"]>>;
+  ) => Awaited<ReturnType<SessionHookSeam["decide"]>>;
+  permission?: (call: {
+    tool: string;
+    arguments: unknown;
+  }) => Awaited<ReturnType<SessionHookSeam["permission"]>>;
 }) {
   const observed: { event: RuntimeHookName; payload: unknown }[] = [];
   const rewritten: { event: RuntimeHookName; payload: object }[] = [];
   const decided: { event: RuntimeHookName; payload: unknown }[] = [];
+  const asked: { tool: string; arguments: unknown }[] = [];
+  const sessions: SessionHookContext[] = [];
   const subscribed = new Set(answers.events ?? []);
 
   return {
     observed,
     rewritten,
     decided,
+    asked,
+    /** Контексты, с которыми шов спрашивали: по ним видно, что он берётся один раз на сессию. */
+    sessions,
     seam: {
-      subscribed: (event) => subscribed.has(event),
-      observe: (event, payload) => {
-        observed.push({ event, payload });
-      },
-      rewrite: async (event, payload) => {
-        rewritten.push({ event, payload });
+      for: (session) => {
+        sessions.push(session);
 
-        return answers.rewrite?.(event, payload) ?? { patch: undefined };
-      },
-      decide: async (event, payload) => {
-        decided.push({ event, payload });
+        return {
+          subscribed: (event) => subscribed.has(event),
+          observe: (event, payload) => {
+            observed.push({ event, payload });
+          },
+          rewrite: async (event, payload) => {
+            rewritten.push({ event, payload });
 
-        return answers.decide?.(event, payload) ?? { refusals: [] };
+            return answers.rewrite?.(event, payload) ?? { patch: undefined };
+          },
+          decide: async (event, payload) => {
+            decided.push({ event, payload });
+
+            return answers.decide?.(event, payload) ?? { refusals: [] };
+          },
+          permission: async (call) => {
+            asked.push(call);
+
+            return answers.permission?.(call) ?? { refusals: [] };
+          },
+        };
       },
     } satisfies RuntimeHookSeam,
   };
@@ -1263,11 +1288,11 @@ describe("the seam of hook subscriptions", () => {
   it("blocks a tool call the deciding subscribers refused, naming every author", async () => {
     const hooks = hookSeam({
       events: ["tool_call"],
-      decide: () => ({
-        refusals: [
-          { contributionId: "guard.paths", reason: "чужая папка" },
-          { contributionId: "guard.hours", reason: "нерабочее время" },
-        ],
+      decide: () => ({ refusals: [{ contributionId: "guard.paths", reason: "чужая папка" }] }),
+      // Хук платформы спрашивается рядом с событием Pi: у события нет ни сессии, ни папки, а отказы
+      // сводятся вместе (docs/hooks.md).
+      permission: () => ({
+        refusals: [{ contributionId: "guard.hours", reason: "нерабочее время" }],
       }),
     });
     const { open } = await withStore(
@@ -1285,9 +1310,8 @@ describe("the seam of hook subscriptions", () => {
     await session.prompt("прочитай", "t1");
 
     // Причина одна, авторов столько, сколько отказало: инструмент запретили вместе.
-    const said = JSON.stringify(hooks.decided);
-
-    assert.match(said, /"toolName":"read"/);
+    assert.match(JSON.stringify(hooks.decided), /"toolName":"read"/);
+    assert.deepEqual(hooks.asked, [{ tool: "read", arguments: { path: "/etc/hosts" } }]);
 
     const entries = (await session.entries()).entries;
     const results = JSON.stringify(entries);
@@ -1321,6 +1345,28 @@ describe("the seam of hook subscriptions", () => {
 
     // Сигнал отмены границу воркера не переживает, поэтому в нагрузке его нет вовсе.
     assert.equal("signal" in (asked?.payload ?? {}), false);
+    await session.close();
+  });
+
+  it("takes the seam of the session once, with the session, the project and the folder", async () => {
+    const hooks = hookSeam({});
+    const { open, folder } = await withStore(
+      [{ text: "первый" }, { text: "второй" }],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    await session.prompt("раз", "t1");
+    await session.prompt("два", "t2");
+
+    // Контекст сессии от события к событию не меняется, а `message_update` публикуется на каждую
+    // дельту стриминга: спрашивать шов на каждое событие значило бы платить за это на горячем пути.
+    assert.deepEqual(hooks.sessions, [
+      { sessionId: session.summary().id, projectId: "p1", folder },
+    ]);
     await session.close();
   });
 });

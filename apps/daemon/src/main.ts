@@ -47,6 +47,7 @@ import {
   pluginsRoute,
   projectPluginRoots,
   standaloneResourceRoots,
+  createPluginHooks,
   pluginToolSource,
   type PluginRoot,
   type PluginSessions,
@@ -57,6 +58,8 @@ import { createProjectStore } from "./projects/public.ts";
 import { createProjectLifecycle } from "./projects/public.ts";
 import {
   coreToolSource,
+  createHookDispatcher,
+  createRuntimeHookSeam,
   createSessionService,
   createToolCollector,
   createTurnQueue,
@@ -245,6 +248,23 @@ const plugins = createPluginSupervisor({
   onPluginGone: pluginProviders.remove,
 });
 
+/**
+ * Сведение ответов подписчиков живёт в области сессий, а наполняет реестр подписок область плагинов
+ * (docs/hooks.md). Таймаут читается живьём, как остальные ключи `config.json`.
+ */
+const hookDispatcher = createHookDispatcher({
+  logger,
+  bus,
+  timeoutMilliseconds: () => settings.current().config.hookTimeoutMilliseconds,
+});
+
+const pluginHooks = createPluginHooks({
+  registry: contributions,
+  plugins,
+  dispatcher: hookDispatcher,
+  timeoutMilliseconds: () => settings.current().config.hookTimeoutMilliseconds,
+});
+
 const pluginWatcher = createPluginWatcher({
   roots: pluginRoots(),
   logger,
@@ -273,6 +293,10 @@ const applyPlugins = (changedDirectories: ChangedPluginDirectory[] = []): Promis
 
       await plugins.apply(discoverPlugins(roots), settings.current().preferences);
       await plugins.reload(changedDirectories);
+
+      // Подписки сверяются с реестром там же, где он меняется: список подписчиков не имеет права
+      // разойтись с действующим набором вкладов (docs/hooks.md).
+      pluginHooks.sync();
     })
     .catch((cause: unknown) => {
       logger.error("applying the plugin state failed", {
@@ -345,6 +369,7 @@ const sessions = createSessionService({
       reserveTokens: settings.current().config.compactionReserveTokens,
       keepRecentTokens: settings.current().config.compactionKeepRecentTokens,
     }),
+    hooks: createRuntimeHookSeam(hookDispatcher),
   }),
   projects,
   contributions: {

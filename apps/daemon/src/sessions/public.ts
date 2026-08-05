@@ -2,9 +2,11 @@ export { coreToolSource } from "./core-tools.ts";
 export {
   createHookDispatcher,
   type HookAnswer,
+  type HookAudience,
   type HookDispatcher,
   type HookSubscription,
 } from "./hook-dispatch.ts";
+export { createRuntimeHookSeam, permissionHookName } from "./runtime-hook-seam.ts";
 export {
   createSessionService,
   type SessionService,

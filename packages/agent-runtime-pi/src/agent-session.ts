@@ -658,6 +658,16 @@ function liveSession(
     },
   });
 
+  /**
+   * Шов сессии берётся один раз: контекст сессии от события к событию не меняется, а спрашивать его
+   * на каждое событие означало бы платить за это на горячем пути `message_update`.
+   */
+  const hooks = seams.hooks?.for({
+    sessionId: summary.id,
+    projectId: summary.projectId,
+    folder: summary.folder,
+  });
+
   const listeners = new Set<(delta: SessionDelta) => void>();
   const publish = (delta: SessionDelta): void => {
     for (const listener of [...listeners]) {
@@ -697,8 +707,6 @@ function liveSession(
     received: Extract<AgentHarnessEvent, { type: Name }>,
     ours?: object,
   ): Promise<AgentHarnessEventResultMap[Name]> => {
-    const hooks = seams.hooks;
-
     if (hooks === undefined || !hooks.subscribed(event)) {
       return answered<Name>(ours);
     }
@@ -725,7 +733,7 @@ function liveSession(
     // и как вмешательство (docs/hooks.md). `AbortSignal` среди наблюдательных не встречается — он
     // есть только у двух перезаписывающих, — поэтому нагрузка уезжает как есть.
     if (runtimeHookKinds[event.type] === "observing") {
-      seams.hooks?.observe(event.type, event);
+      hooks?.observe(event.type, event);
     }
 
     if (event.type === "queue_update") {
@@ -796,19 +804,23 @@ function liveSession(
    * важно не меньше, чем почему (docs/hooks.md).
    */
   harness.on("tool_call", async (event) => {
-    const hooks = seams.hooks;
-
-    if (hooks === undefined || !hooks.subscribed("tool_call")) {
+    if (hooks === undefined) {
       return undefined;
     }
 
-    const decision = await hooks.decide("tool_call", event);
+    // Два решающих хука на одно действие: событие Pi и хук платформы со своей нагрузкой. Спрашиваются
+    // одновременно, а отказы сводятся вместе — запретили вызов, и авторов может быть несколько.
+    const [byEvent, byPermission] = await Promise.all([
+      hooks.subscribed("tool_call") ? hooks.decide("tool_call", event) : { refusals: [] },
+      hooks.permission({ tool: event.toolName, arguments: event.input }),
+    ]);
+    const refusals = [...byEvent.refusals, ...byPermission.refusals];
 
-    if (decision.refusals.length === 0) {
+    if (refusals.length === 0) {
       return undefined;
     }
 
-    return { block: true, reason: refusalText(decision.refusals) };
+    return { block: true, reason: refusalText(refusals) };
   });
 
   return {
