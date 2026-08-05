@@ -16,7 +16,6 @@ import {
   List,
   ListRow,
   Notice,
-  RaisedSurface,
   Spinner,
   Text,
   Toggle,
@@ -105,11 +104,15 @@ export function PluginDetailView({
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
       </div>
 
-      <RaisedSurface>
+      <div className="plugin-detail-surface">
         <header className="plugin-detail-header">
           <div className="plugin-detail-hero">
             <div>
-              <Heading level={headingLevel}>{status.id ?? status.key}</Heading>
+              {headingLevel === 1 ? (
+                <Heading level={headingLevel}>{status.id ?? status.key}</Heading>
+              ) : (
+                <Text>{status.id ?? status.key}</Text>
+              )}
               <Code>{status.key}</Code>
             </div>
             <Text tone="muted">{t("plugins.detail.enabled")}</Text>
@@ -126,7 +129,7 @@ export function PluginDetailView({
             {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
           />
         </header>
-      </RaisedSurface>
+      </div>
 
       <section className="plugin-detail-section" aria-labelledby="plugin-detail-plugin">
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>

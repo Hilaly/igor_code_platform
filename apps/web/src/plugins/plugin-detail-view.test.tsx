@@ -76,7 +76,7 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
     />,
   );
 
-  expect(screen.getByRole("heading", { name: "example" })).toBeTruthy();
+  expect(screen.getByText("example")).toBeTruthy();
   expect(screen.getByText("Running")).toBeTruthy();
   expect(screen.getByText("/plugins/example")).toBeTruthy();
   expect(screen.getByText("bad contribution")).toBeTruthy();
@@ -94,6 +94,21 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(screen.getByText(/"type": "object"/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Back to plugins" }));
   expect(onBack).toHaveBeenCalled();
+});
+
+it("does not add a nested page heading when embedded under Settings", () => {
+  render(
+    <PluginDetailView
+      headingLevel={2}
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.queryByRole("heading", { name: "example" })).toBeNull();
 });
 
 it("shows a not-found state for an unknown plugin key", () => {

@@ -31,7 +31,7 @@ const project: Project = {
 };
 
 describe("ProjectDetailView", () => {
-  it("uses the requested heading level when embedded under another page heading", () => {
+  it("does not add a page heading when embedded under Settings", () => {
     render(
       <ProjectDetailView
         project={project}
@@ -43,8 +43,7 @@ describe("ProjectDetailView", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { level: 2, name: "Alpha" })).toBeDefined();
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Alpha" })).toBeNull();
   });
 
   it("shows the project summary and resources without a duplicated session list", () => {
@@ -59,7 +58,7 @@ describe("ProjectDetailView", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Alpha" })).toBeDefined();
+    expect(screen.getByText("Alpha")).toBeDefined();
     expect(screen.getByText("/code/alpha")).toBeDefined();
     expect(screen.getByText("Сессий: 3")).toBeDefined();
     expect(screen.queryByText("Список сессий проекта")).toBeNull();
@@ -77,9 +76,9 @@ describe("ProjectDetailView", () => {
       />,
     );
 
-    const heading = screen.getByRole("heading", { level: 1, name: "Alpha" });
+    const heading = screen.getByText("Alpha");
     const toolbar = screen.getByRole("toolbar", { name: "Проекты" });
-    const detail = heading.closest("section");
+    const detail = heading.closest("div");
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(detail).not.toBeNull();

@@ -59,12 +59,10 @@
   gap: var(--sovereign-space-3);
 }
 
-.plugin-detail-header h2 {
-  margin: 0 0 var(--sovereign-space-1);
-}
-
-.plugin-detail-header h1 {
-  margin: 0 0 var(--sovereign-space-1);
+.plugin-detail-surface,
+.project-detail-surface {
+  padding-block: var(--sovereign-space-3);
+  border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .plugin-detail-section {
