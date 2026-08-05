@@ -98,7 +98,9 @@ export function PluginDetailView({
 
   return (
     <div className="plugin-detail">
-      <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
+      <div className="plugin-detail-back">
+        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
+      </div>
 
       <header className="plugin-detail-header">
         <div>

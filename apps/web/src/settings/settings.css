@@ -87,7 +87,7 @@
   margin: 0;
 }
 
-.plugin-detail > .button {
+.plugin-detail-back {
   align-self: flex-start;
 }
 
@@ -117,8 +117,8 @@
 }
 
 .plugin-detail-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
