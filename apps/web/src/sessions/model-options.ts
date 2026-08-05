@@ -13,6 +13,25 @@ const referenceOption = (reference: string): ModelPickerOption => ({
   label: reference,
 });
 
+function modelOptions(providerId: string, entry: ModelsEntry | undefined): ModelPickerOption[] {
+  return entry?.kind === "ready"
+    ? entry.models.map((model) => ({
+        value: modelReference(providerId, model.id),
+        label: modelReference(providerId, model.id),
+        description: model.name,
+      }))
+    : [];
+}
+
+function modelGroupState(
+  entry: ModelsEntry | undefined,
+): Pick<ModelPickerGroup, "loading" | "failureReason"> {
+  return {
+    loading: entry?.kind === "loading",
+    failureReason: entry?.kind === "failed" ? entry.reason : undefined,
+  };
+}
+
 export function modelPickerGroups(
   providers: ProviderSummary[] | undefined,
   models: Record<string, ModelsEntry>,
@@ -22,14 +41,7 @@ export function modelPickerGroups(
     selectedReference === undefined ? undefined : parseModelReference(selectedReference);
   const groups = (providers ?? []).map((provider): ModelPickerGroup => {
     const entry = models[provider.id];
-    const options: ModelPickerOption[] =
-      entry?.kind === "ready"
-        ? entry.models.map((model) => ({
-            value: modelReference(provider.id, model.id),
-            label: modelReference(provider.id, model.id),
-            description: model.name,
-          }))
-        : [];
+    const options = modelOptions(provider.id, entry);
 
     if (
       selectedReference !== undefined &&
@@ -42,8 +54,7 @@ export function modelPickerGroups(
     return {
       id: provider.id,
       label: provider.name,
-      loading: entry?.kind === "loading",
-      failureReason: entry?.kind === "failed" ? entry.reason : undefined,
+      ...modelGroupState(entry),
       options,
     };
   });
@@ -53,12 +64,16 @@ export function modelPickerGroups(
     selected !== undefined &&
     !groups.some((group) => group.id === selected.providerId)
   ) {
+    const entry = models[selected.providerId];
+    const options = modelOptions(selected.providerId, entry);
+
     groups.push({
       id: selected.providerId,
       label: selected.providerId,
-      loading: false,
-      failureReason: undefined,
-      options: [referenceOption(selectedReference)],
+      ...modelGroupState(entry),
+      options: options.some((option) => option.value === selectedReference)
+        ? options
+        : [...options, referenceOption(selectedReference)],
     });
   }
 

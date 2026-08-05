@@ -67,7 +67,7 @@ describe("SessionUsage", () => {
     expect(within(contextGroup).getByText("800 / 1000 · 80%")).toBeTruthy();
     expect(within(contextGroup).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("80");
     expect(within(tokensGroup).getByText("700")).toBeTruthy();
-    expect(within(costGroup).getByText("0.1234")).toBeTruthy();
+    expect(within(costGroup).getByText("$0.1234")).toBeTruthy();
   });
 
   it("shows unavailable values as a dash", () => {

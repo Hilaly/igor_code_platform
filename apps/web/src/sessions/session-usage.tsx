@@ -68,7 +68,7 @@ export function SessionUsage({ stats, context, translator }: SessionUsageProps):
 
       <div className="sessions-usage-stat" role="group" aria-label={t("chat.stats.cost.label")}>
         <Text tone="muted">{t("chat.stats.cost.label")}</Text>
-        <Text tone="muted">{stats === undefined ? "—" : stats.costTotal.toFixed(4)}</Text>
+        <Text tone="muted">{stats === undefined ? "—" : `$${stats.costTotal.toFixed(4)}`}</Text>
       </div>
     </div>
   );

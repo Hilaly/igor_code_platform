@@ -82,4 +82,66 @@ describe("session model options", () => {
     ]);
     expect(selectedModel("retired/model-v1", {})).toBeUndefined();
   });
+
+  it("preserves loading state for a selected provider missing from the provider list", () => {
+    expect(modelPickerGroups([], { retired: { kind: "loading" } }, "retired/model-v1")).toEqual([
+      {
+        id: "retired",
+        label: "retired",
+        loading: true,
+        failureReason: undefined,
+        options: [{ value: "retired/model-v1", label: "retired/model-v1" }],
+      },
+    ]);
+  });
+
+  it("preserves failure state for a selected provider missing from the provider list", () => {
+    expect(
+      modelPickerGroups(
+        [],
+        { retired: { kind: "failed", reason: "catalog unavailable" } },
+        "retired/model-v1",
+      ),
+    ).toEqual([
+      {
+        id: "retired",
+        label: "retired",
+        loading: false,
+        failureReason: "catalog unavailable",
+        options: [{ value: "retired/model-v1", label: "retired/model-v1" }],
+      },
+    ]);
+  });
+
+  it("uses a ready catalogue for a selected provider missing from the provider list", () => {
+    const retiredModel: ModelSummary = {
+      ...opus,
+      providerId: "retired",
+      id: "model-v2",
+      name: "Model V2",
+    };
+
+    expect(
+      modelPickerGroups(
+        [],
+        { retired: { kind: "ready", models: [retiredModel] } },
+        "retired/model-v1",
+      ),
+    ).toEqual([
+      {
+        id: "retired",
+        label: "retired",
+        loading: false,
+        failureReason: undefined,
+        options: [
+          {
+            value: "retired/model-v2",
+            label: "retired/model-v2",
+            description: "Model V2",
+          },
+          { value: "retired/model-v1", label: "retired/model-v1" },
+        ],
+      },
+    ]);
+  });
 });
