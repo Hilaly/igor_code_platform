@@ -17,6 +17,13 @@ import { Field } from "./field.tsx";
 import { FilePicker } from "./file-picker.tsx";
 import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
+import {
+  ClearLabelIcon,
+  CopyIcon,
+  ForkBeforeIcon,
+  ForkThroughIcon,
+  SetLabelIcon,
+} from "./icons.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
 import { Message, MessageFeed } from "./message-feed.tsx";
@@ -28,6 +35,22 @@ import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
+    const markup = renderToStaticMarkup(
+      <>
+        <CopyIcon size="sm" />
+        <ForkBeforeIcon />
+        <ForkThroughIcon />
+        <SetLabelIcon />
+        <ClearLabelIcon />
+      </>,
+    );
+
+    expect(markup.match(/<svg/g)).toHaveLength(5);
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).not.toContain("undefined");
+  });
+
   it("raised surface preserves its content without inventing a document section", () => {
     const markup = renderToStaticMarkup(
       <RaisedSurface>

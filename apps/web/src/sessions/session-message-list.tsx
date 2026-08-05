@@ -10,23 +10,29 @@ import type { SessionContentBlock, SessionEntry, SessionForkRequest } from "@sov
 import {
   Badge,
   Button,
+  ClearLabelIcon,
+  CopyIcon,
   Dialog,
   Disclosure,
   EmptyState,
   Field,
+  ForkBeforeIcon,
+  ForkThroughIcon,
   Input,
   Markdown,
-  Menu,
   Message,
   MessageFeed,
   Notice,
+  SetLabelIcon,
   Spinner,
   StreamingText,
   Text,
+  Tooltip,
   ToolCall,
   type ScopedTranslator,
+  type TooltipSide,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 
@@ -85,6 +91,10 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
   const [labelling, setLabelling] = useState<{ entryId: string; label: string } | undefined>(
     undefined,
   );
+  const [copiedEntryId, setCopiedEntryId] = useState<string | undefined>(undefined);
+  const [copyRefusal, setCopyRefusal] = useState<string | undefined>(undefined);
+  const copyConfirmationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const copyRequest = useRef(0);
   const outcomes = outcomesOf(open.entries);
   const activeEntries = open.entries.filter(({ id }) => open.branchEntryIds.has(id));
   const shown = activeEntries.filter(isFeedEntry);
@@ -121,10 +131,61 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
     onLabelRefusalChange(reason);
   };
 
+  const copy = async (entryId: string, text: string): Promise<void> => {
+    const request = ++copyRequest.current;
+
+    if (copyConfirmationTimer.current !== undefined) {
+      clearTimeout(copyConfirmationTimer.current);
+      copyConfirmationTimer.current = undefined;
+    }
+
+    setCopiedEntryId(undefined);
+    setCopyRefusal(undefined);
+
+    try {
+      await navigator.clipboard.writeText(text);
+
+      if (copyRequest.current !== request) {
+        return;
+      }
+
+      setCopiedEntryId(entryId);
+      copyConfirmationTimer.current = setTimeout(() => {
+        if (copyRequest.current !== request) {
+          return;
+        }
+
+        setCopiedEntryId(undefined);
+        copyConfirmationTimer.current = undefined;
+      }, 2000);
+    } catch (cause) {
+      if (copyRequest.current !== request) {
+        return;
+      }
+
+      setCopiedEntryId(undefined);
+      setCopyRefusal(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  useEffect(
+    () => () => {
+      copyRequest.current += 1;
+
+      if (copyConfirmationTimer.current !== undefined) {
+        clearTimeout(copyConfirmationTimer.current);
+      }
+    },
+    [],
+  );
+
   return (
     <>
       {labelRefusal === undefined ? undefined : (
         <Notice tone="danger" title={t("chat.label.refused", { reason: labelRefusal })} />
+      )}
+      {copyRefusal === undefined ? undefined : (
+        <Notice tone="danger" title={t("chat.copy.refused", { reason: copyRefusal })} />
       )}
 
       {open.loading && empty ? (
@@ -137,6 +198,7 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 
           {shown.map((entry) => {
             const mark = open.labels.get(entry.id);
+            const copyText = entry.kind === "message" ? messageText(entry) : undefined;
 
             return (
               <EntryMessage
@@ -144,8 +206,8 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
                 entry={entry}
                 outcomes={outcomes}
                 {...(mark === undefined ? {} : { label: mark })}
-                // Метка архивной сессии отклоняется `409`: меню в ней не показывается вовсе, а у
-                // занятой остаётся видимым, но выключенным.
+                // Метка архивной сессии отклоняется `409`: действия в ней не показываются вовсе, а
+                // у занятой остаются видимыми, но выключенными.
                 {...(archived
                   ? {}
                   : {
@@ -157,14 +219,21 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
                     })}
                 // До реплики режем только вопрос человека; включить запись можно для любого места
                 // дерева, поэтому `at` доступен и на ответе агента.
-                {...(!busy
-                  ? {
-                      onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
-                      ...(entry.kind === "message" && entry.role === "user"
-                        ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
-                        : {}),
-                    }
-                  : {})}
+                forking={{
+                  busy,
+                  onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
+                  ...(entry.kind === "message" && entry.role === "user"
+                    ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
+                    : {}),
+                }}
+                {...(copyText === undefined
+                  ? {}
+                  : {
+                      copying: {
+                        copied: copiedEntryId === entry.id,
+                        onCopy: () => void copy(entry.id, copyText),
+                      },
+                    })}
                 translator={translator}
               />
             );
@@ -237,11 +306,11 @@ function EntryMessage(props: {
   label?: string;
   /** Чем метку правят. Нет вовсе — метку в этой сессии не поставить: она архивная. */
   marking?: { busy: boolean; onLabel: () => void; onClearLabel: () => void };
-  onForkBefore?: () => void;
-  onForkAt?: () => void;
+  forking: { busy: boolean; onForkBefore?: () => void; onForkAt: () => void };
+  copying?: { copied: boolean; onCopy: () => void };
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, label, marking, onForkBefore, onForkAt, translator } = props;
+  const { entry, outcomes, label, marking, forking, copying, translator } = props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -278,46 +347,117 @@ function EntryMessage(props: {
     return undefined;
   }
 
+  const role = entry.role === "user" ? "human" : "agent";
+  const shownTime = formatEntryTime(entry.time);
+  const hasEnabledAction = copying !== undefined || !forking.busy || marking?.busy === false;
+
   return (
-    <Message role={entry.role === "user" ? "human" : "agent"}>
-      {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
-      {entry.content.map((block, index) => (
-        <ContentBlock
-          key={`${entry.id}:${String(index)}`}
-          block={block}
-          outcomes={outcomes}
-          translator={translator}
-        />
-      ))}
-      {onForkBefore === undefined ? undefined : (
-        <Button onClick={onForkBefore}>{t("chat.fork.before")}</Button>
-      )}
-      {onForkAt === undefined ? undefined : <Button onClick={onForkAt}>{t("chat.fork.at")}</Button>}
-      {marking === undefined ? undefined : (
-        <Menu
-          label={t("chat.label.menu")}
-          trigger="…"
-          triggerLabel={t("chat.label.menu")}
-          compact
-          items={[
-            {
-              id: "label",
-              label: t("chat.label.set"),
-              disabled: marking.busy,
-              onSelect: marking.onLabel,
-            },
-            {
-              id: "clear",
-              label: t("chat.label.clear"),
-              // Снимать нечего, пока метки нет: пункт остаётся видимым, но выключен.
-              disabled: marking.busy || label === undefined,
-              onSelect: marking.onClearLabel,
-            },
-          ]}
-        />
-      )}
-    </Message>
+    <div className="sessions-entry-message" data-role={role}>
+      <Message role={role}>
+        {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
+        {entry.content.map((block, index) => (
+          <ContentBlock
+            key={`${entry.id}:${String(index)}`}
+            block={block}
+            outcomes={outcomes}
+            translator={translator}
+          />
+        ))}
+      </Message>
+      <div
+        className="sessions-entry-meta"
+        role="group"
+        aria-label={t("chat.actions")}
+        {...(hasEnabledAction ? {} : { tabIndex: 0 })}
+      >
+        {shownTime === undefined ? undefined : <time dateTime={entry.time}>{shownTime}</time>}
+        {copying === undefined ? undefined : (
+          <MessageAction
+            label={t(copying.copied ? "chat.copy.done" : "chat.copy")}
+            disabled={false}
+            onClick={copying.onCopy}
+            {...(role === "agent" ? { side: "right" as const } : {})}
+          >
+            <CopyIcon size="sm" />
+          </MessageAction>
+        )}
+        {forking.onForkBefore === undefined ? undefined : (
+          <MessageAction
+            label={t("chat.fork.before")}
+            disabled={forking.busy}
+            onClick={forking.onForkBefore}
+          >
+            <ForkBeforeIcon size="sm" />
+          </MessageAction>
+        )}
+        <MessageAction
+          label={t("chat.fork.at")}
+          disabled={forking.busy}
+          onClick={forking.onForkAt}
+          {...(role === "agent" && copying === undefined
+            ? { side: "right" as const }
+            : role === "human" && marking === undefined
+              ? { side: "left" as const }
+              : {})}
+        >
+          <ForkThroughIcon size="sm" />
+        </MessageAction>
+        {marking === undefined ? undefined : (
+          <>
+            <MessageAction
+              label={t("chat.label.set")}
+              disabled={marking.busy}
+              onClick={marking.onLabel}
+            >
+              <SetLabelIcon size="sm" />
+            </MessageAction>
+            <MessageAction
+              label={t("chat.label.clear")}
+              disabled={marking.busy || label === undefined}
+              onClick={marking.onClearLabel}
+              {...(role === "human" ? { side: "left" as const } : {})}
+            >
+              <ClearLabelIcon size="sm" />
+            </MessageAction>
+          </>
+        )}
+      </div>
+    </div>
   );
+}
+
+function MessageAction(props: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  side?: TooltipSide;
+  children: ReactNode;
+}) {
+  const { label, disabled, onClick, side, children } = props;
+
+  return (
+    <Tooltip content={label} {...(side === undefined ? {} : { side })}>
+      <Button size="sm" iconOnly aria-label={label} disabled={disabled} onClick={onClick}>
+        {children}
+      </Button>
+    </Tooltip>
+  );
+}
+
+function formatEntryTime(time: string): string | undefined {
+  const date = new Date(time);
+
+  return Number.isNaN(date.getTime())
+    ? undefined
+    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+function messageText(entry: Extract<SessionEntry, { kind: "message" }>): string | undefined {
+  const parts = entry.content.flatMap((block) =>
+    block.kind === "text" && block.text.trim() !== "" ? [block.text] : [],
+  );
+
+  return parts.length === 0 ? undefined : parts.join("\n\n");
 }
 
 function ContentBlock(props: {
