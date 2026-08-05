@@ -43,6 +43,7 @@ export type ChatViewProps = {
   onLoadModels: (providerId: string) => void;
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
+  onDiagnostic?: (diagnostic: string) => void;
   onInterrupt: () => void;
   onFork: (request: SessionForkRequest) => Promise<void>;
   /** Свернуть контекст руками. Возвращает причину отказа — её показывает вью, а не диагностика. */
@@ -65,6 +66,7 @@ export function ChatView(props: ChatViewProps) {
     onLoadModels,
     onSubmit,
     onSendMessage,
+    onDiagnostic,
     onInterrupt,
     onFork,
     onCompact,
@@ -261,6 +263,7 @@ export function ChatView(props: ChatViewProps) {
         <SessionUsage stats={open.stats} context={open.context} translator={translator} />
         {archived ? undefined : (
           <MessageComposer
+            sessionId={open.id}
             draft={draft}
             onDraftChange={setDraft}
             busy={busy}
@@ -275,6 +278,13 @@ export function ChatView(props: ChatViewProps) {
             onSubmit={onSubmit}
             onSendMessage={onSendMessage}
             onInterrupt={onInterrupt}
+            onError={(error: unknown) => {
+              onDiagnostic?.(
+                `the message composer acceptance failed: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }}
             translator={translator}
           />
         )}

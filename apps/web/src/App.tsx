@@ -552,6 +552,7 @@ export function App() {
                 onLoadModels={sessions.loadModels}
                 onSubmit={sessions.submitTurn}
                 onSendMessage={sessions.sendMessage}
+                onDiagnostic={diagnostics.record}
                 onInterrupt={sessions.interrupt}
                 onFork={async (request) => {
                   const outcome = await sessions.forkSession(request);

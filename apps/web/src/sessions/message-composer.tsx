@@ -15,9 +15,10 @@ import {
   Textarea,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type MessageComposerProps = {
+  sessionId: string;
   draft: string;
   onDraftChange: (draft: string) => void;
   busy: boolean;
@@ -32,6 +33,7 @@ export type MessageComposerProps = {
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
+  onError: (error: unknown) => void;
   translator: ScopedTranslator;
 };
 
@@ -43,6 +45,7 @@ export type MessageComposerProps = {
 const busyModes: SessionMessageMode[] = ["steer", "follow-up", "next-turn"];
 
 export function MessageComposer({
+  sessionId,
   draft,
   onDraftChange,
   busy,
@@ -57,11 +60,20 @@ export function MessageComposer({
   onSubmit,
   onSendMessage,
   onInterrupt,
+  onError,
   translator,
 }: MessageComposerProps): React.JSX.Element {
   const { t } = translator;
   const [mode, setMode] = useState<SessionMessageMode>("steer");
   const [submitting, setSubmitting] = useState(false);
+  const operationToken = useRef(0);
+  const currentSessionId = useRef(sessionId);
+  currentSessionId.current = sessionId;
+
+  useEffect(() => {
+    operationToken.current += 1;
+    setSubmitting(false);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!reasoningSupported && thinkingLevel !== "off") {
@@ -69,33 +81,66 @@ export function MessageComposer({
     }
   }, [onThinkingLevelChange, reasoningSupported, thinkingLevel]);
 
+  const settle = (
+    acceptance: Promise<string | undefined>,
+    token: number,
+    submittedSessionId: string,
+  ): void => {
+    void acceptance.then(
+      (reason) => {
+        if (operationToken.current !== token || currentSessionId.current !== submittedSessionId) {
+          return;
+        }
+
+        setSubmitting(false);
+
+        if (reason === undefined) {
+          onDraftChange("");
+        }
+      },
+      (error: unknown) => {
+        if (operationToken.current !== token || currentSessionId.current !== submittedSessionId) {
+          return;
+        }
+
+        setSubmitting(false);
+        onError(error);
+      },
+    );
+  };
+
   const send = (): void => {
     if (disabled || submitting || draft.trim() === "") {
       return;
     }
 
     setSubmitting(true);
+    const token = operationToken.current;
+    const submittedSessionId = sessionId;
     let acceptance: Promise<string | undefined>;
 
-    if (busy) {
-      // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
-      // человек выбирает сам, потому что момент доставки у них разный.
-      acceptance = onSendMessage({ text: draft, mode });
-    } else {
-      acceptance = onSubmit({
-        text: draft,
-        model,
-        thinkingLevel: reasoningSupported ? thinkingLevel : "off",
-      });
+    try {
+      if (busy) {
+        // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
+        // человек выбирает сам, потому что момент доставки у них разный.
+        acceptance = onSendMessage({ text: draft, mode });
+      } else {
+        acceptance = onSubmit({
+          text: draft,
+          model,
+          thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+        });
+      }
+    } catch (error: unknown) {
+      if (operationToken.current === token && currentSessionId.current === submittedSessionId) {
+        setSubmitting(false);
+        onError(error);
+      }
+
+      return;
     }
 
-    void acceptance.then((reason) => {
-      setSubmitting(false);
-
-      if (reason === undefined) {
-        onDraftChange("");
-      }
-    });
+    settle(acceptance, token, submittedSessionId);
   };
 
   const append = (): void => {
@@ -104,13 +149,22 @@ export function MessageComposer({
     }
 
     setSubmitting(true);
-    void onSendMessage({ text: draft, mode: "append" }).then((reason) => {
-      setSubmitting(false);
+    const token = operationToken.current;
+    const submittedSessionId = sessionId;
+    let acceptance: Promise<string | undefined>;
 
-      if (reason === undefined) {
-        onDraftChange("");
+    try {
+      acceptance = onSendMessage({ text: draft, mode: "append" });
+    } catch (error: unknown) {
+      if (operationToken.current === token && currentSessionId.current === submittedSessionId) {
+        setSubmitting(false);
+        onError(error);
       }
-    });
+
+      return;
+    }
+
+    settle(acceptance, token, submittedSessionId);
   };
 
   return (

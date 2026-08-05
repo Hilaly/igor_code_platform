@@ -62,19 +62,65 @@ const deferred = <T,>() => {
 };
 
 type ComposerHarnessProps = {
+  sessionId?: string;
   busy?: boolean;
   reasoningSupported?: boolean;
   onSubmit?: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage?: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt?: () => void;
+  onError?: (error: unknown) => void;
 };
 
+function SwitchingComposerHarness({
+  onSubmit,
+}: {
+  onSubmit: (request: TurnRequest) => Promise<string | undefined>;
+}) {
+  const [sessionId, setSessionId] = useState("session-a");
+  const [draft, setDraft] = useState("");
+
+  return (
+    <>
+      <MessageComposer
+        sessionId={sessionId}
+        draft={draft}
+        onDraftChange={setDraft}
+        busy={false}
+        model="anthropic/claude-opus-4-5"
+        modelGroups={modelGroups}
+        onModelChange={vi.fn()}
+        onExpandModelGroup={vi.fn()}
+        thinkingLevel="medium"
+        reasoningSupported
+        onThinkingLevelChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendMessage={vi.fn(() => Promise.resolve(undefined))}
+        onInterrupt={vi.fn()}
+        onError={vi.fn()}
+        translator={translator}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          setSessionId("session-b");
+          setDraft("");
+        }}
+      >
+        Переключить сессию
+      </button>
+      <output aria-label="Черновик">{draft}</output>
+    </>
+  );
+}
+
 function ComposerHarness({
+  sessionId = "session-a",
   busy = false,
   reasoningSupported = true,
   onSubmit = vi.fn(() => Promise.resolve(undefined)),
   onSendMessage = vi.fn(() => Promise.resolve(undefined)),
   onInterrupt = vi.fn(),
+  onError,
 }: ComposerHarnessProps) {
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
@@ -83,6 +129,7 @@ function ComposerHarness({
   return (
     <>
       <MessageComposer
+        sessionId={sessionId}
         draft={draft}
         onDraftChange={setDraft}
         busy={busy}
@@ -96,6 +143,7 @@ function ComposerHarness({
         onSubmit={onSubmit}
         onSendMessage={onSendMessage}
         onInterrupt={onInterrupt}
+        onError={onError ?? vi.fn()}
         translator={translator}
       />
       <output aria-label="Черновик">{draft}</output>
@@ -252,6 +300,95 @@ describe("the session message composer", () => {
     );
     expect((field as HTMLTextAreaElement).value).toBe("исправь модель");
   });
+
+  it("does not let a stale session completion clear the new session draft or keep it blocked", async () => {
+    const acceptance = deferred<string | undefined>();
+    const onSubmit = vi.fn(() => acceptance.promise);
+    render(<SwitchingComposerHarness onSubmit={onSubmit} />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "сообщение A" } });
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Переключить сессию" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "сообщение B" },
+    });
+
+    acceptance.resolve(undefined);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(
+        false,
+      ),
+    );
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("сообщение B");
+  });
+
+  it("unblocks and reports unexpected submission rejection while preserving the draft", async () => {
+    const error = new Error("network unavailable");
+    const onError = vi.fn();
+    render(<ComposerHarness onSubmit={() => Promise.reject(error)} onError={onError} />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "не теряй при ошибке" } });
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(
+        false,
+      ),
+    );
+    expect((field as HTMLTextAreaElement).value).toBe("не теряй при ошибке");
+    expect(onError).toHaveBeenCalledWith(error);
+  });
+
+  it.each([
+    ["busy queued message", true, "Вклинить", "steer"],
+    ["idle append message", false, "Дописать без запуска", "append"],
+  ] as const)(
+    "ignores a stale completion for an in-flight %s after switching sessions",
+    async (_name, busy, buttonName, mode) => {
+      const acceptance = deferred<string | undefined>();
+      const onSendMessage = vi.fn(() => acceptance.promise);
+      const onSubmit = vi.fn(() => Promise.resolve(undefined));
+      const view = render(
+        <ComposerHarness busy={busy} onSubmit={onSubmit} onSendMessage={onSendMessage} />,
+      );
+
+      const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+      fireEvent.change(field, { target: { value: "сообщение A" } });
+      if (busy) {
+        fireEvent.click(screen.getByRole("button", { name: buttonName }));
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: buttonName }));
+      }
+      expect(onSendMessage).toHaveBeenCalledWith({ text: "сообщение A", mode });
+
+      view.rerender(
+        <ComposerHarness
+          busy={busy}
+          onSubmit={onSubmit}
+          onSendMessage={onSendMessage}
+          sessionId="session-b"
+        />,
+      );
+      fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+        target: { value: "сообщение B" },
+      });
+      acceptance.resolve(undefined);
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: buttonName }).hasAttribute("disabled")).toBe(
+          false,
+        ),
+      );
+      expect(
+        (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+      ).toBe("сообщение B");
+    },
+  );
 
   it("changes thinking to off only for an explicitly unsupported model", async () => {
     const view = render(<ComposerHarness reasoningSupported={false} />);
