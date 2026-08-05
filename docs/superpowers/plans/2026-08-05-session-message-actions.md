@@ -40,6 +40,7 @@ feature-контейнер, который показывает строку м�
 **Файлы:**
 
 - Создать: `packages/ui-kit/src/components/icons.tsx`
+- Создать: `packages/ui-kit/src/components/icons.module.css`
 - Изменить: `packages/ui-kit/src/components/rendering.test.tsx`
 - Изменить: `packages/ui-kit/src/index.ts`
 - Изменить: `packages/ui-kit/package.json`
@@ -60,7 +61,7 @@ export function SetLabelIcon(props: SymbolIconProps): React.JSX.Element;
 export function ClearLabelIcon(props: SymbolIconProps): React.JSX.Element;
 ```
 
-- [ ] **Шаг 1: добавить падающий тест публичных пиктограмм**
+- [x] **Шаг 1: добавить падающий тест публичных пиктограмм**
 
 В `rendering.test.tsx` импортировать пять компонентов из `./icons.tsx` и проверить общий контракт:
 
@@ -82,7 +83,7 @@ it("renders the shared action icons as decorative symbols on the UI-kit size gri
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED отсутствующего модуля**
+- [x] **Шаг 2: подтвердить RED отсутствующего модуля**
 
 Выполнить:
 
@@ -92,7 +93,7 @@ pnpm --filter @sovereign/ui-kit test -- src/components/rendering.test.tsx
 
 Ожидается: FAIL с невозможностью разрешить `./icons.tsx`.
 
-- [ ] **Шаг 3: подключить библиотеку и реализовать минимальные обёртки**
+- [x] **Шаг 3: подключить библиотеку и реализовать минимальные обёртки**
 
 Выполнить:
 
@@ -105,14 +106,14 @@ pnpm --filter @sovereign/ui-kit add lucide-react
 `strokeWidth={1.75}` и `aria-hidden`, а компонент принимает только размер UI-кита. Не
 реэкспортировать Lucide и его типы.
 
-- [ ] **Шаг 4: открыть публичную поверхность и описать решение**
+- [x] **Шаг 4: открыть публичную поверхность и описать решение**
 
 Добавить `export * from "./components/icons.tsx"` в `packages/ui-kit/src/index.ts`. В разделе
 `Icon` документа `docs/ui-kit.md` записать, что именованные пиктограммы поставляет Lucide через
 обёртки UI-кита; экранный код не импортирует библиотеку напрямую. В «Почему так» описать выбор
 Lucide и отвергнутые локальные SVG/прямые импорты.
 
-- [ ] **Шаг 5: подтвердить GREEN и контракт пакета**
+- [x] **Шаг 5: подтвердить GREEN и контракт пакета**
 
 Выполнить:
 
@@ -123,7 +124,7 @@ pnpm --filter @sovereign/ui-kit typecheck
 
 Ожидается: тест проходит, typecheck завершается с кодом 0.
 
-- [ ] **Шаг 6: сделать атомарный коммит**
+- [x] **Шаг 6: сделать атомарный коммит**
 
 ```bash
 git add packages/ui-kit/src/components/icons.tsx packages/ui-kit/src/components/rendering.test.tsx \
