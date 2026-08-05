@@ -22,6 +22,7 @@
 ### Task 1: Public Settings view primitives
 
 **Files:**
+
 - Replace: `packages/ui-kit/src/components/settings-frame.tsx`
 - Replace: `packages/ui-kit/src/components/settings-frame.module.css`
 - Modify: `packages/ui-kit/src/components/rendering.test.tsx`
@@ -29,6 +30,7 @@
 - Modify: `packages/ui-kit/src/index.ts`
 
 **Interfaces:**
+
 - Produces: `SettingsView`, `SettingsNavigationItem`, `SettingsPage`, and `SettingsRow` React components.
 - `SettingsView` consumes `context`, `navigationLabel`, `navigation`, and `children`.
 - `SettingsNavigationItem` consumes `selected`, `onSelect`, and `children` and exposes `aria-current="page"` when selected.
@@ -46,12 +48,14 @@
 ### Task 2: Web Settings compositor
 
 **Files:**
+
 - Modify: `apps/web/src/settings/settings-view.tsx`
 - Modify: `apps/web/src/settings/settings-view.test.tsx`
 - Modify: `apps/web/src/settings/settings.css`
 - Modify: `apps/web/src/shell/styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: all four Settings primitives from Task 1.
 - Produces: one compact context title (`Settings`), six UI-kit navigation items, and one `SettingsPage` for the active domain view.
 
@@ -64,6 +68,7 @@
 ### Task 3: Appearance and system sections
 
 **Files:**
+
 - Modify: `apps/web/src/settings/appearance-section.tsx`
 - Modify: `apps/web/src/settings/daemon-section.tsx`
 - Modify: `apps/web/src/settings/diagnostics-section.tsx`
@@ -71,6 +76,7 @@
 - Modify: `apps/web/src/settings/settings-view.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `SettingsRow` from Task 1.
 - Produces: compact label/description/control rows for Appearance and Daemon and flat diagnostic content.
 
@@ -83,6 +89,7 @@
 ### Task 4: Projects, Providers, and Plugins views
 
 **Files:**
+
 - Modify: `apps/web/src/projects/projects-view.tsx`
 - Modify: `apps/web/src/projects/projects-view.test.tsx`
 - Modify: `apps/web/src/projects/project-detail-view.tsx`
@@ -96,6 +103,7 @@
 - Modify: `apps/web/src/settings/settings.css`
 
 **Interfaces:**
+
 - Consumes: the heading and content boundary owned by SettingsPage.
 - Produces: embedded list/detail bodies without duplicate page headings or outer panels, preserving every domain action and accessible name.
 
@@ -108,11 +116,13 @@
 ### Task 5: Documentation and visual verification
 
 **Files:**
+
 - Modify: `docs/ui-kit.md`
 - Modify: `docs/superpowers/specs/2026-08-03-settings-master-detail-layout-design.md`
 - Modify: `docs/superpowers/specs/2026-08-05-settings-projects-section-design.md`
 
 **Interfaces:**
+
 - Documents: the implemented public API and removal of the old SettingsFrame/breadcrumb visual contract.
 
 - [ ] **Step 1: Update active documentation** so it names the four UI-kit primitives and treats the mockup as the visual contract for all six sections.
