@@ -181,6 +181,13 @@ const contributions = createContributionRegistry();
 // Единого снимка без project context нет: событие только инвалидирует выбранный проект. Оба
 // производителя зовут один publisher, а revision не даёт повторному scan разбудить клиентов.
 let publishedContributionRevision = contributions.revision();
+
+/**
+ * Сверка подписок на хуки. Ссылка поздняя по той же причине, что у моста сессий: диспетчер строится
+ * после супервизора, а publisher нужен супервизору раньше (docs/hooks.md).
+ */
+const hookSubscriptions: { sync?: () => void } = {};
+
 const publishContributionChanges = (): void => {
   const revision = contributions.revision();
 
@@ -190,6 +197,10 @@ const publishContributionChanges = (): void => {
 
   publishedContributionRevision = revision;
   bus.publish(coreEventTypes.contributionsChanged, { revision });
+  // Подписки сверяются там, где набор вкладов **изменился**, а не там, где начался обход плагинов:
+  // вклады попадают в реестр между `activate` и `running`, то есть позже, чем возвращается
+  // применение, и сверка по концу обхода не увидела бы ни одной подписки (docs/hooks.md).
+  hookSubscriptions.sync?.();
 };
 
 const standaloneRoots = () =>
@@ -265,6 +276,8 @@ const pluginHooks = createPluginHooks({
   timeoutMilliseconds: () => settings.current().config.hookTimeoutMilliseconds,
 });
 
+hookSubscriptions.sync = pluginHooks.sync;
+
 const pluginWatcher = createPluginWatcher({
   roots: pluginRoots(),
   logger,
@@ -293,10 +306,6 @@ const applyPlugins = (changedDirectories: ChangedPluginDirectory[] = []): Promis
 
       await plugins.apply(discoverPlugins(roots), settings.current().preferences);
       await plugins.reload(changedDirectories);
-
-      // Подписки сверяются с реестром там же, где он меняется: список подписчиков не имеет права
-      // разойтись с действующим набором вкладов (docs/hooks.md).
-      pluginHooks.sync();
     })
     .catch((cause: unknown) => {
       logger.error("applying the plugin state failed", {
@@ -390,6 +399,9 @@ const sessions = createSessionService({
   availability: (project) => projectAvailability.of(project.id),
   // Автопорог тоже живой: `0` выключает его, и это умолчание (docs/sessions-and-projects.md).
   compactionThreshold: () => settings.current().config.compactionThreshold,
+  // Хуки платформы: жизненный цикл сессии, решение до её старта и трата турна. Тот же диспетчер, что
+  // у шва рантайма, — иначе подписка попадала бы то в один список, то в другой (docs/hooks.md).
+  hooks: hookDispatcher,
 });
 
 hasActiveProviderSession = (providerId) =>

@@ -48,5 +48,20 @@ export const activate: PluginModule["activate"] = async () => {
     handler: () => new Promise<undefined>(() => {}),
   });
 
+  // Две подписки на одно перезаписывающее событие. Порядок задан рангом источника и идентификатором
+  // вклада, то есть `chain-first` до `chain-second`: второе звено обязано увидеть вход, изменённый
+  // первым (docs/hooks.md).
+  await contribute.hook({
+    id: "chain-first",
+    event: "before_agent_start",
+    handler: ({ systemPrompt }) => ({ systemPrompt: `${systemPrompt} первое звено` }),
+  });
+
+  await contribute.hook({
+    id: "chain-second",
+    event: "before_agent_start",
+    handler: ({ systemPrompt }) => ({ systemPrompt: `${systemPrompt} второе звено` }),
+  });
+
   await log.info("callable is up");
 };

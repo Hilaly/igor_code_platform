@@ -22,7 +22,9 @@ import {
 } from "@sovereign/protocol";
 
 import { createContributionRegistry } from "./contribution-registry.ts";
+import { createPluginHooks } from "./plugin-hooks.ts";
 import { createPluginProviders } from "./plugin-providers.ts";
+import { createHookDispatcher } from "../sessions/public.ts";
 import { carryLoginSteps } from "../providers/public.ts";
 import { createProviderLogins } from "../providers/public.ts";
 import { createEventBus, type EventBus } from "../platform/public.ts";
@@ -1627,5 +1629,60 @@ describe("a call from the core into a plugin", () => {
         reason: "the plugin data:absent is not running and answers no calls",
       },
     );
+  });
+});
+
+describe("the subscriptions of a live plugin", () => {
+  it("reconciles them when the contributions changed, not when the pass began", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const dispatcher = createHookDispatcher({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      timeoutMilliseconds: () => 5_000,
+    });
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      // Тот же сигнал, которым область плагинов сообщает об изменившемся наборе вкладов: подписки
+      // сверяются по нему, а не по концу обхода (docs/hooks.md).
+      publishContributionChanges: () => hooks.sync(),
+    });
+    const hooks = createPluginHooks({
+      registry,
+      plugins: supervisor,
+      dispatcher,
+      timeoutMilliseconds: () => 5_000,
+    });
+
+    running = supervisor;
+
+    // Вклады попадают в реестр между `activate` и `running`, то есть позже, чем возвращается
+    // применение: сверка, привязанная к его концу, не увидела бы ни одной подписки.
+    await supervisor.apply(only("callable"), enabled("data:callable"));
+    await recorded.waitFor(reachedState("data:callable", "running"), "callable running");
+
+    assert.equal(dispatcher.subscribed("before_session_start", { projectId: "p1" }), true);
+    assert.equal(dispatcher.subscribed("turn_finished", { projectId: "p1" }), true);
+
+    // Ответ доезжает из воркера, а отказ несёт автора-вклада, а не автора-плагина. Спрашивается
+    // подписка поимённо: на этом событии у фикстуры есть и зависший подписчик, которого ждать
+    // пришлось бы весь таймаут.
+    assert.deepEqual(
+      await dispatcher.rewrite("turn_finished", { folder: "/forbidden" }, { projectId: "p1" }),
+      { payload: { folder: "/forbidden" }, patch: undefined },
+    );
+
+    // Выключение вклада человеком снимает подписку: реестр перестаёт её отдавать, и сверка это видит.
+    await supervisor.apply(
+      only("callable"),
+      preferences({
+        "data:callable": { enabled: true, disabledContributions: ["callable.watch"] },
+      }),
+    );
+
+    assert.equal(dispatcher.subscribed("turn_finished", { projectId: "p1" }), false);
   });
 });
