@@ -7,13 +7,15 @@
  * неймспейсом плагина в идентификаторе и с именем плагина рядом.
  */
 
+import type { HookCriticality } from "./hook.ts";
 import type { PluginSource } from "./plugin.ts";
 import type { ThinkingLevel } from "./session.ts";
 import type { AgentSkillSelection, AgentToolSelection } from "./tool-pattern.ts";
 
 /**
- * Схема нагрузки в виде данных — то, что отдаёт `z.toJSONSchema()`. Сама схема сюда попасть не
- * может: в ней функции, а между воркером и ядром ходит структурное клонирование (docs/event-bus.md).
+ * Схема в виде данных — то, что отдаёт `z.toJSONSchema()`: нагрузка события и аргументы инструмента
+ * описываются одинаково. Сама схема сюда попасть не может: в ней функции, а между воркером и ядром
+ * ходит структурное клонирование (docs/event-bus.md).
  */
 export type PayloadSchema = Record<string, unknown>;
 
@@ -81,11 +83,40 @@ export type SkillContributionRegistration = RegistrationCommon & {
   disableModelInvocation: boolean;
 };
 
+/**
+ * Инструмент, которым пользуется модель (docs/plugins.md). Аргументы описаны схемой-данными, как
+ * нагрузка события: ручку инструмента собирает рантайм, а ядру она остаётся непрозрачной.
+ *
+ * Группы и порядка здесь нет: группой служит идентификатор плагина, а порядок внутри неё задаёт имя.
+ * Объявлять их автору незачем — на отбор инструментов агентом влияет имя, а не место в списке.
+ */
+export type ToolContributionRegistration = RegistrationCommon & {
+  kind: "tool";
+  /** Имя, которым инструмент зовёт модель. Спор одноимённых разрешает сборка (docs/hooks.md). */
+  name: string;
+  description: string;
+  parameters: PayloadSchema;
+};
+
+/**
+ * Подписка на хук (docs/hooks.md). Порядка подписка не объявляет: он считается по рангу источника
+ * плагина, затем по идентификатору вклада — иначе число, назначаемое автором себе сам, превратилось
+ * бы в гонку.
+ */
+export type HookSubscriptionContributionRegistration = RegistrationCommon & {
+  kind: "hook";
+  /** Имя события Pi или хука платформы. Незнакомое отсеивается при регистрации. */
+  event: string;
+  criticality: HookCriticality;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
   | AgentContributionRegistration
-  | SkillContributionRegistration;
+  | SkillContributionRegistration
+  | ToolContributionRegistration
+  | HookSubscriptionContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 

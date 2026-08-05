@@ -218,4 +218,23 @@ describe("parseConfig", () => {
       assert.equal(parseConfig({ maxConcurrentTurns: value }).kind, "rejected", String(value));
     }
   });
+
+  it("reads the two waits of a plugin separately", () => {
+    // Величины разные по природе: хук ждут внутри турна, инструмент модель зовёт как работу
+    // (docs/hooks.md). Одно значение на оба заставило бы поднять и то, которое держит турн.
+    const value = parsedConfig({ hookTimeoutMilliseconds: 800, pluginToolTimeoutMilliseconds: 30 });
+
+    assert.equal(value.hookTimeoutMilliseconds, 800);
+    assert.equal(value.pluginToolTimeoutMilliseconds, 30);
+    assert.equal(defaultConfig.hookTimeoutMilliseconds, 5000);
+    assert.equal(defaultConfig.pluginToolTimeoutMilliseconds, 120000);
+  });
+
+  it("refuses a wait that is not a positive whole number of milliseconds", () => {
+    for (const key of ["hookTimeoutMilliseconds", "pluginToolTimeoutMilliseconds"]) {
+      for (const value of [0, -1, 1.5, "500", null]) {
+        assert.equal(parseConfig({ [key]: value }).kind, "rejected", `${key}=${String(value)}`);
+      }
+    }
+  });
 });

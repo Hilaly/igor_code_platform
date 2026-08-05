@@ -40,6 +40,20 @@ export type Config = {
    */
   compactionReserveTokens: number;
   compactionKeepRecentTokens: number;
+  /**
+   * Сколько ждать обработчик хука в воркере плагина (docs/hooks.md). Одно значение на все хуки:
+   * отдельной величины на вид хука или на подписку нет, пока не появится потребность, которую нельзя
+   * закрыть общей. Ждать вообще приходится потому, что плагины живут в воркерах, а Pi вызывает
+   * обработчики с `await` последовательно.
+   */
+  hookTimeoutMilliseconds: number;
+  /**
+   * Сколько ждать инструмент плагина. Отдельно от хуков, и это не исключение из правила «одно
+   * значение на все хуки»: инструмент — не хук. Хук ждут внутри турна, и он обязан быть быстрым;
+   * инструмент модель зовёт как работу, и секунды ему мало у любого плагина, который что-то читает
+   * по сети (docs/hooks.md).
+   */
+  pluginToolTimeoutMilliseconds: number;
 };
 
 /**
@@ -105,6 +119,10 @@ export const defaultConfig: Config = {
   // Совпадают с зашитыми в Pi: своя компакция заведена ради управляемости, а не ради других чисел.
   compactionReserveTokens: 16384,
   compactionKeepRecentTokens: 20000,
+  // Пять секунд — предположение, а не измерение: первый же плагин с обращением к сети внутри хука
+  // покажет, мало это или много (docs/hooks.md).
+  hookTimeoutMilliseconds: 5000,
+  pluginToolTimeoutMilliseconds: 120000,
 };
 export const defaultAppearance: Appearance = {
   colorScheme: builtInColorScheme,
@@ -138,6 +156,8 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     "compactionThreshold",
     "compactionReserveTokens",
     "compactionKeepRecentTokens",
+    "hookTimeoutMilliseconds",
+    "pluginToolTimeoutMilliseconds",
   ]);
   const value: Config = { ...defaultConfig };
   const logLevel = fields["logLevel"];
@@ -189,7 +209,12 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     value.compactionThreshold = threshold;
   }
 
-  for (const key of ["compactionReserveTokens", "compactionKeepRecentTokens"] as const) {
+  for (const key of [
+    "compactionReserveTokens",
+    "compactionKeepRecentTokens",
+    "hookTimeoutMilliseconds",
+    "pluginToolTimeoutMilliseconds",
+  ] as const) {
     const tokens = fields[key];
 
     if (tokens === undefined) {
