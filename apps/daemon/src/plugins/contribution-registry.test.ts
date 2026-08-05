@@ -495,3 +495,161 @@ describe("createContributionRegistry", () => {
     assert.deepEqual(registry.resolvedBase(), []);
   });
 });
+
+describe("the two contributions a plugin makes to the work of the agent", () => {
+  const echo: PluginContribution = {
+    kind: "tool",
+    id: "echo",
+    description: "повторяет сказанное",
+    parameters: { type: "object", properties: { text: { type: "string" } } },
+  };
+
+  it("registers a tool and a subscription with their declared form", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [echo, { kind: "hook", id: "watch", event: "turn_finished", criticality: "critical" }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.problems, []);
+    // Порядок набора — по виду и идентификатору: подписка идёт раньше инструмента.
+    assert.deepEqual(outcome.registered, [
+      {
+        ownership: "plugin",
+        kind: "hook",
+        id: "hello.watch",
+        declaredId: "watch",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        event: "turn_finished",
+        criticality: "critical",
+      },
+      {
+        ownership: "plugin",
+        kind: "tool",
+        id: "hello.echo",
+        declaredId: "echo",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        description: "повторяет сказанное",
+        parameters: echo.kind === "tool" ? echo.parameters : {},
+      },
+    ]);
+  });
+
+  it("calls a subscription without a mark advisory", () => {
+    const registry = createContributionRegistry();
+
+    registry.applyPlugin(
+      dataHello,
+      [{ kind: "hook", id: "watch", event: "message_update" }],
+      nothingDisabled,
+    );
+
+    const [subscription] = registry.resolvedBase("hook");
+
+    // Умолчание критичности ставит ядро, и оно некритичное: автор, забывший пометку, не роняет
+    // турны (docs/hooks.md).
+    assert.equal(subscription?.kind === "hook" ? subscription.criticality : undefined, "advisory");
+  });
+
+  it("refuses a subscription to a name no runtime and no platform hook has", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [
+        { kind: "hook", id: "watch", event: "turn_finished" },
+        { kind: "hook", id: "typo", event: "turn_finidhed" },
+        // Собирающий хук подписке не отдаётся: инструмент объявляется вкладом, и второго способа
+        // добавить инструмент у платформы нет (docs/hooks.md).
+        { kind: "hook", id: "collector", event: "tools_collect" },
+        // @ts-expect-error — автор назвал критичность, которой нет; отсев обязан быть и в рантайме.
+        { kind: "hook", id: "loud", event: "turn_finished", criticality: "screaming" },
+      ],
+      nothingDisabled,
+    );
+
+    // Кривой вклад — проблема жизненного цикла, а не исключение: соседи применяются.
+    assert.deepEqual(ids(outcome.registered), ["hello.watch"]);
+    assert.deepEqual(outcome.problems, [
+      'the subscription hello.typo names an unknown hook "turn_finidhed"',
+      'the subscription hello.collector names an unknown hook "tools_collect"',
+      'the subscription hello.loud names an unknown criticality "screaming"',
+    ]);
+  });
+
+  it("refuses a tool the model would not be able to call", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [
+        echo,
+        // Точка в имени инструмента запрещена провайдерами, поэтому неймспейс в имя не ставится.
+        { ...echo, id: "weather.today" },
+        { ...echo, id: "silent", description: "   " },
+        { ...echo, id: "schemaless", parameters: undefined } as unknown as PluginContribution,
+      ],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(ids(outcome.registered), ["hello.echo"]);
+    assert.deepEqual(outcome.problems, [
+      "the tool hello.weather.today must be named ^[a-z0-9][a-z0-9-]{0,63}$: " +
+        "the identifier is the name the model calls",
+      "the tool hello.silent declares no description, so the model cannot use it",
+      "the tool hello.schemaless must declare the schema of its arguments",
+    ]);
+  });
+
+  it("gives the more specific source the last word about the same tool", () => {
+    const registry = createContributionRegistry();
+
+    registry.applyPlugin(builtinHello, [echo], nothingDisabled);
+    registry.applyPlugin(
+      dataHello,
+      [{ ...echo, description: "поставленный рядом" }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(ids(registry.resolvedBase("tool")), ["hello.echo"]);
+    assert.equal(registry.resolvedBase("tool")[0]?.source, "data");
+    assert.deepEqual(registry.conflicts(), []);
+  });
+
+  it("applies neither subscription when two plugins of one source claim the same one", () => {
+    const registry = createContributionRegistry();
+    const watch: PluginContribution = { kind: "hook", id: "watch", event: "turn_finished" };
+
+    registry.applyPlugin(
+      { key: "data:one", id: "shared", source: "data" },
+      [watch],
+      nothingDisabled,
+    );
+    registry.applyPlugin(
+      { key: "data:two", id: "shared", source: "data" },
+      [watch],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(registry.resolvedBase("hook"), []);
+    assert.deepEqual(
+      registry.conflicts().map((conflict) => [conflict.id, conflict.plugins]),
+      [["shared.watch", ["data:one", "data:two"]]],
+    );
+  });
+
+  it("hides a switched-off tool from the resolved set and keeps it visible as switched off", () => {
+    const registry = createContributionRegistry();
+
+    registry.applyPlugin(dataHello, [echo], new Set(["hello.echo"]));
+
+    assert.deepEqual(registry.resolvedBase("tool"), []);
+    assert.deepEqual(ids(registry.switchedOff()), ["hello.echo"]);
+  });
+});
