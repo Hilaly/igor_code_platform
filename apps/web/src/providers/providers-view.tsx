@@ -187,7 +187,9 @@ export function ProvidersView({
 
   return (
     <div className="providers">
-      <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+      {headingLevel === 1 ? (
+        <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+      ) : undefined}
       <Button tone="accent" onClick={onCreate}>
         + {t("providers.user.new")}
       </Button>

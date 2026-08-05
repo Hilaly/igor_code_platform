@@ -8,7 +8,14 @@
  * выбранного состояния: голый `/settings` маршрутизатор заменяет на `/settings/appearance`.
  */
 
-import { Heading, List, ListRow, Text, type ScopedTranslator } from "@sovereign/ui-kit";
+import {
+  Breadcrumbs,
+  Heading,
+  List,
+  ListRow,
+  Text,
+  type ScopedTranslator,
+} from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import { settingsSections, type SettingsSection } from "../router.ts";
@@ -20,6 +27,7 @@ export type SettingsViewProps = {
   appearance: ReactNode;
   providers: ReactNode;
   plugins: ReactNode;
+  detailTitle?: string;
   daemon: ReactNode;
   diagnostics: ReactNode;
   translator: ScopedTranslator;
@@ -31,6 +39,7 @@ export function SettingsView({
   appearance,
   providers,
   plugins,
+  detailTitle,
   daemon,
   diagnostics,
   translator,
@@ -48,10 +57,31 @@ export function SettingsView({
             ? daemon
             : diagnostics;
 
+  const title = detailTitle ?? t(`settings.section.${section}`);
+
   return (
     <div className="settings">
+      <header className="settings-context-bar">
+        <Breadcrumbs
+          ariaLabel={t("settings.context.aria")}
+          separator="·"
+          items={[
+            { id: "sovereign", label: "Sovereign" },
+            { id: "settings", label: t("settings.context.title") },
+            ...(detailTitle === undefined
+              ? []
+              : [
+                  { id: "plugins", label: t("settings.section.plugins") },
+                  { id: "plugin", label: detailTitle },
+                ]),
+          ]}
+        />
+      </header>
       <div className="settings-layout">
         <aside className="settings-sidebar">
+          <span className="settings-sidebar-label">
+            {t("settings.context.title").toUpperCase()}
+          </span>
           <nav className="settings-nav" aria-label={t("settings.sections")}>
             <List>
               {settingsSections.map((candidate) => (
@@ -66,8 +96,16 @@ export function SettingsView({
             </List>
           </nav>
         </aside>
-        <section className="settings-content" aria-label={t(`settings.section.${section}`)}>
-          <Heading level={1}>{t(`settings.section.${section}`)}</Heading>
+        <section
+          className={`settings-content${detailTitle === undefined ? "" : " settings-detail"}`}
+          aria-label={title}
+        >
+          {detailTitle === undefined ? <Heading level={1}>{title}</Heading> : undefined}
+          {detailTitle === undefined ? (
+            <p className="settings-section-description">
+              {t(`settings.section.description.${section}`)}
+            </p>
+          ) : undefined}
           <div className="settings-content-body">{content}</div>
         </section>
       </div>

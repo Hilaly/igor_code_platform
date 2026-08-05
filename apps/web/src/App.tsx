@@ -677,6 +677,12 @@ export function App() {
                   ? page.section
                   : "appearance"
             }
+            detailTitle={
+              page.kind === "settings-plugin"
+                ? (plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
+                    ?.id ?? page.pluginKey)
+                : undefined
+            }
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
             appearance={
               <AppearanceSection

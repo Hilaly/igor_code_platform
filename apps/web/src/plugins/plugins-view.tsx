@@ -77,7 +77,9 @@ export function PluginsView({
 
   return (
     <div className="plugins">
-      <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
+      {headingLevel === 1 ? (
+        <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
+      ) : undefined}
 
       {state.stale ? (
         <Notice tone="warning" title={t("plugins.stale.title")}>

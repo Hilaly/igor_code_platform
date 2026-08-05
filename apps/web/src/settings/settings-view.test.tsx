@@ -38,6 +38,7 @@ it("shows one selected settings section and only its content", () => {
   );
 
   expect(screen.getByRole("navigation", { name: "Разделы настроек" })).toBeTruthy();
+  expect(screen.getByText("НАСТРОЙКИ")).toBeTruthy();
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(screen.getByRole("heading", { level: 1, name: "Провайдеры" })).toBeTruthy();
   expect(screen.getAllByRole("region", { name: "Провайдеры" })).toHaveLength(1);
@@ -109,3 +110,27 @@ it.each([
     expect(screen.getByRole("heading", { level: 2, name: heading })).toBeTruthy();
   },
 );
+
+it("moves the plugin name into the page heading and breadcrumbs on detail", () => {
+  render(
+    <SettingsView
+      section="plugins"
+      detailTitle="Usage insights"
+      onSectionChange={vi.fn()}
+      appearance={<div>appearance content</div>}
+      providers={<div>provider content</div>}
+      plugins={
+        <>
+          <h1>Usage insights</h1>
+          <div>plugin detail content</div>
+        </>
+      }
+      daemon={<div>daemon</div>}
+      diagnostics={<div>diagnostics</div>}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("heading", { level: 1, name: "Usage insights" })).toBeTruthy();
+  expect(screen.getByText("plugin detail content")).toBeTruthy();
+});

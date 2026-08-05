@@ -12,6 +12,7 @@ import {
 } from "@sovereign/protocol";
 import {
   Button,
+  Field,
   Notice,
   Select,
   Text,
@@ -42,59 +43,73 @@ export function AppearanceSection({
   return (
     <div className="settings-appearance">
       {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
-      <Select
-        label={t("appearance.scheme")}
-        value={preferences.appearance.colorScheme}
-        options={schemes.map((scheme) => ({
-          value: scheme.id,
-          label: t(`appearance.scheme.${scheme.id}`),
-        }))}
-        onChange={(colorScheme) =>
-          onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
-        }
-        placeholder={t("common.choose")}
-      />
-      <div className="settings-appearance-choice">
-        <Text tone="muted">{t("appearance.variant")}</Text>
-        <div className="settings-appearance-buttons">
-          {appearanceVariants.map((variant) => (
-            <Button
-              key={variant}
-              pressed={preferences.appearance.variant === variant}
-              onClick={() =>
-                onChange({ ...preferences, appearance: { ...preferences.appearance, variant } })
-              }
-            >
-              {t(`appearance.variant.${variant}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <Field layout="row" label={t("appearance.scheme")} hint={t("settings.appearance.schemeHint")}>
+        {() => (
+          <Select
+            label=""
+            value={preferences.appearance.colorScheme}
+            options={schemes.map((scheme) => ({
+              value: scheme.id,
+              label: t(`appearance.scheme.${scheme.id}`),
+            }))}
+            onChange={(colorScheme) =>
+              onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
+            }
+            placeholder={t("common.choose")}
+          />
+        )}
+      </Field>
+      <Field
+        layout="row"
+        label={t("appearance.variant")}
+        hint={t("settings.appearance.variantHint")}
+      >
+        {() => (
+          <div className="settings-appearance-buttons">
+            {appearanceVariants.map((variant) => (
+              <Button
+                key={variant}
+                pressed={preferences.appearance.variant === variant}
+                onClick={() =>
+                  onChange({ ...preferences, appearance: { ...preferences.appearance, variant } })
+                }
+              >
+                {t(`appearance.variant.${variant}`)}
+              </Button>
+            ))}
+          </div>
+        )}
+      </Field>
       {/* Тот же вид выбора из трёх, что и вариант темы, поэтому и контрол тот же: два разных вида
           управления в одной панели выглядели бы случайностью. Классы раскладки те же по той же причине. */}
-      <div className="settings-appearance-choice">
-        <Text tone="muted">{t("appearance.scale")}</Text>
-        <div className="settings-appearance-buttons">
-          {interfaceScales.map((scale) => (
-            <Button
-              key={scale}
-              pressed={preferences.appearance.scale === scale}
-              onClick={() =>
-                onChange({ ...preferences, appearance: { ...preferences.appearance, scale } })
-              }
-            >
-              {t(`appearance.scale.${scale}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <Select
-        label={t("appearance.locale")}
-        value={preferences.locale}
-        options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
-        onChange={(locale) => onChange({ ...preferences, locale })}
-        placeholder={t("common.choose")}
-      />
+      <Field layout="row" label={t("appearance.scale")} hint={t("settings.appearance.scaleHint")}>
+        {() => (
+          <div className="settings-appearance-buttons">
+            {interfaceScales.map((scale) => (
+              <Button
+                key={scale}
+                pressed={preferences.appearance.scale === scale}
+                onClick={() =>
+                  onChange({ ...preferences, appearance: { ...preferences.appearance, scale } })
+                }
+              >
+                {t(`appearance.scale.${scale}`)}
+              </Button>
+            ))}
+          </div>
+        )}
+      </Field>
+      <Field layout="row" label={t("appearance.locale")}>
+        {() => (
+          <Select
+            label=""
+            value={preferences.locale}
+            options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
+            onChange={(locale) => onChange({ ...preferences, locale })}
+            placeholder={t("common.choose")}
+          />
+        )}
+      </Field>
     </div>
   );
 }

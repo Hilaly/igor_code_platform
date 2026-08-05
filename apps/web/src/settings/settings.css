@@ -7,16 +7,28 @@
  */
 
 .settings {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   min-width: 0;
   container-type: inline-size;
 }
 
+.settings-context-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: var(--sovereign-row-height-compact);
+  padding: var(--sovereign-space-2) var(--sovereign-space-4);
+  border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  background: var(--sovereign-page-surface);
+}
+
 .settings-layout {
   display: grid;
   grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
 }
@@ -31,13 +43,33 @@
 }
 
 .settings-sidebar {
-  padding-inline-end: var(--sovereign-space-4);
+  padding: var(--sovereign-space-5) var(--sovereign-space-4) var(--sovereign-space-5)
+    var(--sovereign-space-5);
   border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   overflow-y: auto;
 }
 
 .settings-content {
-  padding-inline-start: var(--sovereign-space-5);
+  padding: var(--sovereign-space-5) var(--sovereign-space-6);
+}
+
+.settings-content > h1 {
+  margin: 0 0 var(--sovereign-space-3);
+}
+
+.settings-section-description {
+  max-width: var(--sovereign-reading-width);
+  margin: calc(var(--sovereign-space-3) * -1) 0 var(--sovereign-space-4);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.settings-sidebar-label {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+  letter-spacing: var(--sovereign-letter-spacing-wide);
+  text-transform: uppercase;
 }
 
 .settings-nav {
@@ -50,9 +82,13 @@
 
 .settings-content-body {
   width: 100%;
-  max-width: 52rem;
+  max-width: 70rem;
   min-height: 0;
   overflow-y: auto;
+}
+
+.settings-detail .settings-content-body {
+  max-width: 72rem;
 }
 
 .plugins,
@@ -100,7 +136,19 @@
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+.plugin-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  gap: var(--sovereign-space-3);
+}
+
 .plugin-detail-header h2 {
+  margin: 0 0 var(--sovereign-space-1);
+}
+
+.plugin-detail-header h1 {
   margin: 0 0 var(--sovereign-space-1);
 }
 
@@ -118,11 +166,15 @@
 
 .plugin-detail-facts {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .plugin-detail-fact {
+  flex: 1 1 45%;
+  flex-direction: column;
+  align-items: flex-start;
   display: flex;
   justify-content: space-between;
   gap: var(--sovereign-space-2);
@@ -134,7 +186,7 @@
 .plugin-detail-fact > span:last-child {
   min-width: 0;
   overflow-wrap: anywhere;
-  text-align: end;
+  text-align: start;
 }
 
 .plugin-detail-contribution {
@@ -209,6 +261,53 @@
 .settings-daemon > * + * {
   padding-block-start: var(--sovereign-space-3);
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.settings-appearance,
+.settings-daemon {
+  gap: var(--sovereign-space-0);
+}
+
+.settings-property,
+.settings-appearance-choice,
+.settings-daemon-line,
+.settings-daemon > .muted {
+  padding-block: var(--sovereign-space-3);
+}
+
+.settings-appearance-choice {
+  display: flex;
+}
+
+.settings-property {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.45fr) minmax(0, 1fr);
+  align-items: center;
+}
+
+.settings-appearance > .field {
+  padding-block: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.settings-appearance > .field:first-of-type {
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.settings-appearance > .field:last-child {
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.settings-property > * {
+  grid-column: 1 / -1;
+}
+
+.settings-appearance-choice > .muted {
+  font-weight: var(--sovereign-font-weight-medium);
+}
+
+.settings-appearance-buttons {
+  justify-content: flex-start;
 }
 
 .settings-daemon-line {

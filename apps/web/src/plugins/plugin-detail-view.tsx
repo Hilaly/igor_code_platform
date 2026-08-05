@@ -16,6 +16,7 @@ import {
   List,
   ListRow,
   Notice,
+  RaisedSurface,
   Spinner,
   Text,
   Toggle,
@@ -102,23 +103,28 @@ export function PluginDetailView({
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
       </div>
 
-      <header className="plugin-detail-header">
-        <div>
-          <Heading level={2}>{status.id ?? status.key}</Heading>
-          <Code>{status.key}</Code>
-        </div>
-        <Toggle
-          checked={preferences?.enabled ?? false}
-          disabled={preferences === undefined}
-          onChange={(enabled) =>
-            preferences === undefined
-              ? undefined
-              : onSwitch(status.key, { ...preferences, enabled })
-          }
-          label={t("plugins.toggle.plugin")}
-          {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
-        />
-      </header>
+      <RaisedSurface>
+        <header className="plugin-detail-header">
+          <div className="plugin-detail-hero">
+            <div>
+              <Heading level={1}>{status.id ?? status.key}</Heading>
+              <Code>{status.key}</Code>
+            </div>
+            <Text tone="muted">{t("plugins.detail.enabled")}</Text>
+          </div>
+          <Toggle
+            checked={preferences?.enabled ?? false}
+            disabled={preferences === undefined}
+            onChange={(enabled) =>
+              preferences === undefined
+                ? undefined
+                : onSwitch(status.key, { ...preferences, enabled })
+            }
+            label={t("plugins.toggle.plugin")}
+            {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
+          />
+        </header>
+      </RaisedSurface>
 
       <section className="plugin-detail-section" aria-labelledby="plugin-detail-plugin">
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
@@ -129,13 +135,15 @@ export function PluginDetailView({
               <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
             }
           />
-          <Fact label={t("plugins.detail.source")} value={status.source} />
+          <Fact
+            label={t("plugins.detail.source")}
+            value={
+              status.source === "builtin" ? t("plugins.source.builtin") : t("plugins.source.data")
+            }
+          />
           <Fact label={t("plugins.detail.path")} value={<Code>{status.directory}</Code>} />
           {status.attempt === undefined ? undefined : (
-            <Fact
-              label={t("plugins.attempt", { count: status.attempt })}
-              value={String(status.attempt)}
-            />
+            <Fact label={t("plugins.detail.attempt")} value={String(status.attempt)} />
           )}
         </div>
       </section>
