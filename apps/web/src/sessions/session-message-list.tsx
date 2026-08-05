@@ -10,23 +10,27 @@ import type { SessionContentBlock, SessionEntry, SessionForkRequest } from "@sov
 import {
   Badge,
   Button,
+  ClearLabelIcon,
   Dialog,
   Disclosure,
   EmptyState,
   Field,
+  ForkBeforeIcon,
+  ForkThroughIcon,
   Input,
   Markdown,
-  Menu,
   Message,
   MessageFeed,
   Notice,
+  SetLabelIcon,
   Spinner,
   StreamingText,
   Text,
+  Tooltip,
   ToolCall,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 
@@ -144,8 +148,8 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
                 entry={entry}
                 outcomes={outcomes}
                 {...(mark === undefined ? {} : { label: mark })}
-                // Метка архивной сессии отклоняется `409`: меню в ней не показывается вовсе, а у
-                // занятой остаётся видимым, но выключенным.
+                // Метка архивной сессии отклоняется `409`: действия в ней не показываются вовсе, а
+                // у занятой остаются видимыми, но выключенными.
                 {...(archived
                   ? {}
                   : {
@@ -157,14 +161,13 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
                     })}
                 // До реплики режем только вопрос человека; включить запись можно для любого места
                 // дерева, поэтому `at` доступен и на ответе агента.
-                {...(!busy
-                  ? {
-                      onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
-                      ...(entry.kind === "message" && entry.role === "user"
-                        ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
-                        : {}),
-                    }
-                  : {})}
+                forking={{
+                  busy,
+                  onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
+                  ...(entry.kind === "message" && entry.role === "user"
+                    ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
+                    : {}),
+                }}
                 translator={translator}
               />
             );
@@ -237,11 +240,10 @@ function EntryMessage(props: {
   label?: string;
   /** Чем метку правят. Нет вовсе — метку в этой сессии не поставить: она архивная. */
   marking?: { busy: boolean; onLabel: () => void; onClearLabel: () => void };
-  onForkBefore?: () => void;
-  onForkAt?: () => void;
+  forking: { busy: boolean; onForkBefore?: () => void; onForkAt: () => void };
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, label, marking, onForkBefore, onForkAt, translator } = props;
+  const { entry, outcomes, label, marking, forking, translator } = props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -278,46 +280,82 @@ function EntryMessage(props: {
     return undefined;
   }
 
+  const role = entry.role === "user" ? "human" : "agent";
+  const shownTime = formatEntryTime(entry.time);
+
   return (
-    <Message role={entry.role === "user" ? "human" : "agent"}>
-      {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
-      {entry.content.map((block, index) => (
-        <ContentBlock
-          key={`${entry.id}:${String(index)}`}
-          block={block}
-          outcomes={outcomes}
-          translator={translator}
-        />
-      ))}
-      {onForkBefore === undefined ? undefined : (
-        <Button onClick={onForkBefore}>{t("chat.fork.before")}</Button>
-      )}
-      {onForkAt === undefined ? undefined : <Button onClick={onForkAt}>{t("chat.fork.at")}</Button>}
-      {marking === undefined ? undefined : (
-        <Menu
-          label={t("chat.label.menu")}
-          trigger="…"
-          triggerLabel={t("chat.label.menu")}
-          compact
-          items={[
-            {
-              id: "label",
-              label: t("chat.label.set"),
-              disabled: marking.busy,
-              onSelect: marking.onLabel,
-            },
-            {
-              id: "clear",
-              label: t("chat.label.clear"),
-              // Снимать нечего, пока метки нет: пункт остаётся видимым, но выключен.
-              disabled: marking.busy || label === undefined,
-              onSelect: marking.onClearLabel,
-            },
-          ]}
-        />
-      )}
-    </Message>
+    <div className="sessions-entry-message" data-role={role}>
+      <Message role={role}>
+        {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
+        {entry.content.map((block, index) => (
+          <ContentBlock
+            key={`${entry.id}:${String(index)}`}
+            block={block}
+            outcomes={outcomes}
+            translator={translator}
+          />
+        ))}
+      </Message>
+      <div className="sessions-entry-meta">
+        {shownTime === undefined ? undefined : <time dateTime={entry.time}>{shownTime}</time>}
+        {forking.onForkBefore === undefined ? undefined : (
+          <MessageAction
+            label={t("chat.fork.before")}
+            disabled={forking.busy}
+            onClick={forking.onForkBefore}
+          >
+            <ForkBeforeIcon size="sm" />
+          </MessageAction>
+        )}
+        <MessageAction label={t("chat.fork.at")} disabled={forking.busy} onClick={forking.onForkAt}>
+          <ForkThroughIcon size="sm" />
+        </MessageAction>
+        {marking === undefined ? undefined : (
+          <>
+            <MessageAction
+              label={t("chat.label.set")}
+              disabled={marking.busy}
+              onClick={marking.onLabel}
+            >
+              <SetLabelIcon size="sm" />
+            </MessageAction>
+            <MessageAction
+              label={t("chat.label.clear")}
+              disabled={marking.busy || label === undefined}
+              onClick={marking.onClearLabel}
+            >
+              <ClearLabelIcon size="sm" />
+            </MessageAction>
+          </>
+        )}
+      </div>
+    </div>
   );
+}
+
+function MessageAction(props: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const { label, disabled, onClick, children } = props;
+
+  return (
+    <Tooltip content={label}>
+      <Button size="sm" iconOnly aria-label={label} disabled={disabled} onClick={onClick}>
+        {children}
+      </Button>
+    </Tooltip>
+  );
+}
+
+function formatEntryTime(time: string): string | undefined {
+  const date = new Date(time);
+
+  return Number.isNaN(date.getTime())
+    ? undefined
+    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 function ContentBlock(props: {

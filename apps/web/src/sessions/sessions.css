@@ -48,6 +48,45 @@
   background: transparent;
 }
 
+/*
+ * У сохранённой реплики одна строка времени и действий. Она занимает место постоянно, чтобы
+ * соседние сообщения не прыгали при наведении, но становится видимой только в контексте реплики.
+ */
+.sessions-entry-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  width: 100%;
+  max-width: var(--sovereign-reading-width);
+  margin-inline: auto;
+}
+
+.sessions-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  min-height: var(--sovereign-row-height-compact);
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.sessions-entry-message:hover > .sessions-entry-meta,
+.sessions-entry-message:focus-within > .sessions-entry-meta {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sessions-entry-message[data-role="human"] > .sessions-entry-meta {
+  justify-content: flex-end;
+}
+
+.sessions-entry-message[data-role="agent"] > .sessions-entry-meta {
+  justify-content: flex-start;
+}
+
 .session-route-state {
   justify-content: flex-start;
 }

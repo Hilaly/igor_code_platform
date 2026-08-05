@@ -224,8 +224,13 @@ describe("the session message list", () => {
       onLabelRefusalChange,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Метка этой записи" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Пометить запись" }));
+    expect(screen.queryByRole("button", { name: "Метка этой записи" })).toBeNull();
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Снять метку" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Пометить запись" }));
     fireEvent.change(screen.getByRole("textbox", { name: /Метка/ }), {
       target: { value: "сюда вернуться" },
     });
@@ -261,7 +266,55 @@ describe("the session message list", () => {
     expect(onFork).toHaveBeenLastCalledWith({ entryId: "m2", position: "at" });
   });
 
-  it("does not offer writing actions for archived messages", () => {
+  it("shows saved entry time and the role-specific action set", () => {
+    const user = { ...message("m1", "вопрос", "user"), time: "2026-07-29T07:02:00" };
+    const agent = { ...message("m2", "ответ"), time: "2026-07-29T07:02:00" };
+
+    show(
+      openSession({
+        entries: [user, agent],
+        branchEntryIds: new Set([user.id, agent.id]),
+      }),
+    );
+
+    const times = screen.getAllByText("07:02");
+
+    expect(times).toHaveLength(2);
+    expect(times.every((time) => time.tagName === "TIME")).toBe(true);
+    expect(times.every((time) => time.getAttribute("datetime") === "2026-07-29T07:02:00")).toBe(
+      true,
+    );
+    expect(screen.getAllByRole("button", { name: "Форк до этой реплики" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Форк по эту запись" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Пометить запись" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Снять метку" })).toHaveLength(2);
+  });
+
+  it("keeps message actions visible but disabled while busy", () => {
+    const entry = message("m1", "занятая реплика", "user");
+
+    show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }), { busy: true });
+
+    for (const name of [
+      "Форк до этой реплики",
+      "Форк по эту запись",
+      "Пометить запись",
+      "Снять метку",
+    ]) {
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
+  it("omits an invalid saved entry time without hiding its actions", () => {
+    const entry = { ...message("m1", "реплика без времени"), time: "invalid" };
+
+    const view = show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }));
+
+    expect(view.container.querySelector("time")).toBeNull();
+    expect(screen.getByRole("button", { name: "Форк по эту запись" })).toBeTruthy();
+  });
+
+  it("keeps read-only actions but does not offer label actions for archived messages", () => {
     const entry = message("m1", "сохранено");
 
     show(openSession({ entries: [entry], branchEntryIds: new Set([entry.id]) }), {
@@ -269,6 +322,8 @@ describe("the session message list", () => {
     });
 
     expect(screen.getByText("сохранено")).not.toBeNull();
-    expect(screen.queryByRole("button", { name: "Метка этой записи" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Форк по эту запись" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Пометить запись" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Снять метку" })).toBeNull();
   });
 });
