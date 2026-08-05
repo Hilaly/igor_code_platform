@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
+import { BrandLockup } from "./brand-lockup.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { FilePicker } from "./file-picker.tsx";
@@ -83,6 +84,17 @@ describe("markup of the ported primitives", () => {
     // декоративным: опознание даёт обёртка, а не сам знак.
     expect(markup).toContain('role="img"');
     expect(markup).toContain('aria-label="Sovereign"');
+  });
+
+  it("renders the brand lockup as a decorative sign with the product name", () => {
+    // Блок декоративен целиком: название объявляется окружением, а не самим блоком. Знак и имя
+    // стоят в одной линии, имя сохранено как видимый текст.
+    const markup = renderToStaticMarkup(<BrandLockup name="Sovereign" />);
+
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain(">Sovereign<");
+    expect(markup).toContain('stroke="currentColor"');
+    expect(markup).not.toContain("undefined");
   });
 
   it("raised surface preserves its content without inventing a document section", () => {

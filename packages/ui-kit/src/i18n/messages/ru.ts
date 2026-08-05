@@ -130,6 +130,7 @@ export const coreRussian: CatalogRegistration = {
     "login.asking": "Проверяем сессию",
     "login.title": "Вход",
     "login.hint": "Платформа только твоя; пароль у неё один.",
+    "product.name": "Sovereign",
     "login.password": "Пароль",
     "login.password.hint": "Не короче {count} символов.",
     "login.confirmation": "Повтори пароль",

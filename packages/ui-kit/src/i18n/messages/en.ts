@@ -135,6 +135,7 @@ export const coreEnglish: CatalogRegistration = {
     "login.asking": "Checking the session",
     "login.title": "Log in",
     "login.hint": "The platform is yours alone; the password is the only one it keeps.",
+    "product.name": "Sovereign",
     "login.password": "Password",
     "login.password.hint": "At least {count} characters.",
     "login.confirmation": "Repeat the password",
