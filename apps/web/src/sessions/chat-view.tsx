@@ -25,7 +25,7 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
@@ -60,6 +60,9 @@ export function ChatView(props: ChatViewProps) {
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
     open.summary?.thinkingLevel ?? "off",
   );
+  const overridesHydratedFor = useRef(open.summary === undefined ? undefined : open.id);
+  const modelPrepared = useRef(false);
+  const thinkingLevelPrepared = useRef(false);
   const [treeOpen, setTreeOpen] = useState(false);
   const [compacting, setCompacting] = useState(false);
   const [instructions, setInstructions] = useState("");
@@ -98,7 +101,32 @@ export function ChatView(props: ChatViewProps) {
     setDraft("");
     setModel(open.summary?.model ?? "");
     setThinkingLevel(open.summary?.thinkingLevel ?? "off");
+    overridesHydratedFor.current = open.summary === undefined ? undefined : open.id;
+    modelPrepared.current = false;
+    thinkingLevelPrepared.current = false;
   }, [open.id]);
+
+  useEffect(() => {
+    if (open.summary !== undefined && overridesHydratedFor.current !== open.id) {
+      if (!modelPrepared.current) {
+        setModel(open.summary.model);
+      }
+      if (!thinkingLevelPrepared.current) {
+        setThinkingLevel(open.summary.thinkingLevel);
+      }
+      overridesHydratedFor.current = open.id;
+    }
+  }, [open.id, open.summary]);
+
+  const prepareModel = (nextModel: string): void => {
+    modelPrepared.current = true;
+    setModel(nextModel);
+  };
+
+  const prepareThinkingLevel = (nextLevel: ThinkingLevel): void => {
+    thinkingLevelPrepared.current = true;
+    setThinkingLevel(nextLevel);
+  };
 
   useEffect(() => {
     if (!agentAvailable) {
@@ -202,11 +230,11 @@ export function ChatView(props: ChatViewProps) {
           disabled={!agentAvailable}
           model={model}
           modelGroups={modelPickerGroups(undefined, {}, model)}
-          onModelChange={setModel}
+          onModelChange={prepareModel}
           onExpandModelGroup={() => undefined}
           thinkingLevel={thinkingLevel}
           reasoningSupported
-          onThinkingLevelChange={setThinkingLevel}
+          onThinkingLevelChange={prepareThinkingLevel}
           onSubmit={onSubmit}
           onSendMessage={onSendMessage}
           onInterrupt={onInterrupt}
