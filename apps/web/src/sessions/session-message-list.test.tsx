@@ -281,7 +281,7 @@ describe("the session message list", () => {
     expect(onFork).toHaveBeenLastCalledWith({ entryId: "m2", position: "at" });
   });
 
-  it("shows saved entry time and the role-specific action set", () => {
+  it("shows saved entry date and time with the role-specific action set", () => {
     const user = { ...message("m1", "вопрос", "user"), time: "2026-07-29T07:02:00" };
     const agent = { ...message("m2", "ответ"), time: "2026-07-29T07:02:00" };
 
@@ -292,7 +292,7 @@ describe("the session message list", () => {
       }),
     );
 
-    const times = screen.getAllByText("07:02");
+    const times = screen.getAllByText("29.07.2026, 07:02");
 
     expect(times).toHaveLength(2);
     expect(times.every((time) => time.tagName === "TIME")).toBe(true);

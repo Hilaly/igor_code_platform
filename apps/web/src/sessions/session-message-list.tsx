@@ -348,7 +348,7 @@ function EntryMessage(props: {
   }
 
   const role = entry.role === "user" ? "human" : "agent";
-  const shownTime = formatEntryTime(entry.time);
+  const shownTime = formatEntryTimestamp(entry.time);
   const hasEnabledAction = copying !== undefined || !forking.busy || marking?.busy === false;
 
   return (
@@ -444,12 +444,19 @@ function MessageAction(props: {
   );
 }
 
-function formatEntryTime(time: string): string | undefined {
+function formatEntryTimestamp(time: string): string | undefined {
   const date = new Date(time);
 
   return Number.isNaN(date.getTime())
     ? undefined
-    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    : new Intl.DateTimeFormat("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).format(date);
 }
 
 function messageText(entry: Extract<SessionEntry, { kind: "message" }>): string | undefined {
