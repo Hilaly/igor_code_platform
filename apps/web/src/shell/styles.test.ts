@@ -161,6 +161,15 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });
 
+  it("scopes the composer option collapse to its own container", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<\s*36rem\)\s*\{[\s\S]*?\.sessions-composer-options\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
+    expect(sessions).not.toMatch(/@media\s*\(max-width:\s*36rem\)/);
+  });
+
   it("opens the chat and leaves composer elevation to UI Kit", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
