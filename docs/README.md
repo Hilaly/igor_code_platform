@@ -63,6 +63,9 @@
 - [Действия и время реплики в ленте сессии](superpowers/specs/2026-08-05-session-message-actions-design.md) —
   утверждённая единая hover/focus-панель icon-only действий, копирование текста, время записи и
   библиотека иконок через UI-кит.
+- [План панели действий реплики](superpowers/plans/2026-08-05-session-message-actions.md) —
+  TDD-задачи для публичного набора Lucide-иконок, времени, единых действий, clipboard и полной
+  визуальной проверки.
 - [План выделения компонентов чата сессии](superpowers/plans/2026-08-02-session-chat-components.md) —
   два TDD-цикла для контролируемого композера и предметной ленты с полной проверкой.
 - [Индекс проектов и страница проекта](superpowers/specs/2026-08-02-project-index-detail-design.md) —
