@@ -34,7 +34,7 @@
 - Consumes: `ShellLayout`, `defaultLayout`, браузерные `window.innerWidth` и событие `resize`.
 - Produces: `panelWidthLimits.minimum === 160`, `shellCenterMinimumWidth === 320`, `shellResizerWidth === 5`, `maximumPanelWidth(viewportWidth: number, oppositePanelWidth?: number): number`, `clampPanelWidth(width: number, maximum?: number): number`.
 
-- [ ] **Step 1: Write failing layout tests for persistent and dynamic limits**
+- [x] **Step 1: Write failing layout tests for persistent and dynamic limits**
 
 В `layout.test.ts` заменить проверку фиксированного максимума и дополнить `clampPanelWidth` такими требованиями:
 
@@ -62,13 +62,13 @@ it("uses a supplied dynamic maximum", () => {
 
 Импортировать `maximumPanelWidth` рядом с существующими экспортами.
 
-- [ ] **Step 2: Run the layout test and verify RED**
+- [x] **Step 2: Run the layout test and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- src/shell/layout.test.ts`
 
 Expected: FAIL, потому что `maximumPanelWidth` ещё не экспортируется, `panelWidthLimits.maximum` всё ещё обрезает `9000`, а минимум равен `180`.
 
-- [ ] **Step 3: Implement persistent minimum and pure dynamic calculations**
+- [x] **Step 3: Implement persistent minimum and pure dynamic calculations**
 
 В `layout.ts`:
 
@@ -101,13 +101,13 @@ export function clampPanelWidth(width: number, maximum = Number.POSITIVE_INFINIT
 
 `readLayout` продолжает вызывать `clampPanelWidth` без максимума, поэтому нормализует минимум и не уничтожает большое конечное предпочтение.
 
-- [ ] **Step 4: Run the layout test and verify GREEN**
+- [x] **Step 4: Run the layout test and verify GREEN**
 
 Run: `pnpm --filter @sovereign/web test -- src/shell/layout.test.ts`
 
 Expected: PASS, все тесты файла зелёные без предупреждений.
 
-- [ ] **Step 5: Write failing component tests for the viewport-aware resizers**
+- [x] **Step 5: Write failing component tests for the viewport-aware resizers**
 
 В `shell.test.tsx` задать управляемую ширину окна через `Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 })` в `beforeEach`. Проверить:
 
@@ -126,10 +126,10 @@ it("subtracts the visible opposite panel from each maximum", () => {
 
   expect(
     screen.getByRole("separator", { name: "левая панель" }).getAttribute("aria-valuemax"),
-  ).toBe("855");
+  ).toBe("790");
   expect(
     screen.getByRole("separator", { name: "правая панель" }).getAttribute("aria-valuemax"),
-  ).toBe("895");
+  ).toBe("850");
 });
 
 it("temporarily clamps rendered widths after a viewport resize", () => {
@@ -145,15 +145,17 @@ it("temporarily clamps rendered widths after a viewport resize", () => {
 });
 ```
 
-Точные ожидания следуют формуле: `1440 - 320 - 5 = 1115`; при обеих панелях `1440 - 320 - 5 - 5 - opposite`; при окне `800 px` — `800 - 320 - 5 = 475`.
+Точные ожидания следуют формуле: `1440 - 320 - 5 = 1115`; при обеих панелях
+`1440 - 320 - 5 - 5 - opposite` (`790` слева при правой `320`, `850` справа при левой `260`); при
+окне `800 px` — `800 - 320 - 5 = 475`.
 
-- [ ] **Step 6: Run the component test and verify RED**
+- [x] **Step 6: Run the component test and verify RED**
 
 Run: `pnpm --filter @sovereign/web test -- src/shell/shell.test.tsx`
 
 Expected: FAIL: ARIA всё ещё использует удалённый фиксированный максимум, drag не знает динамического максимума, а изменение `window.innerWidth` не вызывает перерасчёт рендера.
 
-- [ ] **Step 7: Implement viewport-aware rendering and resizing**
+- [x] **Step 7: Implement viewport-aware rendering and resizing**
 
 В `shell.tsx` добавить локальный хук без нового файла:
 
@@ -175,17 +177,17 @@ function useViewportWidth(): number {
 
 Расширить `PanelResizerProps` полем `maximum: number`, поставить `aria-valuemax={maximum}` и применять `clampPanelWidth(candidate, maximum)` для pointer и keyboard.
 
-- [ ] **Step 8: Run targeted tests and verify GREEN**
+- [x] **Step 8: Run targeted tests and verify GREEN**
 
 Run: `pnpm --filter @sovereign/web test -- src/shell/layout.test.ts src/shell/shell.test.tsx`
 
 Expected: PASS, оба файла зелёные без предупреждений.
 
-- [ ] **Step 9: Update the canonical UI documentation**
+- [x] **Step 9: Update the canonical UI documentation**
 
 В разделе «Оболочка» файла `docs/ui-kit.md` заменить утверждение о едином фиксированном диапазоне описанием: минимум `160 px`, максимум зависит от окна, центр получает резерв `320 px`, временное сужение окна не перезаписывает предпочтение в `localStorage`.
 
-- [ ] **Step 10: Run formatter and targeted regression tests**
+- [x] **Step 10: Run formatter and targeted regression tests**
 
 Run: `pnpm exec prettier --write apps/web/src/shell/layout.ts apps/web/src/shell/layout.test.ts apps/web/src/shell/shell.tsx apps/web/src/shell/shell.test.tsx docs/ui-kit.md docs/superpowers/plans/2026-08-05-dynamic-shell-panel-widths.md`
 
@@ -193,13 +195,13 @@ Run: `pnpm --filter @sovereign/web test -- src/shell/layout.test.ts src/shell/sh
 
 Expected: formatter exits `0`; tests PASS without warnings.
 
-- [ ] **Step 11: Run the full repository verification**
+- [x] **Step 11: Run the full repository verification**
 
 Run: `make check && make build`
 
 Expected: typecheck, ESLint, Prettier, all tests and the web production build exit `0` without new warnings.
 
-- [ ] **Step 12: Commit the implementation**
+- [x] **Step 12: Commit the implementation**
 
 ```bash
 git add apps/web/src/shell/layout.ts apps/web/src/shell/layout.test.ts \

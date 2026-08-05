@@ -4,6 +4,7 @@ import {
   clampPanelWidth,
   defaultLayout,
   layoutStorageKey,
+  maximumPanelWidth,
   panelWidthLimits,
   readLayout,
   writeLayout,
@@ -68,11 +69,11 @@ describe("readLayout", () => {
     expect(readLayout(storage(JSON.stringify({ openTab: 7 }))).openTab).toBeUndefined();
   });
 
-  it("pulls a width outside the limits back in", () => {
+  it("keeps a large finite preference while restoring the layout", () => {
     const layout = readLayout(storage(JSON.stringify({ leftWidth: 3, rightWidth: 9000 })));
 
     expect(layout.leftWidth).toBe(panelWidthLimits.minimum);
-    expect(layout.rightWidth).toBe(panelWidthLimits.maximum);
+    expect(layout.rightWidth).toBe(9000);
   });
 });
 
@@ -83,6 +84,21 @@ describe("clampPanelWidth", () => {
 
   it("rounds to whole pixels", () => {
     expect(clampPanelWidth(260.4)).toBe(260);
+  });
+
+  it("uses a supplied dynamic maximum", () => {
+    expect(clampPanelWidth(900, 710)).toBe(710);
+  });
+});
+
+describe("maximumPanelWidth", () => {
+  it("leaves the center reserve and visible edges in the viewport", () => {
+    expect(maximumPanelWidth(1440)).toBe(1115);
+    expect(maximumPanelWidth(1440, 400)).toBe(710);
+  });
+
+  it("never returns a maximum below the panel minimum", () => {
+    expect(maximumPanelWidth(300, 400)).toBe(panelWidthLimits.minimum);
   });
 });
 
