@@ -254,6 +254,11 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
   сохранён как совместимое имя связи с описанием. `size="sm"` — для тесных мест (шапка панели); `iconOnly`
   делает кнопку квадратной без боковых отступов, а контент отцентрованным — это кнопка-значок, и
   видимого текста у неё нет, поэтому имя обязан дать `aria-label`, а подсказку — `title`.
+- **`List` и `ListRow`** — семантический список и его строка. `ListRow` принимает `selected`,
+  `onSelect`, `onDoubleClick`, `actions` и `describedBy`: при наличии `onSelect` строка становится
+  кнопкой и получает `aria-describedby`, а действия остаются рядом, не вкладывая кнопку в кнопку.
+- **`Tooltip`** — `content`, `side`, необязательный явный `id` и `children`. Явный `id` связывает
+  подсказку с фокусируемым предком триггера; без него компонент создаёт идентификатор сам.
 - **`Input` и `Textarea`** — `value`, `onChange(value)`, `placeholder`, `invalid`, `disabled`, `id`,
   `describedBy`; у поля ещё `type` (`text` | `password` | `search`), `autoComplete`
   (`off` | `username` | `current-password` | `new-password`), `role`, `ref`, `readOnly`, обработчики

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Combobox } from "./combobox.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
+import { List, ListRow } from "./list.tsx";
 import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { Menu } from "./menu.tsx";
@@ -13,6 +14,7 @@ import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
+import { Tooltip } from "./tooltip.tsx";
 import { Tree, type TreeNode } from "./tree.tsx";
 
 const options = [
@@ -28,6 +30,24 @@ const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it("connects a selectable list row to an explicitly identified tooltip", () => {
+    render(
+      <List>
+        <ListRow onSelect={() => {}} describedBy="project-folder-tip">
+          <Tooltip id="project-folder-tip" content="/complete/project/folder">
+            <code>…/project/folder</code>
+          </Tooltip>
+        </ListRow>
+      </List>,
+    );
+
+    const row = screen.getByRole("button");
+    expect(row.getAttribute("aria-describedby")).toBe("project-folder-tip");
+    expect(document.getElementById("project-folder-tip")?.textContent).toBe(
+      "/complete/project/folder",
+    );
+  });
+
   it("names a status dot without exposing its color as meaning", () => {
     render(<StatusDot tone="positive" label="Демон подключён" />);
 

@@ -446,7 +446,9 @@ describe("ProjectsView", () => {
     // Видимый путь — сокращённый: средние компоненты свернуты в `…`.
     expect(within(row).getByText("/…/sovereign_platform_node/apps/daemon").tagName).toBe("CODE");
     // Полный путь — в тултипе, привязанном к строке.
-    expect(within(row).getByRole("tooltip", { name: deep })).toBeDefined();
+    const tooltip = within(row).getByRole("tooltip", { name: deep });
+    const select = within(row).getAllByRole("button")[0]!;
+    expect(select.getAttribute("aria-describedby")).toBe(tooltip.id);
   });
 
   it("shows a short folder path whole, with the same path repeated in the tooltip", () => {

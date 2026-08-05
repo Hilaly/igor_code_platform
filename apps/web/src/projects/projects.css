@@ -137,6 +137,11 @@
   white-space: nowrap;
 }
 
+/* Фокус живёт на кнопке строки, а не на вложенном `Code`: показываем тот же полный путь, что hover. */
+.projects-list > li > button:focus-visible .projects-row-facts [role="tooltip"] {
+  opacity: 1;
+}
+
 .projects-row-marks {
   display: flex;
   align-items: center;

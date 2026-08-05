@@ -29,7 +29,7 @@ import {
   Tooltip,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { fetchFilesystemListing } from "./api.ts";
 import { shortenPath } from "./path-shorten.ts";
@@ -337,6 +337,7 @@ function ProjectRow({
   const { t } = translator;
   const [dialog, setDialog] = useState<OpenDialog>(undefined);
   const [name, setName] = useState(project.name);
+  const folderTooltipId = useId();
 
   // Эфемерный проект не переименовывается, не архивируется и не удаляется
   // (docs/sessions-and-projects.md), поэтому действий у него нет ни одного — не выключенных, а
@@ -369,6 +370,7 @@ function ProjectRow({
     <>
       <ListRow
         onSelect={onOpen}
+        describedBy={onOpen === undefined ? undefined : folderTooltipId}
         actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
       >
         <div className="projects-row">
@@ -379,7 +381,7 @@ function ProjectRow({
               и строка без усечения растягивала бы карточку или ломалась посимвольно. Тултип снизу,
               чтобы не перекрывать само имя проекта и пометки справа.
             */}
-            <Tooltip content={project.folder} side="bottom">
+            <Tooltip id={folderTooltipId} content={project.folder} side="bottom">
               <Code>{shortenPath(project.folder)}</Code>
             </Tooltip>
           </div>
