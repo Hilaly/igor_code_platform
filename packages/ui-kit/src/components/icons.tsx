@@ -1,6 +1,20 @@
 /** Именованные пиктограммы UI-кита: прикладной код не зависит от словаря внешней библиотеки. */
 
-import { Copy, GitBranchPlus, GitFork, Tag, TagX, type LucideIcon } from "lucide-react";
+import {
+  ChevronRight,
+  Copy,
+  GitBranchPlus,
+  GitFork,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Plus,
+  Tag,
+  TagX,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Icon, type IconSize } from "./icon.tsx";
 import styles from "./icons.module.css";
@@ -23,3 +37,10 @@ export const ForkBeforeIcon = actionIcon(GitBranchPlus);
 export const ForkThroughIcon = actionIcon(GitFork);
 export const SetLabelIcon = actionIcon(Tag);
 export const ClearLabelIcon = actionIcon(TagX);
+export const AddIcon = actionIcon(Plus);
+export const MoreIcon = actionIcon(MoreHorizontal);
+export const ChevronRightIcon = actionIcon(ChevronRight);
+export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);
+export const PanelLeftOpenIcon = actionIcon(PanelLeftOpen);
+export const PanelRightCloseIcon = actionIcon(PanelRightClose);
+export const PanelRightOpenIcon = actionIcon(PanelRightOpen);

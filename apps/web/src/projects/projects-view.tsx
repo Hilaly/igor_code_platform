@@ -21,6 +21,7 @@ import {
   Input,
   ListRow,
   Menu,
+  MoreIcon,
   Notice,
   Panel,
   Spinner,
@@ -432,7 +433,7 @@ function ProjectRow({
     return (
       <Menu
         label={t("projects.actions", { name: project.name })}
-        trigger="…"
+        trigger={<MoreIcon size="sm" />}
         triggerLabel={t("projects.actions", { name: project.name })}
         compact
         items={actions}

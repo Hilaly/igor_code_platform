@@ -4,7 +4,13 @@
  * вкладок, а плагин вкладывается в места внутри.
  */
 
-import { Button } from "@sovereign/ui-kit";
+import {
+  Button,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+} from "@sovereign/ui-kit";
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
@@ -82,7 +88,7 @@ export function Shell({
                 title={labels.hideLeft}
                 onClick={() => onLayoutChange({ ...layout, leftHidden: true })}
               >
-                «
+                <PanelLeftCloseIcon size="sm" />
               </Button>
             </div>
             <div className="shell-left-main">{navigation}</div>
@@ -112,9 +118,7 @@ export function Shell({
               title={labels.showLeft}
               onClick={() => onLayoutChange({ ...layout, leftHidden: false })}
             >
-              {/* Стрелка возврата смотрит к панели: левая панель спрятана слева, значит вернуть её —
-                  движение вправо. Скрывали её стрелкой «, возвращаем противоположной. */}
-              »
+              <PanelLeftOpenIcon size="sm" />
             </Button>
           </span>
         ) : undefined}
@@ -127,7 +131,7 @@ export function Shell({
               title={labels.showRight}
               onClick={() => onLayoutChange({ ...layout, rightHidden: false })}
             >
-              «
+              <PanelRightOpenIcon size="sm" />
             </Button>
           </span>
         ) : undefined}
@@ -170,7 +174,7 @@ export function Shell({
                 title={labels.hideRight}
                 onClick={() => onLayoutChange({ ...layout, rightHidden: true, openTab: undefined })}
               >
-                »
+                <PanelRightCloseIcon size="sm" />
               </Button>
             </div>
             {open === undefined ? (

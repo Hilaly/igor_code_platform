@@ -30,6 +30,7 @@ import {
 } from "react";
 
 import { Badge, type BadgeTone } from "./badge.tsx";
+import { ChevronRightIcon } from "./icons.tsx";
 import styles from "./tree.module.css";
 
 /** Метка узла: строка приходит переведённой, тон — роль, а не цвет (см. `Badge`). */
@@ -287,24 +288,26 @@ export function Tree({
                   tabIndex={-1}
                   onClick={(event) => handleToggleClick(event, node)}
                 >
-                  ▶
+                  <ChevronRightIcon size="xs" />
                 </button>
               ) : (
                 <span className={styles.togglePlaceholder} aria-hidden="true" />
               )}
-              {node.icon ? (
-                <span className={styles.icon} aria-hidden="true">
-                  {node.icon}
+              <span className={styles.content}>
+                {node.icon ? (
+                  <span className={styles.icon} aria-hidden="true">
+                    {node.icon}
+                  </span>
+                ) : null}
+                <span id={labelElementId} className={styles.label}>
+                  {node.label}
                 </span>
-              ) : null}
-              <span id={labelElementId} className={styles.label}>
-                {node.label}
+                {node.badge ? (
+                  <span id={badgeElementId}>
+                    <Badge tone={node.badge.tone}>{node.badge.text}</Badge>
+                  </span>
+                ) : null}
               </span>
-              {node.badge ? (
-                <span id={badgeElementId}>
-                  <Badge tone={node.badge.tone}>{node.badge.text}</Badge>
-                </span>
-              ) : null}
             </div>
             {hasChildren && isExpanded && node.children ? (
               <div role="group" className={styles.children}>

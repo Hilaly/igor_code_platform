@@ -101,6 +101,9 @@
   top: var(--menu-top, auto);
   left: var(--menu-left, auto);
   margin-top: var(--sovereign-space-1);
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - var(--sovereign-space-4));
 }
 
 .menu.portal.above {

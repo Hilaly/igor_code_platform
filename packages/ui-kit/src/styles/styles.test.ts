@@ -90,6 +90,17 @@ describe("stylesheets of the kit", () => {
     expect(effects.match(/--sovereign-elevation-/g)).toHaveLength(3);
   });
 
+  it("keeps Tree actions in one right-aligned rail across nesting levels", () => {
+    const tree = withoutComments(
+      readFileSync(join(kitRoot, "components", "tree.module.css"), "utf8"),
+    );
+
+    expect(tree).toMatch(/\.item\s*\{[^}]*display:\s*grid;/s);
+    expect(tree).toMatch(/\.node\s*\{[^}]*display:\s*contents;/s);
+    expect(tree).toMatch(/\.actions\s*\{[^}]*grid-column:\s*2;/s);
+    expect(tree).toMatch(/\.children\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
+  });
+
   it("describes public accents and elevation without obsolete decorative effects", () => {
     const catalogue = readFileSync(join(kitRoot, "components", "ported.stories.tsx"), "utf8");
     const palette = readFileSync(join(kitRoot, "tokens", "palette.ts"), "utf8");

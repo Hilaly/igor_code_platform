@@ -18,10 +18,16 @@ import { FilePicker } from "./file-picker.tsx";
 import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
 import {
+  AddIcon,
   ClearLabelIcon,
   CopyIcon,
   ForkBeforeIcon,
   ForkThroughIcon,
+  MoreIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
   SetLabelIcon,
 } from "./icons.tsx";
 import { Markdown } from "./markdown.tsx";
@@ -43,10 +49,16 @@ describe("markup of the ported primitives", () => {
         <ForkThroughIcon />
         <SetLabelIcon />
         <ClearLabelIcon />
+        <AddIcon />
+        <MoreIcon />
+        <PanelLeftCloseIcon />
+        <PanelLeftOpenIcon />
+        <PanelRightCloseIcon />
+        <PanelRightOpenIcon />
       </>,
     );
 
-    expect(markup.match(/<svg/g)).toHaveLength(5);
+    expect(markup.match(/<svg/g)).toHaveLength(11);
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).not.toContain("undefined");
   });

@@ -152,10 +152,15 @@ export function Menu({
 
       const rect = triggerElement.getBoundingClientRect();
       const popupHeight = popupRef.current?.getBoundingClientRect().height ?? 0;
+      const popupWidth = popupRef.current?.getBoundingClientRect().width ?? 0;
+      const viewportPadding = 8;
+      const maxLeft = Math.max(viewportPadding, window.innerWidth - popupWidth - viewportPadding);
+      const preferredTop = placement === "above" ? rect.top - popupHeight : rect.bottom;
+      const maxTop = Math.max(viewportPadding, window.innerHeight - popupHeight - viewportPadding);
 
       setPopupPosition({
-        left: rect.left,
-        top: placement === "above" ? rect.top - popupHeight : rect.bottom,
+        left: Math.min(Math.max(rect.left, viewportPadding), maxLeft),
+        top: Math.min(Math.max(preferredTop, viewportPadding), maxTop),
       });
     };
 
@@ -176,7 +181,11 @@ export function Menu({
       role="menu"
       aria-label={label}
       ref={popupRef}
-      style={compact && popupPosition !== undefined ? popupPosition : undefined}
+      style={
+        compact && popupPosition !== undefined
+          ? { ...popupPosition, maxWidth: "calc(100vw - 16px)" }
+          : undefined
+      }
     >
       {items.map((item, index) => (
         <button

@@ -98,6 +98,36 @@ describe("interactive components", () => {
     expect(menu.parentElement).toBe(document.body);
   });
 
+  it("keeps a compact popup sized to its contents instead of the document", () => {
+    render(
+      <Menu
+        label="Действия"
+        trigger="…"
+        triggerLabel="Действия проекта"
+        compact
+        items={[{ id: "rename", label: "Переименовать проект", onSelect: () => {} }]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Действия проекта" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 220,
+      y: 100,
+      top: 100,
+      right: 244,
+      bottom: 124,
+      left: 220,
+      width: 24,
+      height: 24,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(trigger);
+
+    const menu = screen.getByRole("menu", { name: "Действия" });
+    expect(menu.style.maxWidth).toBe("calc(100vw - 16px)");
+    expect(menu.style.left).toBe("220px");
+  });
+
   it("lets a controlled picker render its own trigger and popup role through Popover", () => {
     const onOpenChange = vi.fn();
     render(

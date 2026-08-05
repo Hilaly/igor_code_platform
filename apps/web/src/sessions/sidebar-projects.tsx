@@ -1,11 +1,13 @@
 import type { Project, ProjectUpdate, Session, SessionUpdate } from "@sovereign/protocol";
 import {
+  AddIcon,
   Button,
   ConfirmDialog,
   Dialog,
   Field,
   Input,
   Menu,
+  MoreIcon,
   Notice,
   Spinner,
   Text,
@@ -113,12 +115,12 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         disabled={project.availability !== "available"}
         onClick={() => props.onNewSession(project.id)}
       >
-        +
+        <AddIcon size="sm" />
       </Button>
       {project.ephemeral ? undefined : (
         <Menu
           label={t("projects.actions", { name: project.name })}
-          trigger="…"
+          trigger={<MoreIcon size="sm" />}
           triggerLabel={t("projects.actions", { name: project.name })}
           compact
           items={[
@@ -155,7 +157,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
     return (
       <Menu
         label={t("sessions.actions", { name: title })}
-        trigger="…"
+        trigger={<MoreIcon size="sm" />}
         triggerLabel={t("sessions.actions", { name: title })}
         compact
         items={[

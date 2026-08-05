@@ -6,6 +6,7 @@ import {
   List,
   ListRow,
   Menu,
+  MoreIcon,
   Notice,
   Spinner,
   Text,
@@ -164,7 +165,7 @@ function ArchiveSessionsGroup({
             actions={
               <Menu
                 label={t("sessions.actions", { name: session.title ?? session.id })}
-                trigger="…"
+                trigger={<MoreIcon size="sm" />}
                 triggerLabel={t("sessions.actions", { name: session.title ?? session.id })}
                 compact
                 items={[
