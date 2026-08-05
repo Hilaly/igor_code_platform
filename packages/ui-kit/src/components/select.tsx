@@ -18,6 +18,8 @@ export type SelectProps = {
   options: SelectOption[];
   onChange: (value: string) => void;
   label: string;
+  /** Accessible name when the visible label is supplied by an outer SettingsRow. */
+  ariaLabel?: string;
   /**
    * Что стоит в триггере, пока ничего не выбрано. Обязателен и без значения по умолчанию: строка,
    * зашитая в кит, приезжает на чужом языке — переводить её обязан вызывающий (docs/ui-kit.md).
@@ -31,6 +33,7 @@ export function Select({
   options,
   onChange,
   label,
+  ariaLabel,
   placeholder,
   disabled = false,
 }: SelectProps) {
@@ -140,7 +143,7 @@ export function Select({
         aria-controls={listId}
         aria-haspopup="listbox"
         aria-activedescendant={open ? activeOptionId : undefined}
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         className={`${styles.control}${disabled ? ` ${styles.disabled}` : ""}`}
         onClick={() => {
           if (!disabled) setOpen((prev) => !prev);
@@ -155,7 +158,7 @@ export function Select({
           id={listId}
           className={styles.dropdown}
           role="listbox"
-          aria-label={label}
+          aria-label={ariaLabel ?? label}
           tabIndex={-1}
         >
           {options.map((option, index) => {

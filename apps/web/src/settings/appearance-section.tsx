@@ -47,7 +47,8 @@ export function AppearanceSection({
         description={t("settings.appearance.schemeHint")}
       >
         <Select
-          label={t("appearance.scheme")}
+          label=""
+          ariaLabel={t("appearance.scheme")}
           value={preferences.appearance.colorScheme}
           options={schemes.map((scheme) => ({
             value: scheme.id,
@@ -97,7 +98,8 @@ export function AppearanceSection({
       </SettingsRow>
       <SettingsRow label={t("appearance.locale")}>
         <Select
-          label={t("appearance.locale")}
+          label=""
+          ariaLabel={t("appearance.locale")}
           value={preferences.locale}
           options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
           onChange={(locale) => onChange({ ...preferences, locale })}

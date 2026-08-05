@@ -145,7 +145,7 @@ export function ProvidersView({
       // честнее, чем страница «неизвестный адрес».
       return (
         <div className="providers">
-          <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+          {headingLevel === 1 ? <Heading level={headingLevel}>{t("page.providers.title")}</Heading> : undefined}
           {logins}
           <Button onClick={onBack}>{t("providers.back")}</Button>
           <EmptyState title={t("providers.notfound", { id: providerId })} />

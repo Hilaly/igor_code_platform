@@ -37,6 +37,7 @@ import {
   SettingsRow,
   SettingsView,
 } from "./settings-frame.tsx";
+import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
@@ -78,6 +79,22 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain("Imperium");
     expect(markup).not.toContain("Sovereign · Settings");
     expect(markup).not.toContain("undefined");
+  });
+
+  it("keeps a Select visually compact when its accessible label comes from a Settings row", () => {
+    const markup = renderToStaticMarkup(
+      <Select
+        label=""
+        ariaLabel="Colour scheme"
+        value="imperium"
+        options={[{ value: "imperium", label: "Imperium" }]}
+        onChange={() => {}}
+        placeholder="Choose"
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Colour scheme"');
+    expect(markup).not.toContain(">Colour scheme<");
   });
 
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {

@@ -159,7 +159,7 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
     <ListRow>
       <div className="plugins-row">
         <div className="plugins-row-main">
-          <Heading level={2}>{status.id ?? status.key}</Heading>
+          <Text>{status.id ?? status.key}</Text>
           <Text tone="muted">{status.key}</Text>
         </div>
         <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>

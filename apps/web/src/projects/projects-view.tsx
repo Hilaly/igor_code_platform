@@ -22,7 +22,6 @@ import {
   ListRow,
   Menu,
   Notice,
-  Panel,
   Spinner,
   Text,
   type ScopedTranslator,
@@ -231,7 +230,8 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   }, [pickerOpen, cwd]);
 
   return (
-    <Panel title={t("projects.new.title")}>
+    <section className="projects-new-surface" aria-labelledby="projects-new-title">
+      <Heading level={2}>{t("projects.new.title")}</Heading>
       {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
           больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
       <Form onSubmit={submit} disabled={busy || !ready}>
@@ -301,7 +301,7 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
         confirmLabel={t("projects.folder.picker.confirm")}
         cancelLabel={t("projects.folder.picker.cancel")}
       />
-    </Panel>
+    </section>
   );
 }
 
