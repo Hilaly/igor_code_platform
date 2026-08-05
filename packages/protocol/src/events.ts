@@ -8,6 +8,7 @@
  */
 
 import type { ContributionRegistration } from "./contribution.ts";
+import type { HookCriticality } from "./hook.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginSource } from "./plugin.ts";
 
@@ -66,6 +67,11 @@ export const coreEventTypes = {
   providerLogin: "core.provider.login",
   /** Выход из провайдера. Есть по той же причине: иначе чужой разлогин выглядит поломкой. */
   providerLogout: "core.provider.logout",
+  /**
+   * Подписчик не ответил в срок (docs/hooks.md). «Таймаут не бывает молчаливым»: он и в журнале, и
+   * здесь — иначе политика, тихо перестающая действовать под нагрузкой, выглядит работающей.
+   */
+  hookTimedOut: "core.hook.timed-out",
 } as const;
 
 /**
@@ -127,6 +133,20 @@ export type ProviderLogout = {
   providerId: string;
 };
 
+/**
+ * Нагрузка есть, как у всякого факта: перечитать «кто не ответил» неоткуда. Автор — идентификатор
+ * вклада, а не плагина: подписок у плагина несколько, и выключать придётся конкретную
+ * (docs/hooks.md).
+ */
+export type HookTimedOut = {
+  contributionId: string;
+  event: string;
+  criticality: HookCriticality;
+  /** Что случилось с ответом: исход зависит от вида хука и пометки критичности (docs/hooks.md). */
+  outcome: "refused" | "skipped" | "aborted-the-turn";
+  waitedMilliseconds: number;
+};
+
 export type CoreEventPayloads = {
   "core.plugin.lifecycle": PluginStatus;
   "core.plugin.contributions": PluginContributionsChanged;
@@ -138,6 +158,7 @@ export type CoreEventPayloads = {
   "core.providers.changed": ProvidersChanged;
   "core.provider.login": ProviderLogin;
   "core.provider.logout": ProviderLogout;
+  "core.hook.timed-out": HookTimedOut;
 };
 
 export type CoreEventType = keyof CoreEventPayloads;

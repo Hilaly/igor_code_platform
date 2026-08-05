@@ -1574,8 +1574,9 @@ describe("a call from the core into a plugin", () => {
 
     const outcome = await answer;
 
-    assert.equal(outcome.kind, "failed");
-    assert.match(outcome.kind === "failed" ? outcome.reason : "", /did not answer the hook call/);
+    // Таймаут отделён от сбоя: исход у них разный, и различать их по тексту причины значило бы
+    // сверять формулировки вместо видов (docs/hooks.md).
+    assert.deepEqual(outcome, { kind: "timed-out", waitedMilliseconds: 5_000 });
 
     // Таймаут не бывает молчаливым: вклад-автор назван в журнале (docs/hooks.md).
     const record = await recorded.waitFor(

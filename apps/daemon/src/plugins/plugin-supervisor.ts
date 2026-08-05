@@ -64,12 +64,20 @@ export type PluginSupervisor = {
     pluginKey: string,
     call: PluginCall,
     waiting: { timeoutMilliseconds: number },
-  ) => Promise<PluginCallResult>;
+  ) => Promise<PluginCallOutcome>;
   stopAll: () => Promise<void>;
 };
 
 /** Отмена запланированного действия. Возвращается планировщиком, чтобы таймер можно было снять. */
 export type CancelScheduled = () => void;
+
+/**
+ * Чем кончился вызов плагина глазами ядра. К тому, что умеет сказать воркер, добавляется таймаут:
+ * его ставит демон, и от сбоя он отличается исходом — сбой это ошибка в журнал, а таймаут
+ * разбирается по таблице критичности подписки (docs/hooks.md).
+ */
+export type PluginCallOutcome =
+  PluginCallResult | { kind: "timed-out"; waitedMilliseconds: number };
 
 /**
  * Один запрос плагина глазами того, кто на него отвечает. Имя не `PluginCall`: вызовом называется
@@ -163,7 +171,7 @@ type Supervised = {
    * Вызовы ядра, ждущие ответа этого воркера. Живут у записи, а не общей таблицей: смерть воркера
    * обязана ответить именно его вызовам, и никаким чужим.
    */
-  awaitingCall: Map<string, (result: PluginCallResult) => void>;
+  awaitingCall: Map<string, (result: PluginCallOutcome) => void>;
   cancelRetry?: CancelScheduled;
   /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
   startToken?: object;
@@ -644,7 +652,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     pluginKey: string,
     request: PluginCall,
     waiting: { timeoutMilliseconds: number },
-  ): Promise<PluginCallResult> => {
+  ): Promise<PluginCallOutcome> => {
     const entry = supervised.get(pluginKey);
     const worker = entry?.worker;
 
@@ -660,12 +668,12 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     callsSent += 1;
     const callId = String(callsSent);
 
-    return new Promise<PluginCallResult>((resolve) => {
+    return new Promise<PluginCallOutcome>((resolve) => {
       // Ожидание заводится раньше таймера, а таймер отдаётся ожиданию через эту ячейку: планировщик
       // теста вправе позвать обратный вызов сразу, и тогда снимать будет ещё нечего.
       const timeout: { cancel?: CancelScheduled } = {};
 
-      const settle = (result: PluginCallResult): void => {
+      const settle = (result: PluginCallOutcome): void => {
         // Ответ и таймаут могли прийти оба: побеждает первый, и второй уже никого не касается.
         if (!entry.awaitingCall.delete(callId)) {
           return;
@@ -686,12 +694,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           call: request.kind,
           waitedMilliseconds: waiting.timeoutMilliseconds,
         });
-        settle({
-          kind: "failed",
-          reason:
-            `the plugin ${pluginKey} did not answer the ${request.kind} call ` +
-            `${request.contributionId} in ${waiting.timeoutMilliseconds} ms`,
-        });
+        settle({ kind: "timed-out", waitedMilliseconds: waiting.timeoutMilliseconds });
       }, waiting.timeoutMilliseconds);
 
       const carried: PluginIncoming = { kind: "call", callId, call: request };
