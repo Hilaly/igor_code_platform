@@ -100,6 +100,7 @@ export function MessageComposer({
       },
       (error: unknown) => {
         if (operationToken.current !== token || currentSessionId.current !== submittedSessionId) {
+          onError(error);
           return;
         }
 

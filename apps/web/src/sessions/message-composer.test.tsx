@@ -55,10 +55,12 @@ const modelGroups: ModelPickerGroup[] = [
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((accept) => {
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((accept, fail) => {
     resolve = accept;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 type ComposerHarnessProps = {
@@ -73,8 +75,10 @@ type ComposerHarnessProps = {
 
 function SwitchingComposerHarness({
   onSubmit,
+  onError = vi.fn(),
 }: {
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
+  onError?: (error: unknown) => void;
 }) {
   const [sessionId, setSessionId] = useState("session-a");
   const [draft, setDraft] = useState("");
@@ -96,7 +100,7 @@ function SwitchingComposerHarness({
         onSubmit={onSubmit}
         onSendMessage={vi.fn(() => Promise.resolve(undefined))}
         onInterrupt={vi.fn()}
-        onError={vi.fn()}
+        onError={onError}
         translator={translator}
       />
       <button
@@ -342,6 +346,29 @@ describe("the session message composer", () => {
     );
     expect((field as HTMLTextAreaElement).value).toBe("не теряй при ошибке");
     expect(onError).toHaveBeenCalledWith(error);
+  });
+
+  it("reports a stale rejection without touching the new session draft", async () => {
+    const acceptance = deferred<string | undefined>();
+    const error = new Error("session A failed");
+    const onError = vi.fn();
+    render(<SwitchingComposerHarness onSubmit={() => acceptance.promise} onError={onError} />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "сообщение A" } });
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    // The harness owns the draft reset, while this callback proves the error remains observable.
+    fireEvent.click(screen.getByRole("button", { name: "Переключить сессию" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "сообщение B" },
+    });
+    acceptance.reject(error);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith(error));
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("сообщение B");
   });
 
   it.each([
