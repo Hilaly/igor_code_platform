@@ -10,5 +10,11 @@ export {
   type SessionService,
   type SessionServiceOptions,
 } from "./sessions.ts";
-export { createToolCollector, type ToolCollector, type ToolContext } from "./tool-collection.ts";
+export {
+  createToolCollector,
+  type CollectedTool,
+  type ToolCollector,
+  type ToolContext,
+  type ToolSource,
+} from "./tool-collection.ts";
 export { createTurnQueue, type TurnQueue } from "./turn-queue.ts";

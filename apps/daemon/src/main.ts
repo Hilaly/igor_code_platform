@@ -47,6 +47,7 @@ import {
   pluginsRoute,
   projectPluginRoots,
   standaloneResourceRoots,
+  pluginToolSource,
   type PluginRoot,
   type PluginSessions,
 } from "./plugins/public.ts";
@@ -321,6 +322,17 @@ const events = createEventStream({ bus, logger });
 const toolCollector = createToolCollector();
 
 toolCollector.register(coreToolSource());
+// Инструменты плагинов вторым источником. Набор пересобирается перед каждым турном, поэтому
+// выключенный вклад уносит инструмент с собой, а сессия доигрывает с тем, что осталось.
+toolCollector.register(
+  pluginToolSource({
+    registry: contributions,
+    plugins,
+    // Живьём, как и остальные ключи `config.json`: правка применяется без перезапуска демона.
+    timeoutMilliseconds: () => settings.current().config.pluginToolTimeoutMilliseconds,
+    logger,
+  }),
+);
 
 const sessions = createSessionService({
   store: createAgentSessionStore({
