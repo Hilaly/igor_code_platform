@@ -31,10 +31,29 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import { SettingsFrame } from "./settings-frame.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders the shared settings frame without a route-specific escape hatch", () => {
+    const markup = renderToStaticMarkup(
+      <SettingsFrame
+        context={<span>Sovereign · Settings</span>}
+        settingsLabel="SETTINGS"
+        navigationLabel="Settings sections"
+        navigation={<span>Appearance</span>}
+      >
+        <h1>Appearance</h1>
+      </SettingsFrame>,
+    );
+
+    expect(markup).toContain("Sovereign · Settings");
+    expect(markup).not.toContain("←");
+    expect(markup).toContain("Appearance");
+    expect(markup).not.toContain("undefined");
+  });
+
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
     const markup = renderToStaticMarkup(
       <>

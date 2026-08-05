@@ -139,6 +139,17 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
   });
 
+  it("turns the settings navigation into one scrollable row in narrow containers", () => {
+    const settingsFrameCss = readFileSync(
+      join(kitRoot, "components", "settings-frame.module.css"),
+      "utf8",
+    );
+
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;[^}]*width:\s*max-content;/s,
+    );
+  });
+
   it("keeps shared application states flat and elevates only overlays", () => {
     const dialogCss = withoutComments(
       readFileSync(join(kitRoot, "components", "dialog.module.css"), "utf8"),
