@@ -66,6 +66,17 @@ describe("shortenPath", () => {
     expect(shortenPath(long, 19)).toBe("C:\\…\\repos\\product");
   });
 
+  it("returns Windows roots untouched", () => {
+    expect(shortenPath("C:\\")).toBe("C:\\");
+    expect(shortenPath("\\\\server\\share\\")).toBe("\\\\server\\share\\");
+  });
+
+  it("shortens a relative backslash path without inventing a root", () => {
+    const long = "workspace\\team\\module\\product";
+
+    expect(shortenPath(long, 21)).toBe("…\\team\\module\\product");
+  });
+
   it("preserves the server and share of a UNC path", () => {
     const long = "\\\\server\\share\\archive\\team\\product";
 
