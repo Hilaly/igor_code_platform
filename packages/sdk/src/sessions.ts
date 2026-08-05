@@ -273,6 +273,28 @@ export type SessionEntryLabelled = {
   label?: string;
 };
 
+/**
+ * Отказ подписчика, увиденный со стороны вызывающего. Форма не та, которой отказывает обработчик
+ * (`HookRefusal`): отказавшему незачем называть себя, а тому, кто получил отказ, автор нужен —
+ * подписок у плагина несколько, и выключать придётся конкретную (docs/hooks.md).
+ */
+export type SessionRefusedByHook = {
+  /** Идентификатор вклада, а не плагина: тот же, которым вклад включается и выключается. */
+  contributionId: string;
+  /** Текст плагина, попадает в интерфейс как есть. Таймаут приходит отказом этой же формы. */
+  reason: string;
+};
+
+/**
+ * Исход создания сессии. Объединение, а не сессия с исключением: запрет подписчиком означает, что
+ * система работает как задумано, и разбирать оба случая заставляет тип (docs/hooks.md). Сбои —
+ * недоступный проект, занятая сессия, упавшая запись — по-прежнему исключения.
+ */
+export type SessionCreateOutcome =
+  | { kind: "created"; session: Session }
+  /** Отказов может быть несколько: опрашиваются все подписчики, и в исходе лежит список. */
+  | { kind: "refused"; refusals: SessionRefusedByHook[] };
+
 export type SessionRequest =
   | { kind: "agent-list" }
   | { kind: "session-list"; projectId?: string; archived?: boolean }
@@ -294,7 +316,7 @@ export type SessionRequest =
 export type SessionResponse =
   | { kind: "agent-list"; agents: AgentSummary[] }
   | { kind: "session-list"; sessions: Session[] }
-  | { kind: "session-create"; session: Session }
+  | { kind: "session-create"; outcome: SessionCreateOutcome }
   | { kind: "session-entries"; page: SessionEntriesPage }
   | { kind: "session-prompt"; accepted: TurnAccepted }
   | { kind: "session-abort"; interrupted: boolean }
@@ -349,9 +371,12 @@ export const sessions = {
   /**
    * Создать сессию. Она живёт в ядре: выгрузка плагина, который её создал, сессию не останавливает
    * (docs/architecture.md).
+   *
+   * Возвращает исход, а не сессию: подписчик на `before_session_start` вправе отказать, и отказ —
+   * это значение (docs/hooks.md).
    */
-  create: async (draft: SessionDraft): Promise<Session> =>
-    (await ask({ kind: "session-create", draft }, "session-create")).session,
+  create: async (draft: SessionDraft): Promise<SessionCreateOutcome> =>
+    (await ask({ kind: "session-create", draft }, "session-create")).outcome,
 
   /**
    * Запустить турн. Возврат не значит «турн кончился»: он значит «принят». При исчерпанном пределе

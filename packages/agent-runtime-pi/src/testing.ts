@@ -157,7 +157,15 @@ export function scriptedProvider(options: ScriptedProviderOptions = {}): Scripte
 export type ScriptedToolCall = { id: string; name: string; arguments: Record<string, unknown> };
 
 /** Один ответ модели: текст, вызовы инструментов или и то, и другое. */
-export type ScriptedTurn = { text?: string; toolCalls?: ScriptedToolCall[] };
+export type ScriptedTurn = {
+  text?: string;
+  toolCalls?: ScriptedToolCall[];
+  /**
+   * Сколько это обращение «стоило». Не названо — ноль: сложение нулей неотличимо от потерянной траты,
+   * поэтому тесту учёта нужен способ назвать разные величины на разные обращения.
+   */
+  tokens?: number;
+};
 
 export type ScriptedModelProviderOptions = {
   id?: string;
@@ -294,6 +302,10 @@ function playTurn(
     events.push({ type: "toolcall_start", contentIndex, partial: { ...message } });
     events.push({ type: "toolcall_end", contentIndex, toolCall, partial: { ...message } });
     contentIndex += 1;
+  }
+
+  if (turn.tokens !== undefined) {
+    message.usage = { ...message.usage, output: turn.tokens, totalTokens: turn.tokens };
   }
 
   message.stopReason = (turn.toolCalls?.length ?? 0) > 0 ? "toolUse" : "stop";

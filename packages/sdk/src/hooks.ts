@@ -110,8 +110,12 @@ export type PlatformHookPayloadMap = {
   session_closed: { sessionId: string; projectId: string };
   /** До первой траты: отказ здесь означает, что сессия не создана вовсе. */
   before_session_start: { projectId: string; folder: string; agentId: string };
-  /** Сумма по всем запросам турна, включая повторы и вызовы инструментов (docs/hooks.md). */
-  turn_finished: { sessionId: string; projectId: string; usage: Usage };
+  /**
+   * Сумма по всем запросам турна, включая повторы и вызовы инструментов (docs/hooks.md). Трата
+   * необязательна: турн, не дошедший до провайдера, тратой не отчитывается, и сочинять за него ноль
+   * значило бы выдать неизвестную трату за нулевую.
+   */
+  turn_finished: { sessionId: string; projectId: string; usage?: Usage };
   /**
    * Разрешение на вызов инструмента. Своя нагрузка, а не `tool_call` Pi: у события Pi нет ни
    * сессии, ни проекта. Диалог с человеком ядро не проксирует — его делает плагин.

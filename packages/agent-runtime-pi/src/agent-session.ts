@@ -33,7 +33,7 @@ import {
   type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { MutableModels } from "@earendil-works/pi-ai";
+import type { MutableModels, Usage } from "@earendil-works/pi-ai";
 import {
   isThinkingLevel,
   modelReference,
@@ -172,7 +172,16 @@ export type PersistedAgentSession = {
   close: () => Promise<void>;
 };
 
-export type TurnOutcome = { kind: "done" } | { kind: "busy" } | { kind: "failed"; reason: string };
+/**
+ * `usage` у законченного турна — сумма по всем обращениям к модели внутри него, включая повторы и
+ * вызовы инструментов (docs/hooks.md). Тип рантайма, поэтому наружу он уходит непрозрачным: ядру его
+ * разбирать незачем, оно передаёт его подписчику как есть, а типизирует SDK.
+ *
+ * Траты компакции и пересказа ветки сюда не входят: они приходят своими событиями рантайма, и
+ * считать их турном значило бы посчитать их дважды.
+ */
+export type TurnOutcome =
+  { kind: "done"; usage?: unknown } | { kind: "busy" } | { kind: "failed"; reason: string };
 
 export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
 
@@ -677,6 +686,11 @@ function liveSession(
 
   let phase: SessionPhase = "idle";
   let current: { turnId: string; aborted: boolean; messages: number } | undefined;
+  /**
+   * Трата идущего турна. Складывается из ответов модели и результатов инструментов: у турна несколько
+   * обращений к провайдеру, а платит владелец за все (docs/hooks.md).
+   */
+  let spent: Usage | undefined;
 
   const setPhase = (next: SessionPhase): void => {
     if (phase === next) {
@@ -734,6 +748,14 @@ function liveSession(
     // есть только у двух перезаписывающих, — поэтому нагрузка уезжает как есть.
     if (runtimeHookKinds[event.type] === "observing") {
       hooks?.observe(event.type, event);
+    }
+
+    if (event.type === "message_end" && event.message.role === "assistant") {
+      spent = addUsage(spent, event.message.usage);
+    }
+
+    if (event.type === "tool_result") {
+      spent = addUsage(spent, event.usage);
     }
 
     if (event.type === "queue_update") {
@@ -865,6 +887,7 @@ function liveSession(
       }
 
       current = { turnId, aborted: false, messages: 0 };
+      spent = undefined;
       setPhase("turn");
 
       try {
@@ -878,7 +901,7 @@ function liveSession(
 
         publish(current.aborted ? { kind: "turn-aborted" } : { kind: "turn-end" });
 
-        return { kind: "done" };
+        return spent === undefined ? { kind: "done" } : { kind: "done", usage: spent };
       } catch (cause) {
         if (cause instanceof AgentHarnessError && cause.code === "busy") {
           return { kind: "busy" };
@@ -1386,6 +1409,49 @@ function blocksOf(content: readonly unknown[]): SessionContentBlock[] {
   }
 
   return blocks;
+}
+
+/**
+ * Сложить траты. Своего отчёта мы не заводим — складывается тип рантайма, поле к полю: то, чего Pi не
+ * различает, не различаем и мы (docs/hooks.md).
+ */
+function addUsage(total: Usage | undefined, added: Usage | undefined): Usage | undefined {
+  if (added === undefined) {
+    return total;
+  }
+
+  if (total === undefined) {
+    return added;
+  }
+
+  const cacheWrite1h = addReported(total.cacheWrite1h, added.cacheWrite1h);
+  const reasoning = addReported(total.reasoning, added.reasoning);
+
+  return {
+    input: total.input + added.input,
+    output: total.output + added.output,
+    cacheRead: total.cacheRead + added.cacheRead,
+    cacheWrite: total.cacheWrite + added.cacheWrite,
+    totalTokens: total.totalTokens + added.totalTokens,
+    ...(cacheWrite1h === undefined ? {} : { cacheWrite1h }),
+    ...(reasoning === undefined ? {} : { reasoning }),
+    cost: {
+      input: total.cost.input + added.cost.input,
+      output: total.cost.output + added.cost.output,
+      cacheRead: total.cost.cacheRead + added.cost.cacheRead,
+      cacheWrite: total.cost.cacheWrite + added.cost.cacheWrite,
+      total: total.cost.total + added.cost.total,
+    },
+  };
+}
+
+/**
+ * Необязательные разбивки Pi: `undefined` значит «провайдер этого не сообщает», и это не ноль.
+ * Складывать их как ноль значило бы выдать несообщённое за посчитанное; терять при сложении — забыть
+ * разбивку, которую провайдер дал.
+ */
+function addReported(left: number | undefined, right: number | undefined): number | undefined {
+  return left === undefined && right === undefined ? undefined : (left ?? 0) + (right ?? 0);
 }
 
 /**

@@ -159,9 +159,40 @@ describe("createPluginSessions", () => {
 
     assert.deepEqual(await sessions.answer({ kind: "session-create", draft }), {
       kind: "session-create",
-      session,
+      outcome: { kind: "created", session },
     });
     assert.deepEqual(calls, [{ create: draft }]);
+  });
+
+  it("carries a refusal of the subscribers as an outcome, with every author named", async () => {
+    const { sessions } = bridge({
+      create: () =>
+        Promise.resolve({
+          kind: "refused-by-hooks",
+          refusals: [
+            { contributionId: "budget.guard", reason: "бюджет исчерпан" },
+            { contributionId: "hours.guard", reason: "не рабочее время" },
+          ],
+        }),
+    });
+
+    // Отказ подписчика — не сбой: он уезжает исходом, а список не сворачивается в первую причину.
+    assert.deepEqual(
+      await sessions.answer({
+        kind: "session-create",
+        draft: { projectId: "p1", agentId: "a" },
+      }),
+      {
+        kind: "session-create",
+        outcome: {
+          kind: "refused",
+          refusals: [
+            { contributionId: "budget.guard", reason: "бюджет исчерпан" },
+            { contributionId: "hours.guard", reason: "не рабочее время" },
+          ],
+        },
+      },
+    );
   });
 
   it("turns a domain refusal into a failure with the reason, not into an exception", async () => {

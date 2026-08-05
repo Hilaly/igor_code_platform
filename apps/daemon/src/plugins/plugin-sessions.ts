@@ -190,7 +190,19 @@ export function createPluginSessions(options: PluginSessionsOptions): PluginSess
           const created = await sessions.create(request.draft);
 
           if (created.kind === "created") {
-            return { kind: "session-create", session: sessionForPlugin(created.session) };
+            return {
+              kind: "session-create",
+              outcome: { kind: "created", session: sessionForPlugin(created.session) },
+            };
+          }
+
+          // Отказ подписчика уезжает исходом, а не сбоем: он означает, что политика сработала, и
+          // разбирать его плагина заставляет тип (docs/hooks.md). Сбои платформы остаются `failed`.
+          if (created.kind === "refused-by-hooks") {
+            return {
+              kind: "session-create",
+              outcome: { kind: "refused", refusals: created.refusals },
+            };
           }
 
           return {

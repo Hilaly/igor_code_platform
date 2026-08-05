@@ -278,6 +278,15 @@ export function createHookDispatcher(options: CreateHookDispatcherOptions): Hook
 }
 
 /**
+ * Отказы одной строкой — для тех, у кого места под список нет: маршрут отдаёт список отдельным полем,
+ * а канал плагина и журнал несут только текст. Автор назван у каждого: «кто-то запретил» не оставляет
+ * человеку способа найти и выключить того, кто запретил (docs/hooks.md).
+ */
+export function describeRefusals(refusals: HookRefusal[]): string {
+  return refusals.map((refusal) => `${refusal.contributionId}: ${refusal.reason}`).join("; ");
+}
+
+/**
  * Подписка плагина проекта применима только к сессиям своего проекта. Непроектный источник —
  * встроенный и папка данных — применим ко всем: это та же применимость, что у остальных вкладов.
  */

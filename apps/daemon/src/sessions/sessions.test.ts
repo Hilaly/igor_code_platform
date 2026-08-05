@@ -31,6 +31,7 @@ import {
   type AgentsSnapshot,
   type BusEvent,
   type ContributionRegistration,
+  type HookRefusal,
   type SessionBranch,
   type SessionContextUsage,
   type SessionEntriesPage,
@@ -41,6 +42,7 @@ import {
 } from "@sovereign/protocol";
 
 import { coreToolSource } from "./core-tools.ts";
+import type { HookAudience, HookDispatcher } from "./hook-dispatch.ts";
 import { ensureDataDirectory } from "../platform/public.ts";
 import { createDispatcher } from "../http/public.ts";
 import { createEventBus } from "../platform/public.ts";
@@ -138,6 +140,7 @@ async function serve(
     operationGate?: ReturnType<typeof gate> | (() => ReturnType<typeof gate> | undefined);
     coldSession?: boolean;
     compactionThreshold?: number;
+    hooks?: Pick<HookDispatcher, "observe" | "decide">;
   } = {},
 ) {
   const directory = ensureDataDirectory(mkdtempSync(join(workspace, "case-")));
@@ -317,6 +320,7 @@ async function serve(
     availability: () => "available",
     projectLifecycle,
     compactionThreshold: () => options.compactionThreshold ?? 0,
+    ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
   });
 
   await service.refresh();
@@ -2086,5 +2090,116 @@ describe("a session that lost a tool or a model", () => {
       kind: "model",
       name: model,
     });
+  });
+});
+
+/**
+ * Двойник сведения ответов: диспетчер проверен своими тестами, а здесь проверяются точки вызова —
+ * что платформа спрашивает и рассказывает там, где обещала (docs/hooks.md).
+ */
+function hookRecorder(refusals: HookRefusal[] = []) {
+  const observed: { event: string; payload: unknown; audience: HookAudience }[] = [];
+  const decided: { event: string; payload: unknown; audience: HookAudience }[] = [];
+
+  return {
+    observed,
+    decided,
+    hooks: {
+      observe: (event, payload, audience) => {
+        observed.push({ event, payload, audience });
+      },
+      decide: async (event, payload, audience) => {
+        decided.push({ event, payload, audience });
+
+        return { refusals };
+      },
+    } satisfies Pick<HookDispatcher, "observe" | "decide">,
+  };
+}
+
+function observedPayload(
+  recorder: ReturnType<typeof hookRecorder>,
+  event: string,
+): Record<string, unknown> | undefined {
+  return recorder.observed.find((entry) => entry.event === event)?.payload as
+    Record<string, unknown> | undefined;
+}
+
+describe("the platform hooks of a session", () => {
+  it("asks before the session starts and tells about it once it did", async () => {
+    const recorder = hookRecorder();
+    const { start, projectId, folder } = await serve({ hooks: recorder.hooks });
+
+    const started = await start();
+
+    assert.equal(started.status, 200);
+
+    // Спрашивается до первой траты и до появления файла, и спрашивается о проекте сессии: подписка
+    // плагина проекта чужого проекта не касается.
+    assert.deepEqual(recorder.decided, [
+      {
+        event: "before_session_start",
+        payload: { projectId, folder, agentId: baseAgent.id },
+        audience: { projectId },
+      },
+    ]);
+    assert.deepEqual(observedPayload(recorder, "session_created"), {
+      sessionId: started.body["id"],
+      projectId,
+      agentId: baseAgent.id,
+    });
+  });
+
+  it("refuses the session with 409 and every author named, creating nothing", async () => {
+    const recorder = hookRecorder([
+      { contributionId: "budget.guard", reason: "бюджет исчерпан" },
+      { contributionId: "hours.guard", reason: "не рабочее время" },
+    ]);
+    const { call, start } = await serve({ hooks: recorder.hooks });
+
+    const refused = await start();
+
+    assert.equal(refused.status, 409);
+    assert.deepEqual(refused.body["refusals"], [
+      { contributionId: "budget.guard", reason: "бюджет исчерпан" },
+      { contributionId: "hours.guard", reason: "не рабочее время" },
+    ]);
+
+    // Отказов столько, сколько отказавших: конфликт двух политик не сворачивается в первую причину.
+    assert.match(String(refused.body["error"]), /budget\.guard: бюджет исчерпан/);
+    assert.match(String(refused.body["error"]), /hours\.guard: не рабочее время/);
+
+    // Отказ до первой траты означает, что сессии нет вовсе, а не есть неудавшаяся.
+    assert.deepEqual(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions,
+      [],
+    );
+    assert.equal(
+      recorder.observed.some((entry) => entry.event === "session_created"),
+      false,
+    );
+  });
+
+  it("tells what the turn spent and that the session closed", async () => {
+    const recorder = hookRecorder();
+    const { call, start, projectId } = await serve({
+      turns: [{ text: "готово", tokens: 5 }],
+      hooks: recorder.hooks,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "сделай" });
+    await untilIdle(call, sessionId);
+
+    const finished = observedPayload(recorder, "turn_finished");
+
+    assert.equal(finished?.["sessionId"], sessionId);
+    assert.equal(finished?.["projectId"], projectId);
+
+    // Трата уезжает типом рантайма и непрозрачной: своего отчёта мы не заводим (docs/hooks.md).
+    assert.equal((finished?.["usage"] as { totalTokens?: number } | undefined)?.totalTokens, 5);
+
+    assert.equal((await call("DELETE", sessionPath(sessionId))).status, 200);
+    assert.deepEqual(observedPayload(recorder, "session_closed"), { sessionId, projectId });
   });
 });

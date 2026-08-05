@@ -14,6 +14,7 @@ import {
   type AgentSession,
   type AgentSessionStore,
   type CompactionTuning,
+  type TurnOutcome,
 } from "./agent-session.ts";
 import type {
   RuntimeHookName,
@@ -98,6 +99,16 @@ function saidToModel(requests: Context[], index: number): string {
   return JSON.stringify(requests[index]?.messages ?? []);
 }
 
+/**
+ * Трата турна. Наружу она уходит непрозрачной — ядру её разбирать незачем, — поэтому тест смотрит в
+ * неё так же, как посмотрел бы плагин: по имени поля рантайма.
+ */
+function spentOn(outcome: TurnOutcome): number | undefined {
+  return outcome.kind === "done"
+    ? (outcome.usage as { totalTokens?: number } | undefined)?.totalTokens
+    : undefined;
+}
+
 function recorder(session: AgentSession): SessionDelta[] {
   const deltas: SessionDelta[] = [];
 
@@ -112,7 +123,7 @@ describe("an agent session over pi", () => {
     const session = await open();
     const deltas = recorder(session);
 
-    assert.deepEqual(await session.prompt("скажи что-нибудь", "t1"), { kind: "done" });
+    assert.equal((await session.prompt("скажи что-нибудь", "t1")).kind, "done");
 
     assert.deepEqual(
       deltas.filter((delta) => delta.kind === "phase").map((delta) => delta.phase),
@@ -145,6 +156,24 @@ describe("an agent session over pi", () => {
       ["model-change", "thinking-level-change", "tools-change", "message", "message"],
     );
     assert.equal(page.seen, 5);
+    await session.close();
+  });
+
+  it("reports what the whole turn spent, not what the last request spent", async () => {
+    // Вызов инструмента гонит цикл агента на второй круг: обращений к провайдеру два, и платит
+    // владелец за оба (docs/hooks.md).
+    const { open } = await withStore([
+      { toolCalls: [{ id: "c1", name: "read", arguments: { path: "/dev/null" } }], tokens: 7 },
+      { text: "готово", tokens: 11 },
+      { text: "и ещё", tokens: 3 },
+    ]);
+    const session = await open();
+
+    assert.equal(spentOn(await session.prompt("прочитай", "t1")), 18);
+
+    // Следующий турн начинается с чистого счёта: иначе трата турна была бы тратой сессии, а
+    // накопленную плагин спрашивает у ядра отдельно (docs/hooks.md).
+    assert.equal(spentOn(await session.prompt("ещё", "t2")), 3);
     await session.close();
   });
 
@@ -240,7 +269,7 @@ describe("an agent session over pi", () => {
     const second = await session.prompt("второй", "t2");
 
     assert.deepEqual(second, { kind: "busy" });
-    assert.deepEqual(await running, { kind: "done" });
+    assert.equal((await running).kind, "done");
     await session.close();
   });
 
@@ -1252,7 +1281,7 @@ describe("the seam of hook subscriptions", () => {
     );
     const session = await open();
 
-    assert.deepEqual(await session.prompt("исходный вопрос", "t1"), { kind: "done" });
+    assert.equal((await session.prompt("исходный вопрос", "t1")).kind, "done");
 
     // Пустая поправка — это «ничего не менялось»: пустой объект рантайм принял бы за результат и
     // применил бы поправку без полей.

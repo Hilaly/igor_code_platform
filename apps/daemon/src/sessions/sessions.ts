@@ -58,6 +58,8 @@ import {
   type SessionsSnapshot,
   type SessionStats,
   type SessionUpdate,
+  type HookRefusal,
+  type PlatformHookName,
   type TurnAccepted,
   type TurnRequest,
 } from "@sovereign/protocol";
@@ -74,6 +76,8 @@ import type { Logger } from "../platform/public.ts";
 import { probeProjectFolder } from "../projects/public.ts";
 import type { ProjectStore, StoredProject } from "../projects/public.ts";
 import type { ProjectLifecycle } from "../projects/public.ts";
+import { describeRefusals } from "./hook-dispatch.ts";
+import type { HookDispatcher } from "./hook-dispatch.ts";
 import type { ToolCollector } from "./tool-collection.ts";
 import type { TurnQueue } from "./turn-queue.ts";
 
@@ -104,13 +108,23 @@ export type SessionServiceOptions = {
    * автопорогу, которого нет, а не молча включённому (docs/sessions-and-projects.md).
    */
   compactionThreshold?: () => number;
+  /**
+   * Хуки платформы (docs/hooks.md). Необязательны: без подписчиков служба работает как раньше, а
+   * тесты сессий о плагинах не знают вовсе.
+   */
+  hooks?: Pick<HookDispatcher, "observe" | "decide">;
 };
 
 /** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
 export type CreateSessionOutcome =
   | { kind: "created"; session: Session }
   | { kind: "unknown-project" }
-  | { kind: "refused"; reason: string };
+  | { kind: "refused"; reason: string }
+  /**
+   * Отказал подписчик, а не домен. Отдельный исход, потому что отказов может быть несколько и у
+   * каждого назван автор: конфликт двух политик иначе выглядел бы как одна причина (docs/hooks.md).
+   */
+  | { kind: "refused-by-hooks"; refusals: HookRefusal[] };
 
 export type PromptRequest = TurnRequest & { sessionId: string };
 
@@ -207,6 +221,15 @@ export type SessionService = {
 function describeCause(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
+
+/**
+ * Имена хуков платформы названы типом протокола, а не строкой на месте: опечатка в имени означала бы
+ * хук, на который невозможно подписаться, и заметить это было бы нечем (docs/hooks.md).
+ */
+const beforeSessionStart: PlatformHookName = "before_session_start";
+const sessionCreated: PlatformHookName = "session_created";
+const sessionClosed: PlatformHookName = "session_closed";
+const turnFinished: PlatformHookName = "turn_finished";
 
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const availabilityOf =
@@ -584,6 +607,19 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         };
       }
 
+      // До первой траты и до появления файла: отказ здесь означает, что сессии не будет вовсе
+      // (docs/hooks.md). Спрашивается после проверок домена — подписчику незачем решать за
+      // недоступную папку или несуществующего агента.
+      const decision = await options.hooks?.decide(
+        beforeSessionStart,
+        { projectId: project.id, folder: project.folder, agentId: agent.id },
+        { projectId: project.id },
+      );
+
+      if (decision !== undefined && decision.refusals.length > 0) {
+        return { kind: "refused-by-hooks", refusals: decision.refusals };
+      }
+
       const created = await options.store.create({
         projectId: project.id,
         agentId: agent.id,
@@ -602,6 +638,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       live.set(created.summary().id, created);
       await refresh();
       announce();
+
+      options.hooks?.observe(
+        sessionCreated,
+        { sessionId: created.summary().id, projectId: project.id, agentId: agent.id },
+        { projectId: project.id },
+      );
 
       return { kind: "created", session: describeSession(created.summary()) };
     });
@@ -1117,6 +1159,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is busy" };
     }
 
+    const removed = find(sessionId);
+
     if (!(await options.store.remove(sessionId))) {
       return { kind: "unknown" };
     }
@@ -1124,6 +1168,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     forget(sessionId);
     await refresh();
     announce();
+
+    // Закрытие — это удаление сессии, а не выгрузка harness из памяти и не архивация: убранная с
+    // глаз сессия остаётся в системе и читается по прямому адресу (docs/sessions-and-projects.md).
+    if (removed !== undefined) {
+      options.hooks?.observe(
+        sessionClosed,
+        { sessionId, projectId: removed.projectId },
+        { projectId: removed.projectId },
+      );
+    }
 
     return { kind: "removed" };
   };
@@ -1297,6 +1351,20 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           if (outcome.kind === "failed") {
             options.logger.warn("a turn failed", { session: sessionId, reason: outcome.reason });
           }
+
+          if (outcome.kind === "done") {
+            // Трата уезжает типом рантайма и непрозрачной: своего отчёта мы не заводим, а ядру
+            // разбирать его незачем — типизирует его SDK (docs/hooks.md).
+            options.hooks?.observe(
+              turnFinished,
+              {
+                sessionId,
+                projectId: session.summary().projectId,
+                ...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
+              },
+              { projectId: session.summary().projectId },
+            );
+          }
         } finally {
           places.delete(sessionId);
           scheduleThresholdCheck(sessionId);
@@ -1438,6 +1506,17 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
           if (created.kind === "refused") {
             respondWithError(response, 409, created.reason);
+
+            return;
+          }
+
+          if (created.kind === "refused-by-hooks") {
+            // Тот же код, что у отказа домена, и та же форма плюс список: клиенту незачем различать,
+            // кто именно запретил, а вот показать человеку авторов отказа он обязан (docs/hooks.md).
+            respondWithJson(response, 409, {
+              error: describeRefusals(created.refusals),
+              refusals: created.refusals,
+            });
 
             return;
           }

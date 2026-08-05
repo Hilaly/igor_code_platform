@@ -183,14 +183,14 @@ describe("the session surface", () => {
 
     host.answerSessions((request) =>
       request.kind === "session-create"
-        ? { kind: "session-create", session: created }
+        ? { kind: "session-create", outcome: { kind: "created", session: created } }
         : { kind: "session-prompt", accepted: { sessionId: "0199", turnId: "t1", phase: "turn" } },
     );
 
-    assert.deepEqual(
-      await sessions.create({ projectId: "p1", agentId: "base-agent.agent" }),
-      created,
-    );
+    assert.deepEqual(await sessions.create({ projectId: "p1", agentId: "base-agent.agent" }), {
+      kind: "created",
+      session: created,
+    });
     assert.deepEqual(await sessions.prompt({ sessionId: "0199", text: "сделай" }), {
       sessionId: "0199",
       turnId: "t1",
