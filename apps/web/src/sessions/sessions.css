@@ -74,7 +74,7 @@
 }
 
 .sessions-entry-message:hover > .sessions-entry-meta,
-.sessions-entry-message:focus-within > .sessions-entry-meta {
+.sessions-entry-meta:focus-within {
   opacity: 1;
   pointer-events: auto;
 }
