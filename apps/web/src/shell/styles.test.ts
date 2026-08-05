@@ -162,10 +162,10 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps settings content scrollable without reintroducing a shell split", () => {
+  it("leaves the shared settings scroll and split geometry to UI Kit", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(settings).not.toMatch(/\.settings-content-body/);
     expect(settings).not.toMatch(/\.settings-split/);
   });
 

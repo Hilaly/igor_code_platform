@@ -39,12 +39,13 @@ it("shows one selected settings section and only its content", () => {
   );
 
   expect(screen.getByRole("navigation", { name: "Разделы настроек" })).toBeTruthy();
-  expect(screen.getByText("НАСТРОЙКИ")).toBeTruthy();
+  expect(screen.getByText("Настройки")).toBeTruthy();
+  expect(screen.queryByText("Sovereign")).toBeNull();
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(screen.getByRole("heading", { level: 1, name: "Провайдеры" })).toBeTruthy();
   expect(screen.getAllByRole("region", { name: "Провайдеры" })).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Провайдеры" }).getAttribute("aria-current")).toBe(
-    "true",
+    "page",
   );
   expect(screen.getByText("provider content")).toBeTruthy();
   expect(screen.queryByText("appearance content")).toBeNull();
@@ -117,7 +118,7 @@ it.each([
   },
 );
 
-it("moves the plugin name into the page heading and breadcrumbs on detail", () => {
+it("moves the plugin name into the page heading without inventing breadcrumbs", () => {
   render(
     <SettingsView
       section="plugins"
@@ -140,6 +141,7 @@ it("moves the plugin name into the page heading and breadcrumbs on detail", () =
 
   expect(screen.getByRole("heading", { level: 1, name: "Usage insights" })).toBeTruthy();
   expect(screen.getByRole("heading", { level: 2, name: "Usage insights summary" })).toBeTruthy();
+  expect(screen.queryByText("Sovereign")).toBeNull();
   expect(screen.getByText("plugin detail content")).toBeTruthy();
 });
 
@@ -158,7 +160,7 @@ it("keeps projects selected for both the list and a project detail", () => {
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Проекты" }).getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("button", { name: "Проекты" }).getAttribute("aria-current")).toBe("page");
   expect(screen.getByRole("heading", { level: 1, name: "Проекты" })).toBeTruthy();
   expect(screen.getByText("project list content")).toBeTruthy();
 

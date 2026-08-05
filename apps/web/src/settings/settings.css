@@ -6,28 +6,6 @@
  * оболочки вокруг неё не имеет — как и `sessions.css` рядом.
  */
 
-.settings-content > h1 {
-  margin: 0 0 var(--sovereign-space-3);
-}
-
-.settings-section-description {
-  max-width: var(--sovereign-reading-width);
-  margin: calc(var(--sovereign-space-3) * -1) 0 var(--sovereign-space-4);
-  color: var(--sovereign-text-muted);
-  font-size: var(--sovereign-font-size-xs);
-}
-
-.settings-content-body {
-  width: 100%;
-  max-width: 70rem;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.settings-detail .settings-content-body {
-  max-width: 72rem;
-}
-
 .plugins,
 .plugin-detail {
   display: flex;

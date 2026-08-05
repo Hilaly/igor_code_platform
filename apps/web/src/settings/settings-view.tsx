@@ -9,12 +9,9 @@
  */
 
 import {
-  Breadcrumbs,
-  Heading,
-  List,
-  ListRow,
-  SettingsFrame,
-  Text,
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsView as SettingsKitView,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
@@ -65,51 +62,31 @@ export function SettingsView({
   const title = detailTitle ?? t(`settings.section.${section}`);
 
   return (
-    <SettingsFrame
-      settingsLabel={t("settings.context.title").toUpperCase()}
+    <SettingsKitView
       navigationLabel={t("settings.sections")}
-      context={
-        <Breadcrumbs
-          ariaLabel={t("settings.context.aria")}
-          separator="·"
-          items={[
-            { id: "sovereign", label: "Sovereign" },
-            { id: "settings", label: t("settings.context.title") },
-            ...(detailTitle === undefined
-              ? []
-              : [
-                  { id: section, label: t(`settings.section.${section}`) },
-                  { id: "plugin", label: detailTitle },
-                ]),
-          ]}
-        />
-      }
+      context={t("settings.context.title")}
       navigation={
-        <List>
+        <>
           {settingsSections.map((candidate) => (
-            <ListRow
+            <SettingsNavigationItem
               key={candidate}
               selected={candidate === section}
               onSelect={() => onSectionChange(candidate)}
             >
-              <Text>{t(`settings.section.${candidate}`)}</Text>
-            </ListRow>
+              {t(`settings.section.${candidate}`)}
+            </SettingsNavigationItem>
           ))}
-        </List>
+        </>
       }
     >
-      <section
-        className={`settings-content${detailTitle === undefined ? "" : " settings-detail"}`}
-        aria-label={title}
+      <SettingsPage
+        title={title}
+        description={
+          detailTitle === undefined ? t(`settings.section.description.${section}`) : undefined
+        }
       >
-        <Heading level={1}>{title}</Heading>
-        {detailTitle === undefined ? (
-          <p className="settings-section-description">
-            {t(`settings.section.description.${section}`)}
-          </p>
-        ) : undefined}
-        <div className="settings-content-body">{content}</div>
-      </section>
-    </SettingsFrame>
+        {content}
+      </SettingsPage>
+    </SettingsKitView>
   );
 }
