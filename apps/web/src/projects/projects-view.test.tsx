@@ -436,6 +436,33 @@ describe("ProjectsView", () => {
     expect(onOpen).toHaveBeenCalledWith("alpha");
   });
 
+  it("truncates a long folder path but keeps the full one in the tooltip", () => {
+    // Длинный путь режется до хвоста в самом `<code>`, а полный живёт в тултипе — иначе карточка
+    // растягивалась или путь ломался посимвольно. Тултип всегда в DOM (CSS-only, показывается
+    // наведением), поэтому полный путь там и проверяется.
+    const deep = "/Users/me/repos/sovereign_platform_node/apps/daemon";
+    show(withProjects([project("alpha", { name: "Alpha", folder: deep })]));
+
+    const row = rowOf("Alpha");
+
+    // Видимый путь — сокращённый: средние компоненты свернуты в `…`.
+    expect(within(row).getByText("/Users/…/apps/daemon").tagName).toBe("CODE");
+    // Полный путь — в тултипе, привязанном к строке.
+    expect(within(row).getByRole("tooltip", { name: deep })).toBeDefined();
+  });
+
+  it("shows a short folder path whole, with the same path repeated in the tooltip", () => {
+    show(withProjects([project("alpha", { name: "Alpha", folder: "/code/alpha" })]));
+
+    const row = rowOf("Alpha");
+
+    // Короткий путь показывается целиком как видимый `<code>`, и он же повторяется в тултипе —
+    // поведение едино для длинных и коротких путей, особый случай тут не нужен.
+    expect(within(row).getByRole("tooltip", { name: "/code/alpha" })).toBeDefined();
+    const code = row.querySelector("code");
+    expect(code?.textContent).toBe("/code/alpha");
+  });
+
   it("puts the archived projects behind a disclosure, out of the working list", () => {
     show(withProjects([project("a")], [project("gone", { archived: true })]));
 

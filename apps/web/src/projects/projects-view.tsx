@@ -26,11 +26,13 @@ import {
   Panel,
   Spinner,
   Text,
+  Tooltip,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import { useEffect, useState } from "react";
 
 import { fetchFilesystemListing } from "./api.ts";
+import { shortenPath } from "./path-shorten.ts";
 import type { ProjectsState } from "./state.ts";
 
 export type ProjectsViewProps = {
@@ -372,7 +374,14 @@ function ProjectRow({
         <div className="projects-row">
           <div className="projects-row-facts">
             <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-            <Code>{project.folder}</Code>
+            {/*
+              Длинный путь режется (`shortenPath`), а полный живёт в тултипе: папка бывает глубокой,
+              и строка без усечения растягивала бы карточку или ломалась посимвольно. Тултип снизу,
+              чтобы не перекрывать само имя проекта и пометки справа.
+            */}
+            <Tooltip content={project.folder} side="bottom">
+              <Code>{shortenPath(project.folder)}</Code>
+            </Tooltip>
           </div>
 
           <div className="projects-row-marks">

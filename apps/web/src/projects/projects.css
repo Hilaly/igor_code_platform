@@ -112,9 +112,29 @@
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
-  /* Длинный путь режется, а не растягивает строку: папка бывает глубокой. */
+  /*
+   * Длинный путь режется (`shortenPath` в коде + многоточие здесь), а не растягивает строку и не
+   * ломается посимвольно: папка бывает глубокой, а полный путь живёт в тултипе на наведении.
+   * `min-width: 0` разрешает flex-потомку сжиматься ниже содержимого, иначе путь толкает строку.
+   */
   min-width: 0;
-  overflow-wrap: anywhere;
+}
+
+/*
+ * Путь режется до ширины строки. `Tooltip` оборачивает триггер в inline-flex span — ему нужен
+ * `min-width: 0`, чтобы сжаться, а `Code` внутри становится блоком, чтобы `text-overflow` сработал.
+ * Переносить моноширинный путь не нужно: многоточие с тултипом читаемее вертикального столбца.
+ */
+.projects-row-facts > span {
+  min-width: 0;
+}
+
+.projects-row-facts code {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .projects-row-marks {
