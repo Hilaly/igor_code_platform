@@ -14,8 +14,11 @@
 
 .actions {
   display: flex;
-  flex: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sovereign-space-2);
 }

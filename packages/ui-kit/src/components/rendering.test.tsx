@@ -47,6 +47,23 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain("Дерево");
   });
 
+  it("keeps the action group bounded by the header container", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader
+        title="Системный журнал"
+        actions={
+          <>
+            <button type="button">Обновить</button>
+            <button type="button">Экспорт</button>
+          </>
+        }
+      />,
+    );
+
+    expect(markup).toMatch(/<div class="[^"]*actions[^"]*"[^>]*>/);
+    expect(markup.match(/<button/g)).toHaveLength(2);
+  });
+
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
     const markup = renderToStaticMarkup(
       <>
