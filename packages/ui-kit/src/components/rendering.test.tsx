@@ -19,6 +19,7 @@ import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
 import {
   AddIcon,
+  BrandMark,
   ClearLabelIcon,
   CopyIcon,
   ForkBeforeIcon,
@@ -61,6 +62,27 @@ describe("markup of the ported primitives", () => {
     expect(markup.match(/<svg/g)).toHaveLength(11);
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).not.toContain("undefined");
+  });
+
+  it("renders the brand mark as a decorative symbol that follows the accent colour", () => {
+    // Без `label` знак декоративный: `aria-hidden`, `role="img"` не ставится — продукт объявляется
+    // названием рядом, а не самим знаком. Цвет берётся через `currentColor` (stroke), своя палитра
+    // у монограммы нет.
+    const markup = renderToStaticMarkup(<BrandMark />);
+
+    expect(markup.match(/<svg/g)).toHaveLength(1);
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain('stroke="currentColor"');
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("renders the brand mark with an accessible name when one is given", () => {
+    const markup = renderToStaticMarkup(<BrandMark label="Sovereign" />);
+
+    // Обёртка получает роль и имя — скринридер объявит продукт. Внутренний SVG при этом остаётся
+    // декоративным: опознание даёт обёртка, а не сам знак.
+    expect(markup).toContain('role="img"');
+    expect(markup).toContain('aria-label="Sovereign"');
   });
 
   it("raised surface preserves its content without inventing a document section", () => {
