@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { matchPage, pathOf } from "./router.ts";
 
 describe("matchPage", () => {
+  it("opens an administrative plugin detail from an encoded plugin key", () => {
+    expect(matchPage("/settings/plugins/data%3Ausage")).toEqual({
+      kind: "settings-plugin",
+      pluginKey: "data:usage",
+    });
+  });
+
+  it("round-trips plugin keys that look like path navigation", () => {
+    const page = { kind: "settings-plugin" as const, pluginKey: ".." };
+
+    expect(matchPage(pathOf(page))).toEqual(page);
+  });
+
+  it("keeps the plugin list at its section route", () => {
+    expect(matchPage("/settings/plugins")).toEqual({ kind: "settings", section: "plugins" });
+  });
   it("takes the root for the home page", () => {
     expect(matchPage("/")).toEqual({ kind: "home" });
     expect(matchPage("")).toEqual({ kind: "home" });
