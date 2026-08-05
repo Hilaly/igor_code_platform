@@ -169,12 +169,10 @@ describe("the style sheets of the application", () => {
     expect(settings).not.toMatch(/\.settings-split/);
   });
 
-  it("keeps settings compact, divided, and flat", () => {
+  it("keeps settings content free of application-owned visual frames", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(
-      /\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*[^{]*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
+    expect(settings).not.toMatch(/\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*/s);
     expect(settings).not.toMatch(
       /\.settings[^{]*\{[^}]*(?:box-shadow:\s*var\(--sovereign-elevation-|border-radius:\s*var\(--sovereign-radius-(?:sm|md|lg|xl))/s,
     );

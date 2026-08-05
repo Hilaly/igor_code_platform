@@ -140,74 +140,13 @@
   flex-direction: column;
 }
 
-.settings-appearance > * + *,
-.settings-daemon > * + * {
-  padding-block-start: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.settings-appearance,
-.settings-daemon {
-  gap: var(--sovereign-space-0);
-}
-
-.settings-property,
-.settings-appearance-choice,
-.settings-daemon-line,
-.settings-daemon > .muted {
-  padding-block: var(--sovereign-space-3);
-}
-
-.settings-appearance-choice {
-  display: flex;
-}
-
-.settings-property {
-  display: grid;
-  grid-template-columns: minmax(9rem, 0.45fr) minmax(0, 1fr);
-  align-items: center;
-}
-
-.settings-appearance > .field {
-  padding-block: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.settings-appearance > .field:first-of-type {
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.settings-appearance > .field:last-child {
-  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.settings-property > * {
-  grid-column: 1 / -1;
-}
-
-.settings-appearance-choice > .muted {
-  font-weight: var(--sovereign-font-weight-medium);
-}
-
 .settings-appearance-buttons {
   justify-content: flex-start;
 }
 
-.settings-daemon-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-2);
-}
-
-.settings-appearance-choice,
 .settings-appearance-buttons {
   display: flex;
   gap: var(--sovereign-space-2);
-}
-
-.settings-appearance-choice {
-  flex-direction: column;
 }
 
 .settings-appearance-buttons {

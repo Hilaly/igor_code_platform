@@ -73,6 +73,8 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain("Make Sovereign comfortable.");
     expect(markup).toContain("Colour scheme");
     expect(markup).toContain("Changes colour, not geometry");
+    expect(markup).toContain('role="group"');
+    expect(markup).toContain('aria-label="Colour scheme"');
     expect(markup).toContain("Imperium");
     expect(markup).not.toContain("Sovereign · Settings");
     expect(markup).not.toContain("undefined");
