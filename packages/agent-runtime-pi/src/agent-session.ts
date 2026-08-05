@@ -26,6 +26,7 @@ import {
   prepareCompaction,
   SessionError,
   type AgentHarnessEvent,
+  type AgentHarnessEventResultMap,
   type AgentHarnessTool,
   type ExecutionToolContext,
   type JsonlSessionMetadata,
@@ -47,6 +48,12 @@ import {
   type ThinkingLevel,
 } from "@sovereign/protocol";
 
+import {
+  runtimeHookKinds,
+  type RuntimeHookName,
+  type RuntimeHookRefusal,
+  type RuntimeHookSeam,
+} from "./hook-events.ts";
 import { renderSkillCatalogue, type AgentSkill } from "./skills.ts";
 
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
@@ -313,6 +320,20 @@ export type CreateAgentSessionStoreOptions = {
    * снимок, взятый однажды, устарел бы молча (docs/architecture.md).
    */
   compactionSettings: () => CompactionTuning;
+  /**
+   * Подписки плагинов на события рантайма (docs/hooks.md). Необязательны: без ядра, наполняющего
+   * реестр подписок, рантайм работает как раньше и за фан-аут не платит.
+   */
+  hooks?: RuntimeHookSeam;
+};
+
+/**
+ * Что стор подставляет каждой сессии. Одним объектом, а не растущим хвостом позиционных аргументов:
+ * оба члена берутся у живого демона, и добавляется сюда то же самое — внедрённое, а не своё.
+ */
+type SessionSeams = {
+  compactionSettings: () => CompactionTuning;
+  hooks?: RuntimeHookSeam;
 };
 
 /**
@@ -436,12 +457,10 @@ export function createAgentSessionStore(
       return known;
     }
 
-    const persisted = persistedSession(
-      session,
-      options.models,
-      summary,
-      options.compactionSettings,
-    );
+    const persisted = persistedSession(session, options.models, summary, {
+      compactionSettings: options.compactionSettings,
+      ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
+    });
 
     owned.set(summary.id, persisted);
 
@@ -613,7 +632,7 @@ function liveSession(
   models: MutableModels,
   agent: AgentDefinition,
   summary: AgentSessionSummary,
-  compactionSettings: () => CompactionTuning,
+  seams: SessionSeams,
   onClosed: () => void,
 ): AgentSession | { kind: "unknown-model" } {
   const model = resolveModel(models, summary.model);
@@ -664,7 +683,51 @@ function liveSession(
    */
   let queues: SessionQueues = { steer: [], followUp: [], nextTurn: [] };
 
+  /**
+   * Одно наше звено на событие, а не по обработчику на подписчика: `emitHook` у Pi отдаёт победу
+   * последнему вернувшему результат, и только `before_provider_request` с `before_provider_payload`
+   * цепочку строят сами. Зарегистрируй по обработчику на плагин — получишь два разных правила на
+   * восемь событий, поэтому цепочку мы строим внутри своего обработчика (docs/hooks.md).
+   *
+   * Здесь же исключение подписчика превращается в исход, а не доходит до Pi: у Pi исключение из
+   * обработчика роняет турн (docs/agent-runtime-contract.md).
+   */
+  const chained = async <Name extends keyof AgentHarnessEventResultMap>(
+    event: Name,
+    received: Extract<AgentHarnessEvent, { type: Name }>,
+    ours?: object,
+  ): Promise<AgentHarnessEventResultMap[Name]> => {
+    const hooks = seams.hooks;
+
+    if (hooks === undefined || !hooks.subscribed(event)) {
+      return answered<Name>(ours);
+    }
+
+    // Наше звено — первое: платформа управляет параметрами, плагин видит уже подготовленное. Своё
+    // решение уезжает частью нагрузки, иначе следующее звено не увидело бы, что мы сделали.
+    const rewritten = await hooks.rewrite(event, { ...withoutSignal(received), ...ours });
+
+    if (rewritten.aborted !== undefined) {
+      // Обрыв турна — исключение: другого способа остановить Pi посреди хука нет, и он тот же,
+      // которым рантайм обрывает турн сам (docs/hooks.md).
+      throw new AgentHarnessError(
+        "hook",
+        `the critical hook subscription ${rewritten.aborted.contributionId} stopped the turn: ${rewritten.aborted.reason}`,
+      );
+    }
+
+    return answered<Name>({ ...ours, ...(rewritten.patch ?? {}) });
+  };
+
   harness.subscribe((event) => {
+    // Фан-аут наблюдательных событий подписчикам. Перехватывающие сюда не идут: их зовут свои
+    // обработчики ниже, и подписчик, получивший событие дважды, увидел бы его и как наблюдение,
+    // и как вмешательство (docs/hooks.md). `AbortSignal` среди наблюдательных не встречается — он
+    // есть только у двух перезаписывающих, — поэтому нагрузка уезжает как есть.
+    if (runtimeHookKinds[event.type] === "observing") {
+      seams.hooks?.observe(event.type, event);
+    }
+
     if (event.type === "queue_update") {
       queues = {
         steer: event.steer.map(queuedText),
@@ -693,7 +756,7 @@ function liveSession(
   harness.on("session_before_compact", async (event) => {
     const prepared = prepareCompaction(event.branchEntries, {
       enabled: true,
-      ...compactionSettings(),
+      ...seams.compactionSettings(),
     });
 
     if (!prepared.ok) {
@@ -703,7 +766,7 @@ function liveSession(
     // Сворачивать нечего: ветка пуста либо уже кончается компакцией. Отмена честнее пустого
     // пересказа — она хотя бы не портит дерево записью ни о чём.
     if (prepared.value === undefined) {
-      return { cancel: true };
+      return chained("session_before_compact", event, { cancel: true });
     }
 
     const produced = await generateCompaction(
@@ -719,7 +782,33 @@ function liveSession(
       throw produced.error;
     }
 
-    return { compaction: produced.value };
+    return chained("session_before_compact", event, { compaction: produced.value });
+  });
+
+  // Остальные шесть перезаписывающих событий: своего звена у платформы нет, цепочка целиком плагинная.
+  for (const event of rewritingWithoutOurLink) {
+    harness.on(event, async (received) => chained(event, received));
+  }
+
+  /**
+   * `tool_call` — решающий, а не перезаписывающий: он не переписывает данные, а запрещает действие.
+   * Отказы едут модели одной причиной со всеми авторами: инструмент запретили, и знать, кто именно,
+   * важно не меньше, чем почему (docs/hooks.md).
+   */
+  harness.on("tool_call", async (event) => {
+    const hooks = seams.hooks;
+
+    if (hooks === undefined || !hooks.subscribed("tool_call")) {
+      return undefined;
+    }
+
+    const decision = await hooks.decide("tool_call", event);
+
+    if (decision.refusals.length === 0) {
+      return undefined;
+    }
+
+    return { block: true, reason: refusalText(decision.refusals) };
   });
 
   return {
@@ -924,7 +1013,7 @@ function persistedSession(
   session: PiSession,
   models: MutableModels,
   summary: AgentSessionSummary,
-  compactionSettings: () => CompactionTuning,
+  seams: SessionSeams,
 ): PersistedAgentSession {
   let live: AgentSession | undefined;
 
@@ -981,7 +1070,7 @@ function persistedSession(
         return live;
       }
 
-      const started = liveSession(session, models, agent, summary, compactionSettings, () => {
+      const started = liveSession(session, models, agent, summary, seams, () => {
         live = undefined;
       });
 
@@ -1285,6 +1374,56 @@ function blocksOf(content: readonly unknown[]): SessionContentBlock[] {
   }
 
   return blocks;
+}
+
+/**
+ * Пустое — это «ничего не менялось», и оно уезжает `undefined`. Пустой объект Pi принял бы за
+ * результат и применил бы поправку без полей; отдельного способа сказать «я ничего не меняю», кроме
+ * возврата ничего, нет (docs/hooks.md).
+ *
+ * Приведение неизбежно: поправка приехала из воркера данными, и её форму держит типизированный
+ * обработчик в SDK, а не проверка здесь — проверять её нечем, схемы у события нет.
+ */
+function answered<Name extends keyof AgentHarnessEventResultMap>(
+  fields?: object,
+): AgentHarnessEventResultMap[Name] {
+  const changed = fields !== undefined && Object.keys(fields).length > 0;
+
+  return (changed ? fields : undefined) as AgentHarnessEventResultMap[Name];
+}
+
+/**
+ * Перезаписывающие события, у которых своего звена у платформы нет. `session_before_compact` в
+ * список не входит: там первое звено наше, и цепочку начинает оно (docs/hooks.md).
+ */
+const rewritingWithoutOurLink = (
+  Object.entries(runtimeHookKinds) as [
+    RuntimeHookName,
+    (typeof runtimeHookKinds)[RuntimeHookName],
+  ][]
+)
+  .filter(([event, kind]) => kind === "rewriting" && event !== "session_before_compact")
+  .map(([event]) => event as keyof AgentHarnessEventResultMap);
+
+/**
+ * `AbortSignal` не переживает структурное клонирование, а нагрузка едет в воркер плагина. Поле
+ * убирается, а не переописывается: имена и формы остальных полей остаются пиевскими
+ * (docs/hooks.md).
+ */
+function withoutSignal(event: object): object {
+  if (!("signal" in event)) {
+    return event;
+  }
+
+  const fields = { ...(event as Record<string, unknown>) };
+  delete fields["signal"];
+
+  return fields;
+}
+
+/** Одна причина со всеми авторами: запретили инструмент вместе, и это должно быть видно. */
+function refusalText(refusals: RuntimeHookRefusal[]): string {
+  return refusals.map((refusal) => `${refusal.contributionId}: ${refusal.reason}`).join("; ");
 }
 
 /**

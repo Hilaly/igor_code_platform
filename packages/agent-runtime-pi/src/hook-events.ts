@@ -88,3 +88,29 @@ export function isRuntimeHookName(value: unknown): value is RuntimeHookName {
 export function isInterceptingHookName(value: unknown): boolean {
   return isRuntimeHookName(value) && runtimeHookKinds[value] !== "observing";
 }
+
+/** Кто отказал и почему. Автор — идентификатор вклада, а не плагина (docs/hooks.md). */
+export type RuntimeHookRefusal = { contributionId: string; reason: string };
+
+/**
+ * Шов подписок: сведение ответов живёт в ядре, а зовёт хуки этот пакет. Внедряется, потому что
+ * граница пакетов запрещает знать о демоне, а собирать правила слияния во втором месте значило бы
+ * иметь два ответа на один вопрос.
+ *
+ * Нагрузка уходит непрозрачной: за её форму отвечает контракт Pi, и переписывать его здесь незачем.
+ */
+export type RuntimeHookSeam = {
+  /** Есть ли кого спрашивать. Без подписчиков рантайм не платит за вызов вовсе. */
+  subscribed: (event: RuntimeHookName) => boolean;
+  observe: (event: RuntimeHookName, payload: unknown) => void;
+  decide: (event: RuntimeHookName, payload: unknown) => Promise<{ refusals: RuntimeHookRefusal[] }>;
+  rewrite: (
+    event: RuntimeHookName,
+    payload: object,
+  ) => Promise<{
+    /** Накопленная поправка; `undefined` значит «никто ничего не менял». */
+    patch: Record<string, unknown> | undefined;
+    /** Критичный подписчик не ответил: турн обрывает рантайм, потому что способ обрыва его. */
+    aborted?: RuntimeHookRefusal;
+  }>;
+};

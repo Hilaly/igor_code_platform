@@ -15,6 +15,7 @@ import {
   type AgentSessionStore,
   type CompactionTuning,
 } from "./agent-session.ts";
+import type { RuntimeHookName, RuntimeHookSeam } from "./hook-events.ts";
 import { scriptedModelProvider, type ScriptedTurn } from "./testing.ts";
 
 const folders: string[] = [];
@@ -46,6 +47,7 @@ async function withStore(
   projectFolder?: string,
   beforeAnswer?: (index: number) => void,
   tuning: () => CompactionTuning = compactionSettings,
+  hooks?: RuntimeHookSeam,
 ) {
   const scripted = scriptedModelProvider({
     turns,
@@ -63,6 +65,7 @@ async function withStore(
     directory,
     archivedDirectory,
     compactionSettings: tuning,
+    ...(hooks === undefined ? {} : { hooks }),
   });
 
   const open = async (): Promise<AgentSession> => {
@@ -1110,3 +1113,214 @@ async function freshStore(
 
   return createAgentSessionStore({ models, directory, archivedDirectory, compactionSettings });
 }
+
+/**
+ * Двойник шва подписок: сведение ответов живёт в ядре, а рантайму отдаётся результат. Здесь он
+ * задаётся тестом — иначе проверялось бы сведение, а не то, как рантайм зовёт хуки.
+ */
+function hookSeam(answers: {
+  events?: RuntimeHookName[];
+  rewrite?: (
+    event: RuntimeHookName,
+    payload: object,
+  ) => Awaited<ReturnType<RuntimeHookSeam["rewrite"]>>;
+  decide?: (
+    event: RuntimeHookName,
+    payload: unknown,
+  ) => Awaited<ReturnType<RuntimeHookSeam["decide"]>>;
+}) {
+  const observed: { event: RuntimeHookName; payload: unknown }[] = [];
+  const rewritten: { event: RuntimeHookName; payload: object }[] = [];
+  const decided: { event: RuntimeHookName; payload: unknown }[] = [];
+  const subscribed = new Set(answers.events ?? []);
+
+  return {
+    observed,
+    rewritten,
+    decided,
+    seam: {
+      subscribed: (event) => subscribed.has(event),
+      observe: (event, payload) => {
+        observed.push({ event, payload });
+      },
+      rewrite: async (event, payload) => {
+        rewritten.push({ event, payload });
+
+        return answers.rewrite?.(event, payload) ?? { patch: undefined };
+      },
+      decide: async (event, payload) => {
+        decided.push({ event, payload });
+
+        return answers.decide?.(event, payload) ?? { refusals: [] };
+      },
+    } satisfies RuntimeHookSeam,
+  };
+}
+
+describe("the seam of hook subscriptions", () => {
+  it("fans out the observing events of a turn and keeps the intercepting ones out of it", async () => {
+    const hooks = hookSeam({});
+    const { open } = await withStore(
+      [{ text: "ответ" }],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    await session.prompt("вопрос", "t1");
+
+    const names = new Set(hooks.observed.map((entry) => entry.event));
+
+    // Наблюдение не спрашивает, есть ли подписчик: `subscribed` у этого шва пуст, а события всё
+    // равно доехали — их не ждут, и решать, нужны ли они, будет сведение.
+    assert.equal(names.has("turn_start"), true);
+    assert.equal(names.has("message_update"), true);
+    assert.equal(names.has("settled"), true);
+
+    // Перехватывающие идут своими обработчиками: подписчик, получивший событие и наблюдением, и
+    // вмешательством, увидел бы его дважды.
+    assert.equal(names.has("context"), false);
+    assert.equal(names.has("before_agent_start"), false);
+    await session.close();
+  });
+
+  it("hands the model what a rewriting subscriber left of the context", async () => {
+    const hooks = hookSeam({
+      events: ["context"],
+      rewrite: () => ({
+        patch: {
+          messages: [{ role: "user", content: [{ type: "text", text: "переписано подписчиком" }] }],
+        },
+      }),
+    });
+    const { open, requests } = await withStore(
+      [{ text: "ответ" }],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    await session.prompt("исходный вопрос", "t1");
+
+    // Перезапись доехала до провайдера: иначе хук был бы наблюдением, названным вмешательством.
+    assert.match(saidToModel(requests, 0), /переписано подписчиком/);
+    assert.doesNotMatch(saidToModel(requests, 0), /исходный вопрос/);
+    assert.deepEqual(
+      hooks.rewritten.map((entry) => entry.event),
+      ["context"],
+    );
+    await session.close();
+  });
+
+  it("leaves the turn alone when a subscriber changed nothing", async () => {
+    const hooks = hookSeam({ events: ["context", "before_agent_start"] });
+    const { open, requests } = await withStore(
+      [{ text: "ответ" }],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    assert.deepEqual(await session.prompt("исходный вопрос", "t1"), { kind: "done" });
+
+    // Пустая поправка — это «ничего не менялось»: пустой объект рантайм принял бы за результат и
+    // применил бы поправку без полей.
+    assert.match(saidToModel(requests, 0), /исходный вопрос/);
+    await session.close();
+  });
+
+  it("stops the turn with the author when a critical subscriber did not answer", async () => {
+    const hooks = hookSeam({
+      events: ["context"],
+      rewrite: () => ({
+        patch: undefined,
+        aborted: { contributionId: "guard.slow", reason: "did not answer in 5000 ms" },
+      }),
+    });
+    const { open } = await withStore(
+      [{ text: "ответ" }],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    const outcome = await session.prompt("вопрос", "t1");
+
+    assert.equal(outcome.kind, "failed");
+    assert.match(outcome.kind === "failed" ? outcome.reason : "", /guard\.slow/);
+    assert.match(outcome.kind === "failed" ? outcome.reason : "", /did not answer in 5000 ms/);
+    await session.close();
+  });
+
+  it("blocks a tool call the deciding subscribers refused, naming every author", async () => {
+    const hooks = hookSeam({
+      events: ["tool_call"],
+      decide: () => ({
+        refusals: [
+          { contributionId: "guard.paths", reason: "чужая папка" },
+          { contributionId: "guard.hours", reason: "нерабочее время" },
+        ],
+      }),
+    });
+    const { open } = await withStore(
+      [
+        { toolCalls: [{ id: "c1", name: "read", arguments: { path: "/etc/hosts" } }] },
+        { text: "не вышло" },
+      ],
+      undefined,
+      undefined,
+      undefined,
+      hooks.seam,
+    );
+    const session = await open();
+
+    await session.prompt("прочитай", "t1");
+
+    // Причина одна, авторов столько, сколько отказало: инструмент запретили вместе.
+    const said = JSON.stringify(hooks.decided);
+
+    assert.match(said, /"toolName":"read"/);
+
+    const entries = (await session.entries()).entries;
+    const results = JSON.stringify(entries);
+
+    assert.match(results, /guard\.paths: чужая папка/);
+    assert.match(results, /guard\.hours: нерабочее время/);
+    await session.close();
+  });
+
+  it("makes the platform the first link of the compaction chain", async () => {
+    const hooks = hookSeam({ events: ["session_before_compact"] });
+    const { open } = await withStore(
+      [{ text: "первый ответ" }, { text: "вот пересказ" }],
+      undefined,
+      undefined,
+      () => ({ reserveTokens: 4096, keepRecentTokens: 1 }),
+      hooks.seam,
+    );
+    const session = await open();
+
+    await session.prompt("первый вопрос", "t1");
+
+    assert.deepEqual(await session.compact(), { kind: "done" });
+
+    const asked = hooks.rewritten.at(0);
+
+    // Платформа управляет параметрами компакции, плагин видит уже подготовленное: наше решение
+    // приехало подписчику частью нагрузки, а не осталось за кадром (docs/hooks.md).
+    assert.equal(asked?.event, "session_before_compact");
+    assert.match(JSON.stringify(asked?.payload ?? {}), /вот пересказ/);
+
+    // Сигнал отмены границу воркера не переживает, поэтому в нагрузке его нет вовсе.
+    assert.equal("signal" in (asked?.payload ?? {}), false);
+    await session.close();
+  });
+});
