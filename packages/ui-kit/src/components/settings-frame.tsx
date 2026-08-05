@@ -85,7 +85,11 @@ export type SettingsRowProps = {
 /** A mockup-aligned property row: explanation on the left, control or value on the right. */
 export function SettingsRow({ label, description, children }: SettingsRowProps) {
   return (
-    <div className={styles.row} role="group" aria-label={typeof label === "string" ? label : undefined}>
+    <div
+      className={styles.row}
+      role="group"
+      aria-label={typeof label === "string" ? label : undefined}
+    >
       <div className={styles.rowCopy}>
         <div className={styles.rowLabel}>{label}</div>
         {description === undefined ? undefined : (

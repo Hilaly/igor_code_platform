@@ -42,10 +42,7 @@ export function AppearanceSection({
   return (
     <div className="settings-appearance">
       {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
-      <SettingsRow
-        label={t("appearance.scheme")}
-        description={t("settings.appearance.schemeHint")}
-      >
+      <SettingsRow label={t("appearance.scheme")} description={t("settings.appearance.schemeHint")}>
         <Select
           label=""
           ariaLabel={t("appearance.scheme")}
@@ -78,10 +75,7 @@ export function AppearanceSection({
           ))}
         </div>
       </SettingsRow>
-      <SettingsRow
-        label={t("appearance.scale")}
-        description={t("settings.appearance.scaleHint")}
-      >
+      <SettingsRow label={t("appearance.scale")} description={t("settings.appearance.scaleHint")}>
         <div className="settings-appearance-buttons">
           {interfaceScales.map((scale) => (
             <Button
