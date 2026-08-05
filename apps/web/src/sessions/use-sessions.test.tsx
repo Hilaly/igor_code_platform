@@ -264,6 +264,15 @@ describe("useSessions", () => {
     expect(asked(agentsPath)).toHaveLength(0);
   });
 
+  it("prepares model providers without reloading draft projects", async () => {
+    const view = connect();
+
+    act(() => view.result.current.prepareModels());
+
+    await waitFor(() => expect(asked(providersPath)).toHaveLength(1));
+    expect(asked(projectsPath)).toHaveLength(0);
+  });
+
   it("aborts and ignores a stale project agent answer after the project changes", async () => {
     let resolveP1!: (response: Response) => void;
     delayedProjectAgents.p1 = new Promise((resolve) => {
@@ -618,8 +627,8 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurn("привет");
+    await act(async () => {
+      await view.result.current.submitTurn({ text: "привет" });
     });
 
     await waitFor(() =>
@@ -649,8 +658,8 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurn("привет");
+    await act(async () => {
+      await view.result.current.submitTurn({ text: "привет" });
     });
 
     await waitFor(() =>
@@ -668,8 +677,8 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurnToSession("0200", "первое сообщение");
+    await act(async () => {
+      await view.result.current.submitTurnToSession("0200", { text: "первое сообщение" });
     });
 
     expect(view.result.current.state.open?.id).toBe("0200");
@@ -686,8 +695,11 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurnToSession("0200", "первое сообщение");
+    let reason: string | undefined;
+    await act(async () => {
+      reason = await view.result.current.submitTurnToSession("0200", {
+        text: "первое сообщение",
+      });
     });
 
     await waitFor(() =>
@@ -696,9 +708,10 @@ describe("useSessions", () => {
         failure: "the model disappeared",
       }),
     );
+    expect(reason).toBe("the model disappeared");
   });
 
-  it("does not double the line of a turn that started at once", async () => {
+  it("submits every turn override and returns no refusal when the turn starts", async () => {
     // Начатый турн уже пишет запись реплики: вторая копия висела бы в ленте до конца работы.
     refusals[`POST ${sessionTurnsPath("0199")}`] = {
       status: 202,
@@ -708,11 +721,22 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurn("привет");
+    let reason: string | undefined;
+    await act(async () => {
+      reason = await view.result.current.submitTurn({
+        text: "привет",
+        model: "openai/gpt-5",
+        thinkingLevel: "high",
+      });
     });
 
     await waitFor(() => expect(view.result.current.state.open?.summary?.phase).toBe("turn"));
+    expect(JSON.parse(asked(sessionTurnsPath("0199"), "POST")[0]!.body!)).toEqual({
+      text: "привет",
+      model: "openai/gpt-5",
+      thinkingLevel: "high",
+    });
+    expect(reason).toBeUndefined();
     expect(view.result.current.state.open?.pending).toEqual({});
   });
 
@@ -725,14 +749,47 @@ describe("useSessions", () => {
 
     await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
 
-    act(() => {
-      view.result.current.submitTurn("привет");
+    let reason: string | undefined;
+    await act(async () => {
+      reason = await view.result.current.submitTurn({
+        text: "привет",
+        model: "openai/gpt-5",
+        thinkingLevel: "high",
+      });
     });
 
     await waitFor(() =>
       expect(view.result.current.state.open?.failure).toBe("the session is busy"),
     );
+    expect(JSON.parse(asked(sessionTurnsPath("0199"), "POST")[0]!.body!)).toEqual({
+      text: "привет",
+      model: "openai/gpt-5",
+      thinkingLevel: "high",
+    });
+    expect(reason).toBe("the session is busy");
     expect(view.diagnostics).toContain("the turn was refused: the session is busy");
+  });
+
+  it("returns a network failure after preserving it in the open session and diagnostics", async () => {
+    const view = connect({ sessionId: "0199" });
+
+    await waitFor(() => expect(view.result.current.state.open?.loading).toBe(false));
+
+    const connectedFetch = fetch;
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) =>
+      url === sessionTurnsPath("0199") && init?.method === "POST"
+        ? Promise.reject(new Error("connection reset"))
+        : connectedFetch(url, init),
+    );
+
+    let reason: string | undefined;
+    await act(async () => {
+      reason = await view.result.current.submitTurn({ text: "привет" });
+    });
+
+    expect(reason).toBe("connection reset");
+    expect(view.result.current.state.open?.failure).toBe("connection reset");
+    expect(view.diagnostics).toContain("the turn could not be submitted: connection reset");
   });
 
   it("reads everything again after the stream came back, from the very start", async () => {

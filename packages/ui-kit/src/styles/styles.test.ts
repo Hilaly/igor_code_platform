@@ -156,6 +156,18 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
   });
 
+  it("lets ViewHeader actions wrap inside a constrained container", () => {
+    const viewHeaderCss = readFileSync(
+      join(kitRoot, "components", "view-header.module.css"),
+      "utf8",
+    );
+
+    expect(viewHeaderCss).toMatch(
+      /\.actions\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+    );
+    expect(viewHeaderCss).toMatch(/\.actions\s*\{[^}]*justify-content:\s*flex-end;/s);
+  });
+
   it("keeps shared application states flat and elevates only overlays", () => {
     const dialogCss = withoutComments(
       readFileSync(join(kitRoot, "components", "dialog.module.css"), "utf8"),

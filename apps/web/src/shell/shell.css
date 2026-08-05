@@ -77,6 +77,18 @@
   overflow: auto;
 }
 
+.shell-page[data-content-mode="contained"] {
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.shell-page[data-content-mode="contained"] > :first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
 /*
  * Кнопку скрытия рисует кит (`Button`), а не этот файл: раньше здесь была её геометрия и цвет, и это
  * дублировало кит. Осталась только раскладка вокруг неё и позиционирование возврата.

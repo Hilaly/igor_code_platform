@@ -11,14 +11,13 @@
  */
 
 import {
-  modelReference,
   parseModelReference,
   thinkingLevels,
-  type ModelSummary,
   type Project,
   type ProviderSummary,
   type SessionDraft,
   type ThinkingLevel,
+  type TurnRequest,
 } from "@sovereign/protocol";
 import {
   Button,
@@ -27,7 +26,6 @@ import {
   Heading,
   Link,
   ModelPicker,
-  type ModelPickerGroup,
   Notice,
   Select,
   Spinner,
@@ -37,6 +35,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useEffect, useState } from "react";
 
+import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import type { ModelsEntry } from "./state.ts";
 import type { ProjectAgentsState } from "./use-sessions.ts";
 
@@ -55,7 +54,7 @@ export type NewSessionViewProps = {
   /** Создать сессию. Возвращает идентификатор новой сессии или причину отказа. */
   onCreate: (draft: SessionDraft) => Promise<{ sessionId: string } | { reason: string }>;
   /** Отправить первый турн в только что созданную сессию. */
-  onSubmit: (sessionId: string, text: string) => void;
+  onSubmit: (sessionId: string, request: TurnRequest) => void;
   /** Уйти в открытый чат новой сессии. Зовётся после создания, до отправки турна. */
   onNavigate: (sessionId: string) => void;
   translator: ScopedTranslator;
@@ -150,35 +149,11 @@ export function NewSessionView(props: NewSessionViewProps) {
     setModelRef(undefined);
   };
 
-  // Группы для ModelPicker: провайдер → его модели. Опции — составная ссылка `providerId/modelId`,
-  // как на проводе; человекочитаемое имя — доп. строкой, чтобы опознать модель по каталогу тоже.
-  const groups: ModelPickerGroup[] = (providers ?? []).map((provider) => {
-    const entry = models[provider.id];
-
-    return {
-      id: provider.id,
-      label: provider.name,
-      loading: entry?.kind === "loading",
-      failureReason: entry?.kind === "failed" ? entry.reason : undefined,
-      options:
-        entry?.kind === "ready"
-          ? entry.models.map((model: ModelSummary) => ({
-              value: modelReference(provider.id, model.id),
-              label: modelReference(provider.id, model.id),
-              description: model.name,
-            }))
-          : [],
-    };
-  });
+  const groups = modelPickerGroups(providers, models, modelRef);
 
   // Выбранная модель определяет, доступен ли уровень размышлений: модель без reasoning его не
   // примет, и отправить его нельзя. Берём выбранную по ссылке — она одна на весь пикер.
-  const parsedRef = modelRef === undefined ? undefined : parseModelReference(modelRef);
-  const chosenEntry = parsedRef === undefined ? undefined : models[parsedRef.providerId];
-  let chosenModel: ModelSummary | undefined;
-  if (chosenEntry?.kind === "ready" && parsedRef !== undefined) {
-    chosenModel = chosenEntry.models.find((candidate) => candidate.id === parsedRef.modelId);
-  }
+  const chosenModel = selectedModel(modelRef, models);
   const reasoning = chosenModel === undefined || chosenModel.reasoning;
 
   // Готовность — проект и агент. Модель НЕ обязательна: у агента может быть дефолт, и тогда демон
@@ -211,7 +186,7 @@ export function NewSessionView(props: NewSessionViewProps) {
         const trimmed = firstMessage.trim();
 
         if (trimmed !== "") {
-          props.onSubmit(outcome.sessionId, trimmed);
+          props.onSubmit(outcome.sessionId, { text: trimmed });
         }
       });
   };

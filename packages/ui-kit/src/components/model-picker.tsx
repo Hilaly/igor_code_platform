@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { Notice } from "./notice.tsx";
-import { Popover } from "./popover.tsx";
+import { Popover, type PopoverSide } from "./popover.tsx";
 import { Spinner } from "./state.tsx";
 import styles from "./model-picker.module.css";
 
@@ -53,6 +53,7 @@ export type ModelPickerProps = {
   /** Что рисуется, когда групп нет вовсе. То же правило — переводит вызывающий. */
   emptyText: string;
   disabled?: boolean;
+  side?: Extract<PopoverSide, "top" | "bottom">;
 };
 
 type Row = { kind: "header"; groupId: string } | { kind: "option"; groupId: string; value: string };
@@ -66,6 +67,7 @@ export function ModelPicker({
   placeholder,
   emptyText,
   disabled = false,
+  side = "bottom",
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
@@ -264,6 +266,7 @@ export function ModelPicker({
     <div className={styles.root}>
       {label ? <span className={styles.label}>{label}</span> : null}
       <Popover
+        side={side}
         open={open}
         onOpenChange={setOpen}
         contentRole="tree"

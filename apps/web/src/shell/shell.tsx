@@ -44,6 +44,7 @@ export type ShellProps = {
   tabs: ShellTabDescription[];
   /** Текущая страница не даёт правой панели места; сохранённый layout при этом не меняется. */
   rightUnavailable?: boolean;
+  contentMode?: "page" | "contained";
   children: ReactNode;
 };
 
@@ -55,6 +56,7 @@ export function Shell({
   status,
   tabs,
   rightUnavailable = false,
+  contentMode = "page",
   children,
 }: ShellProps) {
   const open = tabs.find((tab) => tab.id === layout.openTab);
@@ -103,7 +105,7 @@ export function Shell({
           />
         </>
       )}
-      <main className="shell-page">
+      <main className="shell-page" data-content-mode={contentMode}>
         {children}
         {/* Возврат скрытой панели — кнопка поверх угла страницы, а не постоянный рельс: рельс
             постоянно отъедал бы ширину у страницы ради кнопки, которая нужна редко. Кнопка идёт после

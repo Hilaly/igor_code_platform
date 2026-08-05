@@ -27,6 +27,7 @@ import { StatusDot } from "./status-dot.tsx";
 import { Heading, Text } from "./text.tsx";
 import { Toggle } from "./toggle.tsx";
 import { ToastProvider, useToast } from "./toast.tsx";
+import { ViewHeader } from "./view-header.tsx";
 
 const column = {
   display: "flex",
@@ -187,6 +188,45 @@ export const Surfaces = () => (
       </ListRow>
       <ListRow>Строка, которую нельзя выбрать</ListRow>
     </List>
+  </div>
+);
+
+export const ViewHeaders = () => (
+  <div style={column}>
+    <ViewHeader
+      title="Системный журнал"
+      actions={
+        <div style={row}>
+          <Button size="sm" onClick={() => {}}>
+            Обновить
+          </Button>
+          <Button size="sm" onClick={() => {}}>
+            Экспорт
+          </Button>
+          <Button size="sm" onClick={() => {}}>
+            Настроить
+          </Button>
+        </div>
+      }
+    />
+    <div style={{ maxWidth: "22rem" }}>
+      <ViewHeader
+        title="Системный журнал"
+        actions={
+          <div style={row}>
+            <Button size="sm" onClick={() => {}}>
+              Обновить
+            </Button>
+            <Button size="sm" onClick={() => {}}>
+              Экспорт
+            </Button>
+            <Button size="sm" onClick={() => {}}>
+              Настроить
+            </Button>
+          </div>
+        }
+      />
+    </div>
   </div>
 );
 

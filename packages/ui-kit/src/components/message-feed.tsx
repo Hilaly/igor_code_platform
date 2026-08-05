@@ -36,10 +36,20 @@ export type MessageFeedProps = {
   label: string;
   /** Турн идёт. Берётся из фазы сессии, а не из дельт: турн из очереди дельт не даёт вовсе. */
   busy?: boolean;
+  className?: string;
+  before?: ReactNode;
+  after?: ReactNode;
   children: ReactNode;
 };
 
-export function MessageFeed({ label, busy = false, children }: MessageFeedProps) {
+export function MessageFeed({
+  label,
+  busy = false,
+  className,
+  before,
+  after,
+  children,
+}: MessageFeedProps) {
   const container = useRef<HTMLDivElement>(null);
   /**
    * Читающий у низа, пока не доказано обратное: новая сессия открывается пустой, и первая же реплика
@@ -55,11 +65,11 @@ export function MessageFeed({ label, busy = false, children }: MessageFeedProps)
     }
 
     element.scrollTop = element.scrollHeight;
-  }, [children]);
+  }, [after, before, children]);
 
   return (
     <div
-      className={styles.feed}
+      className={`${styles.feed}${className === undefined ? "" : ` ${className}`}`}
       ref={container}
       role="log"
       aria-live="polite"
@@ -69,7 +79,9 @@ export function MessageFeed({ label, busy = false, children }: MessageFeedProps)
         sticking.current = shouldStickToBottom(event.currentTarget);
       }}
     >
+      {before}
       {children}
+      {after}
     </div>
   );
 }

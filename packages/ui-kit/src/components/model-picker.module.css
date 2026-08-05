@@ -72,7 +72,6 @@
 
 .popover .dropdown {
   position: absolute;
-  top: calc(100% + var(--sovereign-space-1));
   left: 0;
   right: 0;
   transform: none;
@@ -85,6 +84,14 @@
   max-height: 16rem;
   overflow-y: auto;
   padding: var(--sovereign-space-1);
+}
+
+.popover .dropdown[data-side="bottom"] {
+  top: calc(100% + var(--sovereign-space-1));
+}
+
+.popover .dropdown[data-side="top"] {
+  bottom: calc(100% + var(--sovereign-space-1));
 }
 
 .group + .group {

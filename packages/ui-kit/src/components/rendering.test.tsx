@@ -11,6 +11,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { ViewHeader } from "../index.ts";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { BrandLockup } from "./brand-lockup.tsx";
 import { Button } from "./button.tsx";
@@ -43,6 +44,34 @@ import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders a container header with a heading and optional actions", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader title="Новая сессия" level={2} actions={<button>Дерево</button>} />,
+    );
+
+    expect(markup).toContain("<header");
+    expect(markup).toContain("<h2");
+    expect(markup).toContain("Новая сессия");
+    expect(markup).toContain("Дерево");
+  });
+
+  it("keeps the action group bounded by the header container", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader
+        title="Системный журнал"
+        actions={
+          <>
+            <button type="button">Обновить</button>
+            <button type="button">Экспорт</button>
+          </>
+        }
+      />,
+    );
+
+    expect(markup).toMatch(/<div class="[^"]*actions[^"]*"[^>]*>/);
+    expect(markup.match(/<button/g)).toHaveLength(2);
+  });
+
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
     const markup = renderToStaticMarkup(
       <>
@@ -498,6 +527,23 @@ describe("text that is still arriving", () => {
 });
 
 describe("feed of messages", () => {
+  it("keeps caller slots inside the same live log", () => {
+    const markup = renderToStaticMarkup(
+      <MessageFeed
+        label="Переписка"
+        className="chat-scroll-root"
+        before={<span>до истории</span>}
+        after={<span>после истории</span>}
+      >
+        <Message role="human">история</Message>
+      </MessageFeed>,
+    );
+
+    expect(markup).toMatch(
+      /<div[^>]*class="[^"]*chat-scroll-root[^"]*"[^>]*role="log"[^>]*>[\s\S]*до истории[\s\S]*история[\s\S]*после истории[\s\S]*<\/div>/,
+    );
+  });
+
   it("is a live log with a name of its own", () => {
     const markup = renderToStaticMarkup(
       <MessageFeed label="Переписка" busy>
