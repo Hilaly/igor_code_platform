@@ -128,6 +128,8 @@
   утверждённый перенос списка и детали проекта в общий SettingsFrame с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
   утверждённый визуальный контракт мокапа для общего каркаса, страниц и строк всех разделов настроек.
+- [План базового вью Settings](superpowers/plans/2026-08-05-settings-ui-kit-view.md) — TDD-срезы
+  для публичных примитивов UI kit, всех вложенных экранов и визуальной сверки с мокапом.
 - [План Projects внутри Settings](superpowers/plans/2026-08-05-settings-projects-section.md) —
   TDD-перенос маршрутов, обоих Projects-вью и полной композиции в единое окно настроек.
 
