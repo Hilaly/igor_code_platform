@@ -230,10 +230,8 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   }, [pickerOpen, cwd]);
 
   return (
-    <section className="projects-new-surface" aria-labelledby="projects-new-title">
-      <Heading id="projects-new-title" level={2}>
-        {t("projects.new.title")}
-      </Heading>
+    <section className="projects-new-surface" aria-label={t("projects.new.title")}>
+      <Heading level={2}>{t("projects.new.title")}</Heading>
       {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
           больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
       <Form onSubmit={submit} disabled={busy || !ready}>
