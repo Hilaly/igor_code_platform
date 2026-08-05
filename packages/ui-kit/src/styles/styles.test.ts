@@ -337,6 +337,15 @@ describe("stylesheets of the kit", () => {
     expect(source).toMatch(/\.surface\s*\{[^}]*box-shadow:\s*var\(--sovereign-elevation-1\);/s);
   });
 
+  it("uses the contrast-safe accent text role for the product lockup", () => {
+    const source = withoutComments(
+      readFileSync(join(kitRoot, "components", "brand-lockup.module.css"), "utf8"),
+    );
+
+    expect(source).toMatch(/\.lockup\s*\{[^}]*color:\s*var\(--sovereign-accent-text\);/s);
+    expect(source).not.toMatch(/color:\s*var\(--sovereign-accent\);/);
+  });
+
   it("dresses every primitive it ships", () => {
     const components = readdirSync(join(kitRoot, "components"))
       .filter((name) => name.endsWith(".tsx"))

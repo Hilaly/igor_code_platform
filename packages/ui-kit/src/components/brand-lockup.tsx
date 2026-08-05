@@ -14,13 +14,8 @@ export type BrandLockupProps = {
 };
 
 export function BrandLockup({ name }: BrandLockupProps): React.JSX.Element {
-  /*
-    Блок декоративен целиком: название продукта объявляется в окружающем тексте (заголовок формы,
-    `aria-label` панели), и дублировать его здесь для скринридера не нужно. Знак внутри `BrandMark`
-    тоже декоративен по умолчанию.
-  */
   return (
-    <div className={styles.lockup} aria-hidden="true">
+    <div className={styles.lockup}>
       <BrandMark size="xl" />
       <span className={styles.name}>{name}</span>
     </div>

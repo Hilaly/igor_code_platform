@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--sovereign-space-2);
-  color: var(--sovereign-accent);
+  color: var(--sovereign-accent-text);
 }
 
 .name {

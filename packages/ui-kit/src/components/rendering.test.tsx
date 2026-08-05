@@ -86,11 +86,11 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('aria-label="Sovereign"');
   });
 
-  it("renders the brand lockup as a decorative sign with the product name", () => {
-    // Блок декоративен целиком: название объявляется окружением, а не самим блоком. Знак и имя
-    // стоят в одной линии, имя сохранено как видимый текст.
+  it("keeps the brand lockup name accessible and only hides its mark", () => {
     const markup = renderToStaticMarkup(<BrandLockup name="Sovereign" />);
 
+    expect(markup).toMatch(/^<div class="[^"]+"><span[^>]*aria-hidden="true"/);
+    expect(markup).not.toMatch(/^<div[^>]*aria-hidden/);
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain(">Sovereign<");
     expect(markup).toContain('stroke="currentColor"');
