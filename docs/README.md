@@ -126,6 +126,8 @@
   утверждённый визуальный каркас всех разделов настроек и вложенная страница управления плагином с его вкладками.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsFrame с удалением старых маршрутов.
+- [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
+  утверждённый визуальный контракт мокапа для общего каркаса, страниц и строк всех разделов настроек.
 - [План Projects внутри Settings](superpowers/plans/2026-08-05-settings-projects-section.md) —
   TDD-перенос маршрутов, обоих Projects-вью и полной композиции в единое окно настроек.
 
