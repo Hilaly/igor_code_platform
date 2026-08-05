@@ -197,6 +197,48 @@
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+/*
+ * Контекст — длинная шкала, а токены и деньги — короткие независимые факты. Сетка позволяет шкале
+ * забрать доступное место, не заставляя числа переноситься или иметь придуманную фиксированную ширину.
+ */
+.sessions-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  padding-inline: var(--sovereign-space-3);
+  padding-block: var(--sovereign-space-1);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.sessions-usage-context,
+.sessions-usage-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.sessions-usage-context > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.sessions-usage-stat {
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+@container (width < 40rem) {
+  .sessions-usage {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .sessions-usage-context {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Полоса заполнения тянется на свободное место: подписи по краям от неё читаются, а она — шкала. */
 .sessions-context > :nth-child(2) {
   flex: 1;
