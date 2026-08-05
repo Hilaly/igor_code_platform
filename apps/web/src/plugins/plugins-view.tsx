@@ -65,7 +65,9 @@ export function PluginsView({
   if (snapshot === undefined) {
     return (
       <div className="plugins">
-        <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
+        {headingLevel === 1 ? (
+          <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
+        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (

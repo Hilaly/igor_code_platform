@@ -28,6 +28,7 @@ import type { ReactNode } from "react";
 import type { PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
+  headingLevel?: 1 | 2;
   state: PluginsState;
   pluginKey: string;
   onBack: () => void;
@@ -51,6 +52,7 @@ type ContributionEntry = { registration: ContributionRegistration; off: boolean 
 
 export function PluginDetailView({
   state,
+  headingLevel = 1,
   pluginKey,
   onBack,
   onSwitch,
@@ -107,7 +109,7 @@ export function PluginDetailView({
         <header className="plugin-detail-header">
           <div className="plugin-detail-hero">
             <div>
-              <Heading level={1}>{status.id ?? status.key}</Heading>
+              <Heading level={headingLevel}>{status.id ?? status.key}</Heading>
               <Code>{status.key}</Code>
             </div>
             <Text tone="muted">{t("plugins.detail.enabled")}</Text>

@@ -404,11 +404,13 @@ export const coreEnglish: CatalogRegistration = {
     "settings.appearance.schemeHint": "Changes colour, not geometry",
     "settings.appearance.variantHint": "Follow the environment or choose explicitly",
     "settings.appearance.scaleHint": "Content density stays contextual",
+    "settings.section.projects": "Projects",
     "settings.section.appearance": "Appearance",
     "settings.section.providers": "Providers",
     "settings.section.plugins": "Plugins",
     "settings.section.daemon": "Daemon",
     "settings.section.diagnostics": "Diagnostics",
+    "settings.section.description.projects": "Manage project folders and their resources.",
     "settings.section.description.appearance":
       "Make Sovereign comfortable without changing its structure.",
     "settings.section.description.providers": "Manage connections to language models and services.",

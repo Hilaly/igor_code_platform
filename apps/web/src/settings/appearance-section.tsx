@@ -15,7 +15,6 @@ import {
   Field,
   Notice,
   Select,
-  Text,
   type ColorScheme,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";

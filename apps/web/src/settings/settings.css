@@ -6,53 +6,6 @@
  * оболочки вокруг неё не имеет — как и `sessions.css` рядом.
  */
 
-.settings {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-  container-type: inline-size;
-}
-
-.settings-context-bar {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  min-height: var(--sovereign-row-height-compact);
-  padding: var(--sovereign-space-2) var(--sovereign-space-4);
-  border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  background: var(--sovereign-page-surface);
-}
-
-.settings-layout {
-  display: grid;
-  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-}
-
-.settings-sidebar,
-.settings-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-  min-width: 0;
-  min-height: 0;
-}
-
-.settings-sidebar {
-  padding: var(--sovereign-space-5) var(--sovereign-space-4) var(--sovereign-space-5)
-    var(--sovereign-space-5);
-  border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  overflow-y: auto;
-}
-
-.settings-content {
-  padding: var(--sovereign-space-5) var(--sovereign-space-6);
-}
-
 .settings-content > h1 {
   margin: 0 0 var(--sovereign-space-3);
 }
@@ -62,22 +15,6 @@
   margin: calc(var(--sovereign-space-3) * -1) 0 var(--sovereign-space-4);
   color: var(--sovereign-text-muted);
   font-size: var(--sovereign-font-size-xs);
-}
-
-.settings-sidebar-label {
-  color: var(--sovereign-text-muted);
-  font-size: var(--sovereign-font-size-xs);
-  font-weight: var(--sovereign-font-weight-medium);
-  letter-spacing: var(--sovereign-letter-spacing-wide);
-  text-transform: uppercase;
-}
-
-.settings-nav {
-  min-height: 0;
-}
-
-.settings-nav > ul > li {
-  min-height: var(--sovereign-row-height-compact);
 }
 
 .settings-content-body {
@@ -216,38 +153,6 @@
   .plugin-detail-contribution-meta,
   .plugin-detail-contribution details {
     grid-column: 1 / -1;
-  }
-}
-
-@container (width < 40rem) {
-  .settings-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .settings-sidebar {
-    padding-inline-end: 0;
-    padding-block-end: var(--sovereign-space-3);
-    border-inline-end: none;
-    border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-    overflow-y: visible;
-  }
-
-  .settings-nav {
-    min-width: 0;
-    overflow-x: auto;
-  }
-
-  /* Прямой ребёнок — китовый `List`. Правило меняет только предметную геометрию и не зависит от
-     хешированного имени класса UI kit. */
-  .settings-nav > ul {
-    flex-direction: row;
-    width: max-content;
-  }
-
-  .settings-content {
-    padding-block-start: var(--sovereign-space-4);
-    padding-inline-start: 0;
   }
 }
 

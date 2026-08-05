@@ -162,25 +162,16 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps settings split by their container and scrolls the active content", () => {
+  it("keeps settings content scrollable without reintroducing a shell split", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(/\.settings\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(settings).toMatch(/\.settings-layout\s*\{[^}]*grid-template-columns:[^;}]+;/s);
     expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
-    expect(settings).toMatch(
-      /@container\s*\(width\s*<\s*40rem\)\s*\{[\s\S]*?\.settings-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    );
-    expect(settings).toMatch(/\.settings-nav\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;/s);
     expect(settings).not.toMatch(/\.settings-split/);
   });
 
   it("keeps settings compact, divided, and flat", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(
-      /\.settings-nav\s*>\s*ul\s*>\s*li\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
-    );
     expect(settings).toMatch(
       /\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*[^{]*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
     );

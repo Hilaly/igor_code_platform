@@ -28,6 +28,7 @@ it("shows one selected settings section and only its content", () => {
     <SettingsView
       section="providers"
       onSectionChange={onSectionChange}
+      projects={<div>project content</div>}
       appearance={<div>appearance content</div>}
       providers={<div>provider content</div>}
       plugins={<div>plugin content</div>}
@@ -48,9 +49,13 @@ it("shows one selected settings section and only its content", () => {
   expect(screen.getByText("provider content")).toBeTruthy();
   expect(screen.queryByText("appearance content")).toBeNull();
   expect(screen.queryByText("plugin content")).toBeNull();
+  expect(screen.queryByText("project content")).toBeNull();
 
   fireEvent.click(screen.getByRole("button", { name: "Плагины" }));
   expect(onSectionChange).toHaveBeenCalledWith("plugins");
+
+  fireEvent.click(screen.getByRole("button", { name: "Проекты" }));
+  expect(onSectionChange).toHaveBeenLastCalledWith("projects");
 });
 
 it.each([
@@ -96,6 +101,7 @@ it.each([
       <SettingsView
         section={section}
         onSectionChange={vi.fn()}
+        projects={<div>project content</div>}
         appearance={<div>appearance content</div>}
         providers={section === "providers" ? content : <div>provider content</div>}
         plugins={section === "plugins" ? content : <div>plugin content</div>}
@@ -107,7 +113,7 @@ it.each([
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: heading })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: heading })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 2, name: heading })).toBeNull();
   },
 );
 
@@ -117,11 +123,12 @@ it("moves the plugin name into the page heading and breadcrumbs on detail", () =
       section="plugins"
       detailTitle="Usage insights"
       onSectionChange={vi.fn()}
+      projects={<div>project content</div>}
       appearance={<div>appearance content</div>}
       providers={<div>provider content</div>}
       plugins={
         <>
-          <h1>Usage insights</h1>
+          <h2>Usage insights summary</h2>
           <div>plugin detail content</div>
         </>
       }
@@ -132,5 +139,51 @@ it("moves the plugin name into the page heading and breadcrumbs on detail", () =
   );
 
   expect(screen.getByRole("heading", { level: 1, name: "Usage insights" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 2, name: "Usage insights summary" })).toBeTruthy();
   expect(screen.getByText("plugin detail content")).toBeTruthy();
+});
+
+it("keeps projects selected for both the list and a project detail", () => {
+  const { rerender } = render(
+    <SettingsView
+      section="projects"
+      onSectionChange={vi.fn()}
+      projects={<div>project list content</div>}
+      appearance={<div>appearance content</div>}
+      providers={<div>provider content</div>}
+      plugins={<div>plugin content</div>}
+      daemon={<div>daemon</div>}
+      diagnostics={<div>diagnostics</div>}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Проекты" }).getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("heading", { level: 1, name: "Проекты" })).toBeTruthy();
+  expect(screen.getByText("project list content")).toBeTruthy();
+
+  rerender(
+    <SettingsView
+      section="projects"
+      detailTitle="Alpha"
+      onSectionChange={vi.fn()}
+      projects={
+        <>
+          <h2>Alpha summary</h2>
+          <div>project detail content</div>
+        </>
+      }
+      appearance={<div>appearance content</div>}
+      providers={<div>provider content</div>}
+      plugins={<div>plugin content</div>}
+      daemon={<div>daemon</div>}
+      diagnostics={<div>diagnostics</div>}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  expect(screen.getByRole("heading", { level: 1, name: "Alpha" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 2, name: "Alpha summary" })).toBeTruthy();
+  expect(screen.getByText("project detail content")).toBeTruthy();
 });

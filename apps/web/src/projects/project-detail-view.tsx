@@ -17,6 +17,7 @@ export type ProjectDetailViewProps = {
   project?: Project;
   failure?: string;
   loaded: boolean;
+  headingLevel?: 1 | 2;
   fileResources?: ReactNode;
   onBack: () => void;
   onNewSession: () => void;
@@ -28,6 +29,7 @@ export function ProjectDetailView({
   failure,
   fileResources,
   loaded,
+  headingLevel = 1,
   onBack,
   onNewSession,
   translator,
@@ -60,7 +62,7 @@ export function ProjectDetailView({
       <Panel>
         <div className="project-detail-header">
           <div>
-            <Heading level={1}>
+            <Heading level={headingLevel}>
               {project.ephemeral ? t("projects.ephemeral") : project.name}
             </Heading>
             <Code>{project.folder}</Code>

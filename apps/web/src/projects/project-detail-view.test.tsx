@@ -31,6 +31,22 @@ const project: Project = {
 };
 
 describe("ProjectDetailView", () => {
+  it("uses the requested heading level when embedded under another page heading", () => {
+    render(
+      <ProjectDetailView
+        project={project}
+        loaded
+        headingLevel={2}
+        onBack={vi.fn()}
+        onNewSession={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 2, name: "Alpha" })).toBeDefined();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
   it("shows the project summary and resources without a duplicated session list", () => {
     render(
       <ProjectDetailView
