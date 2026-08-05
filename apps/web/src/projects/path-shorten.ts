@@ -9,12 +9,36 @@
 
 const ELLIPSIS = "…";
 
-/**
- * Нормализованные компоненты пути без пустых элементов. `"/a/b"` и `"a/b/"` дают `["a", "b"]`;
- * корень `"/"` превращается в `[]`.
- */
-function components(folder: string): string[] {
-  return folder.split("/").filter((segment) => segment.length > 0);
+type ParsedPath = {
+  root: string;
+  separator: "/" | "\\";
+  segments: string[];
+};
+
+/** Разбирает видимый путь, не меняя принятую на его платформе форму корня и разделителя. */
+function parsePath(folder: string): ParsedPath {
+  const separator = folder.match(/[\\/]/)?.[0] === "\\" ? "\\" : "/";
+  const unc = folder.match(/^([\\/]{2})([^\\/]+)[\\/]([^\\/]+)(?:[\\/]+|$)/);
+  const drive = folder.match(/^([A-Za-z]:)[\\/]+/);
+  let root = "";
+  let remainder = folder;
+
+  if (unc !== null) {
+    root = `${separator}${separator}${unc[2]}${separator}${unc[3]}${separator}`;
+    remainder = folder.slice(unc[0].length);
+  } else if (drive !== null) {
+    root = `${drive[1]}${separator}`;
+    remainder = folder.slice(drive[0].length);
+  } else if (folder.startsWith("/") || folder.startsWith("\\")) {
+    root = separator;
+    remainder = folder.replace(/^[\\/]+/, "");
+  }
+
+  return {
+    root,
+    separator,
+    segments: remainder.split(/[\\/]+/).filter((segment) => segment.length > 0),
+  };
 }
 
 /**
@@ -23,8 +47,9 @@ function components(folder: string): string[] {
  * не нужно.
  *
  * Когда путь длиннее лимита, строится от минимума к полноте, и каждая следующая ступень включается,
- * только если итог в лимит влезает: `…/last` → `…/parent/last` → `head/…/parent/last`. Хвост важнее
- * головы — имя папки проекта не жертвуется ради начала пути, поэтому родитель подключается раньше.
+ * только если итог в лимит влезает: `…/last` → `…/parent/last` → `…/more/parent/last`. Хвост важнее
+ * головы — имя папки проекта не жертвуется ради начала пути, поэтому все помещающиеся родители
+ * подключаются раньше первой компоненты.
  * Минимум `…/last` возвращается безальтернативно, даже если он сам длиннее лимита: резать `…` имя
  * проекта пополам хуже, чем показать его целиком поверх лимита.
  *
@@ -36,34 +61,44 @@ export function shortenPath(folder: string, max = 40): string {
     return folder;
   }
 
-  const segments = components(folder);
-  const leadingSlash = folder.startsWith("/") ? "/" : "";
+  const { root, separator, segments } = parsePath(folder);
 
   // Последняя компонента обязательна целиком — она опознаёт проект.
   const last = segments.at(-1) ?? "";
-  const minimum = `${leadingSlash}${ELLIPSIS}/${last}`;
+  const minimum = `${root}${ELLIPSIS}${separator}${last}`;
 
   if (segments.length < 2) {
     return minimum;
   }
 
-  // Родитель последней компоненты добавляет контекста («это в apps», «это в repos»). Включается,
-  // только если итог влезает в лимит — иначе он не помогает, и минимум остаётся.
-  const parent = segments.at(-2) ?? "";
-  const withParent = `${leadingSlash}${ELLIPSIS}/${parent}/${last}`;
+  let suffix = [last];
+  let firstSuffixIndex = segments.length - 1;
+  let shortened = minimum;
 
-  if (withParent.length > max || segments.length < 3) {
-    return minimum;
+  // Родители добавляются справа налево: ближайший к проекту контекст ценнее далёкой головы пути.
+  // Первую компоненту здесь не берём — перед ней нечего было бы скрывать многоточием.
+  for (let index = segments.length - 2; index > 0; index -= 1) {
+    const candidateSuffix = [segments[index] ?? "", ...suffix];
+    const candidate = `${root}${ELLIPSIS}${separator}${candidateSuffix.join(separator)}`;
+
+    if (candidate.length > max) {
+      break;
+    }
+
+    suffix = candidateSuffix;
+    firstSuffixIndex = index;
+    shortened = candidate;
   }
 
-  // Голова — первая компонента — подключается последней, когда между ней и родителем есть, что
-  // пропустить (четыре и более компонент).
-  const head = `${segments[0]}/`;
-  const withHead = `${leadingSlash}${head}${ELLIPSIS}/${parent}/${last}`;
+  // Голова подключается последней и только когда между ней и сохранённым хвостом остаётся середина.
+  if (firstSuffixIndex <= 1) {
+    return shortened;
+  }
 
+  const withHead = `${root}${segments[0]}${separator}${ELLIPSIS}${separator}${suffix.join(separator)}`;
   if (withHead.length <= max) {
     return withHead;
   }
 
-  return withParent;
+  return shortened;
 }

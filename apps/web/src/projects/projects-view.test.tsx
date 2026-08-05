@@ -444,7 +444,7 @@ describe("ProjectsView", () => {
     const row = rowOf("Alpha");
 
     // Видимый путь — сокращённый: средние компоненты свернуты в `…`.
-    expect(within(row).getByText("/Users/…/apps/daemon").tagName).toBe("CODE");
+    expect(within(row).getByText("/…/sovereign_platform_node/apps/daemon").tagName).toBe("CODE");
     // Полный путь — в тултипе, привязанном к строке.
     expect(within(row).getByRole("tooltip", { name: deep })).toBeDefined();
   });

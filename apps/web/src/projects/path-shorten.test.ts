@@ -13,11 +13,11 @@ describe("shortenPath", () => {
     expect(shortenPath(folder, folder.length)).toBe(folder);
   });
 
-  it("keeps head, parent and last when the full tail fits in the limit", () => {
-    // Полный путь длиннее 40, а вся тройка `head/…/parent/last` влезает: показываем её целиком.
+  it("uses spare room for the tail before the head", () => {
+    // В лимит помещается ещё один родитель из хвоста; он важнее далёкой головы `/Users`.
     const long = "/Users/me/repos/sovereign_platform_node/apps/daemon";
 
-    expect(shortenPath(long)).toBe("/Users/…/apps/daemon");
+    expect(shortenPath(long)).toBe("/…/sovereign_platform_node/apps/daemon");
   });
 
   it("drops the head when the limit is tight, keeping parent and last", () => {
@@ -58,5 +58,29 @@ describe("shortenPath", () => {
     const long = "/home/very-long-project-name-here";
 
     expect(shortenPath(long, 10)).toBe("/…/very-long-project-name-here");
+  });
+
+  it("preserves a Windows drive root and backslash separators", () => {
+    const long = "C:\\Users\\me\\repos\\product";
+
+    expect(shortenPath(long, 19)).toBe("C:\\…\\repos\\product");
+  });
+
+  it("preserves the server and share of a UNC path", () => {
+    const long = "\\\\server\\share\\archive\\team\\product";
+
+    expect(shortenPath(long, 29)).toBe("\\\\server\\share\\…\\team\\product");
+  });
+
+  it("keeps every parent that fits before considering the head", () => {
+    const long = "/a/b/c/d/e/f";
+
+    expect(shortenPath(long, 10)).toBe("/…/c/d/e/f");
+  });
+
+  it("keeps Unicode path components whole", () => {
+    const long = "workspace/команда/модуль/проект";
+
+    expect(shortenPath(long, 15)).toBe("…/модуль/проект");
   });
 });
