@@ -38,6 +38,8 @@ import {
 } from "./plugin-sources.ts";
 import type { ChangedPluginDirectory } from "./plugin-watcher.ts";
 import type {
+  PluginCall,
+  PluginCallResult,
   PluginIncoming,
   PluginLoginReply,
   PluginOutgoing,
@@ -52,14 +54,28 @@ export type PluginSupervisor = {
   apply: (discovery: PluginDiscovery, preferences: Preferences) => Promise<void>;
   /** Поднять заново включённые плагины из перечисленных папок: их исходники изменились. */
   reload: (directories: Iterable<ChangedPluginDirectory>) => Promise<void>;
+  /**
+   * Позвать плагин и дождаться значения (docs/hooks.md). Таймаут задаёт вызывающий: у хука и у
+   * инструмента свои ожидания и свои ключи `config.json`, а супервизор про них ничего не знает.
+   *
+   * Исключений не бросает: и мёртвый воркер, и таймаут, и упавший обработчик приезжают исходом.
+   */
+  call: (
+    pluginKey: string,
+    call: PluginCall,
+    waiting: { timeoutMilliseconds: number },
+  ) => Promise<PluginCallResult>;
   stopAll: () => Promise<void>;
 };
 
 /** Отмена запланированного действия. Возвращается планировщиком, чтобы таймер можно было снять. */
 export type CancelScheduled = () => void;
 
-/** Один вызов плагина глазами того, кто на него отвечает. */
-export type PluginCall = {
+/**
+ * Один запрос плагина глазами того, кто на него отвечает. Имя не `PluginCall`: вызовом называется
+ * обратное направление, где зовёт ядро (`plugin-wire.ts`).
+ */
+export type PluginRequestContext = {
   /**
    * Идентификатор вызова. Им же ключуются шаги входа и ответы на них: шаг — часть контракта самой
    * операции, а не отдельный поток (docs/models-and-providers.md).
@@ -99,7 +115,7 @@ export type CreatePluginSupervisorOptions = {
   onRequest?: (
     plugin: ContributingPlugin,
     request: PluginRequest,
-    call: PluginCall,
+    call: PluginRequestContext,
   ) => Promise<PluginResponse>;
   /** Ответ плагина на шаг входа или отказ отвечать. */
   onLoginReply?: (plugin: ContributingPlugin, reply: PluginLoginReply) => void;
@@ -143,6 +159,11 @@ type Supervised = {
   /** Последнее применённое решение о включении: перезагрузка не имеет права поднять выключенный. */
   enabled: boolean;
   resourceChanged: boolean;
+  /**
+   * Вызовы ядра, ждущие ответа этого воркера. Живут у записи, а не общей таблицей: смерть воркера
+   * обязана ответить именно его вызовам, и никаким чужим.
+   */
+  awaitingCall: Map<string, (result: PluginCallResult) => void>;
   cancelRetry?: CancelScheduled;
   /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
   startToken?: object;
@@ -280,8 +301,22 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     publishContributions(revision);
   };
 
+  /**
+   * Ответить всем висящим вызовам этого плагина. Зовётся там же, где снимаются вклады: воркера
+   * больше нет, и вызов иначе ждал бы своего таймаута у того, кого уже некому спросить.
+   */
+  const abandonCalls = (entry: Supervised, reason: string): void => {
+    // Снимок значений: ожидание снимает сам `settle`, и обход живой таблицы шёл бы по тому, что она
+    // на ходу теряет.
+    for (const settle of [...entry.awaitingCall.values()]) {
+      settle({ kind: "failed", reason });
+    }
+  };
+
   const dropContributions = (entry: Supervised, preserveSnapshot = false): void => {
     const revision = registry.revision();
+
+    abandonCalls(entry, `the plugin ${entry.plugin.key} is gone and answers no calls`);
     entry.pending = [];
     entry.contributed = [];
     // Причина уходит вместе с вкладами: у выгруженного плагина объявленного нет вовсе.
@@ -347,7 +382,12 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       entry.worker === worker && (entry.state === "starting" || entry.state === "running");
     const stopping = entry.stoppingWorker === worker && entry.state === "stopping";
 
-    if (!current && !(stopping && (message.kind === "log" || message.kind === "deactivated"))) {
+    // Выгружающийся воркер ещё вправе договорить: ответ на вызов, пришедший по ходу выгрузки, — это
+    // ответ того самого воркера, которого спрашивали, и он лучше выдуманного сбоя.
+    const stoppingMayStillSpeak =
+      message.kind === "log" || message.kind === "deactivated" || message.kind === "call-result";
+
+    if (!current && !(stopping && stoppingMayStillSpeak)) {
       return;
     }
 
@@ -378,6 +418,12 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       case "login-answer":
       case "login-cancel":
         options.onLoginReply?.(entry.plugin, message);
+
+        return;
+      case "call-result":
+        // Ответ на вызов, которого уже нет, — штатное: его сняли по таймауту, и ответ разъехался с
+        // ожиданием. Снимает ожидание сам `settle`, здесь его только зовут.
+        entry.awaitingCall.get(message.callId)?.(message.result);
 
         return;
       case "request": {
@@ -588,6 +634,72 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     transition(entry, finalState);
   };
 
+  /**
+   * Счётчик вызовов **демонский** и общий для всех плагинов: воркерский `requestId` живёт в другом
+   * направлении, и сопоставлять их нечем. Пара «ключ плагина + номер» уникальна и без сброса.
+   */
+  let callsSent = 0;
+
+  const call = (
+    pluginKey: string,
+    request: PluginCall,
+    waiting: { timeoutMilliseconds: number },
+  ): Promise<PluginCallResult> => {
+    const entry = supervised.get(pluginKey);
+    const worker = entry?.worker;
+
+    // Спрашивать выключенный, упавший или ещё запускающийся плагин нечем. Это исход, а не
+    // исключение: зовущая сторона обязана уметь обойтись без вклада, которого нет.
+    if (entry === undefined || worker === undefined || entry.state !== "running") {
+      return Promise.resolve({
+        kind: "failed",
+        reason: `the plugin ${pluginKey} is not running and answers no calls`,
+      });
+    }
+
+    callsSent += 1;
+    const callId = String(callsSent);
+
+    return new Promise<PluginCallResult>((resolve) => {
+      // Ожидание заводится раньше таймера, а таймер отдаётся ожиданию через эту ячейку: планировщик
+      // теста вправе позвать обратный вызов сразу, и тогда снимать будет ещё нечего.
+      const timeout: { cancel?: CancelScheduled } = {};
+
+      const settle = (result: PluginCallResult): void => {
+        // Ответ и таймаут могли прийти оба: побеждает первый, и второй уже никого не касается.
+        if (!entry.awaitingCall.delete(callId)) {
+          return;
+        }
+
+        timeout.cancel?.();
+        resolve(result);
+      };
+
+      entry.awaitingCall.set(callId, settle);
+
+      timeout.cancel = schedule(() => {
+        // Таймаут не бывает молчаливым (docs/hooks.md): автор вызова назван, и запись остаётся в
+        // журнале даже если зовущая сторона решит вызов проигнорировать.
+        logger.warn("the plugin did not answer a call in time", {
+          plugin: pluginKey,
+          contribution: request.contributionId,
+          call: request.kind,
+          waitedMilliseconds: waiting.timeoutMilliseconds,
+        });
+        settle({
+          kind: "failed",
+          reason:
+            `the plugin ${pluginKey} did not answer the ${request.kind} call ` +
+            `${request.contributionId} in ${waiting.timeoutMilliseconds} ms`,
+        });
+      }, waiting.timeoutMilliseconds);
+
+      const carried: PluginIncoming = { kind: "call", callId, call: request };
+
+      worker.postMessage(carried);
+    });
+  };
+
   const rememberRefusals = (discovery: PluginDiscovery): void => {
     const seen = new Set<string>();
 
@@ -659,6 +771,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           disabledContributions: new Set(),
           enabled: false,
           resourceChanged: false,
+          awaitingCall: new Map(),
         };
 
         supervised.set(plugin.key, entry);
@@ -703,6 +816,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   return {
     statuses: () => [...[...supervised.values()].map(statusOf), ...refused.values()],
     apply,
+    call,
     reload: async (directories) => {
       const affected = new Map(
         [...directories].map((changed) => [changed.directory, changed.fileResourcesChanged]),

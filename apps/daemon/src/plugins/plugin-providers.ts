@@ -40,7 +40,7 @@ import type { ContributingPlugin } from "./contribution-registry.ts";
 import type { CredentialStore } from "../providers/public.ts";
 import type { EventBus } from "../platform/public.ts";
 import type { Logger } from "../platform/public.ts";
-import type { PluginCall } from "./plugin-supervisor.ts";
+import type { PluginRequestContext } from "./plugin-supervisor.ts";
 import type { PluginLoginReply } from "./plugin-wire.ts";
 import type { ProviderLogins } from "../providers/public.ts";
 
@@ -123,7 +123,7 @@ export type PluginProviders = {
   request: (
     plugin: ContributingPlugin,
     request: ProviderRequest,
-    call: PluginCall,
+    call: PluginRequestContext,
   ) => Promise<ProviderResponse>;
   /** Ответ плагина на вопрос входа. Отдаётся супервизору как `onLoginReply`. */
   reply: (plugin: ContributingPlugin, reply: PluginLoginReply) => void;
@@ -182,7 +182,7 @@ export function createPluginProviders(options: CreatePluginProvidersOptions): Pl
   const login = (
     plugin: ContributingPlugin,
     request: Extract<ProviderRequest, { kind: "login" }>,
-    call: PluginCall,
+    call: PluginRequestContext,
   ): Promise<ProviderResponse> =>
     new Promise<ProviderResponse>((resolve) => {
       const key = loginKey(plugin.key, call.requestId);

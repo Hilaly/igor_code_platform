@@ -12,6 +12,8 @@ import { pathToFileURL } from "node:url";
 
 import { deliverEvent } from "@sovereign/sdk/events";
 import { installPluginHost } from "@sovereign/sdk/host";
+import { invokeHookHandler } from "@sovereign/sdk/hooks";
+import { invokeTool } from "@sovereign/sdk/tools";
 import type {
   LoginDialogue,
   LoginStep,
@@ -21,6 +23,8 @@ import type {
 } from "@sovereign/sdk";
 
 import type {
+  PluginCall,
+  PluginCallResult,
   PluginIncoming,
   PluginOutgoing,
   PluginResponse,
@@ -167,6 +171,43 @@ const walkLoginStep = async (requestId: string, step: LoginStep): Promise<void> 
   }
 };
 
+/**
+ * Отказ решающего хука в словаре SDK — `{ refuse: причина }`. Перевод в вид канала делается здесь, а
+ * не у диспетчера: иначе каждый, кто зовёт хук, разбирал бы форму значения сам. Поля `refuse` нет ни
+ * у одного из восьми возвращаемых типов Pi, поэтому перезаписывающий хук за отказ не примут.
+ */
+const readRefusal = (value: unknown): string | undefined => {
+  const refusal = (value ?? {}) as { refuse?: unknown };
+
+  return typeof refusal.refuse === "string" ? refusal.refuse : undefined;
+};
+
+/**
+ * Ответить на вызов ядра. Исключение обработчика **не выпускается наружу**: оно уезжает сбоем, потому
+ * что до Pi доходить ему нельзя — там оно роняет турн (docs/hooks.md). Ответ уходит всегда, иначе
+ * ядро ждало бы своего таймаута на живом воркере.
+ */
+const answerCall = async (callId: string, call: PluginCall): Promise<void> => {
+  const result = await (async (): Promise<PluginCallResult> => {
+    try {
+      if (call.kind === "tool") {
+        return { kind: "value", value: await invokeTool(call.contributionId, call.arguments) };
+      }
+
+      const value = await invokeHookHandler(call.contributionId, call.payload);
+      const refusal = readRefusal(value);
+
+      return refusal === undefined
+        ? { kind: "value", value }
+        : { kind: "refused", reason: refusal };
+    } catch (cause) {
+      return { kind: "failed", reason: describe(cause) };
+    }
+  })();
+
+  send({ kind: "call-result", callId, result });
+};
+
 let plugin: PluginModule | undefined;
 
 /**
@@ -192,6 +233,12 @@ port.on("message", (message: PluginIncoming) => {
 
   if (message.kind === "login-step") {
     void walkLoginStep(message.requestId, message.step);
+
+    return;
+  }
+
+  if (message.kind === "call") {
+    void answerCall(message.callId, message.call);
 
     return;
   }

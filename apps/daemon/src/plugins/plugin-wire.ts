@@ -7,9 +7,13 @@
  * применяются одним снимком после `activate` (docs/ui-extension-model.md), а о проблеме плагин
  * узнаёт событием жизненного цикла, а не исключением на месте вызова (docs/plugins.md).
  *
- * Пара «запрос-ответ» здесь ровно одна — `request`/`response`, и она ограничена провайдерами
- * (docs/models-and-providers.md): список, статус и вход бессмысленны без ответа. Общего RPC из этого
- * не делается: вид запроса — закрытое объединение SDK, а не произвольное имя метода.
+ * Пар «запрос-ответ» здесь две, и они направлены в разные стороны. `request`/`response` идёт от
+ * воркера к ядру и ограничена провайдерами и сессиями (docs/models-and-providers.md): список, статус
+ * и вход бессмысленны без ответа. `call`/`call-result` идёт от ядра к воркеру: хук и инструмент
+ * плагина — это ядро, которое зовёт чужой код и **ждёт значение** (docs/hooks.md).
+ *
+ * Общего RPC ни из той, ни из другой не делается: вид запроса и вид вызова — закрытые объединения, а
+ * не произвольное имя метода.
  */
 
 import type {
@@ -35,6 +39,25 @@ export type PluginWorkerData = {
 export type PluginRequest = ProviderRequest | SessionRequest;
 
 export type PluginResponse = ProviderResponse | SessionResponse;
+
+/**
+ * Что ядро зовёт у плагина. Вид закрыт: маршрут плагина добавит своим видом, а не именем метода.
+ * Идентификатор вклада — единственный адрес: им же ключуется таблица обработчиков в воркере, и им же
+ * человек включает и выключает вклад (docs/hooks.md).
+ */
+export type PluginCall =
+  | { kind: "hook"; contributionId: string; event: string; payload: unknown }
+  | { kind: "tool"; contributionId: string; arguments: unknown };
+
+/**
+ * Чем плагин отвечает на вызов. Отказ и сбой разведены: отказ решающего хука — это исход по делу,
+ * который ядро несёт человеку с автором и причиной, а сбой означает, что вызвать не удалось вовсе.
+ * Оба доезжают значением, а не исключением: исключение из хука роняет турн Pi (docs/hooks.md).
+ */
+export type PluginCallResult =
+  | { kind: "value"; value: unknown }
+  | { kind: "refused"; reason: string }
+  | { kind: "failed"; reason: string };
 
 export type PluginOutgoing =
   | {
@@ -62,6 +85,11 @@ export type PluginOutgoing =
   | { kind: "login-answer"; requestId: string; stepId: string; value: string }
   /** Отмена входа: плагин отказался отвечать. Отличается от отказа провайдера, и это видно в конце. */
   | { kind: "login-cancel"; requestId: string }
+  /**
+   * Ответ на `call`, тем же `callId`. Обработчик, бросивший исключение, приезжает сюда сбоем: до Pi
+   * исключению доходить нельзя, там оно роняет турн (docs/hooks.md).
+   */
+  | { kind: "call-result"; callId: string; result: PluginCallResult }
   | { kind: "activated" }
   /** Выгрузка завершена; `problem` заполнен, если `deactivate` бросил. */
   | { kind: "deactivated"; problem?: string }
@@ -74,6 +102,13 @@ export type PluginIncoming =
   | { kind: "event"; type: string; payload: unknown; plugin?: PluginEventOrigin }
   /** Ответ на `request`, тем же `requestId`. */
   | { kind: "response"; requestId: string; response: PluginResponse }
+  /**
+   * Вызов от ядра. `callId` — **демонский** и отдельный от воркерского `requestId`: пары идут в
+   * разные стороны, и общего пространства номеров у них нет. Ждать ответа и снимать ожидание по
+   * таймауту — работа демона: воркер с зависшим обработчиком о том, что он зависший, сообщить не
+   * может по определению (docs/hooks.md).
+   */
+  | { kind: "call"; callId: string; call: PluginCall }
   /** Вопрос или сообщение по ходу входа. Конец диалога приезжает ответом, а не шагом. */
   | { kind: "login-step"; requestId: string; step: LoginStep };
 

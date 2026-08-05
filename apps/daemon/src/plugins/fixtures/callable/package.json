@@ -1,0 +1,11 @@
+{
+  "name": "callable",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "callable",
+    "worker": "src/worker.ts",
+    "platform": "*"
+  }
+}

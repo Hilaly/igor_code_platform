@@ -27,7 +27,7 @@
 ```ts
 type PluginCall =
   | { kind: "hook"; contributionId: string; event: string; payload: unknown }
-  | { kind: "tool"; contributionId: string; name: string; arguments: unknown };
+  | { kind: "tool"; contributionId: string; arguments: unknown };
 
 type PluginCallResult =
   | { kind: "value"; value: unknown }

@@ -1423,3 +1423,208 @@ describe("createPluginSupervisor", () => {
     );
   });
 });
+
+describe("a call from the core into a plugin", () => {
+  const callable = async (recorded: Journal, clock?: ReturnType<typeof manualClock>) => {
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry: createContributionRegistry(),
+      ...(clock === undefined ? {} : { schedule: clock.schedule, now: clock.now }),
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("callable"), enabled("data:callable"));
+    await recorded.waitFor(reachedState("data:callable", "running"), "callable running");
+
+    return supervisor;
+  };
+
+  it("brings back the value the tool of the plugin returned", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    assert.deepEqual(
+      await supervisor.call(
+        "data:callable",
+        { kind: "tool", contributionId: "echo", arguments: { text: "ау" } },
+        { timeoutMilliseconds: 5_000 },
+      ),
+      // Признак неудачи едет рядом с текстом: инструмент, сказавший «не вышло», не сбой плагина.
+      { kind: "value", value: { content: "эхо: ау", isError: false } },
+    );
+  });
+
+  it("carries the payload of the hook across the boundary of the worker", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    const answer = await supervisor.call(
+      "data:callable",
+      {
+        kind: "hook",
+        contributionId: "watch",
+        event: "turn_finished",
+        payload: {
+          sessionId: "0199",
+          projectId: "p1",
+          usage: { inputTokens: 1, outputTokens: 2 },
+        },
+      },
+      { timeoutMilliseconds: 5_000 },
+    );
+
+    assert.deepEqual(answer, { kind: "value", value: undefined });
+    assert.equal(
+      (
+        await recorded.waitFor(
+          (record) => record.message === "the turn finished",
+          "the record of the handler",
+        )
+      )["session"],
+      "0199",
+    );
+  });
+
+  it("tells a refusal of a deciding hook from a value", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+    const ask = (folder: string) =>
+      supervisor.call(
+        "data:callable",
+        {
+          kind: "hook",
+          contributionId: "guard",
+          event: "before_session_start",
+          payload: { projectId: "p1", folder, agentId: "base" },
+        },
+        { timeoutMilliseconds: 5_000 },
+      );
+
+    assert.deepEqual(await ask("/forbidden"), { kind: "refused", reason: "эта папка закрыта" });
+
+    // Разрешение — это отсутствие отказа, а не чей-то голос «за» (docs/hooks.md).
+    assert.deepEqual(await ask("/allowed"), { kind: "value", value: undefined });
+  });
+
+  it("keeps an exception of the plugin inside the worker and answers a failure", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    // Исключение обработчика не имеет права дойти до Pi: там оно роняет турн (docs/hooks.md).
+    const hook = await supervisor.call(
+      "data:callable",
+      {
+        kind: "hook",
+        contributionId: "throws",
+        event: "before_session_start",
+        payload: { projectId: "p1", folder: "/tmp", agentId: "base" },
+      },
+      { timeoutMilliseconds: 5_000 },
+    );
+    const tool = await supervisor.call(
+      "data:callable",
+      { kind: "tool", contributionId: "broken", arguments: {} },
+      { timeoutMilliseconds: 5_000 },
+    );
+
+    assert.equal(hook.kind, "failed");
+    assert.match(hook.kind === "failed" ? hook.reason : "", /the handler is broken/);
+    assert.equal(tool.kind, "failed");
+    assert.match(tool.kind === "failed" ? tool.reason : "", /the tool is broken/);
+  });
+
+  it("names a subscription the plugin never declared instead of hanging on it", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    const answer = await supervisor.call(
+      "data:callable",
+      { kind: "hook", contributionId: "never-declared", event: "turn_finished", payload: {} },
+      { timeoutMilliseconds: 5_000 },
+    );
+
+    assert.equal(answer.kind, "failed");
+    assert.match(
+      answer.kind === "failed" ? answer.reason : "",
+      /no handler for the hook subscription never-declared/,
+    );
+  });
+
+  it("stops waiting for a handler that never answers, and says so with its author", async () => {
+    const recorded = journal();
+    const clock = manualClock();
+    const supervisor = await callable(recorded, clock);
+
+    const answer = supervisor.call(
+      "data:callable",
+      {
+        kind: "hook",
+        contributionId: "hangs",
+        event: "before_session_start",
+        payload: { projectId: "p1", folder: "/tmp", agentId: "base" },
+      },
+      { timeoutMilliseconds: 5_000 },
+    );
+
+    // Ожидание снимает демон: воркер с зависшим обработчиком о том, что он зависший, сообщить не
+    // может по определению (docs/hooks.md).
+    clock.fireAll();
+
+    const outcome = await answer;
+
+    assert.equal(outcome.kind, "failed");
+    assert.match(outcome.kind === "failed" ? outcome.reason : "", /did not answer the hook call/);
+
+    // Таймаут не бывает молчаливым: вклад-автор назван в журнале (docs/hooks.md).
+    const record = await recorded.waitFor(
+      (candidate) => candidate.message === "the plugin did not answer a call in time",
+      "the record of the timeout",
+    );
+
+    assert.equal(record["contribution"], "hangs");
+    assert.equal(record["waitedMilliseconds"], 5_000);
+  });
+
+  it("answers the calls hanging on a plugin that is gone", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    const answer = supervisor.call(
+      "data:callable",
+      {
+        kind: "hook",
+        contributionId: "hangs",
+        event: "before_session_start",
+        payload: { projectId: "p1", folder: "/tmp", agentId: "base" },
+      },
+      // Заведомо больше, чем длится тест: проверяется выгрузка, а не таймаут.
+      { timeoutMilliseconds: 600_000 },
+    );
+
+    await supervisor.apply(only("callable"), disabled("data:callable"));
+
+    const outcome = await answer;
+
+    assert.equal(outcome.kind, "failed");
+    assert.match(outcome.kind === "failed" ? outcome.reason : "", /is gone and answers no calls/);
+  });
+
+  it("refuses to call a plugin that is not running", async () => {
+    const recorded = journal();
+    const supervisor = await callable(recorded);
+
+    assert.deepEqual(
+      await supervisor.call(
+        "data:absent",
+        { kind: "tool", contributionId: "echo", arguments: {} },
+        { timeoutMilliseconds: 5_000 },
+      ),
+      {
+        kind: "failed",
+        reason: "the plugin data:absent is not running and answers no calls",
+      },
+    );
+  });
+});
