@@ -80,7 +80,7 @@ const model = (id: string, overrides: Partial<ModelSummary> = {}): ModelSummary 
   ...overrides,
 });
 
-function show(state: ProvidersState, providerId?: string) {
+function show(state: ProvidersState, providerId?: string, headingLevel: 1 | 2 = 1) {
   const handlers = {
     onOpen: vi.fn(),
     onBack: vi.fn(),
@@ -97,7 +97,13 @@ function show(state: ProvidersState, providerId?: string) {
   };
 
   const { rerender } = render(
-    <ProvidersView state={state} providerId={providerId} {...handlers} translator={translator} />,
+    <ProvidersView
+      state={state}
+      providerId={providerId}
+      headingLevel={headingLevel}
+      {...handlers}
+      translator={translator}
+    />,
   );
 
   return {
@@ -107,6 +113,7 @@ function show(state: ProvidersState, providerId?: string) {
         <ProvidersView
           state={next}
           providerId={id ?? providerId}
+          headingLevel={headingLevel}
           {...handlers}
           translator={translator}
         />,
@@ -329,6 +336,12 @@ describe("ProvidersView", () => {
 
     expect(screen.getByText(/несуществующий/)).toBeDefined();
     expect(screen.getByRole("button", { name: /Все провайдеры/ })).toBeDefined();
+  });
+
+  it("keeps an unknown embedded provider page free of a nested page heading", () => {
+    show(withProviders([provider("anthropic")]), "несуществующий", 2);
+
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
   });
 
   it("shows no models of a provider nobody opened", () => {

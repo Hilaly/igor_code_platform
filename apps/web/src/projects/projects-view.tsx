@@ -23,7 +23,6 @@ import {
   Menu,
   MoreIcon,
   Notice,
-  Panel,
   Spinner,
   Text,
   Tooltip,
@@ -36,6 +35,7 @@ import { shortenPath } from "./path-shorten.ts";
 import type { ProjectsState } from "./state.ts";
 
 export type ProjectsViewProps = {
+  headingLevel?: 1 | 2;
   state: ProjectsState;
   onCreate: (draft: ProjectDraft) => Promise<boolean>;
   onUpdate: (id: string, update: ProjectUpdate) => void;
@@ -51,11 +51,14 @@ export function ProjectsView(props: ProjectsViewProps) {
   const snapshot = state.snapshot;
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const headingLevel = props.headingLevel ?? 1;
 
   if (snapshot === undefined) {
     return (
       <div className="projects">
-        <Heading level={1}>{t("page.projects.title")}</Heading>
+        {headingLevel === 1 ? (
+          <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
+        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -67,7 +70,9 @@ export function ProjectsView(props: ProjectsViewProps) {
 
   return (
     <div className="projects">
-      <Heading level={1}>{t("page.projects.title")}</Heading>
+      {headingLevel === 1 ? (
+        <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
+      ) : undefined}
 
       {state.stale ? (
         <Notice tone="warning" title={t("projects.stale.title")}>
@@ -228,7 +233,8 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   }, [pickerOpen, cwd]);
 
   return (
-    <Panel title={t("projects.new.title")}>
+    <section className="projects-new-surface" aria-label={t("projects.new.title")}>
+      <Heading level={2}>{t("projects.new.title")}</Heading>
       {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
           больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
       <Form onSubmit={submit} disabled={busy || !ready}>
@@ -298,7 +304,7 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
         confirmLabel={t("projects.folder.picker.confirm")}
         cancelLabel={t("projects.folder.picker.cancel")}
       />
-    </Panel>
+    </section>
   );
 }
 

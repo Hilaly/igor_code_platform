@@ -166,6 +166,28 @@ describe("stylesheets of the kit", () => {
     expect(viewHeaderCss).toMatch(/\.actions\s*\{[^}]*justify-content:\s*flex-end;/s);
   });
 
+  it("owns the compact mockup geometry for settings views", () => {
+    const settingsFrameCss = readFileSync(
+      join(kitRoot, "components", "settings-frame.module.css"),
+      "utf8",
+    );
+
+    expect(settingsFrameCss).toMatch(/grid-template-columns:\s*minmax\([^,]+,\s*12rem\)/);
+    expect(settingsFrameCss).toMatch(
+      /\.navigationItemSelected\s*\{[^}]*background:\s*var\(--sovereign-accent-surface\)/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
+    );
+    expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*\{[^}]*overflow-x:\s*auto;/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*28rem\)[\s\S]*\.row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
+  });
+
   it("keeps shared application states flat and elevates only overlays", () => {
     const dialogCss = withoutComments(
       readFileSync(join(kitRoot, "components", "dialog.module.css"), "utf8"),

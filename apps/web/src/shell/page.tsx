@@ -1,6 +1,6 @@
 /**
- * Центральная страница: разводит адреса по вью. Свои вью есть у сессий, у проектов, у провайдеров и у
- * управления плагинами, страницы плагинов появятся вместе с браузерным кодом, который собирает демон
+ * Центральная страница: разводит адреса по вью. Проекты, провайдеры и управление плагинами
+ * собраны внутри единого Settings; страницы плагинов появятся вместе с браузерным кодом, который собирает демон
  * (docs/ui-extension-model.md).
  */
 
@@ -12,8 +12,6 @@ import type { Page } from "../router.ts";
 export type PageViewProps = {
   page: Page;
   /** Вью приходят собранными: страница не знает ни про шину, ни про запросы. */
-  projects: ReactNode;
-  project: ReactNode;
   session: ReactNode;
   sessionArchive: ReactNode;
   /** Создание сессии — отдельный адресуемый экран, не часть мастер-детали. */
@@ -26,8 +24,6 @@ export type PageViewProps = {
 
 export function PageView({
   page,
-  projects,
-  project,
   session,
   sessionArchive,
   newSession,
@@ -37,14 +33,6 @@ export function PageView({
   translator,
 }: PageViewProps) {
   const { t } = translator;
-
-  if (page.kind === "projects") {
-    return projects;
-  }
-
-  if (page.kind === "project") {
-    return project;
-  }
 
   if (page.kind === "session") {
     return session;
@@ -62,7 +50,11 @@ export function PageView({
 
   if (page.kind === "edit-provider") return editProvider;
 
-  if (page.kind === "settings") {
+  if (
+    page.kind === "settings" ||
+    page.kind === "settings-project" ||
+    page.kind === "settings-plugin"
+  ) {
     return settings;
   }
 

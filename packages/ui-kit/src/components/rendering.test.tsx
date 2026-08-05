@@ -40,10 +40,72 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import {
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsRow,
+  SettingsView,
+} from "./settings-frame.tsx";
+import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders the compact settings view, selected navigation, page, and property row", () => {
+    const markup = renderToStaticMarkup(
+      <SettingsView
+        context="Settings"
+        navigationLabel="Settings sections"
+        navigation={
+          <>
+            <SettingsNavigationItem selected onSelect={() => {}}>
+              Appearance
+            </SettingsNavigationItem>
+            <SettingsNavigationItem selected={false} onSelect={() => {}}>
+              Providers
+            </SettingsNavigationItem>
+          </>
+        }
+      >
+        <SettingsPage title="Appearance" description="Make Sovereign comfortable.">
+          <SettingsRow label="Colour scheme" description="Changes colour, not geometry">
+            <button type="button">Imperium</button>
+          </SettingsRow>
+        </SettingsPage>
+      </SettingsView>,
+    );
+
+    expect(markup).toContain("Settings");
+    expect(markup).toContain('aria-label="Settings sections"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toContain("Appearance");
+    expect(markup).toContain("Make Sovereign comfortable.");
+    expect(markup).toContain("Colour scheme");
+    expect(markup).toContain("Changes colour, not geometry");
+    expect(markup).toContain('role="group"');
+    expect(markup).toContain('aria-label="Colour scheme"');
+    expect(markup).toContain("Imperium");
+    expect(markup).not.toContain("Sovereign · Settings");
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("keeps a Select visually compact when its accessible label comes from a Settings row", () => {
+    const markup = renderToStaticMarkup(
+      <Select
+        label=""
+        ariaLabel="Colour scheme"
+        value="imperium"
+        options={[{ value: "imperium", label: "Imperium" }]}
+        onChange={() => {}}
+        placeholder="Choose"
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Colour scheme"');
+    expect(markup).not.toContain(">Colour scheme<");
+  });
+
   it("renders a container header with a heading and optional actions", () => {
     const markup = renderToStaticMarkup(
       <ViewHeader title="Новая сессия" level={2} actions={<button>Дерево</button>} />,

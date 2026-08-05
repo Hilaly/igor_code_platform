@@ -98,7 +98,8 @@
 ## Страницы и маршруты
 
 - Маршруты ядра стабильны; плагин их не захватывает.
-- Маршруты ядра: `/` (заглушка), `/plugins`, `/projects`, `/providers`, `/providers/:providerId`
+- Маршруты ядра: `/` (заглушка), `/settings/projects`, `/settings/projects/:projectId`,
+  `/settings/providers`, `/settings/providers/:providerId`, `/settings/plugins`
   (страница входа и моделей), `/sessions/:sessionId`, `/settings/:section` (страница настроек),
   `/p/<pluginId>/<pageId>/*` (неймспейс плагина). Список разделов настроек закрыт: раздел, которого
   ядро не знает, — неизвестная страница, а не запрос.

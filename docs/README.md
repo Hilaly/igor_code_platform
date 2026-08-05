@@ -124,6 +124,14 @@
   TDD-шаги для хранения предпочтения, расчёта доступной ширины и реакции оболочки на размер окна.
 - [Настройки и деталь плагина](superpowers/specs/2026-08-05-settings-plugin-detail-design.md) —
   утверждённый визуальный каркас всех разделов настроек и вложенная страница управления плагином с его вкладками.
+- [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
+  утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
+- [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
+  утверждённый визуальный контракт мокапа для общего каркаса, страниц и строк всех разделов настроек.
+- [План базового вью Settings](superpowers/plans/2026-08-05-settings-ui-kit-view.md) — TDD-срезы
+  для публичных примитивов UI kit, всех вложенных экранов и визуальной сверки с мокапом.
+- [План Projects внутри Settings](superpowers/plans/2026-08-05-settings-projects-section.md) —
+  TDD-перенос маршрутов, обоих Projects-вью и полной композиции в единое окно настроек.
 - [Исправления UI polish по повторному ревью](superpowers/specs/2026-08-05-ui-polish-review-fixes-design.md) —
   переносимое усечение пути, доступная подсказка, контрастный бренд-блок и чистая история ветки.
 - [План исправлений UI polish](superpowers/plans/2026-08-05-ui-polish-review-fixes.md) —

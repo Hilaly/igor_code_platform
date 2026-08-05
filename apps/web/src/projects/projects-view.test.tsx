@@ -105,6 +105,12 @@ const openNewProject = (): void => {
 };
 
 describe("ProjectsView", () => {
+  it("leaves the section heading to settings when embedded", () => {
+    show(withProjects([]), { headingLevel: 2 });
+
+    expect(screen.queryByRole("heading", { name: "Проекты" })).toBeNull();
+  });
+
   it("exposes active projects as one named list with separate row actions", () => {
     show(withProjects([project("alpha", { name: "Alpha" }), project("beta", { name: "Beta" })]));
 

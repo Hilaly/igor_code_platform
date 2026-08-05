@@ -122,7 +122,9 @@ export function ProvidersView({
   if (snapshot === undefined) {
     return (
       <div className="providers">
-        <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+        {headingLevel === 1 ? (
+          <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+        ) : undefined}
         {logins}
         {actionFailure ? <Notice tone="danger" title={actionFailure} /> : undefined}
         {state.failure === undefined ? (
@@ -145,7 +147,9 @@ export function ProvidersView({
       // честнее, чем страница «неизвестный адрес».
       return (
         <div className="providers">
-          <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+          {headingLevel === 1 ? (
+            <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+          ) : undefined}
           {logins}
           <Button onClick={onBack}>{t("providers.back")}</Button>
           <EmptyState title={t("providers.notfound", { id: providerId })} />
@@ -156,7 +160,11 @@ export function ProvidersView({
     return (
       <div className="providers">
         <Button onClick={onBack}>{t("providers.back")}</Button>
-        <Heading level={headingLevel}>{provider.name}</Heading>
+        {headingLevel === 1 ? (
+          <Heading level={headingLevel}>{provider.name}</Heading>
+        ) : (
+          <Text>{provider.name}</Text>
+        )}
         {logins}
         <ProviderHeader provider={provider} translator={translator} />
         {provider.origin === "user" ? (
@@ -187,7 +195,9 @@ export function ProvidersView({
 
   return (
     <div className="providers">
-      <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+      {headingLevel === 1 ? (
+        <Heading level={headingLevel}>{t("page.providers.title")}</Heading>
+      ) : undefined}
       <Button tone="accent" onClick={onCreate}>
         + {t("providers.user.new")}
       </Button>

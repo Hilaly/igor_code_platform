@@ -191,44 +191,29 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps settings split by their container and scrolls the active content", () => {
+  it("leaves the shared settings scroll and split geometry to UI Kit", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(/\.settings\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(settings).toMatch(/\.settings-layout\s*\{[^}]*grid-template-columns:[^;}]+;/s);
-    expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
-    expect(settings).toMatch(
-      /@container\s*\(width\s*<\s*40rem\)\s*\{[\s\S]*?\.settings-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    );
-    expect(settings).toMatch(/\.settings-nav\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;/s);
+    expect(settings).not.toMatch(/\.settings-content-body/);
     expect(settings).not.toMatch(/\.settings-split/);
   });
 
-  it("keeps settings compact, divided, and flat", () => {
+  it("keeps settings content free of application-owned visual frames", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(
-      /\.settings-nav\s*>\s*ul\s*>\s*li\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
-    );
-    expect(settings).toMatch(
-      /\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*[^{]*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
+    expect(settings).not.toMatch(/\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*/s);
     expect(settings).not.toMatch(
       /\.settings[^{]*\{[^}]*(?:box-shadow:\s*var\(--sovereign-elevation-|border-radius:\s*var\(--sovereign-radius-(?:sm|md|lg|xl))/s,
     );
   });
 
-  it("keeps plugin facts and contributions compact and divided", () => {
-    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+  it("keeps plugin list and detail rows compact and divided", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(shell).toMatch(
-      /\.plugins-plugin-head\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+    expect(settings).toMatch(
+      /\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
     );
-    expect(shell).toMatch(
-      /\.plugins-contributions\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
-    expect(shell).toMatch(
-      /\.plugins-contribution\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);[^}]*padding:\s*var\(--sovereign-space-1\)\s+var\(--sovereign-space-2\);/s,
-    );
+    expect(settings).toMatch(/\.plugin-detail-facts\s*\{[^}]*border-block-start:/s);
+    expect(settings).toMatch(/\.plugin-detail-contribution\s*\{[^}]*min-width:\s*0;/s);
   });
 });
