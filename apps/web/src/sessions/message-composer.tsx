@@ -1,19 +1,35 @@
-import type { SessionMessage, SessionMessageMode } from "@sovereign/protocol";
+import {
+  thinkingLevels,
+  type SessionMessage,
+  type SessionMessageMode,
+  type ThinkingLevel,
+  type TurnRequest,
+} from "@sovereign/protocol";
 import {
   Button,
+  ModelPicker,
+  type ModelPickerGroup,
   RaisedSurface,
   SegmentedControl,
+  Select,
   Textarea,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type MessageComposerProps = {
   draft: string;
   onDraftChange: (draft: string) => void;
   busy: boolean;
   disabled?: boolean;
-  onSubmit: (text: string) => void;
+  model: string;
+  modelGroups: ModelPickerGroup[];
+  onModelChange: (model: string) => void;
+  onExpandModelGroup: (providerId: string) => void;
+  thinkingLevel: ThinkingLevel;
+  reasoningSupported: boolean;
+  onThinkingLevelChange: (level: ThinkingLevel) => void;
+  onSubmit: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   translator: ScopedTranslator;
@@ -31,6 +47,13 @@ export function MessageComposer({
   onDraftChange,
   busy,
   disabled = false,
+  model,
+  modelGroups,
+  onModelChange,
+  onExpandModelGroup,
+  thinkingLevel,
+  reasoningSupported,
+  onThinkingLevelChange,
   onSubmit,
   onSendMessage,
   onInterrupt,
@@ -38,21 +61,56 @@ export function MessageComposer({
 }: MessageComposerProps): React.JSX.Element {
   const { t } = translator;
   const [mode, setMode] = useState<SessionMessageMode>("steer");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!reasoningSupported && thinkingLevel !== "off") {
+      onThinkingLevelChange("off");
+    }
+  }, [onThinkingLevelChange, reasoningSupported, thinkingLevel]);
 
   const send = (): void => {
-    if (disabled || draft.trim() === "") {
+    if (disabled || submitting || draft.trim() === "") {
       return;
     }
+
+    setSubmitting(true);
+    let acceptance: Promise<string | undefined>;
 
     if (busy) {
       // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
       // человек выбирает сам, потому что момент доставки у них разный.
-      void onSendMessage({ text: draft, mode });
+      acceptance = onSendMessage({ text: draft, mode });
     } else {
-      onSubmit(draft);
+      acceptance = onSubmit({
+        text: draft,
+        model,
+        thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+      });
     }
 
-    onDraftChange("");
+    void acceptance.then((reason) => {
+      setSubmitting(false);
+
+      if (reason === undefined) {
+        onDraftChange("");
+      }
+    });
+  };
+
+  const append = (): void => {
+    if (disabled || submitting || draft.trim() === "") {
+      return;
+    }
+
+    setSubmitting(true);
+    void onSendMessage({ text: draft, mode: "append" }).then((reason) => {
+      setSubmitting(false);
+
+      if (reason === undefined) {
+        onDraftChange("");
+      }
+    });
   };
 
   return (
@@ -84,23 +142,39 @@ export function MessageComposer({
               autoGrow
               rows={2}
               maxRows={12}
-              disabled={disabled}
+              disabled={disabled || submitting}
             />
-            <Button tone="accent" onClick={send} disabled={disabled || draft.trim() === ""}>
+            <div className="sessions-composer-options">
+              <ModelPicker
+                label={t("chat.model")}
+                groups={modelGroups}
+                value={model}
+                onChange={onModelChange}
+                onExpandGroup={onExpandModelGroup}
+                placeholder={t("common.choose")}
+                emptyText={t("state.empty")}
+              />
+              <Select
+                label={t("chat.thinking")}
+                value={reasoningSupported ? thinkingLevel : "off"}
+                onChange={(value) => onThinkingLevelChange(value as ThinkingLevel)}
+                disabled={!reasoningSupported}
+                options={thinkingLevels.map((level) => ({
+                  value: level,
+                  label: t(`thinking.${level}`),
+                }))}
+                placeholder={t("common.choose")}
+              />
+            </div>
+            <Button
+              tone="accent"
+              onClick={send}
+              disabled={disabled || submitting || draft.trim() === ""}
+            >
               {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
             </Button>
             {!busy ? (
-              <Button
-                onClick={() => {
-                  if (draft.trim() === "") {
-                    return;
-                  }
-
-                  void onSendMessage({ text: draft, mode: "append" });
-                  onDraftChange("");
-                }}
-                disabled={disabled || draft.trim() === ""}
-              >
+              <Button onClick={append} disabled={disabled || submitting || draft.trim() === ""}>
                 {t("chat.append")}
               </Button>
             ) : undefined}

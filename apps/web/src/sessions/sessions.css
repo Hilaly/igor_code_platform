@@ -113,6 +113,20 @@
   min-width: 0;
 }
 
+.sessions-composer-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sovereign-space-2);
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+@media (max-width: 36rem) {
+  .sessions-composer-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /*
  * Экран создания сессии — отдельный маршрут, а не модал: у модала фиксированная ширина, и список
  * моделей в нём не помещался. Форма ограничена по ширине и прижата к началу, чтобы на широком экране

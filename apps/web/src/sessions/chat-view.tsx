@@ -10,6 +10,8 @@ import type {
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
+  ThinkingLevel,
+  TurnRequest,
 } from "@sovereign/protocol";
 import {
   Badge,
@@ -28,12 +30,13 @@ import { useEffect, useState } from "react";
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer } from "./message-composer.tsx";
+import { modelPickerGroups } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
 import { isBusy, type OpenSession } from "./state.ts";
 
 export type ChatViewProps = {
   open: OpenSession;
-  onSubmit: (text: string) => void;
+  onSubmit: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   onFork: (request: SessionForkRequest) => Promise<void>;
@@ -53,6 +56,10 @@ export function ChatView(props: ChatViewProps) {
     props;
   const { t } = translator;
   const [draft, setDraft] = useState("");
+  const [model, setModel] = useState(open.summary?.model ?? "");
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
+    open.summary?.thinkingLevel ?? "off",
+  );
   const [treeOpen, setTreeOpen] = useState(false);
   const [compacting, setCompacting] = useState(false);
   const [instructions, setInstructions] = useState("");
@@ -86,6 +93,12 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
+
+  useEffect(() => {
+    setDraft("");
+    setModel(open.summary?.model ?? "");
+    setThinkingLevel(open.summary?.thinkingLevel ?? "off");
+  }, [open.id]);
 
   useEffect(() => {
     if (!agentAvailable) {
@@ -187,6 +200,13 @@ export function ChatView(props: ChatViewProps) {
           onDraftChange={setDraft}
           busy={busy}
           disabled={!agentAvailable}
+          model={model}
+          modelGroups={modelPickerGroups(undefined, {}, model)}
+          onModelChange={setModel}
+          onExpandModelGroup={() => undefined}
+          thinkingLevel={thinkingLevel}
+          reasoningSupported
+          onThinkingLevelChange={setThinkingLevel}
           onSubmit={onSubmit}
           onSendMessage={onSendMessage}
           onInterrupt={onInterrupt}
