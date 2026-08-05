@@ -250,6 +250,9 @@ export function Tree({
       const nodeElementId = `${treeId}-item-${encodeURIComponent(node.id)}`;
       const labelElementId = `${nodeElementId}-label`;
       const badgeElementId = `${nodeElementId}-badge`;
+      const indentation = Array.from({ length: level }, (_, index) => (
+        <span key={index} className={styles.indent} aria-hidden="true" />
+      ));
 
       return (
         <div key={node.id} role="none" className={styles.item}>
@@ -277,6 +280,7 @@ export function Tree({
             onClick={(event) => handleItemClick(event, node)}
           >
             <div className={`${styles.row}${isSelected ? ` ${styles.selected}` : ""}`}>
+              {indentation}
               {hasChildren ? (
                 <button
                   type="button"

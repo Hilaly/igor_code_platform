@@ -174,7 +174,6 @@
 
 .sidebar-project-actions {
   min-height: var(--sovereign-row-height-compact);
-  padding-inline-end: var(--sovereign-space-1);
 }
 
 .shell-account {

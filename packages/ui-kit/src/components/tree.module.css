@@ -19,13 +19,18 @@
 }
 
 .row {
-  display: grid;
-  grid-column: 1;
-  grid-template-columns: 1rem minmax(0, 1fr);
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 1;
   min-height: var(--sovereign-row-height-compact);
   align-items: center;
   gap: var(--sovereign-space-2);
   padding-inline: var(--sovereign-space-2);
+  /* Рельс действий рисуется поверх строки отдельной колонкой. Запас не даёт длинной подписи
+     залезть под кнопки, а фон и hover при этом доходят до общего правого края. */
+  padding-inline-end: calc(
+    var(--sovereign-space-2) + var(--sovereign-row-height-compact) * 2 + var(--sovereign-space-1)
+  );
   padding-block: var(--sovereign-space-1);
   box-sizing: content-box;
   border-radius: var(--sovereign-radius-xs);
@@ -67,10 +72,13 @@
   height: 1rem;
 }
 
+.indent {
+  flex: 0 0 var(--sovereign-space-4);
+}
+
 .content {
-  grid-column: 2;
-  grid-row: 1;
   display: flex;
+  flex: 1;
   min-width: 0;
   align-items: center;
   gap: var(--sovereign-space-2);
@@ -117,11 +125,13 @@
   align-items: center;
   gap: var(--sovereign-space-1);
   flex: none;
+  justify-self: end;
+  z-index: 1;
 }
 
 .children {
   display: flex;
   grid-column: 1 / -1;
+  grid-row: 2;
   flex-direction: column;
-  padding-left: var(--sovereign-space-4);
 }
