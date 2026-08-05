@@ -117,6 +117,14 @@ describe("the session message composer", () => {
     ).toBe(true);
   });
 
+  it("opens the model catalogue above the contained bottom zone", () => {
+    render(<ComposerHarness />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+
+    expect(screen.getByRole("tree").getAttribute("data-side")).toBe("top");
+  });
+
   it("reports draft changes through its controlled interface", () => {
     render(<ComposerHarness />);
 

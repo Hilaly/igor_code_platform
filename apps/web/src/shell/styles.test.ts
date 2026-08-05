@@ -141,10 +141,22 @@ describe("the style sheets of the application", () => {
   });
 
   it("keeps direct session content sized by its available container", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
     expect(sessions).toMatch(/\.sessions\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-height:\s*0;/s);
+    expect(sessions).toMatch(
+      /\.sessions-chat\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;/s,
+    );
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*container-type:\s*inline-size;/s);
+    expect(sessions).toMatch(/\.sessions-chat-scroll\s*\{[^}]*min-height:\s*0;/s);
+    expect(sessions).not.toMatch(
+      /\.sessions-chat[^}]*(?:position:\s*(?:sticky|absolute)|100vh|100dvh)/s,
+    );
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*auto;/s);
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*hidden;[^}]*min-height:\s*0;/s,
+    );
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });

@@ -6,13 +6,14 @@
  */
 
 import type {
-  SessionContextUsage,
+  ProviderSummary,
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
   ThinkingLevel,
   TurnRequest,
 } from "@sovereign/protocol";
+import { parseModelReference } from "@sovereign/protocol";
 import {
   Badge,
   Button,
@@ -21,8 +22,7 @@ import {
   Field,
   Input,
   Notice,
-  Progress,
-  Text,
+  ViewHeader,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState } from "react";
@@ -30,12 +30,17 @@ import { useEffect, useRef, useState } from "react";
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer } from "./message-composer.tsx";
-import { modelPickerGroups } from "./model-options.ts";
+import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
-import { isBusy, type OpenSession } from "./state.ts";
+import { SessionUsage } from "./session-usage.tsx";
+import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 
 export type ChatViewProps = {
   open: OpenSession;
+  providers?: ProviderSummary[];
+  models: Record<string, ModelsEntry>;
+  onPrepareModels: () => void;
+  onLoadModels: (providerId: string) => void;
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
@@ -52,8 +57,20 @@ export type ChatViewProps = {
 type Refusal = { what: "compact" | "label"; reason: string };
 
 export function ChatView(props: ChatViewProps) {
-  const { open, onSubmit, onSendMessage, onInterrupt, onFork, onCompact, onSetLabel, translator } =
-    props;
+  const {
+    open,
+    providers,
+    models,
+    onPrepareModels,
+    onLoadModels,
+    onSubmit,
+    onSendMessage,
+    onInterrupt,
+    onFork,
+    onCompact,
+    onSetLabel,
+    translator,
+  } = props;
   const { t } = translator;
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState(open.summary?.model ?? "");
@@ -73,12 +90,13 @@ export function ChatView(props: ChatViewProps) {
   const [refusal, setRefusal] = useState<Refusal | undefined>(undefined);
   const busy = isBusy(open.summary);
   const agentAvailable = open.summary?.agentAvailable !== false;
-  const queues = open.queues;
+  const sessionQueues = open.queues;
   const waiting = [
-    ...(queues?.steer ?? []),
-    ...(queues?.followUp ?? []),
-    ...(queues?.nextTurn ?? []),
+    ...(sessionQueues?.steer ?? []),
+    ...(sessionQueues?.followUp ?? []),
+    ...(sessionQueues?.nextTurn ?? []),
   ];
+  const reasoningSupported = selectedModel(model, models)?.reasoning !== false;
 
   const compact = async (): Promise<void> => {
     setCompacting(false);
@@ -118,6 +136,19 @@ export function ChatView(props: ChatViewProps) {
     }
   }, [open.id, open.summary]);
 
+  useEffect(() => {
+    onPrepareModels();
+  }, [onPrepareModels]);
+
+  useEffect(() => {
+    const current = open.summary?.model;
+    const parsed = current === undefined ? undefined : parseModelReference(current);
+
+    if (parsed !== undefined) {
+      onLoadModels(parsed.providerId);
+    }
+  }, [onLoadModels, open.id, open.summary?.model]);
+
   const prepareModel = (nextModel: string): void => {
     modelPrepared.current = true;
     setModel(nextModel);
@@ -134,17 +165,66 @@ export function ChatView(props: ChatViewProps) {
     }
   }, [agentAvailable]);
 
-  return (
-    <div className="sessions-chat">
-      <div className="sessions-chat-head">
+  const headerActions = (
+    <>
+      {busy ? undefined : <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>}
+      {archived ? undefined : (
         <Button
-          onClick={() => {
-            setTreeOpen(true);
-          }}
+          onClick={() => setCompacting(true)}
+          disabled={busy || !agentAvailable}
+          {...(busy ? { title: t("chat.busy.hint") } : {})}
         >
-          {t("chat.tree.open")}
+          {t("chat.compact")}
         </Button>
+      )}
+      <Button
+        onClick={() => {
+          setTreeOpen(true);
+        }}
+      >
+        {t("chat.tree.open")}
+      </Button>
+    </>
+  );
+
+  const notices = (
+    <>
+      {open.failure === undefined ? undefined : (
+        <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
+      )}
+      {agentAvailable ? undefined : (
+        <Notice
+          tone="warning"
+          title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
+        />
+      )}
+      {refusal?.what !== "compact" ? undefined : (
+        <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
+      )}
+      {open.degradations.map((lost, index) => (
+        <Notice
+          key={`${lost.kind}:${lost.name}:${String(index)}`}
+          tone="warning"
+          title={t(`chat.degraded.${lost.kind}`, { name: lost.name })}
+        />
+      ))}
+    </>
+  );
+
+  const queueBadges =
+    waiting.length === 0 ? undefined : (
+      <div className="sessions-queues">
+        {waiting.map((text, index) => (
+          <Badge key={`${String(index)}:${text}`} tone="accent">
+            {text}
+          </Badge>
+        ))}
       </div>
+    );
+
+  return (
+    <section className="sessions-chat">
+      <ViewHeader title={open.summary?.title ?? t("sessions.new.title")} actions={headerActions} />
 
       <EntryTreeDrawer
         open={treeOpen}
@@ -161,30 +241,10 @@ export function ChatView(props: ChatViewProps) {
         translator={translator}
       />
 
-      {open.failure === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
-      )}
-
-      {agentAvailable ? undefined : (
-        <Notice
-          tone="warning"
-          title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
-        />
-      )}
-
-      {refusal?.what !== "compact" ? undefined : (
-        <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
-      )}
-
-      {open.degradations.map((lost, index) => (
-        <Notice
-          key={`${lost.kind}:${lost.name}:${String(index)}`}
-          tone="warning"
-          title={t(`chat.degraded.${lost.kind}`, { name: lost.name })}
-        />
-      ))}
-
       <SessionMessageList
+        className="sessions-chat-scroll"
+        before={notices}
+        after={queueBadges}
         open={open}
         busy={busy}
         archived={archived}
@@ -197,67 +257,26 @@ export function ChatView(props: ChatViewProps) {
         translator={translator}
       />
 
-      {open.stats === undefined ? undefined : (
-        <div className="sessions-stats">
-          <Text tone="muted">
-            {t("chat.stats.tokens", { total: String(open.stats.totalTokens) })}
-          </Text>
-          <Text tone="muted">
-            {t("chat.stats.cost", { cost: open.stats.costTotal.toFixed(4) })}
-          </Text>
-        </div>
-      )}
-
-      {open.context === undefined ? undefined : (
-        <ContextGauge context={open.context} translator={translator} />
-      )}
-
-      {waiting.length === 0 ? undefined : (
-        <div className="sessions-queues">
-          {waiting.map((text, index) => (
-            <Badge key={`${String(index)}:${text}`} tone="accent">
-              {text}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {archived ? undefined : (
-        <MessageComposer
-          draft={draft}
-          onDraftChange={setDraft}
-          busy={busy}
-          disabled={!agentAvailable}
-          model={model}
-          modelGroups={modelPickerGroups(undefined, {}, model)}
-          onModelChange={prepareModel}
-          onExpandModelGroup={() => undefined}
-          thinkingLevel={thinkingLevel}
-          reasoningSupported
-          onThinkingLevelChange={prepareThinkingLevel}
-          onSubmit={onSubmit}
-          onSendMessage={onSendMessage}
-          onInterrupt={onInterrupt}
-          translator={translator}
-        />
-      )}
-      <div className="sessions-session-actions">
-        {busy ? undefined : (
-          <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
-        )}
-        {/*
-         * Архивной сессии компакции не предлагается вовсе: сервер отклонит её `409`, и кнопка
-         * обещала бы невозможное (docs/sessions-and-projects.md). Занятой она показана выключенной —
-         * занятость проходит сама, и контрол, исчезающий на время турна, хуже выключенного.
-         */}
+      <div className="sessions-chat-bottom">
+        <SessionUsage stats={open.stats} context={open.context} translator={translator} />
         {archived ? undefined : (
-          <Button
-            onClick={() => setCompacting(true)}
-            disabled={busy || !agentAvailable}
-            {...(busy ? { title: t("chat.busy.hint") } : {})}
-          >
-            {t("chat.compact")}
-          </Button>
+          <MessageComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            busy={busy}
+            disabled={!agentAvailable}
+            model={model}
+            modelGroups={modelPickerGroups(providers, models, model)}
+            onModelChange={prepareModel}
+            onExpandModelGroup={onLoadModels}
+            thinkingLevel={thinkingLevel}
+            reasoningSupported={reasoningSupported}
+            onThinkingLevelChange={prepareThinkingLevel}
+            onSubmit={onSubmit}
+            onSendMessage={onSendMessage}
+            onInterrupt={onInterrupt}
+            translator={translator}
+          />
         )}
       </div>
 
@@ -275,48 +294,7 @@ export function ChatView(props: ChatViewProps) {
           {(control) => <Input {...control} value={instructions} onChange={setInstructions} />}
         </Field>
       </ConfirmDialog>
-    </div>
-  );
-}
-
-/**
- * Заполнение контекста. Проценты показываются только когда известно окно модели: без него доли не
- * существует вовсе, и рисовать полосу «из неизвестно чего» значит выдумывать число.
- *
- * Порог автокомпакции виден двумя способами сразу — подписью и цветом полосы, когда он перейдён.
- * `threshold === 0` значит «автопорог выключен», и помечать тогда нечего.
- */
-function ContextGauge(props: { context: SessionContextUsage; translator: ScopedTranslator }) {
-  const { context, translator } = props;
-  const { t } = translator;
-  const window = context.contextWindow;
-  const share = window === undefined || window <= 0 ? undefined : context.tokens / window;
-  const percent = (value: number): string => String(Math.round(value * 100));
-
-  return (
-    <div className="sessions-context">
-      <Text tone="muted">
-        {share === undefined
-          ? t("chat.context.tokens", { tokens: String(context.tokens) })
-          : t("chat.context.used", {
-              tokens: String(context.tokens),
-              window: String(window),
-              percent: percent(share),
-            })}
-      </Text>
-      {share === undefined ? undefined : (
-        <Progress
-          value={share}
-          label={t("chat.context.label")}
-          tone={context.threshold > 0 && share >= context.threshold ? "warning" : "accent"}
-        />
-      )}
-      {share === undefined || context.threshold === 0 ? undefined : (
-        <Text tone="muted">
-          {t("chat.context.threshold", { percent: percent(context.threshold) })}
-        </Text>
-      )}
-    </div>
+    </section>
   );
 }
 

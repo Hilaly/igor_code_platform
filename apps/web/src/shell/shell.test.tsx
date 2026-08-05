@@ -191,6 +191,16 @@ describe("PanelResizer", () => {
 });
 
 describe("hiding and restoring the panels", () => {
+  it("marks a contained page while preserving the page default", () => {
+    const view = show();
+
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("page");
+
+    view.again(defaultLayout, { contentMode: "contained" });
+
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("contained");
+  });
+
   it("a hidden left panel is gone with its edge, and a restore button takes its place", () => {
     show({ layout: { ...defaultLayout, leftHidden: true } });
 

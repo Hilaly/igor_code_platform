@@ -47,6 +47,14 @@ const show = (overrides: Partial<ModelPickerProps> = {}) => {
 };
 
 describe("the ModelPicker", () => {
+  it("can open its catalogue above the trigger", () => {
+    show({ side: "top" });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+
+    expect(screen.getByRole("tree").getAttribute("data-side")).toBe("top");
+  });
+
   it("expands a group on click and asks for its options only then", () => {
     const view = show();
 

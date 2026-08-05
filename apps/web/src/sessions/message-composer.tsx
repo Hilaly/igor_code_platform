@@ -146,6 +146,7 @@ export function MessageComposer({
             />
             <div className="sessions-composer-options">
               <ModelPicker
+                side="top"
                 label={t("chat.model")}
                 groups={modelGroups}
                 value={model}

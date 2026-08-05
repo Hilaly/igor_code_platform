@@ -464,6 +464,23 @@ describe("text that is still arriving", () => {
 });
 
 describe("feed of messages", () => {
+  it("keeps caller slots inside the same live log", () => {
+    const markup = renderToStaticMarkup(
+      <MessageFeed
+        label="Переписка"
+        className="chat-scroll-root"
+        before={<span>до истории</span>}
+        after={<span>после истории</span>}
+      >
+        <Message role="human">история</Message>
+      </MessageFeed>,
+    );
+
+    expect(markup).toMatch(
+      /<div[^>]*class="[^"]*chat-scroll-root[^"]*"[^>]*role="log"[^>]*>[\s\S]*до истории[\s\S]*история[\s\S]*после истории[\s\S]*<\/div>/,
+    );
+  });
+
   it("is a live log with a name of its own", () => {
     const markup = renderToStaticMarkup(
       <MessageFeed label="Переписка" busy>

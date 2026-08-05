@@ -325,7 +325,8 @@ contents`): раскладку задаёт внутренний контейн�
   не попадают в теги и пропускаются клавиатурой; отключённый триггер имеет `aria-disabled` и не
   отвечает на ввод.
 - **`ModelPicker`** — управляемый двойной выбор «группа → опция»: `groups`, `value`, `onChange(value)`,
-  `onExpandGroup(groupId)`, `label`, `placeholder`, `emptyText`, `disabled`. Группа
+  `onExpandGroup(groupId)`, `label`, `placeholder`, `emptyText`, `disabled` и необязательная сторона
+  слоя `side` (`top` | `bottom`, по умолчанию `bottom`). Группа
   (`ModelPickerGroup`) несёт `id`, `label`, `options` (`ModelPickerOption`: `value`, `label`,
   необязательные `description` и `disabled`) и необязательные `loading`, `failureReason`, `disabled`.
   Как и `Select`/`Combobox`, доменно нейтрален: назван в честь первого потребителя, но ни провайдеров,
@@ -439,7 +440,9 @@ contents`): раскладку задаёт внутренний контейн�
   `prefers-reduced-motion`, но сама каретка остаётся — иначе пропадает единственный признак того,
   что ответ ещё идёт.
 - **`MessageFeed` и `Message`** — лента переписки и реплика в ней; два экспорта в одном файле, как
-  `List` и `ListRow`. Лента принимает `label`, `busy`, `children`, объявляет себя `role="log"` с
+  `List` и `ListRow`. Лента принимает `label`, `busy`, `children`, необязательные `className`,
+  `before` и `after`; оба слота входят внутрь того же `role="log"` до и после реплик. Лента
+  объявляет себя `role="log"` с
   `aria-live="polite"` и **одна на всю переписку** отвечает за озвучивание: живых областей внутри
   реплик больше нет. Она же прилипает к низу — но только если читающий уже был внизу, иначе каждая
   дельта срывала бы чтение истории. Решение вынесено чистой функцией `shouldStickToBottom(metrics)`

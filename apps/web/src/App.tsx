@@ -434,6 +434,7 @@ export function App() {
     <Shell
       layout={layout}
       onLayoutChange={setLayout}
+      contentMode={page.kind === "session" ? "contained" : "page"}
       labels={{
         left: translator.t("panel.left"),
         right: translator.t("panel.right"),
@@ -545,6 +546,10 @@ export function App() {
             {sessions.state.open === undefined ? null : (
               <ChatView
                 open={sessions.state.open}
+                providers={sessions.state.providers}
+                models={sessions.state.models}
+                onPrepareModels={sessions.prepareModels}
+                onLoadModels={sessions.loadModels}
                 onSubmit={sessions.submitTurn}
                 onSendMessage={sessions.sendMessage}
                 onInterrupt={sessions.interrupt}
