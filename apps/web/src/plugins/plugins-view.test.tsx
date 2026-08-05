@@ -116,6 +116,41 @@ it("labels every shipped contribution kind without reporting a missing translati
         location: "/plugins/example/skills/example",
         disableModelInvocation: false,
       },
+      {
+        kind: "event",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.happened",
+        declaredId: "happened",
+        title: "Example event",
+        payloadSchema: { type: "object" },
+      },
+      {
+        kind: "tool",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.echo",
+        declaredId: "echo",
+        title: "Example tool",
+        description: "Says it back",
+        parameters: { type: "object", properties: { text: { type: "string" } } },
+      },
+      {
+        kind: "hook",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.guard",
+        declaredId: "guard",
+        title: "Example subscription",
+        event: "before_session_start",
+        criticality: "critical",
+      },
     ],
   };
 
@@ -129,4 +164,13 @@ it("labels every shipped contribution kind without reporting a missing translati
 
   expect(screen.getByText("agent")).toBeTruthy();
   expect(screen.getByText("skill")).toBeTruthy();
+  expect(screen.getByText("event")).toBeTruthy();
+  expect(screen.getByText("tool")).toBeTruthy();
+  expect(screen.getByText("subscription")).toBeTruthy();
+
+  // У подписки видно, куда она вклинивается и чем обойдётся её молчание, у инструмента — что от
+  // модели ждут аргументами: без этого человеку нечем решать, выключать вклад или терпеть.
+  expect(screen.getByText("before_session_start")).toBeTruthy();
+  expect(screen.getByText("critical")).toBeTruthy();
+  expect(screen.getByText("Argument schema")).toBeTruthy();
 });

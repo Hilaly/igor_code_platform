@@ -234,6 +234,28 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
                         </CodeBlock>
                       </Disclosure>
                     ) : undefined}
+                    {/*
+                      У подписки видно, куда она вклинивается и чем обойдётся её молчание: без имени
+                      события и критичности человеку нечем решать, выключать её или терпеть
+                      (docs/hooks.md).
+                    */}
+                    {registration.kind === "hook" ? (
+                      <>
+                        <Code>{registration.event}</Code>
+                        <Badge
+                          tone={registration.criticality === "critical" ? "warning" : "neutral"}
+                        >
+                          {t(`plugins.criticality.${registration.criticality}`)}
+                        </Badge>
+                      </>
+                    ) : undefined}
+                    {registration.kind === "tool" ? (
+                      <Disclosure summary={t("plugins.parameters")}>
+                        <CodeBlock>
+                          {JSON.stringify(registration.parameters, undefined, 2)}
+                        </CodeBlock>
+                      </Disclosure>
+                    ) : undefined}
                   </div>
                 </ListRow>
               ))}
