@@ -55,6 +55,118 @@
   overflow-y: auto;
 }
 
+.plugins,
+.plugin-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+}
+
+.plugins > ul {
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugins-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+  min-height: var(--sovereign-row-height-compact);
+  padding: var(--sovereign-space-2) 0;
+}
+
+.plugins-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.plugins-row-main h2 {
+  margin: 0;
+}
+
+.plugin-detail > .button {
+  align-self: flex-start;
+}
+
+.plugin-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  padding-block: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-header h2 {
+  margin: 0 0 var(--sovereign-space-1);
+}
+
+.plugin-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-section h3 {
+  margin: 0;
+}
+
+.plugin-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding: var(--sovereign-space-2) 0;
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-fact > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+.plugin-detail-contribution {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto minmax(12rem, auto);
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.plugin-detail-contribution-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+@container (width < 40rem) {
+  .plugins-row,
+  .plugin-detail-contribution {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .plugins-row > :nth-child(2),
+  .plugins-row > :nth-child(3),
+  .plugin-detail-contribution-meta,
+  .plugin-detail-contribution details {
+    grid-column: 1 / -1;
+  }
+}
+
 @container (width < 40rem) {
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);

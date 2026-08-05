@@ -49,28 +49,23 @@ const snapshot: PluginsSnapshot = {
   enablement: { "data:example": { enabled: true, disabledContributions: [] } },
 };
 
-it("presents each plugin as one section with a semantic contribution list", () => {
+it("presents a compact plugin row and opens the nested detail page", () => {
   const onSwitch = vi.fn();
+  const onOpen = vi.fn();
   const { container } = render(
-    <PluginsView state={{ snapshot, stale: false }} onSwitch={onSwitch} translator={translator} />,
+    <PluginsView state={{ snapshot, stale: false }} onSwitch={onSwitch} onOpen={onOpen} translator={translator} />,
   );
 
-  const pluginHeading = screen.getByRole("heading", { name: "example" });
-  const pluginSection = pluginHeading.closest("section");
+  const row = screen.getByRole("listitem");
+  expect(container.querySelectorAll("section")).toHaveLength(0);
+  expect(within(row).getByText("example")).toBeTruthy();
+  expect(within(row).getByText("Running")).toBeTruthy();
+  expect(within(row).getByText("1 contribution")).toBeTruthy();
+  expect(within(row).queryByText("Example action")).toBeNull();
 
-  expect(container.querySelectorAll("section")).toHaveLength(1);
-  expect(pluginSection).not.toBeNull();
-  expect(within(pluginSection!).getAllByRole("listitem")).toHaveLength(1);
-  expect(within(pluginSection!).getByText("Running")).toBeTruthy();
-  expect(within(pluginSection!).getByText(/\/plugins\/example/)).toBeTruthy();
-
-  const pluginToggle = within(pluginSection!).getByRole("checkbox", { name: "Switched on" });
-  const contributionToggle = within(pluginSection!).getByRole("checkbox", {
-    name: "Example action",
-  });
+  const pluginToggle = within(row).getByRole("checkbox", { name: "Switched on" });
 
   expect(pluginToggle).toHaveProperty("checked", true);
-  expect(contributionToggle).toHaveProperty("checked", true);
 
   fireEvent.click(pluginToggle);
   expect(onSwitch).toHaveBeenNthCalledWith(1, "data:example", {
@@ -78,11 +73,8 @@ it("presents each plugin as one section with a semantic contribution list", () =
     disabledContributions: [],
   });
 
-  fireEvent.click(contributionToggle);
-  expect(onSwitch).toHaveBeenNthCalledWith(2, "data:example", {
-    enabled: true,
-    disabledContributions: ["example.action"],
-  });
+  fireEvent.click(within(row).getByRole("button", { name: "Open" }));
+  expect(onOpen).toHaveBeenCalledWith("data:example");
 });
 
 it("labels every shipped contribution kind without reporting a missing translation", () => {
@@ -123,10 +115,10 @@ it("labels every shipped contribution kind without reporting a missing translati
     <PluginsView
       state={{ snapshot: completeSnapshot, stale: false }}
       onSwitch={vi.fn()}
+      onOpen={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByText("agent")).toBeTruthy();
-  expect(screen.getByText("skill")).toBeTruthy();
+  expect(screen.getByText("3 contributions")).toBeTruthy();
 });

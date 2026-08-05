@@ -40,6 +40,7 @@ import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
+import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { ProjectDetailView } from "./projects/project-detail-view.tsx";
@@ -499,7 +500,7 @@ export function App() {
         />
       }
       tabs={[]}
-      rightUnavailable={page.kind === "settings"}
+      rightUnavailable={page.kind === "settings" || page.kind === "settings-plugin"}
     >
       <PageView
         page={page}
@@ -669,7 +670,7 @@ export function App() {
         }
         settings={
           <SettingsView
-            section={page.kind === "settings" ? page.section : "appearance"}
+            section={page.kind === "settings-plugin" ? "plugins" : page.kind === "settings" ? page.section : "appearance"}
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
             appearance={
               <AppearanceSection
@@ -721,12 +722,23 @@ export function App() {
               />
             }
             plugins={
-              <PluginsView
-                headingLevel={2}
-                state={plugins.state}
-                onSwitch={plugins.switchPlugin}
-                translator={translator}
-              />
+              page.kind === "settings-plugin" ? (
+                <PluginDetailView
+                  state={plugins.state}
+                  pluginKey={page.pluginKey}
+                  onBack={() => navigation.navigate({ kind: "settings", section: "plugins" })}
+                  onSwitch={plugins.switchPlugin}
+                  translator={translator}
+                />
+              ) : (
+                <PluginsView
+                  headingLevel={2}
+                  state={plugins.state}
+                  onSwitch={plugins.switchPlugin}
+                  onOpen={(pluginKey) => navigation.navigate({ kind: "settings-plugin", pluginKey })}
+                  translator={translator}
+                />
+              )
             }
             daemon={
               <DaemonSection

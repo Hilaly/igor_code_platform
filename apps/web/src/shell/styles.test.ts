@@ -189,17 +189,11 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps plugin facts and contributions compact and divided", () => {
-    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+  it("keeps plugin list and detail rows compact and divided", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(shell).toMatch(
-      /\.plugins-plugin-head\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
-    );
-    expect(shell).toMatch(
-      /\.plugins-contributions\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
-    expect(shell).toMatch(
-      /\.plugins-contribution\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);[^}]*padding:\s*var\(--sovereign-space-1\)\s+var\(--sovereign-space-2\);/s,
-    );
+    expect(settings).toMatch(/\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s);
+    expect(settings).toMatch(/\.plugin-detail-facts\s*\{[^}]*border-block-start:/s);
+    expect(settings).toMatch(/\.plugin-detail-contribution\s*\{[^}]*min-width:\s*0;/s);
   });
 });

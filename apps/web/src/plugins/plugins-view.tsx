@@ -8,7 +8,6 @@
  */
 
 import type {
-  ContributionRegistration,
   PluginLifecycleState,
   PluginPreferences,
   PluginsSnapshot,
@@ -16,15 +15,12 @@ import type {
 } from "@sovereign/protocol";
 import {
   Badge,
-  CodeBlock,
-  Code,
-  Disclosure,
+  Button,
   EmptyState,
   Heading,
   List,
   ListRow,
   Notice,
-  Panel,
   Spinner,
   Text,
   Toggle,
@@ -39,6 +35,7 @@ export type PluginsViewProps = {
   headingLevel?: 1 | 2;
   state: PluginsState;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
+  onOpen?: (pluginKey: string) => void;
   translator: ScopedTranslator;
 };
 
@@ -55,7 +52,7 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   failed: "danger",
 };
 
-export function PluginsView({ headingLevel = 1, state, onSwitch, translator }: PluginsViewProps) {
+export function PluginsView({ headingLevel = 1, state, onSwitch, onOpen, translator }: PluginsViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
 
@@ -104,58 +101,27 @@ export function PluginsView({ headingLevel = 1, state, onSwitch, translator }: P
       {snapshot.plugins.length === 0 ? (
         <EmptyState title={t("plugins.empty")} />
       ) : (
-        snapshot.plugins.map((status) => (
-          <PluginPanel
-            key={status.key}
-            status={status}
-            snapshot={snapshot}
-            onSwitch={onSwitch}
-            translator={translator}
-          />
-        ))
+        <List>
+          {snapshot.plugins.map((status) => (
+            <PluginRow key={status.key} status={status} snapshot={snapshot} onSwitch={onSwitch} onOpen={onOpen} translator={translator} />
+          ))}
+        </List>
       )}
     </div>
   );
 }
 
-type PluginPanelProps = {
+type PluginRowProps = {
   status: PluginStatus;
   snapshot: PluginsSnapshot;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
+  onOpen?: (pluginKey: string) => void;
   translator: ScopedTranslator;
 };
 
-function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProps) {
+function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRowProps) {
   const { t } = translator;
   const preferences = snapshot.enablement[status.key];
-  const mine = (registration: ContributionRegistration): boolean =>
-    registration.ownership === "plugin" && registration.pluginKey === status.key;
-  const declared = [
-    ...snapshot.contributions.filter(mine).map((registration) => ({ registration, off: false })),
-    ...snapshot.switchedOffContributions
-      .filter(mine)
-      .map((registration) => ({ registration, off: true })),
-  ].sort((left, right) => (left.registration.id < right.registration.id ? -1 : 1));
-
-  // Запись сохраняется, даже если вклад исчез вместе с версией плагина (docs/plugins.md): человек должен
-  // видеть, что решение осталось, а не удивляться ему при возвращении вклада.
-  const forgotten = (preferences?.disabledContributions ?? []).filter(
-    (id) => !declared.some((entry) => entry.registration.id === id),
-  );
-
-  const switchContribution = (id: string, on: boolean): void => {
-    if (preferences === undefined) {
-      return;
-    }
-
-    const rest = preferences.disabledContributions.filter((disabled) => disabled !== id);
-
-    onSwitch(status.key, {
-      ...preferences,
-      disabledContributions: on ? rest : [...rest, id],
-    });
-  };
-
   const pluginToggle = (
     <Toggle
       checked={preferences?.enabled ?? false}
@@ -169,91 +135,22 @@ function PluginPanel({ status, snapshot, onSwitch, translator }: PluginPanelProp
       {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
     />
   );
-
+  const contributions = [
+    ...snapshot.contributions,
+    ...snapshot.switchedOffContributions,
+  ].filter((registration) => registration.ownership === "plugin" && registration.pluginKey === status.key).length;
   return (
-    <Panel title={status.id ?? status.key} actions={pluginToggle}>
-      <div className="plugins-plugin">
-        <div className="plugins-plugin-head">
-          <div className="plugins-plugin-facts">
-            <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
-            <Code>{status.key}</Code>
-            {status.attempt === undefined ? undefined : (
-              <Text tone="muted">{t("plugins.attempt", { count: status.attempt })}</Text>
-            )}
-          </div>
-          <Text tone="muted">
-            {t("plugins.directory")}: {status.directory}
-          </Text>
+    <ListRow>
+      <div className="plugins-row">
+        <div className="plugins-row-main">
+          <Heading level={2}>{status.id ?? status.key}</Heading>
+          <Text tone="muted">{status.key}</Text>
         </div>
-
-        {status.reason === undefined ? undefined : (
-          <Notice
-            tone={status.state === "refused" || status.state === "failed" ? "danger" : "info"}
-            title={t("plugins.reason")}
-          >
-            <CodeBlock>{status.reason}</CodeBlock>
-          </Notice>
-        )}
-
-        {status.contributionProblems === undefined ? undefined : (
-          <Notice tone="warning" title={t("plugins.problems.title")}>
-            <ul className="plugins-reasons">
-              {status.contributionProblems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          </Notice>
-        )}
-
-        {declared.length === 0 ? (
-          <Text tone="muted">{t("plugins.contributions.none")}</Text>
-        ) : (
-          <div className="plugins-contributions">
-            <Text tone="muted">{t("plugins.contributions.count", { count: declared.length })}</Text>
-            <List>
-              {declared.map(({ registration, off }) => (
-                <ListRow key={registration.id}>
-                  <div className="plugins-contribution">
-                    <Toggle
-                      checked={!off}
-                      disabled={preferences === undefined}
-                      onChange={(on) => switchContribution(registration.id, on)}
-                      // Без названия подписью служит объявленное имя, а не полный
-                      // идентификатор: тот и так стоит рядом.
-                      label={registration.title ?? registration.declaredId}
-                    />
-                    <Badge tone="neutral">{t(`plugins.kind.${registration.kind}`)}</Badge>
-                    <Code>{registration.id}</Code>
-                    {off ? (
-                      <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
-                    ) : undefined}
-                    {registration.kind === "event" ? (
-                      <Disclosure summary={t("plugins.payloadSchema")}>
-                        <CodeBlock>
-                          {JSON.stringify(registration.payloadSchema, undefined, 2)}
-                        </CodeBlock>
-                      </Disclosure>
-                    ) : undefined}
-                  </div>
-                </ListRow>
-              ))}
-            </List>
-          </div>
-        )}
-
-        {forgotten.length === 0 ? undefined : (
-          <Notice tone="info" title={t("plugins.forgotten.title")}>
-            <ul className="plugins-reasons">
-              {forgotten.map((id) => (
-                <li key={id}>
-                  <Code>{id}</Code>
-                </li>
-              ))}
-            </ul>
-            {t("plugins.forgotten.hint")}
-          </Notice>
-        )}
+        <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+        <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
+        {pluginToggle}
+        {onOpen === undefined ? undefined : <Button size="sm" onClick={() => onOpen(status.key)}>{t("plugins.detail.open")}</Button>}
       </div>
-    </Panel>
+    </ListRow>
   );
 }

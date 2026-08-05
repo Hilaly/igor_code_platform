@@ -62,7 +62,7 @@ export function PageView({
 
   if (page.kind === "edit-provider") return editProvider;
 
-  if (page.kind === "settings") {
+  if (page.kind === "settings" || page.kind === "settings-plugin") {
     return settings;
   }
 
