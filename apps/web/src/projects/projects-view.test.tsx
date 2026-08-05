@@ -150,9 +150,7 @@ describe("ProjectsView", () => {
     // а эфемерный проект не переименовывается никогда (docs/sessions-and-projects.md).
     show(withProjects([work, project("a")]));
 
-    expect(
-      within(rowOf("Работа без проекта")).queryByRole("button", { name: /Действия/ }),
-    ).toBeNull();
+    expect(within(rowOf("Быстрая работа")).queryByRole("button", { name: /Действия/ })).toBeNull();
     expect(within(rowOf("a")).getByRole("button", { name: /Действия/ })).toBeDefined();
   });
 

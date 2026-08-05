@@ -316,7 +316,7 @@ export const coreEnglish: CatalogRegistration = {
     "projects.conflict.mark": "took the folder",
     "projects.empty": "No projects yet",
     "projects.empty.hint": "Create the first one: a folder plus a name. The folder need not exist.",
-    "projects.ephemeral": "Work without a project",
+    "projects.ephemeral": "Quick work",
     "projects.ephemeral.mark": "ephemeral",
     "projects.failed": "The projects could not be read: {reason}",
     "projects.field.folder": "Folder",

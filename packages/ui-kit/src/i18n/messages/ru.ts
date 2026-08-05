@@ -312,7 +312,7 @@ export const coreRussian: CatalogRegistration = {
     "projects.conflict.mark": "занял папку",
     "projects.empty": "Проектов ещё нет",
     "projects.empty.hint": "Создай первый: папка плюс имя. Папка не обязана существовать.",
-    "projects.ephemeral": "Работа без проекта",
+    "projects.ephemeral": "Быстрая работа",
     "projects.ephemeral.mark": "эфемерный",
     "projects.failed": "Не удалось прочитать проекты: {reason}",
     "projects.field.folder": "Папка",
