@@ -8,7 +8,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRef } from "react";
+import { useEffect } from "react";
 
 import { Shell, type ShellProps } from "./shell.tsx";
 import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
@@ -289,20 +289,27 @@ describe("sidebar stability across page changes", () => {
   // перемонтироваться. Иначе дерево проектов сбрасывалось бы в «Loading…», а статус — в «Connecting»,
   // и каждая навигация начиналась бы с пустой панели. `navigation` и `status` стоят в фиксированных
   // позициях оболочки и не зависят от `children`, поэтому React сохраняет их subtree между рендерами.
-  function NavigationProbe({ onMount }: { onMount: () => void }): React.JSX.Element {
-    const mounted = useRef(false);
-    if (!mounted.current) {
-      mounted.current = true;
+  function NavigationProbe({
+    onMount,
+    onUnmount,
+  }: {
+    onMount: () => void;
+    onUnmount: () => void;
+  }): React.JSX.Element {
+    useEffect(() => {
       onMount();
-    }
+
+      return () => onUnmount();
+    }, [onMount, onUnmount]);
 
     return <nav>сайдбар</nav>;
   }
 
   it("does not remount the navigation subtree when the page changes", () => {
     const mounts = vi.fn();
+    const unmounts = vi.fn();
     const { again } = show({
-      navigation: <NavigationProbe onMount={mounts} />,
+      navigation: <NavigationProbe onMount={mounts} onUnmount={unmounts} />,
       children: <div>первая страница</div>,
     });
 
@@ -311,16 +318,18 @@ describe("sidebar stability across page changes", () => {
 
     // Один монтаж — при первом рендере; навигация пережила две смены страницы.
     expect(mounts).toHaveBeenCalledTimes(1);
+    expect(unmounts).not.toHaveBeenCalled();
   });
 
   it("does not remount the status subtree when the page changes", () => {
     const mounts = vi.fn();
+    const unmounts = vi.fn();
     const StatusProbe = (): React.JSX.Element => {
-      const mounted = useRef(false);
-      if (!mounted.current) {
-        mounted.current = true;
+      useEffect(() => {
         mounts();
-      }
+
+        return () => unmounts();
+      }, []);
 
       return <div role="status">статус</div>;
     };
@@ -333,5 +342,6 @@ describe("sidebar stability across page changes", () => {
     again(defaultLayout, { children: <div>вторая страница</div> });
 
     expect(mounts).toHaveBeenCalledTimes(1);
+    expect(unmounts).not.toHaveBeenCalled();
   });
 });
