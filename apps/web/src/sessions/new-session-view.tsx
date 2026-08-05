@@ -19,6 +19,7 @@ import {
   type ProviderSummary,
   type SessionDraft,
   type ThinkingLevel,
+  type TurnRequest,
 } from "@sovereign/protocol";
 import {
   Button,
@@ -55,7 +56,7 @@ export type NewSessionViewProps = {
   /** Создать сессию. Возвращает идентификатор новой сессии или причину отказа. */
   onCreate: (draft: SessionDraft) => Promise<{ sessionId: string } | { reason: string }>;
   /** Отправить первый турн в только что созданную сессию. */
-  onSubmit: (sessionId: string, text: string) => void;
+  onSubmit: (sessionId: string, request: TurnRequest) => void;
   /** Уйти в открытый чат новой сессии. Зовётся после создания, до отправки турна. */
   onNavigate: (sessionId: string) => void;
   translator: ScopedTranslator;
@@ -211,7 +212,7 @@ export function NewSessionView(props: NewSessionViewProps) {
         const trimmed = firstMessage.trim();
 
         if (trimmed !== "") {
-          props.onSubmit(outcome.sessionId, trimmed);
+          props.onSubmit(outcome.sessionId, { text: trimmed });
         }
       });
   };

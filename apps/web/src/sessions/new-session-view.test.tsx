@@ -481,7 +481,7 @@ describe("the screen that creates a session", () => {
 
     await waitFor(() => expect(view.onNavigate).toHaveBeenCalledWith("0199"));
     // Текст уезжает турном уже в созданную сессию — отдельным запросом, не полем черновика.
-    expect(view.onSubmit).toHaveBeenCalledWith("0199", "привет, разбери баг");
+    expect(view.onSubmit).toHaveBeenCalledWith("0199", { text: "привет, разбери баг" });
   });
 
   it("creates a session without a turn when the first message is empty", async () => {

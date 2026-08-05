@@ -545,7 +545,7 @@ export function App() {
             {sessions.state.open === undefined ? null : (
               <ChatView
                 open={sessions.state.open}
-                onSubmit={sessions.submitTurn}
+                onSubmit={(text) => void sessions.submitTurn({ text })}
                 onSendMessage={sessions.sendMessage}
                 onInterrupt={sessions.interrupt}
                 onFork={async (request) => {
