@@ -1,0 +1,21 @@
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  padding: var(--sovereign-space-3) var(--sovereign-space-4);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.title {
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+}

@@ -11,6 +11,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { ViewHeader } from "../index.ts";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
@@ -35,6 +36,17 @@ import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders a container header with a heading and optional actions", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader title="Новая сессия" level={2} actions={<button>Дерево</button>} />,
+    );
+
+    expect(markup).toContain("<header");
+    expect(markup).toContain("<h2");
+    expect(markup).toContain("Новая сессия");
+    expect(markup).toContain("Дерево");
+  });
+
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
     const markup = renderToStaticMarkup(
       <>
