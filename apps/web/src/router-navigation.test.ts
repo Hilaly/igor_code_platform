@@ -24,6 +24,12 @@ describe("provider navigation in a browser", () => {
     ["/sessions", "/", { kind: "home" }],
     ["/settings", "/settings/appearance", { kind: "settings", section: "appearance" }],
     ["/plugins", "/settings/plugins", { kind: "settings", section: "plugins" }],
+    ["/settings/projects", "/settings/projects", { kind: "settings", section: "projects" }],
+    [
+      "/settings/projects/alpha",
+      "/settings/projects/alpha",
+      { kind: "settings-project", projectId: "alpha" },
+    ],
     ["/providers", "/settings/providers", { kind: "settings", section: "providers" }],
     [
       "/providers/anthropic",

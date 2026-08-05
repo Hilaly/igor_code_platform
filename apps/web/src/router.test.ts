@@ -31,11 +31,20 @@ describe("matchPage", () => {
     expect(matchPage("/plugins/hello")).toEqual({ kind: "unknown", path: "/plugins/hello" });
   });
 
-  it("keeps the projects on their own address", () => {
-    expect(matchPage("/projects")).toEqual({ kind: "projects" });
-    expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
-      kind: "project",
+  it("keeps project management inside settings and drops the old addresses", () => {
+    expect(matchPage("/settings/projects")).toEqual({ kind: "settings", section: "projects" });
+    expect(matchPage("/settings/projects/b7Kq3xv9pQdT")).toEqual({
+      kind: "settings-project",
       projectId: "b7Kq3xv9pQdT",
+    });
+    expect(pathOf({ kind: "settings", section: "projects" })).toBe("/settings/projects");
+    expect(pathOf({ kind: "settings-project", projectId: "b7Kq3xv9pQdT" })).toBe(
+      "/settings/projects/b7Kq3xv9pQdT",
+    );
+    expect(matchPage("/projects")).toEqual({ kind: "unknown", path: "/projects" });
+    expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
+      kind: "unknown",
+      path: "/projects/b7Kq3xv9pQdT",
     });
   });
 
@@ -176,8 +185,8 @@ describe("pathOf", () => {
   it("survives a round trip", () => {
     for (const path of [
       "/",
-      "/projects",
-      "/projects/b7Kq3xv9pQdT",
+      "/settings/projects",
+      "/settings/projects/b7Kq3xv9pQdT",
       "/sessions/new",
       "/sessions/archive",
       "/sessions/0199abcd-ef01",

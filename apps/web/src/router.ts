@@ -11,13 +11,13 @@ export const pluginPagePrefix = "p";
 
 /** Канонические адреса рабочих вью; старые системные адреса разбираются ниже для замены. */
 export const pluginsPagePath = "/plugins";
-export const projectsPagePath = "/projects";
 export const providersPagePath = "/providers";
 export const sessionsPagePath = "/sessions";
 export const settingsPagePath = "/settings";
 
 /** Разделы вью настроек. Список закрыт: раздел, который ядро не знает, не превращается в запрос. */
 export const settingsSections = [
+  "projects",
   "appearance",
   "providers",
   "plugins",
@@ -29,8 +29,6 @@ export type SettingsSection = (typeof settingsSections)[number];
 
 export type Page =
   | { kind: "home" }
-  | { kind: "projects" }
-  | { kind: "project"; projectId: string }
   /** Адрес конкретного разговора; каталога сессий в центральной области больше нет. */
   | { kind: "session"; sessionId: string }
   | { kind: "session-archive" }
@@ -43,6 +41,7 @@ export type Page =
   | { kind: "edit-provider"; providerId: string }
   /** Выбранный раздел всегда записан в адресе и остаётся единственным источником выбора. */
   | { kind: "settings"; section: SettingsSection; providerId?: string }
+  | { kind: "settings-project"; projectId: string }
   /** Административная деталь плагина; не смешивается с пользовательскими страницами `/p/...`. */
   | { kind: "settings-plugin"; pluginKey: string }
   /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
@@ -104,17 +103,6 @@ export function matchPage(path: string): Page {
     return { kind: "settings", section: "plugins" };
   }
 
-  if (segments.length === 1 && `/${segments[0]}` === projectsPagePath) {
-    return { kind: "projects" };
-  }
-
-  if (`/${segments[0]}` === projectsPagePath && segments.length === 2) {
-    const segment = segments[1];
-    const projectId = segment === undefined ? undefined : decodePathSegment(segment);
-
-    return projectId === undefined ? { kind: "unknown", path } : { kind: "project", projectId };
-  }
-
   if (`/${segments[0]}` === providersPagePath && segments[1] === "new" && segments.length === 2) {
     return { kind: "new-provider" };
   }
@@ -162,6 +150,17 @@ export function matchPage(path: string): Page {
 
     // Мусор в адресе не превращается в запрос, который вернёт 404: проверка та же, что у демона.
     return isSessionId(sessionId) ? { kind: "session", sessionId } : { kind: "unknown", path };
+  }
+
+  if (
+    `/${segments[0]}` === settingsPagePath &&
+    segments[1] === "projects" &&
+    segments.length === 3
+  ) {
+    const projectId = segments[2] === undefined ? undefined : decodePathSegment(segments[2]);
+    return projectId === undefined
+      ? { kind: "unknown", path }
+      : { kind: "settings-project", projectId };
   }
 
   if (
@@ -243,10 +242,6 @@ export function pathOf(page: Page): string {
   switch (page.kind) {
     case "home":
       return "/";
-    case "projects":
-      return projectsPagePath;
-    case "project":
-      return `${projectsPagePath}/${encodeURIComponent(page.projectId)}`;
     case "session":
       return `${sessionsPagePath}/${page.sessionId}`;
     case "session-archive":
@@ -263,6 +258,8 @@ export function pathOf(page: Page): string {
         : `${settingsPagePath}/${page.section}`;
     case "settings-plugin":
       return `${settingsPagePath}/plugins/${encodeOpaqueSegment(page.pluginKey)}`;
+    case "settings-project":
+      return `${settingsPagePath}/projects/${encodeURIComponent(page.projectId)}`;
     case "plugin":
       return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":
