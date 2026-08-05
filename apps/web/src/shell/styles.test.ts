@@ -129,6 +129,14 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });
 
+  it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
+    const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
+
+    expect(projects).toMatch(
+      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*opacity:\s*1;/s,
+    );
+  });
+
   it("separates shell surfaces and keeps the sidebar compact", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 

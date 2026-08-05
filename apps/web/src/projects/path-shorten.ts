@@ -63,13 +63,15 @@ export function shortenPath(folder: string, max = 40): string {
 
   const { root, separator, segments } = parsePath(folder);
 
+  // Многоточие сообщает об опущенных компонентах. У корня и единственной компоненты опускать
+  // нечего, поэтому превышение лимита здесь честнее усечения, которое изобретало бы структуру.
+  if (segments.length < 2) {
+    return folder;
+  }
+
   // Последняя компонента обязательна целиком — она опознаёт проект.
   const last = segments.at(-1) ?? "";
   const minimum = `${root}${ELLIPSIS}${separator}${last}`;
-
-  if (segments.length < 2) {
-    return minimum;
-  }
 
   let suffix = [last];
   let firstSuffixIndex = segments.length - 1;

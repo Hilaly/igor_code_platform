@@ -71,6 +71,18 @@ describe("shortenPath", () => {
     expect(shortenPath("\\\\server\\share\\")).toBe("\\\\server\\share\\");
   });
 
+  it("does not invent an omission in a single-component path", () => {
+    const long = "/one-very-long-project-folder-name";
+
+    expect(shortenPath(long, 10)).toBe(long);
+  });
+
+  it("does not invent a child below a long UNC share root", () => {
+    const long = "\\\\very-long-server-name\\very-long-share-name\\";
+
+    expect(shortenPath(long, 10)).toBe(long);
+  });
+
   it("shortens a relative backslash path without inventing a root", () => {
     const long = "workspace\\team\\module\\product";
 
