@@ -139,14 +139,25 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
   });
 
-  it("turns the settings navigation into one scrollable row in narrow containers", () => {
+  it("owns the compact mockup geometry for settings views", () => {
     const settingsFrameCss = readFileSync(
       join(kitRoot, "components", "settings-frame.module.css"),
       "utf8",
     );
 
+    expect(settingsFrameCss).toMatch(/grid-template-columns:\s*minmax\([^,]+,\s*12rem\)/);
     expect(settingsFrameCss).toMatch(
-      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;[^}]*width:\s*max-content;/s,
+      /\.navigationItemSelected\s*\{[^}]*background:\s*var\(--sovereign-accent-surface\)/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
+    );
+    expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*\{[^}]*overflow-x:\s*auto;/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*28rem\)[\s\S]*\.row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
     );
   });
 

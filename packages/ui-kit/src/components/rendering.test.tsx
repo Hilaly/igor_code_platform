@@ -31,26 +31,50 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
-import { SettingsFrame } from "./settings-frame.tsx";
+import {
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsRow,
+  SettingsView,
+} from "./settings-frame.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
-  it("renders the shared settings frame without a route-specific escape hatch", () => {
+  it("renders the compact settings view, selected navigation, page, and property row", () => {
     const markup = renderToStaticMarkup(
-      <SettingsFrame
-        context={<span>Sovereign · Settings</span>}
-        settingsLabel="SETTINGS"
+      <SettingsView
+        context="Settings"
         navigationLabel="Settings sections"
-        navigation={<span>Appearance</span>}
+        navigation={
+          <>
+            <SettingsNavigationItem selected onSelect={() => {}}>
+              Appearance
+            </SettingsNavigationItem>
+            <SettingsNavigationItem selected={false} onSelect={() => {}}>
+              Providers
+            </SettingsNavigationItem>
+          </>
+        }
       >
-        <h1>Appearance</h1>
-      </SettingsFrame>,
+        <SettingsPage title="Appearance" description="Make Sovereign comfortable.">
+          <SettingsRow label="Colour scheme" description="Changes colour, not geometry">
+            <button type="button">Imperium</button>
+          </SettingsRow>
+        </SettingsPage>
+      </SettingsView>,
     );
 
-    expect(markup).toContain("Sovereign · Settings");
-    expect(markup).not.toContain("←");
+    expect(markup).toContain("Settings");
+    expect(markup).toContain('aria-label="Settings sections"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup.match(/<h1/g)).toHaveLength(1);
     expect(markup).toContain("Appearance");
+    expect(markup).toContain("Make Sovereign comfortable.");
+    expect(markup).toContain("Colour scheme");
+    expect(markup).toContain("Changes colour, not geometry");
+    expect(markup).toContain("Imperium");
+    expect(markup).not.toContain("Sovereign · Settings");
     expect(markup).not.toContain("undefined");
   });
 
