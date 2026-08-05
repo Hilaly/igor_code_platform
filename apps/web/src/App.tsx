@@ -670,7 +670,13 @@ export function App() {
         }
         settings={
           <SettingsView
-            section={page.kind === "settings-plugin" ? "plugins" : page.kind === "settings" ? page.section : "appearance"}
+            section={
+              page.kind === "settings-plugin"
+                ? "plugins"
+                : page.kind === "settings"
+                  ? page.section
+                  : "appearance"
+            }
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
             appearance={
               <AppearanceSection
@@ -735,7 +741,9 @@ export function App() {
                   headingLevel={2}
                   state={plugins.state}
                   onSwitch={plugins.switchPlugin}
-                  onOpen={(pluginKey) => navigation.navigate({ kind: "settings-plugin", pluginKey })}
+                  onOpen={(pluginKey) =>
+                    navigation.navigate({ kind: "settings-plugin", pluginKey })
+                  }
                   translator={translator}
                 />
               )

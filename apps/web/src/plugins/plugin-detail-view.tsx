@@ -111,7 +111,9 @@ export function PluginDetailView({
           checked={preferences?.enabled ?? false}
           disabled={preferences === undefined}
           onChange={(enabled) =>
-            preferences === undefined ? undefined : onSwitch(status.key, { ...preferences, enabled })
+            preferences === undefined
+              ? undefined
+              : onSwitch(status.key, { ...preferences, enabled })
           }
           label={t("plugins.toggle.plugin")}
           {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
@@ -121,10 +123,20 @@ export function PluginDetailView({
       <section className="plugin-detail-section" aria-labelledby="plugin-detail-plugin">
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
         <div className="plugin-detail-facts" id="plugin-detail-plugin">
-          <Fact label={t("plugins.detail.lifecycle")} value={<Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>} />
+          <Fact
+            label={t("plugins.detail.lifecycle")}
+            value={
+              <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+            }
+          />
           <Fact label={t("plugins.detail.source")} value={status.source} />
           <Fact label={t("plugins.detail.path")} value={<Code>{status.directory}</Code>} />
-          {status.attempt === undefined ? undefined : <Fact label={t("plugins.attempt", { count: status.attempt })} value={String(status.attempt)} />}
+          {status.attempt === undefined ? undefined : (
+            <Fact
+              label={t("plugins.attempt", { count: status.attempt })}
+              value={String(status.attempt)}
+            />
+          )}
         </div>
       </section>
 
@@ -135,9 +147,13 @@ export function PluginDetailView({
         >
           {status.reason === undefined ? (
             <ul className="plugins-reasons">
-              {status.contributionProblems?.map((problem) => <li key={problem}>{problem}</li>)}
+              {status.contributionProblems?.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
             </ul>
-          ) : <CodeBlock>{status.reason}</CodeBlock>}
+          ) : (
+            <CodeBlock>{status.reason}</CodeBlock>
+          )}
         </Notice>
       )}
 
@@ -159,7 +175,9 @@ export function PluginDetailView({
                   <div className="plugin-detail-contribution-meta">
                     <Badge tone="neutral">{t(`plugins.kind.${registration.kind}`)}</Badge>
                     <Code>{registration.id}</Code>
-                    {off ? <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text> : undefined}
+                    {off ? (
+                      <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                    ) : undefined}
                   </div>
                   <TechnicalData registration={registration} translator={translator} />
                 </div>
@@ -172,7 +190,11 @@ export function PluginDetailView({
       {forgotten.length === 0 ? undefined : (
         <Notice tone="info" title={t("plugins.forgotten.title")}>
           <ul className="plugins-reasons">
-            {forgotten.map((id) => <li key={id}><Code>{id}</Code></li>)}
+            {forgotten.map((id) => (
+              <li key={id}>
+                <Code>{id}</Code>
+              </li>
+            ))}
           </ul>
           {t("plugins.forgotten.hint")}
         </Notice>
@@ -186,26 +208,53 @@ function contributionsFor(snapshot: PluginsSnapshot, status: PluginStatus): Cont
     registration.ownership === "plugin" && registration.pluginKey === status.key;
   return [
     ...snapshot.contributions.filter(mine).map((registration) => ({ registration, off: false })),
-    ...snapshot.switchedOffContributions.filter(mine).map((registration) => ({ registration, off: true })),
+    ...snapshot.switchedOffContributions
+      .filter(mine)
+      .map((registration) => ({ registration, off: true })),
   ].sort((left, right) => left.registration.id.localeCompare(right.registration.id));
 }
 
 function Fact({ label, value }: { label: string; value: ReactNode }) {
-  return <div className="plugin-detail-fact"><Text tone="muted">{label}</Text><span>{value}</span></div>;
+  return (
+    <div className="plugin-detail-fact">
+      <Text tone="muted">{label}</Text>
+      <span>{value}</span>
+    </div>
+  );
 }
 
-function TechnicalData({ registration, translator }: { registration: ContributionRegistration; translator: ScopedTranslator }) {
+function TechnicalData({
+  registration,
+  translator,
+}: {
+  registration: ContributionRegistration;
+  translator: ScopedTranslator;
+}) {
   const { t } = translator;
-  const data = registration.kind === "event"
-    ? registration.payloadSchema
-    : registration.kind === "skill"
-      ? { location: registration.location, disableModelInvocation: registration.disableModelInvocation, metadata: registration.metadata }
-      : registration.kind === "agent"
-        ? { model: registration.model, thinkingLevel: registration.thinkingLevel, tools: registration.tools, skills: registration.skills }
-        : registration.payload;
+  const data =
+    registration.kind === "event"
+      ? registration.payloadSchema
+      : registration.kind === "skill"
+        ? {
+            location: registration.location,
+            disableModelInvocation: registration.disableModelInvocation,
+            metadata: registration.metadata,
+          }
+        : registration.kind === "agent"
+          ? {
+              model: registration.model,
+              thinkingLevel: registration.thinkingLevel,
+              tools: registration.tools,
+              skills: registration.skills,
+            }
+          : registration.payload;
   if (data === undefined) return undefined;
   return (
-    <Disclosure summary={registration.kind === "event" ? t("plugins.payloadSchema") : t("plugins.detail.technical")}>
+    <Disclosure
+      summary={
+        registration.kind === "event" ? t("plugins.payloadSchema") : t("plugins.detail.technical")
+      }
+    >
       <CodeBlock>{JSON.stringify(data, undefined, 2) ?? "—"}</CodeBlock>
     </Disclosure>
   );

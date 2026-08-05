@@ -53,7 +53,12 @@ it("presents a compact plugin row and opens the nested detail page", () => {
   const onSwitch = vi.fn();
   const onOpen = vi.fn();
   const { container } = render(
-    <PluginsView state={{ snapshot, stale: false }} onSwitch={onSwitch} onOpen={onOpen} translator={translator} />,
+    <PluginsView
+      state={{ snapshot, stale: false }}
+      onSwitch={onSwitch}
+      onOpen={onOpen}
+      translator={translator}
+    />,
   );
 
   const row = screen.getByRole("listitem");

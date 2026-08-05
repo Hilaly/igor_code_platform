@@ -192,7 +192,9 @@ describe("the style sheets of the application", () => {
   it("keeps plugin list and detail rows compact and divided", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(/\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s);
+    expect(settings).toMatch(
+      /\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+    );
     expect(settings).toMatch(/\.plugin-detail-facts\s*\{[^}]*border-block-start:/s);
     expect(settings).toMatch(/\.plugin-detail-contribution\s*\{[^}]*min-width:\s*0;/s);
   });

@@ -52,7 +52,13 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   failed: "danger",
 };
 
-export function PluginsView({ headingLevel = 1, state, onSwitch, onOpen, translator }: PluginsViewProps) {
+export function PluginsView({
+  headingLevel = 1,
+  state,
+  onSwitch,
+  onOpen,
+  translator,
+}: PluginsViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
 
@@ -103,7 +109,14 @@ export function PluginsView({ headingLevel = 1, state, onSwitch, onOpen, transla
       ) : (
         <List>
           {snapshot.plugins.map((status) => (
-            <PluginRow key={status.key} status={status} snapshot={snapshot} onSwitch={onSwitch} onOpen={onOpen} translator={translator} />
+            <PluginRow
+              key={status.key}
+              status={status}
+              snapshot={snapshot}
+              onSwitch={onSwitch}
+              onOpen={onOpen}
+              translator={translator}
+            />
           ))}
         </List>
       )}
@@ -135,10 +148,9 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
       {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
     />
   );
-  const contributions = [
-    ...snapshot.contributions,
-    ...snapshot.switchedOffContributions,
-  ].filter((registration) => registration.ownership === "plugin" && registration.pluginKey === status.key).length;
+  const contributions = [...snapshot.contributions, ...snapshot.switchedOffContributions].filter(
+    (registration) => registration.ownership === "plugin" && registration.pluginKey === status.key,
+  ).length;
   return (
     <ListRow>
       <div className="plugins-row">
@@ -149,7 +161,11 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
         <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
         <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
         {pluginToggle}
-        {onOpen === undefined ? undefined : <Button size="sm" onClick={() => onOpen(status.key)}>{t("plugins.detail.open")}</Button>}
+        {onOpen === undefined ? undefined : (
+          <Button size="sm" onClick={() => onOpen(status.key)}>
+            {t("plugins.detail.open")}
+          </Button>
+        )}
       </div>
     </ListRow>
   );
