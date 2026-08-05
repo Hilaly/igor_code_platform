@@ -166,13 +166,37 @@ const pluginsMustNotImportAppsOrRuntime = {
 };
 
 /**
- * Единственное место, где Pi легален. Запрет на приложения повторён здесь дословно: без повтора
- * блок снял бы его вместе с запретом на Pi. Исключений из правила «Pi только здесь» сегодня нет.
+ * Единственное место, где Pi легален как **код**. Запрет на приложения повторён здесь дословно: без
+ * повтора блок снял бы его вместе с запретом на Pi.
  */
 const agentRuntimeMayImportPi = {
   files: ["packages/agent-runtime-pi/**/*.ts"],
   rules: {
     "no-restricted-imports": ["error", { patterns: [noApplicationImports] }],
+  },
+};
+
+/**
+ * Единственное названное исключение из правила «Pi только в agent-runtime-pi» (docs/hooks.md): SDK
+ * реэкспортирует типы 32 событий рантайма, чтобы автор плагина брал их оттуда же, откуда всё
+ * остальное платформенное. Исключение пофайловое, а не на пакет: реэкспорт типов — это один модуль,
+ * и расползание по соседям ловится тестом границы в `packages/agent-runtime-pi`.
+ */
+const sdkHooksMayReexportPiTypes = {
+  files: ["packages/sdk/src/hooks.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            ...noApplicationImports,
+            message:
+              "Пакеты не зависят от приложений: зависимости идут только из apps/ в packages/.",
+          },
+        ],
+      },
+    ],
   },
 };
 
@@ -230,6 +254,7 @@ export default tseslint.config(
   packagesMustNotImportApps,
   pluginsMustNotImportAppsOrRuntime,
   agentRuntimeMayImportPi,
+  sdkHooksMayReexportPiTypes,
   ...Object.entries(daemonAreaDependencies).map(([area, dependencies]) =>
     daemonAreaBoundary(area, dependencies),
   ),

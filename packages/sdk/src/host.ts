@@ -96,11 +96,47 @@ export type AgentContribution = {
   skills?: AgentSkillSelection;
 };
 
+/**
+ * Насколько подписка обязательна (docs/hooks.md). Копия списка из протокола, как и остальные типы
+ * здесь. Не сказано — ядро подставит `advisory`: критичность по умолчанию значила бы, что забывший
+ * пометку автор роняет турны.
+ */
+export const hookCriticalities = ["advisory", "critical"] as const;
+
+export type HookCriticality = (typeof hookCriticalities)[number];
+
+/**
+ * Объявление подписки на хук — то, что уходит хосту. Обработчик остаётся в воркере: через границу
+ * ходит структурное клонирование, а функция им не переносится (docs/hooks.md).
+ */
+export type HookContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  event: string;
+  criticality?: HookCriticality;
+};
+
+/**
+ * Объявление инструмента. Идентификатор вклада служит и **именем, которым инструмент зовёт
+ * модель**: второе имя рядом было бы вторым способом сказать то же, а имена инструментов у
+ * провайдеров ограничены `[A-Za-z0-9_-]` — неймспейс с точкой в них не проходит.
+ */
+export type ToolContribution = {
+  id: string;
+  title?: string;
+  /** Что читает модель. Обязательно: без описания инструмент ей бесполезен. */
+  description: string;
+  parameters: PayloadSchema;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
   | ({ kind: "event" } & EventContribution)
-  | ({ kind: "agent" } & AgentContribution);
+  | ({ kind: "agent" } & AgentContribution)
+  | ({ kind: "hook" } & HookContribution)
+  | ({ kind: "tool" } & ToolContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

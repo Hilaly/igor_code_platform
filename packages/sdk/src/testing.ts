@@ -7,6 +7,8 @@
  */
 
 import { clearEventHandlers, deliverEvent, type EventOrigin } from "./events.ts";
+import { clearHookHandlers, invokeHookHandler } from "./hooks.ts";
+import { clearToolInvocations, invokeTool } from "./tools.ts";
 import {
   installPluginHost,
   removePluginHost,
@@ -69,7 +71,16 @@ export type PluginTestHost = {
   answerLogin: (script: { steps?: LoginStep[]; conclusion?: LoginConclusion }) => void;
   /** Доставить событие подписчику — то, что в живой платформе делает ядро. */
   deliver: (type: string, payload: unknown, origin?: EventOrigin) => Promise<void>;
-  /** Снимает шов и подписки. Без этого следующий тест увидит чужой хост. */
+  /**
+   * Позвать хук и инструмент — то, что в живой платформе приходит обратным каналом. Идентификатор
+   * объявленный, без неймспейса: в воркере таблица обработчиков ключуется им же (docs/hooks.md).
+   */
+  callHook: (declaredId: string, payload: unknown) => Promise<unknown>;
+  callTool: (
+    declaredId: string,
+    toolArguments: unknown,
+  ) => Promise<{ content: string; isError: boolean }>;
+  /** Снимает шов, подписки и таблицы обработчиков. Без этого следующий тест увидит чужой хост. */
   restore: () => void;
 };
 
@@ -175,8 +186,12 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
       loginScript = script;
     },
     deliver: deliverEvent,
+    callHook: invokeHookHandler,
+    callTool: invokeTool,
     restore: () => {
       clearEventHandlers();
+      clearHookHandlers();
+      clearToolInvocations();
       removePluginHost();
     },
   };

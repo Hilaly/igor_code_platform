@@ -4,8 +4,11 @@
  * контексте или в контексте проекта.
  */
 
+import { isRuntimeHookName } from "@sovereign/agent-runtime-pi";
 import {
   coreEventNamespace,
+  isHookCriticality,
+  isSubscribablePlatformHook,
   isThinkingLevel,
   pluginSourceRank,
   type ContributionConflict,
@@ -23,6 +26,13 @@ type PluginContributionRegistration = Extract<ContributionRegistration, { owners
 
 /** Точки в идентификаторе разрешены: они дают плагину свою иерархию внутри своего неймспейса. */
 const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
+
+/**
+ * У инструмента идентификатор строже общего: он же имя, которым его зовёт модель, а провайдеры
+ * принимают в имени инструмента только `[A-Za-z0-9_-]` и не длиннее 64 символов. Поэтому точка,
+ * законная в остальных идентификаторах, здесь запрещена (docs/plugins.md).
+ */
+const toolNamePattern = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 export type ContributionApplyOutcome = {
   registered: ContributionRegistration[];
@@ -684,6 +694,54 @@ function programmaticRegistration(
       kind: "custom",
       ...(contribution.payload === undefined ? {} : { payload: contribution.payload }),
     };
+  }
+
+  if (contribution.kind === "hook") {
+    if (!isRuntimeHookName(contribution.event) && !isSubscribablePlatformHook(contribution.event)) {
+      // Незнакомое имя — проблема жизненного цикла, а не исключение: остальные вклады плагина
+      // применяются, а причина видна в интерфейсе (docs/plugins.md).
+      problems.push(
+        `the subscription ${id} names an unknown hook ${JSON.stringify(contribution.event)}`,
+      );
+      return undefined;
+    }
+    if (contribution.criticality !== undefined && !isHookCriticality(contribution.criticality)) {
+      problems.push(
+        `the subscription ${id} names an unknown criticality ${JSON.stringify(contribution.criticality)}`,
+      );
+      return undefined;
+    }
+
+    return {
+      ...common,
+      kind: "hook",
+      event: contribution.event,
+      // Не сказано — некритичная: критичность по умолчанию значила бы, что забывший пометку автор
+      // роняет турны (docs/hooks.md).
+      criticality: contribution.criticality ?? "advisory",
+    };
+  }
+
+  if (contribution.kind === "tool") {
+    if (!toolNamePattern.test(contribution.id)) {
+      problems.push(
+        `the tool ${id} must be named ${toolNamePattern.source}: the identifier is the name the model calls`,
+      );
+      return undefined;
+    }
+
+    const description =
+      typeof contribution.description === "string" ? contribution.description.trim() : "";
+    if (description === "") {
+      problems.push(`the tool ${id} declares no description, so the model cannot use it`);
+      return undefined;
+    }
+    if (typeof contribution.parameters !== "object" || contribution.parameters === null) {
+      problems.push(`the tool ${id} must declare the schema of its arguments`);
+      return undefined;
+    }
+
+    return { ...common, kind: "tool", description, parameters: contribution.parameters };
   }
 
   const instructions =

@@ -38,6 +38,33 @@ describe("the agent runtime boundary", () => {
     );
   });
 
+  it("lets the sdk module of hooks re-export the event types of pi", async () => {
+    // Единственное названное исключение (docs/hooks.md). Проверяется настоящим конфигом: без него
+    // обещание «исключение появится тем же коммитом, что и хуки» осталось бы текстом.
+    assert.deepEqual(await messagesFor("packages/sdk/src/hooks.ts", importsPi + importsPiRoot), []);
+  });
+
+  it("keeps the exception to one file of the sdk", async () => {
+    for (const path of [
+      "packages/sdk/src/index.ts",
+      "packages/sdk/src/host.ts",
+      "packages/sdk/src/tools.ts",
+      "packages/sdk/src/hooks-extra.ts",
+    ]) {
+      assert.equal(
+        (await messagesFor(path, importsPiRoot)).length,
+        1,
+        `исключение расползлось на ${path}`,
+      );
+    }
+  });
+
+  it("keeps the ban on importing applications inside the exception", async () => {
+    // Плоский конфиг заменяет опции правила целиком, поэтому разрешающий блок обязан повторить
+    // остальные запреты. Забытый повтор снял бы старую защиту молча.
+    assert.equal((await messagesFor("packages/sdk/src/hooks.ts", importsDaemon)).length, 1);
+  });
+
   it("refuses pi in the daemon, in another package and in a plugin", async () => {
     for (const path of [
       "apps/daemon/src/providers.ts",

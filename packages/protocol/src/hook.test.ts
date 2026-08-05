@@ -5,7 +5,8 @@ import {
   hookCriticalities,
   isHookCriticality,
   isPlatformHookName,
-  platformHookMergeKinds,
+  isSubscribablePlatformHook,
+  platformHooks,
   platformHookNames,
 } from "./hook.ts";
 
@@ -23,10 +24,21 @@ describe("platform hooks", () => {
   });
 
   it("keeps the merge kind of every point", () => {
-    assert.equal(platformHookMergeKinds.tools_collect, "collecting");
-    assert.equal(platformHookMergeKinds.before_session_start, "deciding");
-    assert.equal(platformHookMergeKinds.permission_request, "deciding");
-    assert.equal(platformHookMergeKinds.turn_finished, "observing");
+    assert.equal(platformHooks.tools_collect.merge, "collecting");
+    assert.equal(platformHooks.before_session_start.merge, "deciding");
+    assert.equal(platformHooks.permission_request.merge, "deciding");
+    assert.equal(platformHooks.turn_finished.merge, "observing");
+  });
+
+  it("does not let a plugin subscribe to the collection of tools", () => {
+    // Инструмент объявляется вкладом, а не подпиской: второй способ добавить инструмент нельзя было
+    // бы выключить отдельно, хотя вклад выключается (docs/plugins.md).
+    assert.equal(isPlatformHookName("tools_collect"), true);
+    assert.equal(isSubscribablePlatformHook("tools_collect"), false);
+
+    for (const name of platformHookNames.filter((candidate) => candidate !== "tools_collect")) {
+      assert.equal(isSubscribablePlatformHook(name), true, name);
+    }
   });
 
   it("does not recognise an event of the runtime as a platform hook", () => {

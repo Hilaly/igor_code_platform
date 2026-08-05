@@ -3,6 +3,8 @@ import { afterEach, describe, it } from "node:test";
 
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
+import { clearHookHandlers } from "./hooks.ts";
+import { clearToolInvocations } from "./tools.ts";
 import {
   contribute,
   defineEvent,
@@ -30,6 +32,8 @@ const anthropic: ProviderSummary = {
 
 afterEach(() => {
   clearEventHandlers();
+  clearHookHandlers();
+  clearToolInvocations();
   removePluginHost();
 });
 
@@ -52,6 +56,20 @@ describe("the sdk without a host", () => {
     await assert.rejects(() => contribute.event(taskCreated), /sdk is not initialised/);
     await assert.rejects(
       () => contribute.agent({ id: "agent", instructions: "делай", tools: { include: ["*"] } }),
+      /sdk is not initialised/,
+    );
+    await assert.rejects(
+      () => contribute.hook({ id: "watch", event: "turn_finished", handler: () => {} }),
+      /sdk is not initialised/,
+    );
+    await assert.rejects(
+      () =>
+        contribute.tool({
+          id: "weather",
+          description: "говорит погоду",
+          parameters: z.object({ city: z.string() }),
+          invoke: () => "ясно",
+        }),
       /sdk is not initialised/,
     );
     await assert.rejects(() => taskCreated.publish({ id: "42" }), /sdk is not initialised/);
@@ -653,5 +671,200 @@ describe("a subscription", () => {
     assert.deepEqual(seen, ["second"]);
     assert.equal(host.logs.at(-1)?.level, "error");
     assert.match(String(host.logs.at(-1)?.fields?.["reason"]), /the handler is broken/);
+  });
+});
+
+describe("a hook subscription", () => {
+  it("is declared to the core while the handler stays in the worker", async () => {
+    const host = installTestHost({ id: "guard" });
+
+    await contribute.hook({
+      id: "watch-turns",
+      title: "Watch turns",
+      event: "turn_finished",
+      criticality: "advisory",
+      handler: () => {},
+    });
+
+    // Обработчик через границу не уезжает: в объявлении его нет вовсе, и объявление обязано
+    // переживать структурное клонирование, как всякий вклад (docs/plugins.md).
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "hook",
+        id: "watch-turns",
+        title: "Watch turns",
+        event: "turn_finished",
+        criticality: "advisory",
+      },
+    ]);
+    assert.deepEqual(structuredClone(host.contributions), host.contributions);
+  });
+
+  it("leaves the unsaid unsaid: no criticality of its own", async () => {
+    const host = installTestHost({ id: "guard" });
+
+    await contribute.hook({ id: "watch-turns", event: "turn_finished", handler: () => {} });
+
+    // Умолчание критичности ставит ядро. Второе место, где решается «что значит не сказано»,
+    // означало бы два разных ответа на один вопрос — как и у объявления агента.
+    assert.deepEqual(host.contributions, [
+      { kind: "hook", id: "watch-turns", event: "turn_finished" },
+    ]);
+  });
+
+  it("answers a call by its declared id and gives the core what the handler returned", async () => {
+    const host = installTestHost({ id: "guard" });
+    const seen: unknown[] = [];
+
+    await contribute.hook({
+      id: "refuse-start",
+      event: "before_session_start",
+      criticality: "critical",
+      handler: (payload) => {
+        seen.push(payload);
+
+        return { refuse: "проект закрыт" };
+      },
+    });
+
+    const answer = await host.callHook("refuse-start", {
+      projectId: "p1",
+      folder: "/tmp/p1",
+      agentId: "base",
+    });
+
+    assert.deepEqual(seen, [{ projectId: "p1", folder: "/tmp/p1", agentId: "base" }]);
+    assert.deepEqual(answer, { refuse: "проект закрыт" });
+  });
+
+  it("returns nothing when the handler has nothing to add", async () => {
+    const host = installTestHost({ id: "guard" });
+
+    await contribute.hook({ id: "let-it-be", event: "before_session_start", handler: () => {} });
+
+    // Разрешение — это отсутствие отказа, а не чей-то голос «за» (docs/hooks.md).
+    assert.equal(
+      await host.callHook("let-it-be", { projectId: "p1", folder: "/tmp/p1", agentId: "base" }),
+      undefined,
+    );
+  });
+
+  it("names the subscription the core asked about but the plugin never declared", async () => {
+    const host = installTestHost({ id: "guard" });
+
+    await assert.rejects(
+      () => host.callHook("never-declared", {}),
+      /no handler for the hook subscription never-declared/,
+    );
+  });
+
+  it("subscribes to an event of the runtime under the name of the runtime", async () => {
+    const host = installTestHost({ id: "guard" });
+    const seen: unknown[] = [];
+
+    await contribute.hook({
+      id: "watch-tools",
+      event: "tool_call",
+      handler: (payload) => {
+        seen.push(payload.toolName);
+      },
+    });
+
+    await host.callHook("watch-tools", { type: "tool_call", toolName: "bash" });
+
+    // Имя события берётся у Pi без переименования: цена решения названа в docs/hooks.md.
+    assert.deepEqual(host.contributions, [{ kind: "hook", id: "watch-tools", event: "tool_call" }]);
+    assert.deepEqual(seen, ["bash"]);
+  });
+});
+
+describe("a tool of a plugin", () => {
+  const parameters = z.object({ city: z.string(), days: z.number().optional() });
+
+  it("is declared with its arguments as data", async () => {
+    const host = installTestHost({ id: "weather" });
+
+    await contribute.tool({
+      id: "forecast",
+      title: "Forecast",
+      description: "говорит погоду в городе",
+      parameters,
+      invoke: () => "ясно",
+    });
+
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "tool",
+        id: "forecast",
+        title: "Forecast",
+        description: "говорит погоду в городе",
+        parameters: z.toJSONSchema(parameters),
+      },
+    ]);
+    assert.deepEqual(structuredClone(host.contributions), host.contributions);
+  });
+
+  it("answers a call with the text the model will read", async () => {
+    const host = installTestHost({ id: "weather" });
+    const seen: unknown[] = [];
+
+    await contribute.tool({
+      id: "forecast",
+      description: "говорит погоду в городе",
+      parameters,
+      invoke: (toolArguments) => {
+        seen.push(toolArguments);
+
+        return `в ${toolArguments.city} ясно`;
+      },
+    });
+
+    assert.deepEqual(await host.callTool("forecast", { city: "Тбилиси" }), {
+      content: "в Тбилиси ясно",
+      isError: false,
+    });
+    assert.deepEqual(seen, [{ city: "Тбилиси" }]);
+  });
+
+  it("keeps the mark of failure, so the model sees a failed call as failed", async () => {
+    const host = installTestHost({ id: "weather" });
+
+    await contribute.tool({
+      id: "forecast",
+      description: "говорит погоду в городе",
+      parameters,
+      invoke: () => ({ content: "город не найден", isError: true }),
+    });
+
+    assert.deepEqual(await host.callTool("forecast", { city: "Атлантида" }), {
+      content: "город не найден",
+      isError: true,
+    });
+  });
+
+  it("refuses an outcome that is neither a text nor a text with a mark", async () => {
+    const host = installTestHost({ id: "weather" });
+
+    await contribute.tool({
+      id: "forecast",
+      description: "говорит погоду в городе",
+      parameters,
+      // @ts-expect-error — автор ошибся в форме исхода; проверка обязана поймать это и в рантайме.
+      invoke: () => ({ temperature: 25 }),
+    });
+
+    await assert.rejects(
+      () => host.callTool("forecast", { city: "Тбилиси" }),
+      /the tool forecast returned neither a string nor \{ content: string \}/,
+    );
+  });
+
+  it("names the tool the core asked about but the plugin never declared", async () => {
+    const host = installTestHost({ id: "weather" });
+
+    await assert.rejects(
+      () => host.callTool("never-declared", {}),
+      /no implementation for the tool never-declared/,
+    );
   });
 });

@@ -12,12 +12,15 @@ import {
   currentPluginHost,
   type AgentContribution,
   type CustomContribution,
+  type HookCriticality,
   type PluginLogLevel,
 } from "./host.ts";
+import { rememberHookHandler, type HookHandler, type HookName } from "./hooks.ts";
+import { rememberToolInvoke, type PluginToolInvoke } from "./tools.ts";
 
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
-export { thinkingLevels } from "./host.ts";
+export { hookCriticalities, thinkingLevels } from "./host.ts";
 
 export type {
   AgentContribution,
@@ -25,13 +28,35 @@ export type {
   AgentToolSelection,
   CustomContribution,
   EventContribution,
+  HookContribution,
+  HookCriticality,
   PayloadSchema,
   PluginContribution,
   PluginHost,
   PluginIdentity,
   PluginLogLevel,
   ThinkingLevel,
+  ToolContribution,
 } from "./host.ts";
+
+/**
+ * Хуки: типы событий Pi как есть плюс пять хуков платформы (docs/hooks.md). Отдельной точкой входа
+ * `@sovereign/sdk/hooks` тоже: автор, которому нужны только типы события, не тянет весь остальной
+ * контракт.
+ */
+export type {
+  HookHandler,
+  HookName,
+  HookPayload,
+  HookRefusal,
+  HookResult,
+  PlatformHookName,
+  RuntimeHookName,
+  RuntimeHookPayload,
+  RuntimeHookResult,
+} from "./hooks.ts";
+
+export type { PluginToolInvoke, PluginToolOutcome } from "./tools.ts";
 
 /** Провайдеры LLM: операции над ними и типы, которыми платформа о них рассказывает. */
 export { providers } from "./providers.ts";
@@ -187,6 +212,53 @@ export const contribute = {
    */
   agent: async (agent: AgentContribution): Promise<void> =>
     currentPluginHost().contribute({ kind: "agent", ...agent }),
+
+  /**
+   * Подписаться на хук (docs/hooks.md). Обработчик остаётся в воркере, ядру уходит объявление: имя
+   * события, критичность и идентификатор вклада, которым подписка включается и выключается.
+   *
+   * Порядок подписка не объявляет: он считается по рангу источника плагина, затем по
+   * идентификатору вклада. Число, которое автор назначал бы себе сам, превратилось бы в гонку.
+   */
+  hook: async <Name extends HookName>(subscription: {
+    id: string;
+    title?: string;
+    description?: string;
+    event: Name;
+    criticality?: HookCriticality;
+    handler: HookHandler<Name>;
+  }): Promise<void> => {
+    const { handler, ...declaration } = subscription;
+
+    // Обработчик запоминается до объявления: ядро вправе позвать хук сразу, как узнало о подписке.
+    rememberHookHandler(declaration.id, handler as (payload: never) => unknown);
+
+    await currentPluginHost().contribute({ kind: "hook", ...declaration });
+  },
+
+  /**
+   * Объявить инструмент для модели (docs/plugins.md). `id` служит и именем, которым инструмент зовёт
+   * модель: имена инструментов у провайдеров ограничены `[A-Za-z0-9_-]`, поэтому неймспейс с точкой
+   * в имя не ставится, а спор одноимённых разрешает сборка набора (docs/hooks.md).
+   */
+  tool: async <Schema extends z.ZodType>(tool: {
+    id: string;
+    title?: string;
+    description: string;
+    parameters: Schema;
+    invoke: PluginToolInvoke<z.output<Schema>>;
+  }): Promise<void> => {
+    const { invoke, parameters, ...declaration } = tool;
+
+    rememberToolInvoke(declaration.id, invoke as (toolArguments: never) => unknown);
+
+    await currentPluginHost().contribute({
+      kind: "tool",
+      ...declaration,
+      // Схема уезжает данными: в ней функции, а граница воркера — структурное клонирование.
+      parameters: { ...z.toJSONSchema(parameters) },
+    });
+  },
 };
 
 export const events = {
