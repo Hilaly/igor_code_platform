@@ -108,10 +108,39 @@
  * прокручивается над ним.
  */
 .sessions-composer {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-rows: minmax(0, auto) auto;
   gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sessions-composer > textarea {
+  min-width: 0;
+  resize: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sovereign-border-strong) transparent;
+}
+
+.sessions-composer > textarea::-webkit-scrollbar {
+  width: var(--sovereign-space-2);
+}
+
+.sessions-composer > textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sessions-composer > textarea::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--sovereign-radius-full);
+  background: var(--sovereign-border-strong);
+  background-clip: padding-box;
+}
+
+.sessions-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
   min-width: 0;
 }
 
@@ -120,23 +149,17 @@
   margin-inline: var(--sovereign-space-3);
 }
 
-.sessions-composer > :first-child {
-  flex: 1;
+.sessions-composer-future-slot {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.sessions-composer-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sovereign-space-2);
-  flex: 1 0 100%;
+.sessions-composer-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-1);
   min-width: 0;
-}
-
-@container (width < 36rem) {
-  .sessions-composer-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /*

@@ -55,6 +55,7 @@ export const coreRussian: CatalogRegistration = {
     "chat.mode.steer": "Прямо сейчас",
     "chat.mode.steer.send": "Вклинить",
     "chat.model": "Модель",
+    "chat.nextTurn.settings": "Параметры следующего турна",
     "chat.thinking": "Уровень рассуждений",
     "chat.stats.tokens.label": "Токены сессии",
     "chat.stats.cost.label": "Стоимость",

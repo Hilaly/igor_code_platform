@@ -126,7 +126,16 @@ describe("the style sheets of the application", () => {
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
     expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-y:\s*auto;/s);
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-width:\s*0;/s);
-    expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0,\s*auto\)\s+auto;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-composer-toolbar\s*\{[^}]*justify-content:\s*space-between;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*>\s*textarea\s*\{[^}]*scrollbar-width:\s*thin;/s,
+    );
+    expect(sessions).not.toMatch(/\.sessions-composer(?:-surface)?\s*\{[^}]*overflow\s*:/s);
   });
 
   it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
@@ -169,13 +178,10 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });
 
-  it("scopes the composer option collapse to its own container", () => {
+  it("does not retain a composer option collapse container", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
-    expect(sessions).toMatch(
-      /@container\s*\(width\s*<\s*36rem\)\s*\{[\s\S]*?\.sessions-composer-options\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    );
-    expect(sessions).not.toMatch(/@media\s*\(max-width:\s*36rem\)/);
+    expect(sessions).not.toMatch(/sessions-composer-options/);
   });
 
   it("opens the chat and leaves composer elevation to UI Kit", () => {

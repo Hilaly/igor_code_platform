@@ -139,13 +139,15 @@ const show = (open: OpenSession, overrides: Partial<ChatViewProps> = {}) => {
 };
 
 function chooseModel(scope: HTMLElement, provider: string, reference: RegExp): void {
-  fireEvent.click(within(scope).getByRole("combobox", { name: "Модель" }));
+  fireEvent.click(within(scope).getByRole("button", { name: /\/.*·/i }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
   fireEvent.click(screen.getByRole("treeitem", { name: provider }).querySelector("div")!);
   fireEvent.click(screen.getByRole("treeitem", { name: reference }));
 }
 
 function chooseThinking(scope: HTMLElement, level: string): void {
-  fireEvent.click(within(scope).getByRole("combobox", { name: "Уровень рассуждений" }));
+  fireEvent.click(within(scope).getByRole("button", { name: /\/.*·/i }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
   fireEvent.click(screen.getByRole("option", { name: level }));
 }
 
@@ -177,8 +179,7 @@ describe("the session chat view", () => {
     expect(onLoadModels).toHaveBeenCalledTimes(1);
     expect(onLoadModels).toHaveBeenCalledWith("anthropic");
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
-    fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
+    chooseModel(document.body, "Google", /google\/gemini-2\.5-pro/);
     expect(onLoadModels).toHaveBeenLastCalledWith("google");
   });
 
@@ -249,12 +250,12 @@ describe("the session chat view", () => {
     expect(
       (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
     ).toBe("");
-    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain(
-      "anthropic/claude-opus-4-5",
-    );
-    expect(screen.getByRole("combobox", { name: "Уровень рассуждений" }).textContent).toContain(
-      "Средний",
-    );
+    expect(
+      screen.getByRole("button", { name: /anthropic\/claude.*средний/i }).textContent,
+    ).toContain("anthropic/claude-opus-4-5");
+    expect(
+      screen.getByRole("button", { name: /anthropic\/claude.*средний/i }).textContent,
+    ).toContain("Средний");
   });
 
   it("keeps a busy model choice for the next idle submit without starting a turn", () => {
@@ -285,14 +286,16 @@ describe("the session chat view", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Уровень рассуждений" }).getAttribute("aria-disabled"),
+        screen
+          .getByRole("button", { name: /anthropic\/claude.*выключены/i })
+          .getAttribute("aria-disabled"),
       ).toBe("true"),
     );
 
     view.rerender(<ChatView {...view.props} models={{}} />);
-    expect(
-      screen.getByRole("combobox", { name: "Уровень рассуждений" }).getAttribute("aria-disabled"),
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: /\/.*·/i }).getAttribute("aria-disabled")).toBe(
+      "false",
+    );
   });
 
   it("hydrates next-turn overrides when the first summary arrives for the open session", () => {
@@ -314,7 +317,8 @@ describe("the session chat view", () => {
   it("does not overwrite a prepared thinking level when the first summary arrives", () => {
     const view = show(openSession(undefined));
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Уровень рассуждений" }));
+    fireEvent.click(screen.getByRole("button", { name: /\/.*·/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
     fireEvent.click(screen.getByRole("option", { name: "Высокий" }));
     view.rerender(
       <ChatView {...view.props} open={openSession({ ...summary, thinkingLevel: "medium" })} />,

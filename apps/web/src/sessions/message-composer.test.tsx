@@ -169,12 +169,29 @@ describe("the session message composer", () => {
     ).toBe(true);
   });
 
-  it("opens the model catalogue above the contained bottom zone", () => {
+  it("renders one textarea row and one toolbar row inside the raised surface", () => {
+    const { container } = render(<ComposerHarness />);
+    const composer = container.querySelector(".sessions-composer");
+    expect(composer?.querySelector("textarea")).not.toBeNull();
+    expect(composer?.querySelector(".sessions-composer-toolbar")).not.toBeNull();
+    expect(composer?.querySelectorAll(".sessions-composer-options")).toHaveLength(0);
+    expect(composer?.querySelectorAll("button")).toHaveLength(3);
+  });
+
+  it("shows the compact combined trigger instead of two visible comboboxes", () => {
+    render(<ComposerHarness />);
+    expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Модель" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Уровень рассуждений" })).toBeNull();
+  });
+
+  it("opens the model catalogue from the contained bottom zone", () => {
     render(<ComposerHarness />);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+    fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
 
-    expect(screen.getByRole("tree").getAttribute("data-side")).toBe("top");
+    expect(screen.getByRole("tree")).not.toBeNull();
   });
 
   it("reports draft changes through its controlled interface", () => {
@@ -190,11 +207,10 @@ describe("the session message composer", () => {
   it("keeps next-turn controls editable while the session is busy", () => {
     render(<ComposerHarness busy />);
 
-    expect(screen.getByRole("combobox", { name: "Модель" }).getAttribute("aria-disabled")).toBe(
-      "false",
-    );
     expect(
-      screen.getByRole("combobox", { name: "Уровень рассуждений" }).getAttribute("aria-disabled"),
+      screen
+        .getByRole("button", { name: /anthropic\/claude.*средний/i })
+        .getAttribute("aria-disabled"),
     ).toBe("false");
   });
 
@@ -203,10 +219,12 @@ describe("the session message composer", () => {
 
     render(<ComposerHarness onSubmit={onSubmit} />);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+    fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
     fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
     fireEvent.click(screen.getByRole("treeitem", { name: /google\/gemini-2\.5-pro/ }));
-    fireEvent.click(screen.getByRole("combobox", { name: "Уровень рассуждений" }));
+    fireEvent.click(screen.getByRole("button", { name: /google\/gemini-2\.5-pro.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
     fireEvent.click(screen.getByRole("option", { name: "Высокий" }));
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
@@ -420,8 +438,7 @@ describe("the session message composer", () => {
   it("changes thinking to off only for an explicitly unsupported model", async () => {
     const view = render(<ComposerHarness reasoningSupported={false} />);
 
-    const thinking = screen.getByRole("combobox", { name: "Уровень рассуждений" });
-    expect(thinking.textContent).toContain("Выключены");
+    const thinking = screen.getByRole("button", { name: /anthropic\/claude.*выключены/i });
     expect(thinking.getAttribute("aria-disabled")).toBe("true");
     await waitFor(() =>
       expect(screen.getByRole("status", { name: "Выбранный уровень" }).textContent).toBe("off"),
@@ -429,10 +446,10 @@ describe("the session message composer", () => {
 
     view.rerender(<ComposerHarness reasoningSupported />);
     expect(
-      screen.getByRole("combobox", { name: "Уровень рассуждений" }).getAttribute("aria-disabled"),
+      screen
+        .getByRole("button", { name: /anthropic\/claude.*выключены/i })
+        .getAttribute("aria-disabled"),
     ).toBe("false");
-    expect(screen.getByRole("combobox", { name: "Уровень рассуждений" }).textContent).toContain(
-      "Выключены",
-    );
+    expect(screen.getByRole("button", { name: /anthropic\/claude.*выключены/i })).not.toBeNull();
   });
 });
