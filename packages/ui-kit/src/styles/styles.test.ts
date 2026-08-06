@@ -143,10 +143,10 @@ describe("stylesheets of the kit", () => {
     expect(listCss).toContain("box-sizing: content-box");
     expect(listCss).toContain(".select:has(> *)");
     expect(treeCss).toContain("min-height: var(--sovereign-row-height-compact)");
-    expect(treeCss).not.toContain("width: 100%");
+    expect(treeCss).toContain("width: 100%");
     expect(treeCss).toContain("padding-inline: var(--sovereign-space-2)");
     expect(treeCss).toContain("padding-block: var(--sovereign-space-1)");
-    expect(treeCss).toContain("box-sizing: content-box");
+    expect(treeCss).toContain("box-sizing: border-box");
     expect(textCss).toContain("font-family: var(--sovereign-font-family-display)");
     expect(panelCss).toContain("border-radius: var(--sovereign-radius-sm)");
     expect(panelCss).toContain("background: var(--sovereign-panel-surface)");

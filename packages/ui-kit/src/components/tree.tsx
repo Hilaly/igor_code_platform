@@ -20,7 +20,9 @@
  */
 
 import {
+  useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -28,10 +30,13 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { Badge, type BadgeTone } from "./badge.tsx";
 import { ChevronRightIcon } from "./icons.tsx";
 import styles from "./tree.module.css";
+
+const contextCloseDelayMilliseconds = 120;
 
 /** Метка узла: строка приходит переведённой, тон — роль, а не цвет (см. `Badge`). */
 export type TreeNodeBadge = {
@@ -50,6 +55,8 @@ export type TreeNode = {
   badge?: TreeNodeBadge;
   /** Независимые действия рядом со строкой: они не выбирают и не раскрывают узел. */
   actions?: ReactNode;
+  /** Краткий контекст узла во всплывающем слое по наведению или фокусу. */
+  context?: ReactNode;
   children?: TreeNode[];
 };
 
@@ -83,6 +90,8 @@ export type TreeProps = {
    * Зовётся в обоих режимах: набор меняется и тогда, когда его хранит само дерево.
    */
   onExpandedChange?: (expandedIds: string[]) => void;
+  /** В покое прячет рельс действий, показывая его наведением и фокусом. */
+  actionsVisibility?: "always" | "interaction";
 };
 
 type FlatNode = {
@@ -128,6 +137,7 @@ export function Tree({
   toggleLabel,
   expandedIds,
   onExpandedChange,
+  actionsVisibility = "always",
 }: TreeProps) {
   const [ownExpandedIds, setOwnExpandedIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -135,6 +145,65 @@ export function Tree({
   const [focusedId, setFocusedId] = useState<string | undefined>();
   const treeId = useId();
   const itemElements = useRef(new Map<string, HTMLDivElement>());
+  const contextElement = useRef<HTMLDivElement | null>(null);
+  const contextCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [activeContext, setActiveContext] = useState<
+    { node: TreeNode; anchor: HTMLDivElement } | undefined
+  >();
+  const [contextPosition, setContextPosition] = useState<
+    { top: number; left: number } | undefined
+  >();
+
+  const cancelContextClose = (): void => {
+    if (contextCloseTimer.current !== undefined) clearTimeout(contextCloseTimer.current);
+  };
+
+  const openContext = (node: TreeNode, anchor: HTMLDivElement): void => {
+    if (node.context === undefined) return;
+    cancelContextClose();
+    setActiveContext({ node, anchor });
+  };
+
+  const scheduleContextClose = (): void => {
+    cancelContextClose();
+    contextCloseTimer.current = setTimeout(
+      () => setActiveContext(undefined),
+      contextCloseDelayMilliseconds,
+    );
+  };
+
+  useEffect(() => () => cancelContextClose(), []);
+
+  useLayoutEffect(() => {
+    if (activeContext === undefined || typeof window === "undefined") return;
+
+    const updatePosition = (): void => {
+      const anchor = activeContext.anchor.getBoundingClientRect();
+      const context = contextElement.current?.getBoundingClientRect();
+      const width = context?.width ?? 0;
+      const height = context?.height ?? 0;
+      const viewportPadding = 8;
+      const gap = 8;
+      const preferredLeft = anchor.right + gap;
+      const left = Math.min(
+        Math.max(preferredLeft, viewportPadding),
+        Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
+      );
+      const top = Math.min(
+        Math.max(anchor.top, viewportPadding),
+        Math.max(viewportPadding, window.innerHeight - height - viewportPadding),
+      );
+      setContextPosition({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [activeContext]);
 
   /** Владелец раскрытия определяется наличием пропа, и второго источника у набора нет. */
   const isExpansionControlled = expandedIds !== undefined;
@@ -278,6 +347,19 @@ export function Tree({
             className={styles.node}
             onKeyDown={(event) => handleKeyDown(event, node.id)}
             onClick={(event) => handleItemClick(event, node)}
+            onPointerEnter={(event) => openContext(node, event.currentTarget)}
+            onPointerLeave={scheduleContextClose}
+            onFocus={(event) => openContext(node, event.currentTarget)}
+            onBlur={(event) => {
+              if (
+                event.relatedTarget instanceof Node &&
+                (event.currentTarget.contains(event.relatedTarget) ||
+                  contextElement.current?.contains(event.relatedTarget))
+              ) {
+                return;
+              }
+              scheduleContextClose();
+            }}
           >
             <div className={`${styles.row}${isSelected ? ` ${styles.selected}` : ""}`}>
               {indentation}
@@ -334,8 +416,31 @@ export function Tree({
   }
 
   return (
-    <div className={styles.root} role="tree" aria-label={label}>
-      {renderNodes(nodes)}
-    </div>
+    <>
+      <div
+        className={styles.root}
+        role="tree"
+        aria-label={label}
+        data-actions-visibility={actionsVisibility}
+      >
+        {renderNodes(nodes)}
+      </div>
+      {activeContext !== undefined && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={contextElement}
+              className={styles.context}
+              role="tooltip"
+              aria-label={activeContext.node.label}
+              style={contextPosition}
+              onPointerEnter={cancelContextClose}
+              onPointerLeave={scheduleContextClose}
+            >
+              {activeContext.node.context}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

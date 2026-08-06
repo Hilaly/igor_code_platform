@@ -101,6 +101,50 @@ describe("interactive components", () => {
     );
   });
 
+  it("keeps a Tree context open across the pointer bridge and also opens it from focus", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Tree
+          label="Projects"
+          toggleLabel={treeToggleLabel}
+          actionsVisibility="interaction"
+          nodes={[
+            {
+              id: "project",
+              label: "Alpha",
+              actions: <button type="button">Project actions</button>,
+              context: <div>Project facts</div>,
+            },
+          ]}
+        />,
+      );
+
+      const tree = screen.getByRole("tree", { name: "Projects" });
+      expect(tree.getAttribute("data-actions-visibility")).toBe("interaction");
+      const project = screen.getByRole("treeitem", { name: "Alpha" });
+
+      fireEvent.pointerEnter(project);
+      const context = screen.getByRole("tooltip", { name: "Alpha" });
+      expect(context.parentElement).toBe(document.body);
+      expect(screen.getByText("Project facts")).toBeTruthy();
+
+      fireEvent.pointerLeave(project);
+      fireEvent.pointerEnter(context);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.getByText("Project facts")).toBeTruthy();
+
+      fireEvent.pointerLeave(context);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.queryByText("Project facts")).toBeNull();
+
+      fireEvent.focus(project);
+      expect(screen.getByText("Project facts")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders a compact menu popup in the document body", () => {
     render(
       <Menu

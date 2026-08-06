@@ -26,6 +26,7 @@ import {
   CopyIcon,
   ForkBeforeIcon,
   ForkThroughIcon,
+  FolderIcon,
   MoreIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -49,8 +50,33 @@ import {
 import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
+import { Tree } from "./tree.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("keeps a contextual Tree icon decorative and the label as its accessible name", () => {
+    const markup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        actionsVisibility="interaction"
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            icon: <FolderIcon />,
+            context: <div>Project facts</div>,
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Projects"');
+    expect(markup).toContain('data-actions-visibility="interaction"');
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain(">Alpha<");
+    expect(markup).not.toContain("Project facts");
+  });
+
   it("renders the compact settings view, selected navigation, page, and property row", () => {
     const markup = renderToStaticMarkup(
       <SettingsView
