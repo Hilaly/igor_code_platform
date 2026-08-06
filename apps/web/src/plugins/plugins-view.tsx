@@ -183,7 +183,9 @@ function PublicRoutes({
       <ul className="plugins-reasons">
         {open.map((registration) =>
           registration.kind !== "public-route" ? undefined : (
-            <li key={`${registration.pluginKey}:${registration.id}`}>
+            <li
+              key={`${registration.source}:${registration.id}:${registration.method}:${registration.path}`}
+            >
               {t("plugins.public.item", {
                 method: registration.method,
                 url: routeAddress(registration),
