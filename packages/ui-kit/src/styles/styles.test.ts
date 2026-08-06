@@ -144,6 +144,7 @@ describe("stylesheets of the kit", () => {
     expect(listCss).toContain(".select:has(> *)");
     expect(treeCss).toContain("min-height: var(--sovereign-row-height-compact)");
     expect(treeCss).toContain("width: 100%");
+    expect(treeCss).toContain("overflow-x: hidden");
     expect(treeCss).toContain("padding-inline: var(--sovereign-space-2)");
     expect(treeCss).toContain("padding-block: var(--sovereign-space-1)");
     expect(treeCss).toContain("box-sizing: border-box");

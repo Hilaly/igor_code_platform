@@ -1,6 +1,9 @@
 .root {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
   gap: var(--sovereign-space-1);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);

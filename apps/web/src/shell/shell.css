@@ -190,6 +190,14 @@
   flex: 1;
 }
 
+.shell-left-projects {
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1;
+}
+
 .shell-nav-header {
   display: flex;
   flex-direction: column;
