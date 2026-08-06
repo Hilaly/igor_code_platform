@@ -374,6 +374,37 @@ failed` в журнал ядра и до рантайма не доходит.
 [runtime-checks.md](runtime-checks.md), проверка 35. Цена фан-аута событий рантайма измерена там же,
 проверкой 34.
 
+## Маршруты и хранилище плагина живьём
+
+Плагин из `plugins/` директории данных объявляет `contribute.route`, `contribute.publicRoute` и
+пользуется `storage` ([plugins.md](plugins.md), [web-api.md](web-api.md)). Зависимостей ему не надо:
+хватает симлинка `node_modules/@sovereign/sdk` на `packages/sdk`.
+
+```bash
+curl -b jar 'http://localhost:5273/p/routed/board/7?full=yes'   # 200, ответ плагина
+curl 'http://localhost:5273/p/routed/board/7'                    # 401: сессия нужна
+curl -X POST -H 'content-type: text/plain' -d 'тело' \
+  http://localhost:5273/p/routed/webhooks/github                 # 202: публичный, без сессии
+```
+
+Что стоит посмотреть, кроме кодов ответа:
+
+1. **Лимит частоты.** `publicRouteRequestsPerMinute: 3` в `config.json`, четвёртый вызов подряд —
+   `429`, и в журнале `the public route of a plugin was called too often`. Правка ключа применяется
+   без перезапуска, как и правка предела тела: следующий запрос считается уже по новому.
+2. **Таймаут.** Маршрут, чей обработчик возвращает `new Promise(() => {})`, отвечает `504` ровно через
+   `pluginRouteTimeoutMilliseconds`; подробностей наружу не уходит, причина остаётся в журнале.
+3. **Журнал различает вызовы.** У записи `a route of a plugin was called` есть поле `access`, и у
+   публичного вызова рядом стоит `caller` — адрес вызывающего.
+4. **Переключение вклада.** `disabledContributions: ["routed.webhook"]` в `preferences.json` — и
+   адрес отвечает `404`, а соседний маршрут того же плагина работает; вернули запись — вернулся
+   адрес. Правка исходников плагина приносит новый маршрут той же перезагрузкой.
+5. **Хранилище.** `plugin-storage/data%3Arouted.json` появляется после первой записи,
+   `storage.directory()` отдаёт готовую `plugin-files/data%3Arouted/`. Битый файл читается отказом и
+   **не перезаписывается**: под ним состояние плагина.
+
+Все пять прогонялись на срезе 11b; чем кончились — в [roadmap.md](roadmap.md).
+
 ## Проверка перед коммитом
 
 ```bash
