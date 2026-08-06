@@ -14,7 +14,7 @@ export type PopoverProps = {
   children: ReactNode;
   side?: PopoverSide;
   ariaLabel?: string;
-  contentRole?: "dialog" | "listbox" | "tree";
+  contentRole?: "dialog" | "listbox" | "menu" | "tree";
   rootClassName?: string;
   contentClassName?: string;
   open?: boolean;

@@ -10,7 +10,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ModelPicker, type ModelPickerGroup, type ModelPickerProps } from "./model-picker.tsx";
+import {
+  ModelPicker,
+  type ModelPickerGroup,
+  ModelPickerMenu,
+  type ModelPickerProps,
+} from "./model-picker.tsx";
 
 afterEach(cleanup);
 
@@ -47,6 +52,36 @@ const show = (overrides: Partial<ModelPickerProps> = {}) => {
 };
 
 describe("the ModelPicker", () => {
+  it("keeps its existing trigger around the grouped tree", () => {
+    show();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Модель" }));
+
+    expect(screen.getByRole("tree", { name: "Модель" })).not.toBeNull();
+    expect(screen.getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"))).toEqual([
+      "Anthropic",
+      "Google",
+    ]);
+  });
+
+  it("renders the grouped menu body without another picker trigger", () => {
+    render(
+      <ModelPickerMenu
+        groups={[anthropic, google]}
+        value="anthropic/claude-opus"
+        onChange={vi.fn()}
+        onExpandGroup={vi.fn()}
+        label="Модель"
+        placeholder="Выберите модель"
+        emptyText="Моделей нет"
+      />,
+    );
+
+    expect(screen.getByRole("tree", { name: "Модель" })).not.toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Модель" })).toBeNull();
+    expect(screen.getByRole("treeitem", { name: "Anthropic" })).not.toBeNull();
+  });
+
   it("can open its catalogue above the trigger", () => {
     show({ side: "top" });
 
