@@ -188,6 +188,14 @@ describe("the style sheets of the application", () => {
     );
   });
 
+  it("lets contained content fill the shell body", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;/s,
+    );
+  });
+
   it("scopes the composer option collapse to its own container", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
