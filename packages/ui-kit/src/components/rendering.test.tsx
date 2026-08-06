@@ -117,6 +117,33 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain("Дерево");
   });
 
+  it("renders title-only headers without omitted slots", () => {
+    const markup = renderToStaticMarkup(<ViewHeader title="Только заголовок" />);
+
+    expect(markup).toContain("<header");
+    expect(markup).toContain("Только заголовок");
+    expect(markup).not.toMatch(/class="[^"]*context[^"]*"/);
+    expect(markup).not.toMatch(/class="[^"]*actions[^"]*"/);
+  });
+
+  it("renders context alongside the heading", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader title="Проект" context="/workspace/project" level={3} />,
+    );
+
+    expect(markup).toContain("<h3");
+    expect(markup).toContain("Проект");
+    expect(markup).toContain("/workspace/project");
+    expect(markup).toMatch(/class="[^"]*context[^"]*"/);
+  });
+
+  it("exposes the complete long context value through title", () => {
+    const context = "/workspace/a-very-long-project-folder-name";
+    const markup = renderToStaticMarkup(<ViewHeader title="Проект" context={context} />);
+
+    expect(markup).toContain(`title="${context}"`);
+  });
+
   it("keeps the action group bounded by the header container", () => {
     const markup = renderToStaticMarkup(
       <ViewHeader
