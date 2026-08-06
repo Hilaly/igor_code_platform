@@ -1,56 +1,70 @@
-# Slice 11b Review Fixes Implementation Plan
+# План исправлений среза 11b по ревью
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Для агентов:** выполнять задачи по одной через `superpowers:subagent-driven-development` или
+> `superpowers:executing-plans`. Состояние шагов отмечено флажками.
 
-**Goal:** Устранить подтверждённые дефекты поверхности плагинов slice 11b и довести ветку до состояния, пригодного для мерджа.
+**Цель:** устранить подтверждённые дефекты поверхности плагинов среза 11b и довести ветку до
+состояния, пригодного для слияния.
 
-**Architecture:** Сохраняем wire-контракт вклада `kind + id`; SDK и supervisor адресуют обработчик составным ключом, чтобы route и public-route с одинаковым id не смешивались. HTTP-диспетчер остаётся буферизующим, но связывает принятый маршрут с поколением загрузки и выбирает наиболее специфичный шаблон. Storage принимает только JSON values и явно возвращает ошибку записи.
+**Архитектура:** сохраняем проводной контракт вклада `kind + id`; SDK и супервизор адресуют
+обработчик составным ключом, чтобы `route` и `public-route` с одинаковым `id` не смешивались.
+HTTP-диспетчер остаётся буферизующим, но связывает принятый маршрут с поколением загрузки и выбирает
+наиболее специфичный шаблон. Хранилище принимает только значения JSON и явно возвращает ошибку
+записи.
 
-**Tech Stack:** TypeScript, Node.js HTTP, Vitest, React, pnpm/workspace scripts.
+**Стек:** TypeScript, Node.js HTTP, Vitest, React, скрипты рабочего пространства pnpm.
 
-## Global Constraints
+## Общие ограничения
 
 - Публичный маршрут не требует cookie/session/form auth.
 - Конфликтующие маршруты не публикуются и их статус должен быть виден через `/api/plugins`.
 - Изменения сопровождаются регрессионными тестами и русской документацией.
 - Не добавлять внешние зависимости.
 
-### Task 1: SDK handler identity
+### Задача 1: идентичность обработчика SDK
 
-**Files:** `packages/sdk/src/index.ts`, `packages/sdk/src/routes.ts`, SDK tests.
+**Файлы:** `packages/sdk/src/index.ts`, `packages/sdk/src/routes.ts`, тесты SDK.
 
-- [ ] Add failing test for same id route/public-route and verify separate calls.
-- [ ] Include kind/visibility in handler and supervisor call key.
-- [ ] Run targeted tests and commit `fix(sdk): keep route handlers distinct by kind`.
+- [x] Добавить падающий тест для одинакового `id` у `route` и `public-route` и проверить раздельные
+      вызовы.
+- [x] Включить вид вклада в ключ обработчика и вызова супервизора.
+- [x] Запустить целевые тесты и создать коммит `fix(sdk): keep route handlers distinct by kind`.
 
-### Task 2: HTTP robustness and routing
+### Задача 2: устойчивость HTTP и маршрутизация
 
-**Files:** `apps/daemon/src/http/dispatcher.ts`, `apps/daemon/src/plugins/plugin-routes.ts`, related tests.
+**Файлы:** `apps/daemon/src/http/dispatcher.ts`, `apps/daemon/src/plugins/plugin-routes.ts`, связанные
+тесты.
 
-- [ ] Add abort body-read regression test.
-- [ ] Add literal-vs-parameter and same-parameter-shape tests.
-- [ ] Bind in-flight calls to the route registry generation and reject stale calls.
-- [ ] Implement minimal fixes, run targeted daemon tests, commit `fix(daemon): harden plugin route dispatch`.
+- [x] Добавить регрессионный тест отмены чтения тела.
+- [x] Добавить тесты приоритета литерального пути и одинаковой формы параметрических путей.
+- [x] Привязать выполняющиеся вызовы к поколению реестра маршрутов и отклонять устаревшие вызовы.
+- [x] Внести минимальные исправления, запустить целевые тесты демона и создать коммит
+      `fix(daemon): harden plugin route dispatch`.
 
-### Task 3: Strict storage JSON values
+### Задача 3: строгие JSON-значения хранилища
 
-**Files:** `apps/daemon/src/plugins/plugin-storage.ts`, storage tests.
+**Файлы:** `apps/daemon/src/plugins/plugin-storage.ts`, тесты хранилища.
 
-- [ ] Add failing tests for undefined/function/symbol/NaN/Infinity/nested invalid values.
-- [ ] Validate complete JSON value before writing and preserve prior file.
-- [ ] Run storage tests and commit `fix(daemon): reject non-json plugin storage values`.
+- [x] Добавить падающие тесты для `undefined`, функции, символа, `NaN`, бесконечности и вложенных
+      недопустимых значений.
+- [x] Проверять полное значение JSON до записи и сохранять прежний файл при отказе.
+- [x] Запустить тесты хранилища и создать коммит
+      `fix(daemon): reject non-json plugin storage values`.
 
-### Task 4: Truthful plugin UI and docs
+### Задача 4: достоверные интерфейс и документация плагинов
 
-**Files:** `apps/daemon/src/plugins/plugins-snapshot.ts`, web plugin view/detail tests and components, `packages/ui-kit/src/i18n/messages/{en,ru}.ts`, docs.
+**Файлы:** `apps/daemon/src/plugins/plugins-snapshot.ts`, тесты и компоненты веб-интерфейса
+плагинов, `packages/ui-kit/src/i18n/messages/{en,ru}.ts`, документация.
 
-- [ ] Expose route conflict status/effective routes in snapshot and filter UI to effective public routes.
-- [ ] Show declared path alongside method and full URL in contribution details.
-- [ ] Correct public-route localization wording and document conflict/generation/storage behavior.
-- [ ] Run targeted web tests and commit `fix(web): show effective plugin routes accurately`.
+- [x] Отдавать в снимке конфликты и действующие маршруты, показывать в интерфейсе только
+      действующие публичные маршруты.
+- [x] Показывать объявленный путь вместе с методом и полным адресом в деталях вклада.
+- [x] Исправить локализацию публичного маршрута и описать конфликты, поколения и хранилище.
+- [x] Запустить целевые веб-тесты и создать коммит
+      `fix(web): show effective plugin routes accurately`.
 
-### Task 5: Full verification
+### Задача 5: полная проверка
 
-- [ ] Run `make check` in the linked worktree.
-- [ ] Run `git diff --check main...HEAD` and inspect status/log.
-- [ ] Ensure backlog/docs reflect intentionally deferred limitations.
+- [x] Запустить `make check` в связанном рабочем дереве.
+- [x] Запустить `git diff --check main...HEAD` и проверить состояние и историю.
+- [x] Убедиться, что бэклог и документация отражают намеренно отложенные ограничения.
