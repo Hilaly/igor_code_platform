@@ -46,12 +46,14 @@
 ### Task 1: Add public action icons needed by the compact toolbar
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/icons.tsx`
 - Modify: `packages/ui-kit/src/components/rendering.test.tsx`
 - Modify: `packages/ui-kit/src/index.ts`
 - Modify: `packages/ui-kit/package.json` and `pnpm-lock.yaml` only if a missing icon dependency is discovered
 
 **Interfaces:**
+
 - Consumes: existing `Icon`, `IconSize`, and `lucide-react` wrappers.
 - Produces: `SendIcon`, `AppendIcon`, and `StopIcon` exported from `@sovereign/ui-kit`, each accepting `{ size?: IconSize }` and rendering decorative SVG content.
 
@@ -101,6 +103,7 @@ git commit -m "feat(ui-kit): add composer action icons"
 ### Task 2: Build the controlled combined model/reasoning picker
 
 **Files:**
+
 - Create: `packages/ui-kit/src/components/next-turn-picker.tsx`
 - Create: `packages/ui-kit/src/components/next-turn-picker.module.css`
 - Create: `packages/ui-kit/src/components/next-turn-picker.test.tsx`
@@ -108,6 +111,7 @@ git commit -m "feat(ui-kit): add composer action icons"
 - Modify: `packages/ui-kit/src/i18n/messages/en.ts` and `packages/ui-kit/src/i18n/messages/ru.ts` if new labels are needed
 
 **Interfaces:**
+
 - Consumes: `ModelPickerGroup[]`, current `model`, current `thinkingLevel`, `reasoningSupported`, `thinkingLevels`, `Popover`, the reusable `ModelPickerMenu`, `Tooltip`, and localized labels.
 - Produces:
 
@@ -242,6 +246,7 @@ git commit -m "feat(ui-kit): add next-turn cascade picker"
 ### Task 3: Reshape `MessageComposer` around the compact surface
 
 **Files:**
+
 - Modify: `apps/web/src/sessions/message-composer.tsx`
 - Modify: `apps/web/src/sessions/message-composer.test.tsx`
 - Modify: `apps/web/src/sessions/sessions.css`
@@ -249,6 +254,7 @@ git commit -m "feat(ui-kit): add next-turn cascade picker"
 - Modify: `packages/ui-kit/src/i18n/messages/en.ts` and `packages/ui-kit/src/i18n/messages/ru.ts` if action labels are missing
 
 **Interfaces:**
+
 - Consumes: `NextTurnPicker`, `SendIcon`, `AppendIcon`, `StopIcon`, `Button`, `Tooltip`, existing handlers, and existing translator.
 - Produces: unchanged `MessageComposerProps` and unchanged `onSubmit`, `onSendMessage`, `onInterrupt`, `onError` behavior.
 
@@ -269,7 +275,9 @@ it("renders one textarea row and one toolbar row inside the raised surface", () 
 it("keeps icon actions named and preserves idle append/send callbacks", async () => {
   const onSendMessage = vi.fn(() => Promise.resolve(undefined));
   render(<ComposerHarness onSendMessage={onSendMessage} />);
-  fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), { target: { value: "добавь" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+    target: { value: "добавь" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Дописать без запуска" }));
   expect(onSendMessage).toHaveBeenCalledWith({ text: "добавь", mode: "append" });
 });
@@ -391,12 +399,14 @@ git commit -m "feat(web): compact the session composer"
 ### Task 4: Document and verify the final visual contract
 
 **Files:**
+
 - Modify: `docs/ui-kit.md`
 - Modify: `docs/README.md`
 - Modify: `apps/web/src/sessions/message-composer.test.tsx` or `apps/web/src/sessions/composer-scrollbar.test.ts`
 - Modify: `apps/web/src/shell/styles.test.ts` if final selector coverage needs tightening
 
 **Interfaces:**
+
 - Consumes: completed `NextTurnPicker`, compact composer DOM, existing UI-kit tokens.
 - Produces: repository documentation and a final focused verification suite for visual invariants.
 
