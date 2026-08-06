@@ -98,7 +98,11 @@ describe("stylesheets of the kit", () => {
     expect(tree).toMatch(/\.item\s*\{[^}]*display:\s*grid;/s);
     expect(tree).toMatch(/\.node\s*\{[^}]*display:\s*contents;/s);
     expect(tree).toMatch(/\.actions\s*\{[^}]*grid-column:\s*2;/s);
+    expect(tree).toMatch(/\.row\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*grid-row:\s*1;/s);
     expect(tree).toMatch(/\.children\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
+    expect(tree).toMatch(/\.children\s*\{[^}]*grid-row:\s*2;/s);
+    expect(tree).not.toMatch(/\.children\s*\{[^}]*padding-left:/s);
+    expect(tree).toMatch(/\.indent\s*\{[^}]*flex:\s*0\s+0\s+var\(--sovereign-space-4\);/s);
   });
 
   it("describes public accents and elevation without obsolete decorative effects", () => {
@@ -148,6 +152,40 @@ describe("stylesheets of the kit", () => {
     expect(panelCss).toContain("background: var(--sovereign-panel-surface)");
     expect(panelCss).toContain("box-shadow: var(--sovereign-elevation-1)");
     expect(panelCss).not.toMatch(/backdrop-filter|gradient|glass/);
+  });
+
+  it("lets ViewHeader actions wrap inside a constrained container", () => {
+    const viewHeaderCss = readFileSync(
+      join(kitRoot, "components", "view-header.module.css"),
+      "utf8",
+    );
+
+    expect(viewHeaderCss).toMatch(
+      /\.actions\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+    );
+    expect(viewHeaderCss).toMatch(/\.actions\s*\{[^}]*justify-content:\s*flex-end;/s);
+  });
+
+  it("owns the compact mockup geometry for settings views", () => {
+    const settingsFrameCss = readFileSync(
+      join(kitRoot, "components", "settings-frame.module.css"),
+      "utf8",
+    );
+
+    expect(settingsFrameCss).toMatch(/grid-template-columns:\s*minmax\([^,]+,\s*12rem\)/);
+    expect(settingsFrameCss).toMatch(
+      /\.navigationItemSelected\s*\{[^}]*background:\s*var\(--sovereign-accent-surface\)/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
+    );
+    expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*\{[^}]*overflow-x:\s*auto;/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /@container\s*\(width\s*<\s*28rem\)[\s\S]*\.row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
   });
 
   it("keeps shared application states flat and elevates only overlays", () => {
@@ -335,6 +373,15 @@ describe("stylesheets of the kit", () => {
     expect(source).toMatch(/\.surface\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-md\);/s);
     expect(source).toMatch(/\.surface\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);/s);
     expect(source).toMatch(/\.surface\s*\{[^}]*box-shadow:\s*var\(--sovereign-elevation-1\);/s);
+  });
+
+  it("uses the contrast-safe accent text role for the product lockup", () => {
+    const source = withoutComments(
+      readFileSync(join(kitRoot, "components", "brand-lockup.module.css"), "utf8"),
+    );
+
+    expect(source).toMatch(/\.lockup\s*\{[^}]*color:\s*var\(--sovereign-accent-text\);/s);
+    expect(source).not.toMatch(/color:\s*var\(--sovereign-accent\);/);
   });
 
   it("dresses every primitive it ships", () => {

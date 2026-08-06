@@ -18,13 +18,16 @@ export type TooltipSide = "top" | "bottom" | "left" | "right";
 export type TooltipProps = {
   /** Текст подсказки, уже переведённый. */
   content: string;
+  /** Явный id нужен, когда описание связано с фокусируемым предком триггера. */
+  id?: string;
   side?: TooltipSide;
   /** Элемент, к которому подсказка привязана. */
   children: ReactNode;
 };
 
-export function Tooltip({ content, side = "top", children }: TooltipProps) {
-  const tooltipId = useId();
+export function Tooltip({ content, id, side = "top", children }: TooltipProps) {
+  const generatedId = useId();
+  const tooltipId = id ?? generatedId;
   const trigger = isValidElement(children)
     ? cloneElement(children, {
         "aria-describedby": (children.props as { "aria-describedby"?: string })["aria-describedby"]

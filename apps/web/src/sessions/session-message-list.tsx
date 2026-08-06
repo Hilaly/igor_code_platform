@@ -45,6 +45,9 @@ export type SessionMessageListProps = {
   labelRefusal: string | undefined;
   onLabelRefusalChange: (reason: string | undefined) => void;
   translator: ScopedTranslator;
+  className?: string;
+  before?: ReactNode;
+  after?: ReactNode;
 };
 
 /** Исход вызова инструмента из записей: результат приезжает отдельной записью, а не внутри вызова. */
@@ -85,6 +88,9 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
     labelRefusal,
     onLabelRefusalChange,
     translator,
+    className,
+    before,
+    after,
   } = props;
   const { t } = translator;
   /** Запись, которой правят метку, и черновик метки — как у переименования сессии. */
@@ -181,79 +187,87 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 
   return (
     <>
-      {labelRefusal === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.label.refused", { reason: labelRefusal })} />
-      )}
-      {copyRefusal === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.copy.refused", { reason: copyRefusal })} />
-      )}
+      <MessageFeed
+        label={t("chat.feed.label")}
+        busy={busy}
+        className={className}
+        before={before}
+        after={after}
+      >
+        {labelRefusal === undefined ? undefined : (
+          <Notice tone="danger" title={t("chat.label.refused", { reason: labelRefusal })} />
+        )}
+        {copyRefusal === undefined ? undefined : (
+          <Notice tone="danger" title={t("chat.copy.refused", { reason: copyRefusal })} />
+        )}
 
-      {open.loading && empty ? (
-        <Spinner label={t("state.loading")} />
-      ) : (
-        <MessageFeed label={t("chat.feed.label")} busy={busy}>
-          {empty ? (
-            <EmptyState title={t("chat.empty.title")} hint={t("chat.empty.hint")} />
-          ) : undefined}
+        {open.loading && empty ? (
+          <Spinner label={t("state.loading")} />
+        ) : (
+          <>
+            {empty ? (
+              <EmptyState title={t("chat.empty.title")} hint={t("chat.empty.hint")} />
+            ) : undefined}
 
-          {shown.map((entry) => {
-            const mark = open.labels.get(entry.id);
-            const copyText = entry.kind === "message" ? messageText(entry) : undefined;
+            {shown.map((entry) => {
+              const mark = open.labels.get(entry.id);
+              const copyText = entry.kind === "message" ? messageText(entry) : undefined;
 
-            return (
-              <EntryMessage
-                key={entry.id}
-                entry={entry}
-                outcomes={outcomes}
-                {...(mark === undefined ? {} : { label: mark })}
-                // Метка архивной сессии отклоняется `409`: действия в ней не показываются вовсе, а
-                // у занятой остаются видимыми, но выключенными.
-                {...(archived
-                  ? {}
-                  : {
-                      marking: {
-                        busy,
-                        onLabel: () => setLabelling({ entryId: entry.id, label: mark ?? "" }),
-                        onClearLabel: () => void label(entry.id, null),
-                      },
-                    })}
-                // До реплики режем только вопрос человека; включить запись можно для любого места
-                // дерева, поэтому `at` доступен и на ответе агента.
-                forking={{
-                  busy,
-                  onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
-                  ...(entry.kind === "message" && entry.role === "user"
-                    ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
-                    : {}),
-                }}
-                {...(copyText === undefined
-                  ? {}
-                  : {
-                      copying: {
-                        copied: copiedEntryId === entry.id,
-                        onCopy: () => void copy(entry.id, copyText),
-                      },
-                    })}
-                translator={translator}
-              />
-            );
-          })}
+              return (
+                <EntryMessage
+                  key={entry.id}
+                  entry={entry}
+                  outcomes={outcomes}
+                  {...(mark === undefined ? {} : { label: mark })}
+                  // Метка архивной сессии отклоняется `409`: действия в ней не показываются вовсе, а
+                  // у занятой остаются видимыми, но выключенными.
+                  {...(archived
+                    ? {}
+                    : {
+                        marking: {
+                          busy,
+                          onLabel: () => setLabelling({ entryId: entry.id, label: mark ?? "" }),
+                          onClearLabel: () => void label(entry.id, null),
+                        },
+                      })}
+                  // До реплики режем только вопрос человека; включить запись можно для любого места
+                  // дерева, поэтому `at` доступен и на ответе агента.
+                  forking={{
+                    busy,
+                    onForkAt: () => void onFork({ entryId: entry.id, position: "at" }),
+                    ...(entry.kind === "message" && entry.role === "user"
+                      ? { onForkBefore: () => void onFork({ entryId: entry.id }) }
+                      : {}),
+                  }}
+                  {...(copyText === undefined
+                    ? {}
+                    : {
+                        copying: {
+                          copied: copiedEntryId === entry.id,
+                          onCopy: () => void copy(entry.id, copyText),
+                        },
+                      })}
+                  translator={translator}
+                />
+              );
+            })}
 
-          {pending.map(([turnId, text]) => (
-            <Message key={turnId} role="human" header={t("chat.turn.queued")}>
-              {text}
-            </Message>
-          ))}
+            {pending.map(([turnId, text]) => (
+              <Message key={turnId} role="human" header={t("chat.turn.queued")}>
+                {text}
+              </Message>
+            ))}
 
-          {liveOrder.map((key) => {
-            const item = live?.items[key];
+            {liveOrder.map((key) => {
+              const item = live?.items[key];
 
-            return item === undefined ? undefined : (
-              <LiveMessage key={key} item={item} translator={translator} />
-            );
-          })}
-        </MessageFeed>
-      )}
+              return item === undefined ? undefined : (
+                <LiveMessage key={key} item={item} translator={translator} />
+              );
+            })}
+          </>
+        )}
+      </MessageFeed>
 
       <Dialog
         open={labelling !== undefined}

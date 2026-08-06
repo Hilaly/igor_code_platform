@@ -14,7 +14,7 @@ import {
   Button,
   Notice,
   Select,
-  Text,
+  SettingsRow,
   type ColorScheme,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
@@ -42,20 +42,25 @@ export function AppearanceSection({
   return (
     <div className="settings-appearance">
       {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
-      <Select
-        label={t("appearance.scheme")}
-        value={preferences.appearance.colorScheme}
-        options={schemes.map((scheme) => ({
-          value: scheme.id,
-          label: t(`appearance.scheme.${scheme.id}`),
-        }))}
-        onChange={(colorScheme) =>
-          onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
-        }
-        placeholder={t("common.choose")}
-      />
-      <div className="settings-appearance-choice">
-        <Text tone="muted">{t("appearance.variant")}</Text>
+      <SettingsRow label={t("appearance.scheme")} description={t("settings.appearance.schemeHint")}>
+        <Select
+          label=""
+          ariaLabel={t("appearance.scheme")}
+          value={preferences.appearance.colorScheme}
+          options={schemes.map((scheme) => ({
+            value: scheme.id,
+            label: t(`appearance.scheme.${scheme.id}`),
+          }))}
+          onChange={(colorScheme) =>
+            onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
+          }
+          placeholder={t("common.choose")}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label={t("appearance.variant")}
+        description={t("settings.appearance.variantHint")}
+      >
         <div className="settings-appearance-buttons">
           {appearanceVariants.map((variant) => (
             <Button
@@ -69,11 +74,8 @@ export function AppearanceSection({
             </Button>
           ))}
         </div>
-      </div>
-      {/* Тот же вид выбора из трёх, что и вариант темы, поэтому и контрол тот же: два разных вида
-          управления в одной панели выглядели бы случайностью. Классы раскладки те же по той же причине. */}
-      <div className="settings-appearance-choice">
-        <Text tone="muted">{t("appearance.scale")}</Text>
+      </SettingsRow>
+      <SettingsRow label={t("appearance.scale")} description={t("settings.appearance.scaleHint")}>
         <div className="settings-appearance-buttons">
           {interfaceScales.map((scale) => (
             <Button
@@ -87,14 +89,17 @@ export function AppearanceSection({
             </Button>
           ))}
         </div>
-      </div>
-      <Select
-        label={t("appearance.locale")}
-        value={preferences.locale}
-        options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
-        onChange={(locale) => onChange({ ...preferences, locale })}
-        placeholder={t("common.choose")}
-      />
+      </SettingsRow>
+      <SettingsRow label={t("appearance.locale")}>
+        <Select
+          label=""
+          ariaLabel={t("appearance.locale")}
+          value={preferences.locale}
+          options={locales.map((locale) => ({ value: locale, label: localeName(locale) }))}
+          onChange={(locale) => onChange({ ...preferences, locale })}
+          placeholder={t("common.choose")}
+        />
+      </SettingsRow>
     </div>
   );
 }

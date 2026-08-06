@@ -6,7 +6,6 @@ import {
   EmptyState,
   Heading,
   Notice,
-  Panel,
   Spinner,
   Text,
   type ScopedTranslator,
@@ -17,6 +16,7 @@ export type ProjectDetailViewProps = {
   project?: Project;
   failure?: string;
   loaded: boolean;
+  headingLevel?: 1 | 2;
   fileResources?: ReactNode;
   onBack: () => void;
   onNewSession: () => void;
@@ -28,6 +28,7 @@ export function ProjectDetailView({
   failure,
   fileResources,
   loaded,
+  headingLevel = 1,
   onBack,
   onNewSession,
   translator,
@@ -57,12 +58,16 @@ export function ProjectDetailView({
           {t("sessions.new")}
         </Button>
       </div>
-      <Panel>
+      <div className="project-detail-surface">
         <div className="project-detail-header">
           <div>
-            <Heading level={1}>
-              {project.ephemeral ? t("projects.ephemeral") : project.name}
-            </Heading>
+            {headingLevel === 1 ? (
+              <Heading level={headingLevel}>
+                {project.ephemeral ? t("projects.ephemeral") : project.name}
+              </Heading>
+            ) : (
+              <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
+            )}
             <Code>{project.folder}</Code>
           </div>
           <Badge tone={project.availability === "available" ? "success" : "warning"}>
@@ -77,7 +82,7 @@ export function ProjectDetailView({
             <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
           ) : undefined}
         </div>
-      </Panel>
+      </div>
       {fileResources}
     </div>
   );

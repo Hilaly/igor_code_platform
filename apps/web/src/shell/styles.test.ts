@@ -129,6 +129,14 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });
 
+  it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
+    const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
+
+    expect(projects).toMatch(
+      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*opacity:\s*1;/s,
+    );
+  });
+
   it("separates shell surfaces and keeps the sidebar compact", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
@@ -141,12 +149,33 @@ describe("the style sheets of the application", () => {
   });
 
   it("keeps direct session content sized by its available container", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
     expect(sessions).toMatch(/\.sessions\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-height:\s*0;/s);
+    expect(sessions).toMatch(
+      /\.sessions-chat\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;/s,
+    );
+    expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*container-type:\s*inline-size;/s);
+    expect(sessions).toMatch(/\.sessions-chat-scroll\s*\{[^}]*min-height:\s*0;/s);
+    expect(sessions).not.toMatch(
+      /\.sessions-chat[^}]*(?:position:\s*(?:sticky|absolute)|100vh|100dvh)/s,
+    );
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*auto;/s);
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*hidden;[^}]*min-height:\s*0;/s,
+    );
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
+  });
+
+  it("scopes the composer option collapse to its own container", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<\s*36rem\)\s*\{[\s\S]*?\.sessions-composer-options\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
+    expect(sessions).not.toMatch(/@media\s*\(max-width:\s*36rem\)/);
   });
 
   it("opens the chat and leaves composer elevation to UI Kit", () => {
@@ -162,44 +191,29 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps settings split by their container and scrolls the active content", () => {
+  it("leaves the shared settings scroll and split geometry to UI Kit", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(/\.settings\s*\{[^}]*container-type:\s*inline-size;/s);
-    expect(settings).toMatch(/\.settings-layout\s*\{[^}]*grid-template-columns:[^;}]+;/s);
-    expect(settings).toMatch(/\.settings-content-body\s*\{[^}]*overflow-y:\s*auto;/s);
-    expect(settings).toMatch(
-      /@container\s*\(width\s*<\s*40rem\)\s*\{[\s\S]*?\.settings-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    );
-    expect(settings).toMatch(/\.settings-nav\s*>\s*ul\s*\{[^}]*flex-direction:\s*row;/s);
+    expect(settings).not.toMatch(/\.settings-content-body/);
     expect(settings).not.toMatch(/\.settings-split/);
   });
 
-  it("keeps settings compact, divided, and flat", () => {
+  it("keeps settings content free of application-owned visual frames", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(
-      /\.settings-nav\s*>\s*ul\s*>\s*li\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
-    );
-    expect(settings).toMatch(
-      /\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*[^{]*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
+    expect(settings).not.toMatch(/\.settings-(?:appearance|daemon)\s*>\s*\*\s*\+\s*\*/s);
     expect(settings).not.toMatch(
       /\.settings[^{]*\{[^}]*(?:box-shadow:\s*var\(--sovereign-elevation-|border-radius:\s*var\(--sovereign-radius-(?:sm|md|lg|xl))/s,
     );
   });
 
-  it("keeps plugin facts and contributions compact and divided", () => {
-    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+  it("keeps plugin list and detail rows compact and divided", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(shell).toMatch(
-      /\.plugins-plugin-head\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+    expect(settings).toMatch(
+      /\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
     );
-    expect(shell).toMatch(
-      /\.plugins-contributions\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+var\(--sovereign-border-subtle\);/s,
-    );
-    expect(shell).toMatch(
-      /\.plugins-contribution\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);[^}]*padding:\s*var\(--sovereign-space-1\)\s+var\(--sovereign-space-2\);/s,
-    );
+    expect(settings).toMatch(/\.plugin-detail-facts\s*\{[^}]*border-block-start:/s);
+    expect(settings).toMatch(/\.plugin-detail-contribution\s*\{[^}]*min-width:\s*0;/s);
   });
 });

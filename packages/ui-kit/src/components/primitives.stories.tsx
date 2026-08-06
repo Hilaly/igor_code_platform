@@ -9,11 +9,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "./badge.tsx";
+import { BrandLockup } from "./brand-lockup.tsx";
 import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { ConfirmDialog } from "./dialog.tsx";
 import { Disclosure } from "./disclosure.tsx";
 import { Input } from "./input.tsx";
+import { BrandMark } from "./icons.tsx";
 import { Link } from "./link.tsx";
 import { List, ListRow } from "./list.tsx";
 import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
@@ -25,6 +27,7 @@ import { StatusDot } from "./status-dot.tsx";
 import { Heading, Text } from "./text.tsx";
 import { Toggle } from "./toggle.tsx";
 import { ToastProvider, useToast } from "./toast.tsx";
+import { ViewHeader } from "./view-header.tsx";
 
 const column = {
   display: "flex",
@@ -47,6 +50,17 @@ export const Typography = () => (
     <Text>
       Внутри строки встречается <Code>идентификатор</Code> — он набран моноширинным.
     </Text>
+  </div>
+);
+
+export const Branding = () => (
+  <div style={column}>
+    <BrandLockup name="Sovereign" />
+    <div style={row}>
+      <BrandMark size="sm" label="Sovereign" />
+      <BrandMark size="md" label="Sovereign" />
+      <BrandMark size="xl" label="Sovereign" />
+    </div>
   </div>
 );
 
@@ -174,6 +188,45 @@ export const Surfaces = () => (
       </ListRow>
       <ListRow>Строка, которую нельзя выбрать</ListRow>
     </List>
+  </div>
+);
+
+export const ViewHeaders = () => (
+  <div style={column}>
+    <ViewHeader
+      title="Системный журнал"
+      actions={
+        <div style={row}>
+          <Button size="sm" onClick={() => {}}>
+            Обновить
+          </Button>
+          <Button size="sm" onClick={() => {}}>
+            Экспорт
+          </Button>
+          <Button size="sm" onClick={() => {}}>
+            Настроить
+          </Button>
+        </div>
+      }
+    />
+    <div style={{ maxWidth: "22rem" }}>
+      <ViewHeader
+        title="Системный журнал"
+        actions={
+          <div style={row}>
+            <Button size="sm" onClick={() => {}}>
+              Обновить
+            </Button>
+            <Button size="sm" onClick={() => {}}>
+              Экспорт
+            </Button>
+            <Button size="sm" onClick={() => {}}>
+              Настроить
+            </Button>
+          </div>
+        }
+      />
+    </div>
   </div>
 );
 

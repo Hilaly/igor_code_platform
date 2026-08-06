@@ -8,6 +8,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useEffect } from "react";
 
 import { Shell, type ShellProps } from "./shell.tsx";
 import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
@@ -191,6 +192,16 @@ describe("PanelResizer", () => {
 });
 
 describe("hiding and restoring the panels", () => {
+  it("marks a contained page while preserving the page default", () => {
+    const view = show();
+
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("page");
+
+    view.again(defaultLayout, { contentMode: "contained" });
+
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("contained");
+  });
+
   it("a hidden left panel is gone with its edge, and a restore button takes its place", () => {
     show({ layout: { ...defaultLayout, leftHidden: true } });
 
@@ -280,5 +291,67 @@ describe("hiding and restoring the panels", () => {
     expect(screen.getByRole("complementary", { name: "правая панель" })).toBeDefined();
     expect(screen.getByRole("separator", { name: "правая панель" })).toBeDefined();
     expect(screen.getByText("содержимое вида")).toBeDefined();
+  });
+});
+
+describe("sidebar stability across page changes", () => {
+  // Регрессия фликера: при переходе между страницами сайдбар и индикатор связи не должны
+  // перемонтироваться. Иначе дерево проектов сбрасывалось бы в «Loading…», а статус — в «Connecting»,
+  // и каждая навигация начиналась бы с пустой панели. `navigation` и `status` стоят в фиксированных
+  // позициях оболочки и не зависят от `children`, поэтому React сохраняет их subtree между рендерами.
+  function NavigationProbe({
+    onMount,
+    onUnmount,
+  }: {
+    onMount: () => void;
+    onUnmount: () => void;
+  }): React.JSX.Element {
+    useEffect(() => {
+      onMount();
+
+      return () => onUnmount();
+    }, [onMount, onUnmount]);
+
+    return <nav>сайдбар</nav>;
+  }
+
+  it("does not remount the navigation subtree when the page changes", () => {
+    const mounts = vi.fn();
+    const unmounts = vi.fn();
+    const { again } = show({
+      navigation: <NavigationProbe onMount={mounts} onUnmount={unmounts} />,
+      children: <div>первая страница</div>,
+    });
+
+    again(defaultLayout, { children: <div>вторая страница</div> });
+    again(defaultLayout, { children: <div>третья страница</div> });
+
+    // Один монтаж — при первом рендере; навигация пережила две смены страницы.
+    expect(mounts).toHaveBeenCalledTimes(1);
+    expect(unmounts).not.toHaveBeenCalled();
+  });
+
+  it("does not remount the status subtree when the page changes", () => {
+    const mounts = vi.fn();
+    const unmounts = vi.fn();
+    const StatusProbe = (): React.JSX.Element => {
+      useEffect(() => {
+        mounts();
+
+        return () => unmounts();
+      }, []);
+
+      return <div role="status">статус</div>;
+    };
+
+    const { again } = show({
+      status: <StatusProbe />,
+      children: <div>первая страница</div>,
+    });
+
+    again(defaultLayout, { children: <div>вторая страница</div> });
+
+    expect(mounts).toHaveBeenCalledTimes(1);
+    expect(unmounts).not.toHaveBeenCalled();
   });
 });

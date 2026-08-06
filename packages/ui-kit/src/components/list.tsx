@@ -17,6 +17,8 @@ export function List({ children }: ListProps) {
 
 export type ListRowProps = {
   selected?: boolean;
+  /** id элемента с полным описанием выбираемой строки. */
+  describedBy?: string;
   onSelect?: () => void;
   /**
    * Двойной клик. Не заменяет `onSelect`: выбор и подтверждение — разные жесты (пикер файла
@@ -31,6 +33,7 @@ export type ListRowProps = {
 
 export function ListRow({
   selected = false,
+  describedBy,
   onSelect,
   onDoubleClick,
   children,
@@ -55,6 +58,7 @@ export function ListRow({
         onClick={onSelect}
         onDoubleClick={onDoubleClick}
         aria-current={selected}
+        aria-describedby={describedBy}
       >
         {children}
       </button>

@@ -9,6 +9,7 @@
 
 import { minimumPasswordLength } from "@sovereign/protocol";
 import {
+  BrandLockup,
   Button,
   Field,
   Form,
@@ -70,6 +71,15 @@ export function LoginView({
             }}
           >
             <div className="login-body">
+              {/*
+                Бренд-блок над заголовком формы: вход — единственный экран без оболочки, и без него
+                карточка выглядит безымянной. Типографика и знак — из кита; здесь только отступ до
+                следующего поля. Блок декоративен: название продукта объявляет заголовок формы и
+                окружающие подписи.
+              */}
+              <div className="login-brand">
+                <BrandLockup name={t("product.name")} />
+              </div>
               <Heading level={1}>{title}</Heading>
               <Text tone="muted">{t(registering ? "login.registration.hint" : "login.hint")}</Text>
 

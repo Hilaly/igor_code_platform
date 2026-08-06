@@ -90,6 +90,7 @@ export function Popover({
         <div
           id={popoverId}
           className={`${styles.content} ${styles[side]}${contentClassName ? ` ${contentClassName}` : ""}`}
+          data-side={side}
           role={contentRole}
           aria-label={ariaLabel}
         >

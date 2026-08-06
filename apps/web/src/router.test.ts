@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { matchPage, pathOf } from "./router.ts";
 
 describe("matchPage", () => {
+  it("opens an administrative plugin detail from an encoded plugin key", () => {
+    expect(matchPage("/settings/plugins/data%3Ausage")).toEqual({
+      kind: "settings-plugin",
+      pluginKey: "data:usage",
+    });
+  });
+
+  it("round-trips plugin keys that look like path navigation", () => {
+    const page = { kind: "settings-plugin" as const, pluginKey: ".." };
+
+    expect(matchPage(pathOf(page))).toEqual(page);
+  });
+
+  it("keeps the plugin list at its section route", () => {
+    expect(matchPage("/settings/plugins")).toEqual({ kind: "settings", section: "plugins" });
+  });
   it("takes the root for the home page", () => {
     expect(matchPage("/")).toEqual({ kind: "home" });
     expect(matchPage("")).toEqual({ kind: "home" });
@@ -15,11 +31,20 @@ describe("matchPage", () => {
     expect(matchPage("/plugins/hello")).toEqual({ kind: "unknown", path: "/plugins/hello" });
   });
 
-  it("keeps the projects on their own address", () => {
-    expect(matchPage("/projects")).toEqual({ kind: "projects" });
-    expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
-      kind: "project",
+  it("keeps project management inside settings and drops the old addresses", () => {
+    expect(matchPage("/settings/projects")).toEqual({ kind: "settings", section: "projects" });
+    expect(matchPage("/settings/projects/b7Kq3xv9pQdT")).toEqual({
+      kind: "settings-project",
       projectId: "b7Kq3xv9pQdT",
+    });
+    expect(pathOf({ kind: "settings", section: "projects" })).toBe("/settings/projects");
+    expect(pathOf({ kind: "settings-project", projectId: "b7Kq3xv9pQdT" })).toBe(
+      "/settings/projects/b7Kq3xv9pQdT",
+    );
+    expect(matchPage("/projects")).toEqual({ kind: "unknown", path: "/projects" });
+    expect(matchPage("/projects/b7Kq3xv9pQdT")).toEqual({
+      kind: "unknown",
+      path: "/projects/b7Kq3xv9pQdT",
     });
   });
 
@@ -160,8 +185,8 @@ describe("pathOf", () => {
   it("survives a round trip", () => {
     for (const path of [
       "/",
-      "/projects",
-      "/projects/b7Kq3xv9pQdT",
+      "/settings/projects",
+      "/settings/projects/b7Kq3xv9pQdT",
       "/sessions/new",
       "/sessions/archive",
       "/sessions/0199abcd-ef01",

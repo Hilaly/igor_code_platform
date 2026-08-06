@@ -17,6 +17,7 @@ import {
   type SessionMessage,
   type SessionNavigateRequest,
   type SessionUpdate,
+  type TurnRequest,
 } from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -92,13 +93,15 @@ export type SessionsController = {
   createSession: (draft: SessionDraft) => Promise<CreateSessionOutcome>;
   /** Подготовить диалог создания: проекты и настроенные провайдеры. Зовётся по его открытию. */
   prepareDraft: () => void;
+  /** Подготовить настроенные провайдеры для выбора модели следующего турна. */
+  prepareModels: () => void;
   /** Выбрать проект черновика и прочитать только разрешённых в нём агентов. */
   selectProject: (projectId: string) => void;
   /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
   loadModels: (providerId: string) => void;
-  submitTurn: (text: string) => void;
+  submitTurn: SubmitTurn;
   /** Первый турн новой сессии адресуется явно: переход по маршруту применяется React асинхронно. */
-  submitTurnToSession: (sessionId: string, text: string) => void;
+  submitTurnToSession: SubmitTurnToSession;
   /** Сообщение, которое не запускает турн. Отказ приезжает причиной, а не исключением. */
   sendMessage: (message: SessionMessage) => Promise<string | undefined>;
   interrupt: () => void;
@@ -118,6 +121,13 @@ export type SessionsController = {
   /** Кадр дельты из потока. Не событие шины (docs/sessions-and-projects.md). */
   receiveSessionDelta: (frame: SessionDeltaFrame) => void;
 };
+
+export type SubmitTurn = (request: TurnRequest) => Promise<string | undefined>;
+export type SubmitTurnToSession = (
+  sessionId: string,
+  request: TurnRequest,
+) => Promise<string | undefined>;
+export type PrepareModels = () => void;
 
 export type ProjectAgentsState = {
   projectId?: string;
@@ -395,15 +405,18 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [],
   );
 
-  const prepareDraft = useCallback(() => {
-    reloadDraftProjects();
-
+  const prepareModels = useCallback<PrepareModels>(() => {
     void fetchProvidersSnapshot()
       .then((snapshot) => apply((current) => applyProviders(current, snapshot.providers)))
       .catch((cause: unknown) =>
         onDiagnostic(`the providers could not be read: ${reasonOf(cause)}`),
       );
-  }, [apply, onDiagnostic, reloadDraftProjects]);
+  }, [apply, onDiagnostic]);
+
+  const prepareDraft = useCallback(() => {
+    reloadDraftProjects();
+    prepareModels();
+  }, [prepareModels, reloadDraftProjects]);
 
   const loadModels = useCallback(
     (providerId: string) => {
@@ -445,54 +458,61 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     [onDiagnostic],
   );
 
-  const submitTurnToSession = useCallback(
-    (id: string, text: string) => {
+  const submitTurnToSession = useCallback<SubmitTurnToSession>(
+    async (id, request) => {
       // Маршрут применится отдельным React-рендером, а ответ POST может прийти раньше. Открываем
       // адресный state синхронно, чтобы queued/refused outcome не потерялся на прежней сессии.
       apply((current) => openSession(current, id));
 
-      void submitTurnRequest(id, { text })
-        .then((outcome) => {
-          if (outcome.kind === "refused") {
-            onDiagnostic(`the turn was refused: ${outcome.reason}`);
-            apply((current) => applyTurnFailure(current, id, outcome.reason));
+      let outcome;
+      try {
+        outcome = await submitTurnRequest(id, request);
+      } catch (cause: unknown) {
+        const reason = reasonOf(cause);
 
-            return;
-          }
+        onDiagnostic(`the turn could not be submitted: ${reason}`);
+        apply((current) => applyTurnFailure(current, id, reason));
 
-          // Текст показывается сразу — но только у турна, вставшего в очередь: он не даёт ни одной
-          // дельты, и без этого реплика ждала бы конца чужого турна. У начатого турна запись уже
-          // пишется, и вторая копия реплики висела бы в ленте до самого конца работы.
-          if (outcome.accepted.phase === "queued") {
-            apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, text));
-          }
-          apply((current) =>
-            applySummary(
-              current,
-              id,
-              current.open?.summary === undefined
-                ? undefined
-                : { ...current.open.summary, phase: outcome.accepted.phase },
-            ),
-          );
-        })
-        .catch((cause: unknown) => {
-          const reason = reasonOf(cause);
+        return reason;
+      }
 
-          onDiagnostic(`the turn could not be submitted: ${reason}`);
-          apply((current) => applyTurnFailure(current, id, reason));
-        });
+      if (outcome.kind === "refused") {
+        onDiagnostic(`the turn was refused: ${outcome.reason}`);
+        apply((current) => applyTurnFailure(current, id, outcome.reason));
+
+        return outcome.reason;
+      }
+
+      // Текст показывается сразу — но только у турна, вставшего в очередь: он не даёт ни одной
+      // дельты, и без этого реплика ждала бы конца чужого турна. У начатого турна запись уже
+      // пишется, и вторая копия реплики висела бы в ленте до самого конца работы.
+      if (outcome.accepted.phase === "queued") {
+        apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, request.text));
+      }
+      apply((current) =>
+        applySummary(
+          current,
+          id,
+          current.open?.summary === undefined
+            ? undefined
+            : { ...current.open.summary, phase: outcome.accepted.phase },
+        ),
+      );
+
+      return undefined;
     },
     [apply, onDiagnostic],
   );
 
-  const submitTurn = useCallback(
-    (text: string) => {
+  const submitTurn = useCallback<SubmitTurn>(
+    async (request) => {
       const id = latest.current.open?.id;
 
       if (id !== undefined) {
-        submitTurnToSession(id, text);
+        return submitTurnToSession(id, request);
       }
+
+      return undefined;
     },
     [submitTurnToSession],
   );
@@ -730,6 +750,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     projectAgents,
     createSession,
     prepareDraft,
+    prepareModels,
     selectProject,
     loadModels,
     submitTurn,

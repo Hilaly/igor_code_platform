@@ -23,17 +23,19 @@ import {
   Menu,
   MoreIcon,
   Notice,
-  Panel,
   Spinner,
   Text,
+  Tooltip,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { fetchFilesystemListing } from "./api.ts";
+import { shortenPath } from "./path-shorten.ts";
 import type { ProjectsState } from "./state.ts";
 
 export type ProjectsViewProps = {
+  headingLevel?: 1 | 2;
   state: ProjectsState;
   onCreate: (draft: ProjectDraft) => Promise<boolean>;
   onUpdate: (id: string, update: ProjectUpdate) => void;
@@ -49,11 +51,14 @@ export function ProjectsView(props: ProjectsViewProps) {
   const snapshot = state.snapshot;
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const headingLevel = props.headingLevel ?? 1;
 
   if (snapshot === undefined) {
     return (
       <div className="projects">
-        <Heading level={1}>{t("page.projects.title")}</Heading>
+        {headingLevel === 1 ? (
+          <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
+        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -65,7 +70,9 @@ export function ProjectsView(props: ProjectsViewProps) {
 
   return (
     <div className="projects">
-      <Heading level={1}>{t("page.projects.title")}</Heading>
+      {headingLevel === 1 ? (
+        <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
+      ) : undefined}
 
       {state.stale ? (
         <Notice tone="warning" title={t("projects.stale.title")}>
@@ -226,7 +233,8 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
   }, [pickerOpen, cwd]);
 
   return (
-    <Panel title={t("projects.new.title")}>
+    <section className="projects-new-surface" aria-label={t("projects.new.title")}>
+      <Heading level={2}>{t("projects.new.title")}</Heading>
       {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
           больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
       <Form onSubmit={submit} disabled={busy || !ready}>
@@ -296,7 +304,7 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
         confirmLabel={t("projects.folder.picker.confirm")}
         cancelLabel={t("projects.folder.picker.cancel")}
       />
-    </Panel>
+    </section>
   );
 }
 
@@ -335,6 +343,7 @@ function ProjectRow({
   const { t } = translator;
   const [dialog, setDialog] = useState<OpenDialog>(undefined);
   const [name, setName] = useState(project.name);
+  const folderTooltipId = useId();
 
   // Эфемерный проект не переименовывается, не архивируется и не удаляется
   // (docs/sessions-and-projects.md), поэтому действий у него нет ни одного — не выключенных, а
@@ -367,12 +376,20 @@ function ProjectRow({
     <>
       <ListRow
         onSelect={onOpen}
+        describedBy={onOpen === undefined ? undefined : folderTooltipId}
         actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
       >
         <div className="projects-row">
           <div className="projects-row-facts">
             <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-            <Code>{project.folder}</Code>
+            {/*
+              Длинный путь режется (`shortenPath`), а полный живёт в тултипе: папка бывает глубокой,
+              и строка без усечения растягивала бы карточку или ломалась посимвольно. Тултип снизу,
+              чтобы не перекрывать само имя проекта и пометки справа.
+            */}
+            <Tooltip id={folderTooltipId} content={project.folder} side="bottom">
+              <Code>{shortenPath(project.folder)}</Code>
+            </Tooltip>
           </div>
 
           <div className="projects-row-marks">

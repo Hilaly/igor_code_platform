@@ -101,6 +101,20 @@ it("expands projects, persists the layout, and opens a child session", () => {
   expect(onOpenSession).toHaveBeenCalledWith("0199");
 });
 
+it("toggles a project by clicking anywhere on its row", () => {
+  values.clear();
+  show();
+
+  const projectRow = screen.getByRole("treeitem", { name: "Alpha" });
+  fireEvent.click(projectRow);
+  expect(screen.getByRole("treeitem", { name: "Session A" })).toBeTruthy();
+  expect(projectRow.getAttribute("aria-expanded")).toBe("true");
+
+  fireEvent.click(projectRow);
+  expect(screen.queryByRole("treeitem", { name: "Session A" })).toBeNull();
+  expect(projectRow.getAttribute("aria-expanded")).toBe("false");
+});
+
 it("expands the selected session project on first render", () => {
   values.clear();
   show({ selectedSessionId: "0199" });

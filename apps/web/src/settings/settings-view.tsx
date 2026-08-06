@@ -8,7 +8,12 @@
  * выбранного состояния: голый `/settings` маршрутизатор заменяет на `/settings/appearance`.
  */
 
-import { Heading, List, ListRow, Text, type ScopedTranslator } from "@sovereign/ui-kit";
+import {
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsView as SettingsKitView,
+  type ScopedTranslator,
+} from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import { settingsSections, type SettingsSection } from "../router.ts";
@@ -17,9 +22,11 @@ export type SettingsViewProps = {
   /** Выбранный раздел уже канонизирован маршрутизатором и всегда записан в адресе. */
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
+  projects: ReactNode;
   appearance: ReactNode;
   providers: ReactNode;
   plugins: ReactNode;
+  detailTitle?: string;
   daemon: ReactNode;
   diagnostics: ReactNode;
   translator: ScopedTranslator;
@@ -28,9 +35,11 @@ export type SettingsViewProps = {
 export function SettingsView({
   section,
   onSectionChange,
+  projects,
   appearance,
   providers,
   plugins,
+  detailTitle,
   daemon,
   diagnostics,
   translator,
@@ -38,39 +47,46 @@ export function SettingsView({
   const { t } = translator;
 
   const content =
-    section === "appearance"
-      ? appearance
-      : section === "providers"
-        ? providers
-        : section === "plugins"
-          ? plugins
-          : section === "daemon"
-            ? daemon
-            : diagnostics;
+    section === "projects"
+      ? projects
+      : section === "appearance"
+        ? appearance
+        : section === "providers"
+          ? providers
+          : section === "plugins"
+            ? plugins
+            : section === "daemon"
+              ? daemon
+              : diagnostics;
+
+  const title = detailTitle ?? t(`settings.section.${section}`);
 
   return (
-    <div className="settings">
-      <div className="settings-layout">
-        <aside className="settings-sidebar">
-          <nav className="settings-nav" aria-label={t("settings.sections")}>
-            <List>
-              {settingsSections.map((candidate) => (
-                <ListRow
-                  key={candidate}
-                  selected={candidate === section}
-                  onSelect={() => onSectionChange(candidate)}
-                >
-                  <Text>{t(`settings.section.${candidate}`)}</Text>
-                </ListRow>
-              ))}
-            </List>
-          </nav>
-        </aside>
-        <section className="settings-content" aria-label={t(`settings.section.${section}`)}>
-          <Heading level={1}>{t(`settings.section.${section}`)}</Heading>
-          <div className="settings-content-body">{content}</div>
-        </section>
-      </div>
-    </div>
+    <SettingsKitView
+      navigationLabel={t("settings.sections")}
+      context={t("settings.context.title")}
+      navigation={
+        <>
+          {settingsSections.map((candidate) => (
+            <SettingsNavigationItem
+              key={candidate}
+              selected={candidate === section}
+              onSelect={() => onSectionChange(candidate)}
+            >
+              {t(`settings.section.${candidate}`)}
+            </SettingsNavigationItem>
+          ))}
+        </>
+      }
+    >
+      <SettingsPage
+        title={title}
+        description={
+          detailTitle === undefined ? t(`settings.section.description.${section}`) : undefined
+        }
+      >
+        {content}
+      </SettingsPage>
+    </SettingsKitView>
   );
 }

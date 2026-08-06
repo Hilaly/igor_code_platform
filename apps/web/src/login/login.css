@@ -25,3 +25,11 @@
   flex-direction: column;
   gap: var(--sovereign-space-2);
 }
+
+/*
+ * Бренд-блок над заголовком формы. Вид знака и типографика названия — из китового `BrandLockup`;
+ * здесь только отступ до следующего поля, чтобы блок не прилипал к заголовку.
+ */
+.login-brand {
+  margin-block-end: var(--sovereign-space-2);
+}

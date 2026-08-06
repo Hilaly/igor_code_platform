@@ -6,84 +6,129 @@
  * оболочки вокруг неё не имеет — как и `sessions.css` рядом.
  */
 
-.settings {
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-  container-type: inline-size;
-}
-
-.settings-layout {
-  display: grid;
-  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-}
-
-.settings-sidebar,
-.settings-content {
+.plugins,
+.plugin-detail {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-3);
   min-width: 0;
-  min-height: 0;
 }
 
-.settings-sidebar {
-  padding-inline-end: var(--sovereign-space-4);
-  border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  overflow-y: auto;
+.plugins > ul {
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.settings-content {
-  padding-inline-start: var(--sovereign-space-5);
-}
-
-.settings-nav {
-  min-height: 0;
-}
-
-.settings-nav > ul > li {
+.plugins-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--sovereign-space-3);
   min-height: var(--sovereign-row-height-compact);
+  padding: var(--sovereign-space-2) 0;
 }
 
-.settings-content-body {
+.plugins-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.plugins-row-main h2 {
+  margin: 0;
+}
+
+.plugin-detail-back {
+  align-self: flex-start;
+}
+
+.plugin-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  padding-block: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  gap: var(--sovereign-space-3);
+}
+
+.plugin-detail-surface,
+.project-detail-surface {
+  padding-block: var(--sovereign-space-3);
+  border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-section h3 {
+  margin: 0;
+}
+
+.plugin-detail-facts {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-fact {
+  flex: 1 1 45%;
+  flex-direction: column;
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding: var(--sovereign-space-2) 0;
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-fact > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.plugin-detail-contribution {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto minmax(12rem, auto);
+  align-items: center;
+  gap: var(--sovereign-space-2);
   width: 100%;
-  max-width: 52rem;
-  min-height: 0;
-  overflow-y: auto;
+  min-width: 0;
+}
+
+.plugin-detail-contribution-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
 }
 
 @container (width < 40rem) {
-  .settings-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+  .plugins-row,
+  .plugin-detail-contribution {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .settings-sidebar {
-    padding-inline-end: 0;
-    padding-block-end: var(--sovereign-space-3);
-    border-inline-end: none;
-    border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-    overflow-y: visible;
-  }
-
-  .settings-nav {
-    min-width: 0;
-    overflow-x: auto;
-  }
-
-  /* Прямой ребёнок — китовый `List`. Правило меняет только предметную геометрию и не зависит от
-     хешированного имени класса UI kit. */
-  .settings-nav > ul {
-    flex-direction: row;
-    width: max-content;
-  }
-
-  .settings-content {
-    padding-block-start: var(--sovereign-space-4);
-    padding-inline-start: 0;
+  .plugins-row > :nth-child(2),
+  .plugins-row > :nth-child(3),
+  .plugin-detail-contribution-meta,
+  .plugin-detail-contribution details {
+    grid-column: 1 / -1;
   }
 }
 
@@ -93,27 +138,13 @@
   flex-direction: column;
 }
 
-.settings-appearance > * + *,
-.settings-daemon > * + * {
-  padding-block-start: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+.settings-appearance-buttons {
+  justify-content: flex-start;
 }
 
-.settings-daemon-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-2);
-}
-
-.settings-appearance-choice,
 .settings-appearance-buttons {
   display: flex;
   gap: var(--sovereign-space-2);
-}
-
-.settings-appearance-choice {
-  flex-direction: column;
 }
 
 .settings-appearance-buttons {

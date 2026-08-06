@@ -241,6 +241,16 @@ export function SidebarProjects(props: SidebarProjectsProps) {
           })
         }
         onSelect={(node) => {
+          if (node.id.startsWith("project:")) {
+            const projectNodeId = node.id;
+            const nextExpanded = expanded.includes(projectNodeId.slice("project:".length))
+              ? expanded.filter((id) => `project:${id}` !== projectNodeId)
+              : [...expanded, projectNodeId.slice("project:".length)];
+            setExpanded(nextExpanded);
+            props.storage.setItem(expandedProjectsKey, JSON.stringify(nextExpanded));
+            return;
+          }
+
           if (!node.id.startsWith("session:")) return;
           const sessionId = node.id.slice("session:".length);
           const session = props.sessions?.find(({ id }) => id === sessionId);

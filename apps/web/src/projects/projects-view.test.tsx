@@ -105,6 +105,12 @@ const openNewProject = (): void => {
 };
 
 describe("ProjectsView", () => {
+  it("leaves the section heading to settings when embedded", () => {
+    show(withProjects([]), { headingLevel: 2 });
+
+    expect(screen.queryByRole("heading", { name: "Проекты" })).toBeNull();
+  });
+
   it("exposes active projects as one named list with separate row actions", () => {
     show(withProjects([project("alpha", { name: "Alpha" }), project("beta", { name: "Beta" })]));
 
@@ -150,9 +156,7 @@ describe("ProjectsView", () => {
     // а эфемерный проект не переименовывается никогда (docs/sessions-and-projects.md).
     show(withProjects([work, project("a")]));
 
-    expect(
-      within(rowOf("Работа без проекта")).queryByRole("button", { name: /Действия/ }),
-    ).toBeNull();
+    expect(within(rowOf("Быстрая работа")).queryByRole("button", { name: /Действия/ })).toBeNull();
     expect(within(rowOf("a")).getByRole("button", { name: /Действия/ })).toBeDefined();
   });
 
@@ -434,6 +438,35 @@ describe("ProjectsView", () => {
     fireEvent.click(within(rowOf("Alpha")).getAllByRole("button")[0]!);
 
     expect(onOpen).toHaveBeenCalledWith("alpha");
+  });
+
+  it("truncates a long folder path but keeps the full one in the tooltip", () => {
+    // Длинный путь режется до хвоста в самом `<code>`, а полный живёт в тултипе — иначе карточка
+    // растягивалась или путь ломался посимвольно. Тултип всегда в DOM (CSS-only, показывается
+    // наведением), поэтому полный путь там и проверяется.
+    const deep = "/Users/me/repos/sovereign_platform_node/apps/daemon";
+    show(withProjects([project("alpha", { name: "Alpha", folder: deep })]));
+
+    const row = rowOf("Alpha");
+
+    // Видимый путь — сокращённый: средние компоненты свернуты в `…`.
+    expect(within(row).getByText("/…/sovereign_platform_node/apps/daemon").tagName).toBe("CODE");
+    // Полный путь — в тултипе, привязанном к строке.
+    const tooltip = within(row).getByRole("tooltip", { name: deep });
+    const select = within(row).getAllByRole("button")[0]!;
+    expect(select.getAttribute("aria-describedby")).toBe(tooltip.id);
+  });
+
+  it("shows a short folder path whole, with the same path repeated in the tooltip", () => {
+    show(withProjects([project("alpha", { name: "Alpha", folder: "/code/alpha" })]));
+
+    const row = rowOf("Alpha");
+
+    // Короткий путь показывается целиком как видимый `<code>`, и он же повторяется в тултипе —
+    // поведение едино для длинных и коротких путей, особый случай тут не нужен.
+    expect(within(row).getByRole("tooltip", { name: "/code/alpha" })).toBeDefined();
+    const code = row.querySelector("code");
+    expect(code?.textContent).toBe("/code/alpha");
   });
 
   it("puts the archived projects behind a disclosure, out of the working list", () => {

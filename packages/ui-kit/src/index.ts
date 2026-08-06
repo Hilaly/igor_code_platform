@@ -16,6 +16,7 @@
 
 export * from "./components/accordion.tsx";
 export * from "./components/badge.tsx";
+export * from "./components/brand-lockup.tsx";
 export * from "./components/breadcrumbs.tsx";
 export * from "./components/button.tsx";
 export * from "./components/code.tsx";
@@ -44,6 +45,7 @@ export * from "./components/raised-surface.tsx";
 export * from "./components/segmented-control.tsx";
 export * from "./components/select.tsx";
 export * from "./components/skeleton.tsx";
+export * from "./components/settings-frame.tsx";
 export * from "./components/slider.tsx";
 export * from "./components/state.tsx";
 export * from "./components/status-dot.tsx";
@@ -55,6 +57,7 @@ export * from "./components/toggle.tsx";
 export * from "./components/tool-call.tsx";
 export * from "./components/tooltip.tsx";
 export * from "./components/tree.tsx";
+export * from "./components/view-header.tsx";
 export * from "./i18n/catalog.ts";
 export * from "./i18n/messages/en.ts";
 export * from "./i18n/messages/ru.ts";

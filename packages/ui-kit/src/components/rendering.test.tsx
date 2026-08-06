@@ -11,7 +11,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { ViewHeader } from "../index.ts";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
+import { BrandLockup } from "./brand-lockup.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { FilePicker } from "./file-picker.tsx";
@@ -19,6 +21,7 @@ import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
 import {
   AddIcon,
+  BrandMark,
   ClearLabelIcon,
   CopyIcon,
   ForkBeforeIcon,
@@ -37,10 +40,100 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import {
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsRow,
+  SettingsView,
+} from "./settings-frame.tsx";
+import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("renders the compact settings view, selected navigation, page, and property row", () => {
+    const markup = renderToStaticMarkup(
+      <SettingsView
+        context="Settings"
+        navigationLabel="Settings sections"
+        navigation={
+          <>
+            <SettingsNavigationItem selected onSelect={() => {}}>
+              Appearance
+            </SettingsNavigationItem>
+            <SettingsNavigationItem selected={false} onSelect={() => {}}>
+              Providers
+            </SettingsNavigationItem>
+          </>
+        }
+      >
+        <SettingsPage title="Appearance" description="Make Sovereign comfortable.">
+          <SettingsRow label="Colour scheme" description="Changes colour, not geometry">
+            <button type="button">Imperium</button>
+          </SettingsRow>
+        </SettingsPage>
+      </SettingsView>,
+    );
+
+    expect(markup).toContain("Settings");
+    expect(markup).toContain('aria-label="Settings sections"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toContain("Appearance");
+    expect(markup).toContain("Make Sovereign comfortable.");
+    expect(markup).toContain("Colour scheme");
+    expect(markup).toContain("Changes colour, not geometry");
+    expect(markup).toContain('role="group"');
+    expect(markup).toContain('aria-label="Colour scheme"');
+    expect(markup).toContain("Imperium");
+    expect(markup).not.toContain("Sovereign · Settings");
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("keeps a Select visually compact when its accessible label comes from a Settings row", () => {
+    const markup = renderToStaticMarkup(
+      <Select
+        label=""
+        ariaLabel="Colour scheme"
+        value="imperium"
+        options={[{ value: "imperium", label: "Imperium" }]}
+        onChange={() => {}}
+        placeholder="Choose"
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Colour scheme"');
+    expect(markup).not.toContain(">Colour scheme<");
+  });
+
+  it("renders a container header with a heading and optional actions", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader title="Новая сессия" level={2} actions={<button>Дерево</button>} />,
+    );
+
+    expect(markup).toContain("<header");
+    expect(markup).toContain("<h2");
+    expect(markup).toContain("Новая сессия");
+    expect(markup).toContain("Дерево");
+  });
+
+  it("keeps the action group bounded by the header container", () => {
+    const markup = renderToStaticMarkup(
+      <ViewHeader
+        title="Системный журнал"
+        actions={
+          <>
+            <button type="button">Обновить</button>
+            <button type="button">Экспорт</button>
+          </>
+        }
+      />,
+    );
+
+    expect(markup).toMatch(/<div class="[^"]*actions[^"]*"[^>]*>/);
+    expect(markup.match(/<button/g)).toHaveLength(2);
+  });
+
   it("renders the shared action icons as decorative symbols on the UI-kit size grid", () => {
     const markup = renderToStaticMarkup(
       <>
@@ -60,6 +153,38 @@ describe("markup of the ported primitives", () => {
 
     expect(markup.match(/<svg/g)).toHaveLength(11);
     expect(markup).toContain('aria-hidden="true"');
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("renders the brand mark as a decorative symbol that follows the accent colour", () => {
+    // Без `label` знак декоративный: `aria-hidden`, `role="img"` не ставится — продукт объявляется
+    // названием рядом, а не самим знаком. Цвет берётся через `currentColor` (stroke), своя палитра
+    // у монограммы нет.
+    const markup = renderToStaticMarkup(<BrandMark />);
+
+    expect(markup.match(/<svg/g)).toHaveLength(1);
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain('stroke="currentColor"');
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("renders the brand mark with an accessible name when one is given", () => {
+    const markup = renderToStaticMarkup(<BrandMark label="Sovereign" />);
+
+    // Обёртка получает роль и имя — скринридер объявит продукт. Внутренний SVG при этом остаётся
+    // декоративным: опознание даёт обёртка, а не сам знак.
+    expect(markup).toContain('role="img"');
+    expect(markup).toContain('aria-label="Sovereign"');
+  });
+
+  it("keeps the brand lockup name accessible and only hides its mark", () => {
+    const markup = renderToStaticMarkup(<BrandLockup name="Sovereign" />);
+
+    expect(markup).toMatch(/^<div class="[^"]+"><span[^>]*aria-hidden="true"/);
+    expect(markup).not.toMatch(/^<div[^>]*aria-hidden/);
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain(">Sovereign<");
+    expect(markup).toContain('stroke="currentColor"');
     expect(markup).not.toContain("undefined");
   });
 
@@ -464,6 +589,23 @@ describe("text that is still arriving", () => {
 });
 
 describe("feed of messages", () => {
+  it("keeps caller slots inside the same live log", () => {
+    const markup = renderToStaticMarkup(
+      <MessageFeed
+        label="Переписка"
+        className="chat-scroll-root"
+        before={<span>до истории</span>}
+        after={<span>после истории</span>}
+      >
+        <Message role="human">история</Message>
+      </MessageFeed>,
+    );
+
+    expect(markup).toMatch(
+      /<div[^>]*class="[^"]*chat-scroll-root[^"]*"[^>]*role="log"[^>]*>[\s\S]*до истории[\s\S]*история[\s\S]*после истории[\s\S]*<\/div>/,
+    );
+  });
+
   it("is a live log with a name of its own", () => {
     const markup = renderToStaticMarkup(
       <MessageFeed label="Переписка" busy>

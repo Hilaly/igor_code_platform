@@ -40,6 +40,7 @@ import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
+import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { ProjectDetailView } from "./projects/project-detail-view.tsx";
@@ -277,7 +278,7 @@ export function App() {
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
   const fileResources = useFileResources(
-    page.kind === "project" ? page.projectId : undefined,
+    page.kind === "settings-project" ? page.projectId : undefined,
     bus,
     stream,
     diagnostics.record,
@@ -434,6 +435,7 @@ export function App() {
     <Shell
       layout={layout}
       onLayoutChange={setLayout}
+      contentMode={page.kind === "session" ? "contained" : "page"}
       labels={{
         left: translator.t("panel.left"),
         right: translator.t("panel.right"),
@@ -499,43 +501,14 @@ export function App() {
         />
       }
       tabs={[]}
-      rightUnavailable={page.kind === "settings"}
+      rightUnavailable={
+        page.kind === "settings" ||
+        page.kind === "settings-project" ||
+        page.kind === "settings-plugin"
+      }
     >
       <PageView
         page={page}
-        projects={
-          <ProjectsView
-            state={projects.state}
-            onCreate={projects.create}
-            onUpdate={projects.update}
-            onRemove={projects.remove}
-            onDismissComplaints={projects.dismissComplaints}
-            onOpen={(id) => navigation.navigate({ kind: "project", projectId: id })}
-            translator={translator}
-          />
-        }
-        project={
-          <ProjectDetailView
-            project={
-              projects.state.snapshot === undefined
-                ? undefined
-                : [...projects.state.snapshot.projects, ...projects.state.snapshot.archived].find(
-                    ({ id }) => id === (page.kind === "project" ? page.projectId : ""),
-                  )
-            }
-            loaded={projects.state.snapshot !== undefined}
-            failure={projects.state.failure}
-            fileResources={<FileResourcesPanel state={fileResources} translator={translator} />}
-            onBack={() => navigation.navigate({ kind: "projects" })}
-            onNewSession={() => {
-              if (page.kind === "project") {
-                setDraftProjectId(page.projectId);
-              }
-              navigation.navigate({ kind: "new-session" });
-            }}
-            translator={translator}
-          />
-        }
         session={
           <SessionRouteView
             sessionId={page.kind === "session" ? page.sessionId : ""}
@@ -545,8 +518,13 @@ export function App() {
             {sessions.state.open === undefined ? null : (
               <ChatView
                 open={sessions.state.open}
+                providers={sessions.state.providers}
+                models={sessions.state.models}
+                onPrepareModels={sessions.prepareModels}
+                onLoadModels={sessions.loadModels}
                 onSubmit={sessions.submitTurn}
                 onSendMessage={sessions.sendMessage}
+                onDiagnostic={diagnostics.record}
                 onInterrupt={sessions.interrupt}
                 onFork={async (request) => {
                   const outcome = await sessions.forkSession(request);
@@ -669,8 +647,68 @@ export function App() {
         }
         settings={
           <SettingsView
-            section={page.kind === "settings" ? page.section : "appearance"}
+            section={
+              page.kind === "settings-plugin"
+                ? "plugins"
+                : page.kind === "settings-project"
+                  ? "projects"
+                  : page.kind === "settings"
+                    ? page.section
+                    : "appearance"
+            }
+            detailTitle={
+              page.kind === "settings-plugin"
+                ? (plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
+                    ?.id ?? page.pluginKey)
+                : page.kind === "settings-project"
+                  ? projects.state.snapshot === undefined
+                    ? page.projectId
+                    : ([
+                        ...projects.state.snapshot.projects,
+                        ...projects.state.snapshot.archived,
+                      ].find(({ id }) => id === page.projectId)?.name ?? page.projectId)
+                  : undefined
+            }
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
+            projects={
+              page.kind === "settings-project" ? (
+                <ProjectDetailView
+                  project={
+                    projects.state.snapshot === undefined
+                      ? undefined
+                      : [
+                          ...projects.state.snapshot.projects,
+                          ...projects.state.snapshot.archived,
+                        ].find(({ id }) => id === page.projectId)
+                  }
+                  loaded={projects.state.snapshot !== undefined}
+                  headingLevel={2}
+                  failure={projects.state.failure}
+                  fileResources={
+                    <FileResourcesPanel state={fileResources} translator={translator} />
+                  }
+                  onBack={() => navigation.navigate({ kind: "settings", section: "projects" })}
+                  onNewSession={() => {
+                    setDraftProjectId(page.projectId);
+                    navigation.navigate({ kind: "new-session" });
+                  }}
+                  translator={translator}
+                />
+              ) : (
+                <ProjectsView
+                  headingLevel={2}
+                  state={projects.state}
+                  onCreate={projects.create}
+                  onUpdate={projects.update}
+                  onRemove={projects.remove}
+                  onDismissComplaints={projects.dismissComplaints}
+                  onOpen={(projectId) =>
+                    navigation.navigate({ kind: "settings-project", projectId })
+                  }
+                  translator={translator}
+                />
+              )
+            }
             appearance={
               <AppearanceSection
                 preferences={preferences}
@@ -721,12 +759,26 @@ export function App() {
               />
             }
             plugins={
-              <PluginsView
-                headingLevel={2}
-                state={plugins.state}
-                onSwitch={plugins.switchPlugin}
-                translator={translator}
-              />
+              page.kind === "settings-plugin" ? (
+                <PluginDetailView
+                  headingLevel={2}
+                  state={plugins.state}
+                  pluginKey={page.pluginKey}
+                  onBack={() => navigation.navigate({ kind: "settings", section: "plugins" })}
+                  onSwitch={plugins.switchPlugin}
+                  translator={translator}
+                />
+              ) : (
+                <PluginsView
+                  headingLevel={2}
+                  state={plugins.state}
+                  onSwitch={plugins.switchPlugin}
+                  onOpen={(pluginKey) =>
+                    navigation.navigate({ kind: "settings-plugin", pluginKey })
+                  }
+                  translator={translator}
+                />
+              )
             }
             daemon={
               <DaemonSection

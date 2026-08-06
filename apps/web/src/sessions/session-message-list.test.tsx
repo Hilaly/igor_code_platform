@@ -3,6 +3,7 @@
 import type { SessionEntry, SessionForkRequest } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionMessageList } from "./session-message-list.tsx";
@@ -66,6 +67,9 @@ const show = (
     onSetLabel?: (entryId: string, label: string | null) => Promise<string | undefined>;
     labelRefusal?: string;
     onLabelRefusalChange?: (reason: string | undefined) => void;
+    className?: string;
+    before?: ReactNode;
+    after?: ReactNode;
   } = {},
 ) =>
   render(
@@ -78,10 +82,44 @@ const show = (
       labelRefusal={options.labelRefusal}
       onLabelRefusalChange={options.onLabelRefusalChange ?? vi.fn()}
       translator={translator}
+      className={options.className}
+      before={options.before}
+      after={options.after}
     />,
   );
 
 describe("the session message list", () => {
+  it("keeps its slots, loading, and empty state inside its single log", () => {
+    const view = show(openSession(), {
+      className: "sessions-chat-scroll",
+      before: <span>до истории</span>,
+      after: <span>после истории</span>,
+    });
+    const log = screen.getByRole("log", { name: "Переписка" });
+
+    expect(log.classList.contains("sessions-chat-scroll")).toBe(true);
+    expect(within(log).getByText("до истории")).toBeDefined();
+    expect(within(log).getByText("Пока ничего не сказано")).toBeDefined();
+    expect(within(log).getByText("после истории")).toBeDefined();
+
+    view.rerender(
+      <SessionMessageList
+        open={openSession({ loading: true })}
+        busy={false}
+        archived={false}
+        onFork={vi.fn()}
+        onSetLabel={vi.fn()}
+        labelRefusal={undefined}
+        onLabelRefusalChange={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("log", { name: "Переписка" })).getByText("Загрузка…"),
+    ).toBeDefined();
+  });
+
   it("renders persisted entries, pending turns, and live items in that order", () => {
     const persisted = message("m1", "сохранённая реплика");
 
