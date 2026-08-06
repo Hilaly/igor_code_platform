@@ -439,7 +439,11 @@ describe("the session message composer", () => {
     const view = render(<ComposerHarness reasoningSupported={false} />);
 
     const thinking = screen.getByRole("button", { name: /anthropic\/claude.*выключены/i });
-    expect(thinking.getAttribute("aria-disabled")).toBe("true");
+    expect(thinking.getAttribute("aria-disabled")).toBe("false");
+    fireEvent.click(thinking);
+    expect(
+      screen.getByRole("menuitem", { name: /Уровень рассуждений/ }).getAttribute("aria-disabled"),
+    ).toBe("true");
     await waitFor(() =>
       expect(screen.getByRole("status", { name: "Выбранный уровень" }).textContent).toBe("off"),
     );

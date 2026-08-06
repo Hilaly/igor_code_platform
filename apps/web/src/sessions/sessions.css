@@ -160,6 +160,29 @@
   justify-content: flex-end;
   gap: var(--sovereign-space-1);
   min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.sessions-composer-actions > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sessions-composer-actions button {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container (width <= 40rem) {
+  .sessions-composer-toolbar {
+    align-items: flex-start;
+  }
+
+  .sessions-composer-actions {
+    flex: 0 1 auto;
+    justify-content: flex-start;
+  }
 }
 
 /*

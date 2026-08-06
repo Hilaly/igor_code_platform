@@ -154,6 +154,20 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/\.sessions-composer-surface\s*\{[^}]*overflow(?:-y)?\s*:/s);
   });
 
+  it("keeps the compact action group within the composer on narrow containers", () => {
+    const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
+
+    expect(sessions).toMatch(
+      /\.sessions-composer-actions\s*\{[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/s,
+    );
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<=\s*40rem\)\s*\{[\s\S]*\.sessions-composer-actions\s*\{[^}]*flex:\s*0\s+1\s+auto;/s,
+    );
+    expect(sessions).not.toMatch(
+      /\.sessions-composer-actions\s*\{[^}]*overflow(?:-x|-y)?\s*:\s*(?:auto|scroll|hidden)/s,
+    );
+  });
+
   it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 

@@ -141,17 +141,17 @@ describe("the NextTurnPicker", () => {
     const modelRow = screen.getByRole("menuitem", { name: /Модель/ });
     const rowRoot = modelRow.parentElement!;
     vi.spyOn(modelRow, "getBoundingClientRect").mockReturnValue({
-      x: 80,
+      x: 680,
       y: 0,
       width: 20,
       height: 20,
       top: 0,
-      right: 100,
+      right: 700,
       bottom: 20,
-      left: 80,
+      left: 680,
       toJSON: () => ({}),
     });
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 700 });
     const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!;
     vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
       x: 0,
@@ -168,7 +168,7 @@ describe("the NextTurnPicker", () => {
     await waitFor(() => {
       expect(nested.getAttribute("data-side")).toBe("left");
       expect(nested.style.position).toBe("fixed");
-      expect(Number.parseFloat(nested.style.left)).toBe(12);
+      expect(Number.parseFloat(nested.style.left)).toBe(612);
     });
 
     fireEvent.pointerDown(document.body);
@@ -386,6 +386,63 @@ describe("the NextTurnPicker", () => {
     expect(onExpand).toHaveBeenCalledWith("google");
   });
 
+  it("preserves expanded provider groups after closing and reopening the model submenu", () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
+    expect(screen.getByRole("treeitem", { name: "Google" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    expect(screen.getByRole("treeitem", { name: "Google" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("places a nested submenu below its parent on a narrow viewport", async () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    const row = screen.getByRole("menuitem", { name: /Модель/ });
+    vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
+      x: 12,
+      y: 40,
+      width: 180,
+      height: 32,
+      top: 40,
+      right: 192,
+      bottom: 72,
+      left: 12,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 500 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!;
+    vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 180,
+      top: 0,
+      right: 300,
+      bottom: 180,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => {
+      expect(nested.getAttribute("data-side")).toBe("bottom");
+      expect(Number.parseFloat(nested.style.top)).toBeGreaterThanOrEqual(72);
+      expect(Number.parseFloat(nested.style.left)).toBeGreaterThanOrEqual(8);
+    });
+  });
+
   it("opens reasoning submenu, changes level, and closes the cascade", () => {
     const onChange = vi.fn();
     render(<Harness onThinkingLevelChange={onChange} />);
@@ -398,8 +455,11 @@ describe("the NextTurnPicker", () => {
 
   it("forces off and disables reasoning when the selected model does not support it", () => {
     render(<Harness reasoningSupported={false} thinkingLevel="high" />);
-    expect(screen.getByRole("button", { name: /выкл/i }).getAttribute("aria-disabled")).toBe(
-      "true",
-    );
+    const trigger = screen.getByRole("button", { name: /выкл/i });
+    expect(trigger.getAttribute("aria-disabled")).toBe("false");
+    fireEvent.click(trigger);
+    expect(
+      screen.getByRole("menuitem", { name: /Уровень рассуждений/ }).getAttribute("aria-disabled"),
+    ).toBe("true");
   });
 });

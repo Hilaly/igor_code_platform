@@ -289,8 +289,12 @@ describe("the session chat view", () => {
         screen
           .getByRole("button", { name: /anthropic\/claude.*выключены/i })
           .getAttribute("aria-disabled"),
-      ).toBe("true"),
+      ).toBe("false"),
     );
+    fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*выключены/i }));
+    expect(
+      screen.getByRole("menuitem", { name: /Уровень рассуждений/ }).getAttribute("aria-disabled"),
+    ).toBe("true");
 
     view.rerender(<ChatView {...view.props} models={{}} />);
     expect(screen.getByRole("button", { name: /\/.*·/i }).getAttribute("aria-disabled")).toBe(

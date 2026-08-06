@@ -68,7 +68,6 @@ export type ModelPickerMenuProps = {
   onChange: (value: string) => void;
   onExpandGroup?: (groupId: string) => void;
   label: string;
-  placeholder: string;
   emptyText: string;
   disabled?: boolean;
   expandedGroups?: ReadonlySet<string>;
@@ -188,7 +187,6 @@ export function ModelPicker({
             onChange={onChange}
             onExpandGroup={onExpandGroup}
             label={label}
-            placeholder={placeholder}
             emptyText={emptyText}
             disabled={disabled}
             expandedGroups={expandedGroups}

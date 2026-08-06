@@ -43,6 +43,9 @@ export function NextTurnPicker({
   const [outerOpen, setOuterOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [expandedModelGroups, setExpandedModelGroups] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const reasoningMenuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -116,7 +119,7 @@ export function NextTurnPicker({
             aria-haspopup="menu"
             aria-expanded={outerOpen}
             aria-controls={outerOpen ? contentId : undefined}
-            aria-disabled={disabled || !reasoningSupported}
+            aria-disabled={disabled}
             disabled={disabled}
             onClick={toggle}
           >
@@ -131,6 +134,7 @@ export function NextTurnPicker({
       <Popover
         side="right"
         viewportSafe
+        narrowBelow
         open={modelOpen}
         onOpenChange={(open) => {
           setModelOpen(open);
@@ -166,15 +170,17 @@ export function NextTurnPicker({
           }}
           onExpandGroup={onExpandModelGroup}
           label={modelLabel}
-          placeholder={placeholder}
           emptyText={emptyText}
           disabled={disabled}
+          expandedGroups={expandedModelGroups}
+          onExpandedGroupsChange={setExpandedModelGroups}
         />
       </Popover>
 
       <Popover
         side="right"
         viewportSafe
+        narrowBelow
         open={reasoningOpen}
         onOpenChange={(open) => {
           if (!reasoningSupported) return;

@@ -84,7 +84,6 @@ describe("the ModelPicker", () => {
         onChange={vi.fn()}
         onExpandGroup={vi.fn()}
         label="Модель"
-        placeholder="Выберите модель"
         emptyText="Моделей нет"
       />,
     );

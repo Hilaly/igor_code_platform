@@ -20,6 +20,7 @@ export type PopoverProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   viewportSafe?: boolean;
+  narrowBelow?: boolean;
 };
 
 export function Popover({
@@ -34,6 +35,7 @@ export function Popover({
   open: controlledOpen,
   onOpenChange,
   viewportSafe = false,
+  narrowBelow = false,
 }: PopoverProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
@@ -76,18 +78,28 @@ export function Popover({
       content.style.maxWidth = `${width}px`;
       content.style.maxHeight = `${height}px`;
       const nextSide =
-        side === "right" && roomRight < width && roomLeft >= width
-          ? "left"
-          : side === "left" && roomLeft < width && roomRight >= width
-            ? "right"
-            : side;
-      const preferredLeft =
-        nextSide === "left" ? triggerRect.left - gap - width : triggerRect.right + gap;
+        narrowBelow && window.innerWidth <= 640 && (side === "right" || side === "left")
+          ? "bottom"
+          : side === "right" && roomRight < width && roomLeft >= width
+            ? "left"
+            : side === "left" && roomLeft < width && roomRight >= width
+              ? "right"
+              : side;
+      const belowFallback = nextSide === "bottom" && side !== "bottom";
+      const preferredLeft = belowFallback
+        ? triggerRect.left
+        : nextSide === "left"
+          ? triggerRect.left - gap - width
+          : triggerRect.right + gap;
       const horizontalLeft = Math.max(
         gap,
         Math.min(preferredLeft, window.innerWidth - width - gap),
       );
-      const preferredTop = nextSide === "top" ? triggerRect.top - height - gap : triggerRect.top;
+      const preferredTop = belowFallback
+        ? triggerRect.bottom + gap
+        : nextSide === "top"
+          ? triggerRect.top - height - gap
+          : triggerRect.top;
       const top = Math.max(gap, Math.min(preferredTop, window.innerHeight - height - gap));
       setViewportStyle({
         position: "fixed",
@@ -100,7 +112,7 @@ export function Popover({
     resolveSide();
     window.addEventListener("resize", resolveSide);
     return () => window.removeEventListener("resize", resolveSide);
-  }, [contentRole, open, side, viewportSafe]);
+  }, [contentRole, narrowBelow, open, side, viewportSafe]);
 
   useEffect(() => {
     if (!open) return;
