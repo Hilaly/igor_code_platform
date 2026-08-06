@@ -21,6 +21,7 @@ import { Form } from "./form.tsx";
 import { Input, Textarea } from "./input.tsx";
 import {
   AddIcon,
+  AppendIcon,
   BrandMark,
   ClearLabelIcon,
   CopyIcon,
@@ -32,6 +33,8 @@ import {
   PanelRightCloseIcon,
   PanelRightOpenIcon,
   SetLabelIcon,
+  SendIcon,
+  StopIcon,
 } from "./icons.tsx";
 import { Markdown } from "./markdown.tsx";
 import { Menu } from "./menu.tsx";
@@ -199,6 +202,20 @@ describe("markup of the ported primitives", () => {
     );
 
     expect(markup.match(/<svg/g)).toHaveLength(11);
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).not.toContain("undefined");
+  });
+
+  it("renders composer action icons on the shared UI-kit size grid", () => {
+    const markup = renderToStaticMarkup(
+      <>
+        <SendIcon size="sm" />
+        <AppendIcon />
+        <StopIcon />
+      </>,
+    );
+
+    expect(markup.match(/<svg/g)).toHaveLength(3);
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).not.toContain("undefined");
   });

@@ -59,6 +59,7 @@ export const coreEnglish: CatalogRegistration = {
     "chat.mode.steer": "Right now",
     "chat.mode.steer.send": "Steer",
     "chat.model": "Model",
+    "chat.nextTurn.settings": "Next-turn settings",
     "chat.thinking": "Reasoning level",
     "chat.stats.tokens.label": "Session tokens",
     "chat.stats.cost.label": "Cost",

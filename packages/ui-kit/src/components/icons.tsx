@@ -11,6 +11,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  Send,
+  Square,
   Tag,
   TagX,
   type LucideIcon,
@@ -38,6 +40,9 @@ export const ForkThroughIcon = actionIcon(GitFork);
 export const SetLabelIcon = actionIcon(Tag);
 export const ClearLabelIcon = actionIcon(TagX);
 export const AddIcon = actionIcon(Plus);
+export const SendIcon = actionIcon(Send);
+export const AppendIcon = actionIcon(Plus);
+export const StopIcon = actionIcon(Square);
 export const MoreIcon = actionIcon(MoreHorizontal);
 export const ChevronRightIcon = actionIcon(ChevronRight);
 export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);

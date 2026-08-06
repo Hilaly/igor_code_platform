@@ -113,7 +113,11 @@ describe("the style sheets of the application", () => {
 
   it.each(sheets)("$name leaves visual-system properties to UI Kit", ({ styles }) => {
     expect(styles).not.toMatch(/\bfont-family\s*:/);
-    expect(styles).not.toMatch(/\bborder-radius\s*:/);
+    const withoutScrollbarThumbRadius = styles.replace(
+      /\.sessions-composer\s*>\s*textarea::-webkit-scrollbar-thumb\s*\{[^}]*\}/s,
+      "",
+    );
+    expect(withoutScrollbarThumbRadius).not.toMatch(/\bborder-radius\s*:/);
     expect(styles).not.toMatch(/\bbox-shadow\s*:/);
     expect(styles).not.toMatch(/(?:linear|radial|conic)-gradient\(/);
     expect(styles).not.toMatch(/\bbackdrop-filter\s*:/);
@@ -126,7 +130,42 @@ describe("the style sheets of the application", () => {
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
     expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-y:\s*auto;/s);
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-width:\s*0;/s);
-    expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0,\s*auto\)\s+auto;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-composer-toolbar\s*\{[^}]*justify-content:\s*space-between;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*>\s*textarea\s*\{[^}]*scrollbar-width:\s*thin;/s,
+    );
+    expect(sessions).not.toMatch(/\.sessions-composer(?:-surface)?\s*\{[^}]*overflow\s*:/s);
+  });
+
+  it("keeps overflow scoped to the textarea", () => {
+    const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
+
+    expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*display:\s*grid;/s);
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*>\s*textarea\s*\{[^}]*scrollbar-width:\s*thin;/s,
+    );
+    expect(sessions).toMatch(/\.sessions-composer\s*>\s*textarea::-webkit-scrollbar-thumb/);
+    expect(sessions).not.toMatch(/\.sessions-composer\s*\{[^}]*overflow(?:-y)?\s*:/s);
+    expect(sessions).not.toMatch(/\.sessions-composer-surface\s*\{[^}]*overflow(?:-y)?\s*:/s);
+  });
+
+  it("keeps the compact action group within the composer on narrow containers", () => {
+    const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
+
+    expect(sessions).toMatch(
+      /\.sessions-composer-actions\s*\{[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/s,
+    );
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<=\s*40rem\)\s*\{[\s\S]*\.sessions-composer-actions\s*\{[^}]*flex:\s*0\s+1\s+auto;/s,
+    );
+    expect(sessions).not.toMatch(
+      /\.sessions-composer-actions\s*\{[^}]*overflow(?:-x|-y)?\s*:\s*(?:auto|scroll|hidden)/s,
+    );
   });
 
   it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
@@ -196,13 +235,10 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("scopes the composer option collapse to its own container", () => {
+  it("does not retain a composer option collapse container", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
-    expect(sessions).toMatch(
-      /@container\s*\(width\s*<\s*36rem\)\s*\{[\s\S]*?\.sessions-composer-options\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
-    );
-    expect(sessions).not.toMatch(/@media\s*\(max-width:\s*36rem\)/);
+    expect(sessions).not.toMatch(/sessions-composer-options/);
   });
 
   it("opens the chat and leaves composer elevation to UI Kit", () => {

@@ -1,5 +1,4 @@
 import {
-  thinkingLevels,
   type SessionMessage,
   type SessionMessageMode,
   type ThinkingLevel,
@@ -7,12 +6,15 @@ import {
 } from "@sovereign/protocol";
 import {
   Button,
-  ModelPicker,
-  type ModelPickerGroup,
+  AppendIcon,
+  NextTurnPicker,
   RaisedSurface,
+  SendIcon,
   SegmentedControl,
-  Select,
+  StopIcon,
   Textarea,
+  Tooltip,
+  type ModelPickerGroup,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState } from "react";
@@ -199,46 +201,62 @@ export function MessageComposer({
               maxRows={12}
               disabled={disabled || submitting}
             />
-            <div className="sessions-composer-options">
-              <ModelPicker
-                side="top"
-                label={t("chat.model")}
-                groups={modelGroups}
-                value={model}
-                onChange={onModelChange}
-                onExpandGroup={onExpandModelGroup}
-                placeholder={t("common.choose")}
-                emptyText={t("state.empty")}
-              />
-              <Select
-                label={t("chat.thinking")}
-                value={reasoningSupported ? thinkingLevel : "off"}
-                onChange={(value) => onThinkingLevelChange(value as ThinkingLevel)}
-                disabled={!reasoningSupported}
-                options={thinkingLevels.map((level) => ({
-                  value: level,
-                  label: t(`thinking.${level}`),
-                }))}
-                placeholder={t("common.choose")}
-              />
+            <div className="sessions-composer-toolbar">
+              <div className="sessions-composer-future-slot" aria-hidden="true" />
+              <div className="sessions-composer-actions">
+                {!busy ? (
+                  <Tooltip content={t("chat.append")}>
+                    <Button
+                      iconOnly
+                      aria-label={t("chat.append")}
+                      onClick={append}
+                      disabled={disabled || submitting || draft.trim() === ""}
+                    >
+                      <AppendIcon />
+                    </Button>
+                  </Tooltip>
+                ) : null}
+                <Tooltip content={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}>
+                  <Button
+                    tone="accent"
+                    iconOnly
+                    aria-label={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
+                    onClick={send}
+                    disabled={disabled || submitting || draft.trim() === ""}
+                  >
+                    <SendIcon />
+                  </Button>
+                </Tooltip>
+                <NextTurnPicker
+                  model={model}
+                  modelGroups={modelGroups}
+                  onModelChange={onModelChange}
+                  onExpandModelGroup={onExpandModelGroup}
+                  thinkingLevel={thinkingLevel}
+                  reasoningSupported={reasoningSupported}
+                  onThinkingLevelChange={onThinkingLevelChange}
+                  modelLabel={t("chat.model")}
+                  reasoningLabel={t("chat.thinking")}
+                  triggerLabel={t("chat.nextTurn.settings")}
+                  placeholder={t("common.choose")}
+                  emptyText={t("state.empty")}
+                  translator={translator}
+                  disabled={disabled}
+                />
+                {busy ? (
+                  <Tooltip content={t("chat.stop")}>
+                    <Button
+                      iconOnly
+                      tone="danger"
+                      aria-label={t("chat.stop")}
+                      onClick={onInterrupt}
+                    >
+                      <StopIcon />
+                    </Button>
+                  </Tooltip>
+                ) : null}
+              </div>
             </div>
-            <Button
-              tone="accent"
-              onClick={send}
-              disabled={disabled || submitting || draft.trim() === ""}
-            >
-              {busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
-            </Button>
-            {!busy ? (
-              <Button onClick={append} disabled={disabled || submitting || draft.trim() === ""}>
-                {t("chat.append")}
-              </Button>
-            ) : undefined}
-            {busy ? (
-              <Button tone="danger" onClick={onInterrupt}>
-                {t("chat.stop")}
-              </Button>
-            ) : undefined}
           </div>
         </RaisedSurface>
       </div>

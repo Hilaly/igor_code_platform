@@ -81,9 +81,14 @@
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   border-radius: var(--sovereign-radius-md);
   box-shadow: var(--sovereign-elevation-2);
+  padding: var(--sovereign-space-1);
+}
+
+.menuBody {
+  min-width: 0;
   max-height: 16rem;
   overflow-y: auto;
-  padding: var(--sovereign-space-1);
+  outline: none;
 }
 
 .popover .dropdown[data-side="bottom"] {

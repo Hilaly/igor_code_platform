@@ -34,7 +34,13 @@ export * from "./components/list.tsx";
 export * from "./components/markdown.tsx";
 export * from "./components/menu.tsx";
 export * from "./components/message-feed.tsx";
-export * from "./components/model-picker.tsx";
+export { ModelPicker } from "./components/model-picker.tsx";
+export type {
+  ModelPickerGroup,
+  ModelPickerOption,
+  ModelPickerProps,
+} from "./components/model-picker.tsx";
+export * from "./components/next-turn-picker.tsx";
 export * from "./components/multi-select.tsx";
 export * from "./components/notice.tsx";
 export * from "./components/panel.tsx";
