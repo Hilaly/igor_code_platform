@@ -125,6 +125,9 @@ describe("the style sheets of the application", () => {
 
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
     expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-x:\s*hidden;/s);
+    expect(shell).toMatch(/\.shell-left\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(shell).toMatch(/\.shell-nav\s*\{[^}]*min-width:\s*0;/s);
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-width:\s*0;/s);
     expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*flex-wrap:\s*wrap;/s);
   });

@@ -446,7 +446,33 @@ export function App() {
         showRight: translator.t("panel.right.show"),
       }}
       navigation={
-        <div className="shell-nav">
+        <SidebarProjects
+          projects={projects.state.snapshot?.projects}
+          sessions={sessions.state.sessions}
+          projectsLoading={
+            projects.state.snapshot === undefined && projects.state.failure === undefined
+          }
+          projectsFailure={projects.state.failure}
+          sessionsLoading={
+            sessions.state.sessions === undefined && sessions.state.failure === undefined
+          }
+          sessionsFailure={sessions.state.failure}
+          selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
+          storage={localStorage}
+          onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+          onNewSession={(projectId) => {
+            setDraftProjectId(projectId);
+            navigation.navigate({ kind: "new-session" });
+          }}
+          onUpdateProject={projects.update}
+          onRemoveProject={projects.remove}
+          onUpdateSession={sessions.updateSession}
+          onRemoveSession={sessions.removeSession}
+          translator={translator}
+        />
+      }
+      navigationHeader={
+        <div className="shell-nav-header">
           <Heading level={3}>Sovereign</Heading>
           <Button
             onClick={() => {
@@ -456,32 +482,6 @@ export function App() {
           >
             + {translator.t("sessions.new")}
           </Button>
-          <div className="shell-projects">
-            <SidebarProjects
-              projects={projects.state.snapshot?.projects}
-              sessions={sessions.state.sessions}
-              projectsLoading={
-                projects.state.snapshot === undefined && projects.state.failure === undefined
-              }
-              projectsFailure={projects.state.failure}
-              sessionsLoading={
-                sessions.state.sessions === undefined && sessions.state.failure === undefined
-              }
-              sessionsFailure={sessions.state.failure}
-              selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
-              storage={localStorage}
-              onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-              onNewSession={(projectId) => {
-                setDraftProjectId(projectId);
-                navigation.navigate({ kind: "new-session" });
-              }}
-              onUpdateProject={projects.update}
-              onRemoveProject={projects.remove}
-              onUpdateSession={sessions.updateSession}
-              onRemoveSession={sessions.removeSession}
-              translator={translator}
-            />
-          </div>
         </div>
       }
       status={

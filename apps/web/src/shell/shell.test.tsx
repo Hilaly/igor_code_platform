@@ -42,6 +42,7 @@ function show(overrides: Partial<ShellProps> = {}) {
     onLayoutChange,
     labels,
     navigation: <div>навигация</div>,
+    navigationHeader: <div>шапка</div>,
     status: <div>статус демона</div>,
     tabs: [],
     children: <div>страница</div>,
@@ -192,6 +193,13 @@ describe("PanelResizer", () => {
 });
 
 describe("hiding and restoring the panels", () => {
+  it("keeps the left navigation in explicit header, project, and footer sections", () => {
+    show();
+
+    expect(screen.getByTestId("shell-left-header")).toBeTruthy();
+    expect(screen.getByTestId("shell-left-projects")).toBeTruthy();
+    expect(screen.getByTestId("shell-left-footer")).toBeTruthy();
+  });
   it("marks a contained page while preserving the page default", () => {
     const view = show();
 
