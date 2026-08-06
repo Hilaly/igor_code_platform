@@ -392,7 +392,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.public.item": "{method} {url} — {plugin}",
     "plugins.routeConflicts.title": "Маршруты не применены",
     "plugins.routeConflicts.item":
-      "{method} {path}: на адрес претендуют {contributions}, поэтому маршрут не отвечает",
+      "{method} {path}: на адрес претендуют {contributions} ({plugins}), поэтому маршрут не отвечает",
     "plugins.payloadSchema": "Схема нагрузки",
     "plugins.problems.title": "Объявлено, но не применено",
     "plugins.reason": "Причина",

@@ -20,6 +20,8 @@ export type PluginRouteConflict = {
   /** Форма нормализованного пути вклада, без `/p/<pluginId>/`; все параметрические сегменты — `:`. */
   path: string;
   contributions: string[];
+  /** Ключи источников, чтобы одинаковые id из разных project-контекстов различались. */
+  pluginKeys: string[];
 };
 
 export type PluginsSnapshot = {

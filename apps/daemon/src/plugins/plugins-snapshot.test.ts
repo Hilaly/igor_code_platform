@@ -188,6 +188,7 @@ describe("buildPluginsSnapshot", () => {
         method: "POST",
         path: "hooks/github",
         contributions: ["hello.first", "hello.second"],
+        pluginKeys: ["data:hello", "data:hello"],
       },
     ]);
     // The administrative contribution snapshot keeps both declarations so the operator can fix them;
@@ -212,6 +213,7 @@ describe("buildPluginsSnapshot", () => {
         method: "GET",
         path: "items/:",
         contributions: ["hello.by-id", "hello.by-name"],
+        pluginKeys: ["data:hello", "data:hello"],
       },
     ]);
   });

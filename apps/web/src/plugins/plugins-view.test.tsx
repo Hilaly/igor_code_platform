@@ -221,6 +221,7 @@ it("does not list a public route whose address is conflicted", () => {
         method: "POST",
         path: "hooks/github",
         contributions: ["example.first", "example.second"],
+        pluginKeys: ["data:example", "data:example"],
       },
     ],
   };
@@ -236,4 +237,50 @@ it("does not list a public route whose address is conflicted", () => {
 
   expect(screen.queryByText(/POST \/p\/example\/hooks\/github/)).toBeNull();
   expect(screen.getByText("Routes not applied")).toBeTruthy();
+});
+
+it("keeps same-id routes from different project sources distinct", () => {
+  const withSameId: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "project:p1:example",
+        pluginId: "example",
+        source: "project:p1",
+        id: "example.hook",
+        declaredId: "hook",
+        method: "POST",
+        path: "hooks/p1",
+      },
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "project:p2:example",
+        pluginId: "example",
+        source: "project:p2",
+        id: "example.hook",
+        declaredId: "hook",
+        method: "POST",
+        path: "hooks/p2",
+      },
+    ],
+  };
+
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  render(
+    <PluginsView
+      state={{ snapshot: withSameId, stale: false }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("POST /p/example/hooks/p1 — example.hook")).toBeTruthy();
+  expect(screen.getByText("POST /p/example/hooks/p2 — example.hook")).toBeTruthy();
+  expect(error).not.toHaveBeenCalledWith(expect.stringContaining("same key"));
+  error.mockRestore();
 });

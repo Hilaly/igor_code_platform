@@ -394,7 +394,8 @@ export const coreEnglish: CatalogRegistration = {
       "A public route answers without a session; the plugin authenticates incoming requests.",
     "plugins.public.item": "{method} {url} — {plugin}",
     "plugins.routeConflicts.title": "Routes not applied",
-    "plugins.routeConflicts.item": "{method} {path}: claimed by {contributions}, so none answers",
+    "plugins.routeConflicts.item":
+      "{method} {path}: claimed by {contributions} ({plugins}), so none answers",
     "plugins.payloadSchema": "Payload schema",
     "plugins.problems.title": "Declared, but not applied",
     "plugins.reason": "Reason",

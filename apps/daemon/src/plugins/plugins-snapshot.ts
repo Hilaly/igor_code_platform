@@ -71,7 +71,12 @@ export function buildPluginsSnapshot(sources: PluginsSnapshotSources): PluginsSn
 function routeConflictsOf(contributions: PluginsSnapshot["contributions"]): PluginRouteConflict[] {
   const claims = new Map<
     string,
-    { method: PluginRouteConflict["method"]; path: string; ids: string[] }
+    {
+      method: PluginRouteConflict["method"];
+      path: string;
+      ids: string[];
+      pluginKeys: string[];
+    }
   >();
 
   for (const contribution of contributions) {
@@ -90,9 +95,11 @@ function routeConflictsOf(contributions: PluginsSnapshot["contributions"]): Plug
         method: contribution.method,
         path,
         ids: [contribution.id],
+        pluginKeys: [contribution.pluginKey],
       });
     } else {
       existing.ids.push(contribution.id);
+      existing.pluginKeys.push(contribution.pluginKey);
     }
   }
 
@@ -101,7 +108,12 @@ function routeConflictsOf(contributions: PluginsSnapshot["contributions"]): Plug
     .sort((left, right) =>
       `${left.method} ${left.path}`.localeCompare(`${right.method} ${right.path}`, "en"),
     )
-    .map(({ method, path, ids }) => ({ method, path, contributions: ids }));
+    .map(({ method, path, ids, pluginKeys }) => ({
+      method,
+      path,
+      contributions: ids,
+      pluginKeys,
+    }));
 }
 
 function pathShape(path: string): string {

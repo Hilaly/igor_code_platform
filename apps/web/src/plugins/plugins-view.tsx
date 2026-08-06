@@ -117,6 +117,7 @@ export function PluginsView({
                   method: conflict.method,
                   path: conflict.path,
                   contributions: conflict.contributions.join(", "),
+                  plugins: conflict.pluginKeys.join(", "),
                 })}
               </li>
             ))}
@@ -182,7 +183,7 @@ function PublicRoutes({
       <ul className="plugins-reasons">
         {open.map((registration) =>
           registration.kind !== "public-route" ? undefined : (
-            <li key={registration.id}>
+            <li key={`${registration.pluginKey}:${registration.id}`}>
               {t("plugins.public.item", {
                 method: registration.method,
                 url: routeAddress(registration),
