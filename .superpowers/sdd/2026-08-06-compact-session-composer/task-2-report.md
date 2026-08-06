@@ -57,6 +57,27 @@ git diff --check
 
 Result: TypeScript passed, all changed files matched Prettier, and the diff had no whitespace errors.
 
+## Round 3 scoped fixes
+
+- `ModelPickerMenu` now accepts an internal `focusRef`, allowing the combined picker to focus the actual tree element that owns its keyboard handler. Regression coverage drives model expansion and selection through Arrow/Enter and verifies the controlled callback.
+- `Popover viewportSafe` now applies fixed viewport coordinates in addition to side resolution and max dimensions. Constrained tests assert fixed positioning and clamped left/top values for horizontal and bottom-edge collisions.
+
+### Round 3 verification
+
+```text
+pnpm --filter @sovereign/ui-kit test -- src/components/next-turn-picker.test.tsx
+```
+
+Result: 14 test files, 189 tests passed.
+
+```text
+pnpm --filter @sovereign/ui-kit typecheck
+pnpm exec prettier --check packages/ui-kit/src/components/next-turn-picker.tsx packages/ui-kit/src/components/next-turn-picker.test.tsx packages/ui-kit/src/components/model-picker.tsx packages/ui-kit/src/components/model-picker.test.tsx packages/ui-kit/src/components/popover.tsx packages/ui-kit/src/components/next-turn-picker.module.css packages/ui-kit/src/components/model-picker.module.css packages/ui-kit/src/index.ts
+git diff --check
+```
+
+Result: TypeScript passed, all changed files matched Prettier, and the diff had no whitespace errors.
+
 ## Round 2 scoped fixes
 
 - `Popover viewportSafe` now applies viewport-constrained max width/height while retaining horizontal side resolution, so a submenu remains bounded even when neither side has enough room and near-edge vertical surfaces cannot exceed the viewport.

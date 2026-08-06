@@ -41,6 +41,7 @@ export function Popover({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [resolvedSide, setResolvedSide] = useState(side);
+  const [viewportStyle, setViewportStyle] = useState<React.CSSProperties | undefined>();
 
   const setOpen = (next: boolean): void => {
     if (next && !open && typeof document !== "undefined") {
@@ -71,6 +72,23 @@ export function Popover({
       const height = Math.min(contentRect.height, Math.max(0, window.innerHeight - 16));
       content.style.maxWidth = `${width}px`;
       content.style.maxHeight = `${height}px`;
+      const gap = 8;
+      const preferredLeft =
+        side === "left" ? triggerRect.left - width - gap : triggerRect.right + gap;
+      const horizontalLeft =
+        side === "right" && roomRight >= width
+          ? preferredLeft
+          : side === "left" && roomLeft >= width
+            ? preferredLeft
+            : Math.max(gap, Math.min(preferredLeft, window.innerWidth - width - gap));
+      const preferredTop = side === "top" ? triggerRect.top - height - gap : triggerRect.top;
+      const top = Math.max(gap, Math.min(preferredTop, window.innerHeight - height - gap));
+      setViewportStyle({
+        position: "fixed",
+        left: `${horizontalLeft}px`,
+        top: `${top}px`,
+        transform: "none",
+      });
       if (side === "right" && roomRight < contentRect.width && roomLeft >= contentRect.width) {
         setResolvedSide("left");
       } else if (
@@ -132,6 +150,7 @@ export function Popover({
           id={popoverId}
           className={`${styles.content} ${styles[resolvedSide]}${contentClassName ? ` ${contentClassName}` : ""}`}
           data-side={resolvedSide}
+          style={viewportSafe ? viewportStyle : undefined}
           role={contentRole}
           aria-label={ariaLabel}
         >

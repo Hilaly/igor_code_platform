@@ -156,21 +156,20 @@ export function NextTurnPicker({
           </button>
         )}
       >
-        <div ref={modelMenuRef} tabIndex={-1}>
-          <ModelPickerMenu
-            groups={modelGroups}
-            value={model}
-            onChange={(nextModel) => {
-              onModelChange(nextModel);
-              closeCascade();
-            }}
-            onExpandGroup={onExpandModelGroup}
-            label={modelLabel}
-            placeholder={placeholder}
-            emptyText={emptyText}
-            disabled={disabled}
-          />
-        </div>
+        <ModelPickerMenu
+          focusRef={modelMenuRef}
+          groups={modelGroups}
+          value={model}
+          onChange={(nextModel) => {
+            onModelChange(nextModel);
+            closeCascade();
+          }}
+          onExpandGroup={onExpandModelGroup}
+          label={modelLabel}
+          placeholder={placeholder}
+          emptyText={emptyText}
+          disabled={disabled}
+        />
       </Popover>
 
       <Popover

@@ -73,6 +73,7 @@ export type ModelPickerMenuProps = {
   disabled?: boolean;
   expandedGroups?: ReadonlySet<string>;
   onExpandedGroupsChange?: (groups: ReadonlySet<string>) => void;
+  focusRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 type Row = { kind: "header"; groupId: string } | { kind: "option"; groupId: string; value: string };
@@ -209,6 +210,7 @@ export function ModelPickerMenu({
   disabled = false,
   expandedGroups,
   onExpandedGroupsChange,
+  focusRef,
 }: ModelPickerMenuProps): React.JSX.Element {
   const parent = useContext(ModelPickerMenuContext);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -356,6 +358,7 @@ export function ModelPickerMenu({
   return (
     <div
       className={styles.menuBody}
+      ref={focusRef}
       role="tree"
       aria-label={label}
       data-side={parent?.side}

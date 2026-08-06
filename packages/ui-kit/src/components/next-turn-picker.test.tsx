@@ -83,16 +83,20 @@ describe("the NextTurnPicker", () => {
 
   it("transfers focus into the model submenu, changes the controlled model, and restores trigger focus", () => {
     const onModelChange = vi.fn();
-    render(<Harness onModelChange={onModelChange} />);
-    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    render(<Harness model="" onModelChange={onModelChange} />);
+    const trigger = screen.getByRole("button", { name: /выберите модель.*средний/i });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
 
-    expect(document.activeElement).toBe(screen.getByRole("tree", { name: "Модель" }).parentElement);
-    fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
-    fireEvent.click(screen.getByRole("treeitem", { name: /gemini/ }));
-
-    expect(onModelChange).toHaveBeenCalledWith("google/gemini");
+    expect(document.activeElement).toBe(screen.getByRole("tree", { name: "Модель" }));
+    const tree = screen.getByRole("tree", { name: "Модель" });
+    fireEvent.keyDown(tree, { key: "Home" });
+    fireEvent.keyDown(tree, { key: "Enter" });
+    fireEvent.keyDown(tree, { key: "ArrowDown" });
+    fireEvent.keyDown(tree, { key: "Enter" });
+    fireEvent.keyDown(tree, { key: "ArrowDown" });
+    fireEvent.keyDown(tree, { key: "Enter" });
+    expect(onModelChange).toHaveBeenCalledWith("anthropic/claude");
     expect(document.activeElement).toBe(trigger);
   });
 
@@ -125,7 +129,7 @@ describe("the NextTurnPicker", () => {
     const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
-    expect(document.activeElement).toBe(screen.getByRole("tree").parentElement);
+    expect(document.activeElement).toBe(screen.getByRole("tree"));
   });
 
   it("closes on an outside pointer and flips a nested submenu when the right side overflows", async () => {
@@ -147,7 +151,7 @@ describe("the NextTurnPicker", () => {
       toJSON: () => ({}),
     });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
-    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!.parentElement!;
+    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!;
     vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
@@ -185,7 +189,7 @@ describe("the NextTurnPicker", () => {
     });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
-    const nested = screen.getByRole("tree").parentElement!.parentElement!;
+    const nested = screen.getByRole("tree").parentElement!;
     vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
@@ -199,7 +203,9 @@ describe("the NextTurnPicker", () => {
     });
     fireEvent.resize(window);
     await waitFor(() => {
-      expect(nested.getAttribute("data-side")).toBe("right");
+      expect(nested.style.position).toBe("fixed");
+      expect(Number.parseFloat(nested.style.left)).toBeGreaterThanOrEqual(8);
+      expect(Number.parseFloat(nested.style.top)).toBeLessThanOrEqual(92);
     });
   });
 
