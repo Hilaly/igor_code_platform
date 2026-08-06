@@ -17,7 +17,7 @@ const translator = createTranslator({
   },
 });
 
-it("shows one small daemon indicator next to the account menu", () => {
+it("shows one compact account trigger with an icon and daemon indicator", () => {
   render(
     <AccountControl
       stream="open"
@@ -29,7 +29,10 @@ it("shows one small daemon indicator next to the account menu", () => {
   );
   expect(screen.getAllByRole("status")).toHaveLength(1);
   expect(screen.getByRole("status", { name: "На связи" })).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: "Учётная запись" })).toHaveLength(1);
+  const trigger = screen.getByRole("button", { name: "Учётная запись" });
+  expect(trigger.querySelector("svg")).toBeTruthy();
+  expect(trigger.textContent).toContain("Учётная запись");
+  expect(trigger.contains(screen.getByRole("status", { name: "На связи" }))).toBe(true);
 });
 
 it("opens archived sessions from the account menu", () => {
