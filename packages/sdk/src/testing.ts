@@ -8,6 +8,12 @@
 
 import { clearEventHandlers, deliverEvent, type EventOrigin } from "./events.ts";
 import { clearHookHandlers, invokeHookHandler } from "./hooks.ts";
+import {
+  clearRouteHandlers,
+  invokeRoute,
+  type PluginRouteRequest,
+  type PluginRouteResponse,
+} from "./routes.ts";
 import { clearToolInvocations, invokeTool } from "./tools.ts";
 import {
   installPluginHost,
@@ -80,6 +86,15 @@ export type PluginTestHost = {
     declaredId: string,
     toolArguments: unknown,
   ) => Promise<{ content: string; isError: boolean }>;
+  /** Позвать маршрут — то же, что делает диспетчер, получив запрос на `/p/<id плагина>/…`. */
+  callRoute: (declaredId: string, request: PluginRouteRequest) => Promise<PluginRouteResponse>;
+  /**
+   * Хранилище плагина в памяти: настоящее, а не заглушка с ответами. Плагин, который что-то записал
+   * и тут же прочитал, обязан проверяться этим же способом, а тест вправе подложить значение сам.
+   */
+  stored: Map<string, unknown>;
+  /** Чем шов отвечает на запрос своей папки. Файлов он не создаёт: их создаёт платформа. */
+  answerStorageDirectory: (path: string) => void;
   /** Снимает шов, подписки и таблицы обработчиков. Без этого следующий тест увидит чужой хост. */
   restore: () => void;
 };
@@ -97,7 +112,9 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const sessionRequests: SessionRequest[] = [];
   const logins: LoginInput[] = [];
   const loginAnswers: string[] = [];
+  const stored = new Map<string, unknown>();
 
+  let storageDirectory = `/tmp/sovereign-plugin-${resolved.source}-${resolved.id}`;
   let loginScript: { steps?: LoginStep[]; conclusion?: LoginConclusion } = {};
 
   let answerProviderRequest: (
@@ -149,6 +166,27 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
 
       return answerSessionRequest(request);
     },
+    storage: async (request) => {
+      switch (request.kind) {
+        case "storage-get":
+          // Значения нет — поля нет: так же отвечает и настоящее хранилище.
+          return stored.has(request.key)
+            ? { kind: "storage-value", value: stored.get(request.key) }
+            : { kind: "storage-value" };
+        case "storage-set":
+          stored.set(request.key, request.value);
+
+          return { kind: "storage-written" };
+        case "storage-delete":
+          stored.delete(request.key);
+
+          return { kind: "storage-written" };
+        case "storage-keys":
+          return { kind: "storage-keys", keys: [...stored.keys()].sort() };
+        case "storage-directory":
+          return { kind: "storage-directory", path: storageDirectory };
+      }
+    },
     login: async (input) => {
       logins.push(input);
 
@@ -188,10 +226,16 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     deliver: deliverEvent,
     callHook: invokeHookHandler,
     callTool: invokeTool,
+    callRoute: invokeRoute,
+    stored,
+    answerStorageDirectory: (path) => {
+      storageDirectory = path;
+    },
     restore: () => {
       clearEventHandlers();
       clearHookHandlers();
       clearToolInvocations();
+      clearRouteHandlers();
       removePluginHost();
     },
   };
