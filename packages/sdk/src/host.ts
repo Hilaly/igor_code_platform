@@ -173,15 +173,14 @@ export type PluginHost = {
   subscribeEvent: (type: string) => Promise<void>;
   unsubscribeEvent: (type: string) => Promise<void>;
   /**
-   * Один из двух методов хоста, у которых есть ответ. Односторонность канала — правило, а не
-   * недоделка, и исключений ровно два: провайдеры и сессии. Список, статус и вход бессмысленны без
-   * ответа, а общего RPC у платформы нет (docs/plugins.md, docs/models-and-providers.md).
+   * Один из трёх методов хоста, у которых есть ответ. Односторонность канала — правило, а не
+   * недоделка; провайдеры, сессии и хранилище бессмысленны без ответа, а общего RPC у платформы
+   * нет (docs/plugins.md, docs/models-and-providers.md).
    */
   providers: (request: ProviderRequest) => Promise<ProviderResponse>;
   /**
-   * Вторая пара «запрос-ответ» в канале плагина — сессии агента. Односторонность канала остаётся
-   * правилом: исключений ровно два, и оба сделаны там, где операция без ответа бессмысленна
-   * (docs/plugins.md, docs/sessions-and-projects.md).
+   * Второй метод «запрос-ответ» в канале плагина — сессии агента. Это отдельный вид запроса, а не
+   * общий RPC: операция без ответа бессмысленна (docs/plugins.md, docs/sessions-and-projects.md).
    */
   sessions: (request: SessionRequest) => Promise<SessionResponse>;
   /**
