@@ -88,7 +88,7 @@ describe("the NextTurnPicker", () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
 
-    expect(document.activeElement).toBe(screen.getByRole("tree", { name: "Модель" }));
+    expect(document.activeElement).toBe(screen.getByRole("tree", { name: "Модель" }).parentElement);
     fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
     fireEvent.click(screen.getByRole("treeitem", { name: /gemini/ }));
 
@@ -97,7 +97,8 @@ describe("the NextTurnPicker", () => {
   });
 
   it("navigates reasoning options with arrows and restores focus after Escape", () => {
-    render(<Harness />);
+    const onThinkingLevelChange = vi.fn();
+    render(<Harness onThinkingLevelChange={onThinkingLevelChange} />);
     const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
@@ -107,6 +108,7 @@ describe("the NextTurnPicker", () => {
     fireEvent.keyDown(listbox, { key: "ArrowDown" });
     fireEvent.keyDown(listbox, { key: "ArrowDown" });
     fireEvent.keyDown(listbox, { key: "Enter" });
+    expect(onThinkingLevelChange).toHaveBeenCalledWith("minimal");
     expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
     expect(document.activeElement).toBe(trigger);
 
@@ -116,6 +118,14 @@ describe("the NextTurnPicker", () => {
       key: "Escape",
     });
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("focuses the local model tree when labels contain selector characters", () => {
+    render(<Harness modelLabel={'Модель [a] "quoted"'} />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    expect(document.activeElement).toBe(screen.getByRole("tree").parentElement);
   });
 
   it("closes on an outside pointer and flips a nested submenu when the right side overflows", async () => {
@@ -137,7 +147,7 @@ describe("the NextTurnPicker", () => {
       toJSON: () => ({}),
     });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
-    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!;
+    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!.parentElement!;
     vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
@@ -155,6 +165,42 @@ describe("the NextTurnPicker", () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("clamps nested content when both horizontal sides and the vertical boundary are constrained", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    const row = screen.getByRole("menuitem", { name: /Модель/ });
+    vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
+      x: 45,
+      y: 90,
+      width: 10,
+      height: 10,
+      top: 90,
+      right: 55,
+      bottom: 100,
+      left: 45,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
+    const nested = screen.getByRole("tree").parentElement!.parentElement!;
+    vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+      top: 0,
+      right: 80,
+      bottom: 80,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => {
+      expect(nested.getAttribute("data-side")).toBe("right");
+    });
   });
 
   it("opens provider-grouped model submenu and preserves lazy expansion callback", () => {

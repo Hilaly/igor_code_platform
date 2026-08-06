@@ -56,3 +56,25 @@ git diff --check
 ```
 
 Result: TypeScript passed, all changed files matched Prettier, and the diff had no whitespace errors.
+
+## Round 2 scoped fixes
+
+- `Popover viewportSafe` now applies viewport-constrained max width/height while retaining horizontal side resolution, so a submenu remains bounded even when neither side has enough room and near-edge vertical surfaces cannot exceed the viewport.
+- Reasoning keyboard coverage now asserts the selected `minimal` value is delivered through `onThinkingLevelChange`.
+- Model submenu focus uses an explicit local ref wrapper; no label-derived global selector remains. A selector-character label regression confirms the local target is focused without throwing.
+
+### Round 2 verification
+
+```text
+pnpm --filter @sovereign/ui-kit test -- src/components/next-turn-picker.test.tsx
+```
+
+Result: 14 test files, 189 tests passed.
+
+```text
+pnpm --filter @sovereign/ui-kit typecheck
+pnpm exec prettier --check packages/ui-kit/src/components/next-turn-picker.tsx packages/ui-kit/src/components/next-turn-picker.test.tsx packages/ui-kit/src/components/model-picker.tsx packages/ui-kit/src/components/model-picker.test.tsx packages/ui-kit/src/components/popover.tsx packages/ui-kit/src/components/next-turn-picker.module.css packages/ui-kit/src/components/model-picker.module.css packages/ui-kit/src/index.ts
+git diff --check
+```
+
+Result: TypeScript passed, all changed files matched Prettier, and the diff had no whitespace errors.

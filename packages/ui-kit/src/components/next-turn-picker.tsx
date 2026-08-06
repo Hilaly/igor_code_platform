@@ -44,6 +44,7 @@ export function NextTurnPicker({
   const [modelOpen, setModelOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const reasoningMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const shownThinkingLevel: ThinkingLevel = reasoningSupported ? thinkingLevel : "off";
   const thinkingLabel = translator.t(`thinking.${shownThinkingLevel}`);
@@ -64,9 +65,7 @@ export function NextTurnPicker({
   };
 
   useEffect(() => {
-    if (modelOpen) {
-      document.querySelector<HTMLElement>(`[role="tree"][aria-label="${modelLabel}"]`)?.focus();
-    }
+    if (modelOpen) modelMenuRef.current?.focus();
   }, [modelOpen]);
   useEffect(() => {
     if (reasoningOpen) reasoningMenuRef.current?.focus();
@@ -157,19 +156,21 @@ export function NextTurnPicker({
           </button>
         )}
       >
-        <ModelPickerMenu
-          groups={modelGroups}
-          value={model}
-          onChange={(nextModel) => {
-            onModelChange(nextModel);
-            closeCascade();
-          }}
-          onExpandGroup={onExpandModelGroup}
-          label={modelLabel}
-          placeholder={placeholder}
-          emptyText={emptyText}
-          disabled={disabled}
-        />
+        <div ref={modelMenuRef} tabIndex={-1}>
+          <ModelPickerMenu
+            groups={modelGroups}
+            value={model}
+            onChange={(nextModel) => {
+              onModelChange(nextModel);
+              closeCascade();
+            }}
+            onExpandGroup={onExpandModelGroup}
+            label={modelLabel}
+            placeholder={placeholder}
+            emptyText={emptyText}
+            disabled={disabled}
+          />
+        </div>
       </Popover>
 
       <Popover

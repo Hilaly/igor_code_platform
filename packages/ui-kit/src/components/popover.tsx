@@ -67,6 +67,10 @@ export function Popover({
       const contentRect = content.getBoundingClientRect();
       const roomRight = window.innerWidth - triggerRect.right;
       const roomLeft = triggerRect.left;
+      const width = Math.min(contentRect.width, Math.max(0, window.innerWidth - 16));
+      const height = Math.min(contentRect.height, Math.max(0, window.innerHeight - 16));
+      content.style.maxWidth = `${width}px`;
+      content.style.maxHeight = `${height}px`;
       if (side === "right" && roomRight < contentRect.width && roomLeft >= contentRect.width) {
         setResolvedSide("left");
       } else if (
