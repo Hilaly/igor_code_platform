@@ -12,6 +12,8 @@ import { createPortal } from "react-dom";
 import styles from "./menu.module.css";
 import { nextEnabledIndex } from "./roving-focus.ts";
 
+const hoverCloseDelayMilliseconds = 120;
+
 /** Опасный пункт выделен цветом: удаление в списке действий не должно выглядеть как остальные. */
 export type MenuItemTone = "normal" | "danger";
 
@@ -43,6 +45,8 @@ export type MenuProps = {
   block?: boolean;
   /** Лёгкий триггер для контекстных меню: без капсулы, с подсветкой только при взаимодействии. */
   compact?: boolean;
+  /** Открывает компактное меню наведением, сохраняя клик и клавиатуру как полные альтернативы. */
+  openOnHover?: boolean;
   items: MenuItemDescription[];
 };
 
@@ -53,6 +57,7 @@ export function Menu({
   placement = "below",
   block = false,
   compact = false,
+  openOnHover = false,
   items,
 }: MenuProps) {
   const menuId = useId();
@@ -61,6 +66,8 @@ export function Menu({
   const popupRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const itemElements = useRef<(HTMLButtonElement | null)[]>([]);
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const openedByPointer = useRef(false);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | undefined>();
   // Ссылка на свежий набор: массив пунктов приходит новым на каждой перерисовке вызывающего, и в
   // зависимостях эффекта он снимал бы слушатели и заново забирал фокус на первый пункт.
@@ -83,7 +90,8 @@ export function Menu({
     // Открытое меню забирает фокус на первый доступный пункт: иначе стрелкам не от чего отсчитывать.
     const firstEnabled = nextEnabledIndex(latestItems.current, -1, 1);
 
-    if (firstEnabled !== undefined) {
+    // Наведение не должно уводить клавиатурный фокус с того места, где оставил его человек.
+    if (!openedByPointer.current && firstEnabled !== undefined) {
       itemElements.current[firstEnabled]?.focus();
     }
 
@@ -138,6 +146,13 @@ export function Menu({
     };
   }, [open]);
 
+  useEffect(
+    () => () => {
+      if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current);
+    },
+    [],
+  );
+
   useLayoutEffect(() => {
     if (!open || !compact || typeof window === "undefined") {
       return;
@@ -181,6 +196,13 @@ export function Menu({
       role="menu"
       aria-label={label}
       ref={popupRef}
+      onPointerEnter={() => {
+        if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current);
+      }}
+      onPointerLeave={() => {
+        if (!openOnHover) return;
+        hoverCloseTimer.current = setTimeout(() => setOpen(false), hoverCloseDelayMilliseconds);
+      }}
       style={
         compact && popupPosition !== undefined
           ? { ...popupPosition, maxWidth: "calc(100vw - 16px)" }
@@ -210,7 +232,20 @@ export function Menu({
   ) : undefined;
 
   return (
-    <div className={`${styles.root}${block ? ` ${styles.block}` : ""}`} ref={rootRef}>
+    <div
+      className={`${styles.root}${block ? ` ${styles.block}` : ""}`}
+      ref={rootRef}
+      onPointerEnter={() => {
+        if (!openOnHover) return;
+        if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current);
+        openedByPointer.current = true;
+        setOpen(true);
+      }}
+      onPointerLeave={() => {
+        if (!openOnHover) return;
+        hoverCloseTimer.current = setTimeout(() => setOpen(false), hoverCloseDelayMilliseconds);
+      }}
+    >
       <button
         type="button"
         className={`${styles.trigger}${block ? ` ${styles.block}` : ""}${compact ? ` ${styles.compact}` : ""}`}
@@ -219,7 +254,10 @@ export function Menu({
         aria-label={triggerLabel}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          openedByPointer.current = false;
+          setOpen((current) => !current);
+        }}
       >
         {trigger}
       </button>
