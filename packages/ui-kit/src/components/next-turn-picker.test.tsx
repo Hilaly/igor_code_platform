@@ -139,7 +139,6 @@ describe("the NextTurnPicker", () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
     const modelRow = screen.getByRole("menuitem", { name: /Модель/ });
-    const rowRoot = modelRow.parentElement!;
     vi.spyOn(modelRow, "getBoundingClientRect").mockReturnValue({
       x: 680,
       y: 0,
