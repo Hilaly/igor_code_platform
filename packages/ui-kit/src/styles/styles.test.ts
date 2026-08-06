@@ -103,6 +103,10 @@ describe("stylesheets of the kit", () => {
     expect(tree).toMatch(/\.children\s*\{[^}]*grid-row:\s*2;/s);
     expect(tree).not.toMatch(/\.children\s*\{[^}]*padding-left:/s);
     expect(tree).toMatch(/\.indent\s*\{[^}]*flex:\s*0\s+0\s+var\(--sovereign-space-4\);/s);
+    expect(tree).toMatch(
+      /\.root\[data-disclosure-alignment="label"\] \.togglePlaceholder\s*\{[^}]*width:\s*0;/s,
+    );
+    expect(tree).not.toMatch(/\.root\[data-disclosure-alignment="label"\] \.toggle\s*,/s);
   });
 
   it("describes public accents and elevation without obsolete decorative effects", () => {
