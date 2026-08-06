@@ -161,7 +161,11 @@ export function createPluginStorage(options: CreatePluginStorageOptions): Plugin
           // Проверка до записи, а не после: значение с циклом или `bigint` уронило бы запись уже
           // после того, как остальные ключи ушли бы в сериализацию.
           try {
-            JSON.stringify(request.value);
+            if (!isJsonValue(request.value)) {
+              return failure(
+                `the value of ${request.key} is not json for ${pluginKey}: unsupported value`,
+              );
+            }
           } catch (cause) {
             return failure(
               `the value of ${request.key} is not json for ${pluginKey}: ${describe(cause)}`,
@@ -240,6 +244,53 @@ function failure(reason: string): StorageFailure {
 
 function describe(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+function isJsonValue(value: unknown, ancestors = new Set<object>()): boolean {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+
+  if (typeof value !== "object") {
+    return false;
+  }
+
+  if (ancestors.has(value)) {
+    return false;
+  }
+
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    return false;
+  }
+
+  const array = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+
+  if (!array && prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  ancestors.add(value);
+
+  try {
+    if (array) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.hasOwn(value, index) || !isJsonValue(value[index], ancestors)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    return Object.values(value).every((entry) => isJsonValue(entry, ancestors));
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 /** Виды запроса не пересекаются по построению: у хранилища они начинаются с `storage-`. */

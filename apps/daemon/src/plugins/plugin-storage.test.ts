@@ -71,6 +71,15 @@ describe("the key-value storage of a plugin", () => {
     });
   });
 
+  it("stores arrays as JSON values", async () => {
+    const store = storage();
+
+    assert.deepEqual(
+      await store.answer(data, { kind: "storage-set", key: "items", value: [1, { ok: true }] }),
+      { kind: "storage-written" },
+    );
+  });
+
   it("writes a file named by the plugin key, with the colon encoded", async () => {
     const store = storage();
 
@@ -126,6 +135,33 @@ describe("the key-value storage of a plugin", () => {
     const answer = await store.answer(data, { kind: "storage-set", key: "cyclic", value: cyclic });
 
     assert.equal(answer.kind, "failed");
+    assert.deepEqual(await store.answer(data, { kind: "storage-keys" }), {
+      kind: "storage-keys",
+      keys: ["kept"],
+    });
+  });
+
+  it("rejects every value that is not representable as JSON", async () => {
+    const store = storage();
+    await store.answer(data, { kind: "storage-set", key: "kept", value: 1 });
+
+    const invalid: unknown[] = [
+      undefined,
+      () => "no",
+      Symbol("no"),
+      NaN,
+      Infinity,
+      new Map(),
+      { nested: undefined },
+      [undefined],
+    ];
+
+    for (const value of invalid) {
+      const answer = await store.answer(data, { kind: "storage-set", key: "bad", value });
+
+      assert.equal(answer.kind, "failed");
+    }
+
     assert.deepEqual(await store.answer(data, { kind: "storage-keys" }), {
       kind: "storage-keys",
       keys: ["kept"],
