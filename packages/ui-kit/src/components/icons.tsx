@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Copy,
   Folder,
+  FolderOpen,
   GitBranchPlus,
   GitFork,
   MoreHorizontal,
@@ -42,6 +43,7 @@ export const ClearLabelIcon = actionIcon(TagX);
 export const AddIcon = actionIcon(Plus);
 export const MoreIcon = actionIcon(MoreHorizontal);
 export const FolderIcon = actionIcon(Folder);
+export const FolderOpenIcon = actionIcon(FolderOpen);
 export const UserIcon = actionIcon(UserRound);
 export const ChevronRightIcon = actionIcon(ChevronRight);
 export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);

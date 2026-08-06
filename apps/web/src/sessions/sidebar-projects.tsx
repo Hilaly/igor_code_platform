@@ -6,6 +6,7 @@ import {
   Dialog,
   Field,
   FolderIcon,
+  FolderOpenIcon,
   Input,
   Menu,
   MoreIcon,
@@ -215,7 +216,8 @@ export function SidebarProjects(props: SidebarProjectsProps) {
       ? { badge: { tone: "warning" as const, text: t("projects.availability.missing") } }
       : {}),
     actions: projectActions(project),
-    icon: <FolderIcon size="sm" />,
+    disclosureIcon: (expanded) =>
+      expanded ? <FolderOpenIcon size="sm" /> : <FolderIcon size="sm" />,
     context: (
       <TreeContextCard>
         <TreeContextCardHeader

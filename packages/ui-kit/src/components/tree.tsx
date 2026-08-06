@@ -51,6 +51,8 @@ export type TreeNode = {
   title?: string;
   /** Значок перед подписью. Декоративный: в имя узла для скринридера он не попадает. */
   icon?: ReactNode;
+  /** Иконка кнопки раскрытия. Функция может выбрать вариант для закрытого/открытого состояния. */
+  disclosureIcon?: ReactNode | ((expanded: boolean) => ReactNode);
   /** Метка рядом с подписью — состояние записи, число вложенных, что угодно ещё. */
   badge?: TreeNodeBadge;
   /** Независимые действия рядом со строкой: они не выбирают и не раскрывают узел. */
@@ -374,7 +376,9 @@ export function Tree({
                   tabIndex={-1}
                   onClick={(event) => handleToggleClick(event, node)}
                 >
-                  <ChevronRightIcon size="xs" />
+                  {typeof node.disclosureIcon === "function"
+                    ? node.disclosureIcon(isExpanded)
+                    : (node.disclosureIcon ?? <ChevronRightIcon size="xs" />)}
                 </button>
               ) : (
                 <span className={styles.togglePlaceholder} aria-hidden="true" />

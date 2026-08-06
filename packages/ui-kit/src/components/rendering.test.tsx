@@ -27,6 +27,7 @@ import {
   ForkBeforeIcon,
   ForkThroughIcon,
   FolderIcon,
+  FolderOpenIcon,
   MoreIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -75,6 +76,46 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain(">Alpha<");
     expect(markup).not.toContain("Project facts");
+  });
+
+  it("can render a folder as the disclosure icon", () => {
+    const collapsedMarkup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: (expanded) => (expanded ? <FolderOpenIcon /> : <FolderIcon />),
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    const expandedMarkup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        expandedIds={["alpha"]}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: (expanded) => (expanded ? <FolderOpenIcon /> : <FolderIcon />),
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(collapsedMarkup).toContain('aria-label="Projects"');
+    expect(collapsedMarkup).toContain('aria-expanded="false"');
+    expect(collapsedMarkup).not.toContain("lucide-chevron-right");
+    expect(collapsedMarkup).toContain("lucide-folder");
+    expect(expandedMarkup).toContain('aria-expanded="true"');
+    expect(expandedMarkup).toContain("lucide-folder-open");
   });
 
   it("renders the compact settings view, selected navigation, page, and property row", () => {
