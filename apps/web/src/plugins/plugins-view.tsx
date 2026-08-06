@@ -28,7 +28,7 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
-import type { PluginsState } from "./state.ts";
+import { routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginsViewProps = {
   /** Внутри страницы настроек заголовок раздела уже `h1`; самостоятельное вью по умолчанию владеет им. */
@@ -108,6 +108,8 @@ export function PluginsView({
         </Notice>
       )}
 
+      <PublicRoutes snapshot={snapshot} translator={translator} />
+
       {snapshot.plugins.length === 0 ? (
         <EmptyState title={t("plugins.empty")} />
       ) : (
@@ -125,6 +127,49 @@ export function PluginsView({
         </List>
       )}
     </div>
+  );
+}
+
+/**
+ * Публичные маршруты собраны в одном месте, а не разложены по карточкам плагинов: это единственная
+ * поверхность платформы, открытая наружу, и человек обязан видеть её целиком (docs/web-api.md).
+ *
+ * Выключенные вклады сюда не входят: выключенный маршрут не отвечает, и показывать его открытым
+ * значило бы пугать тем, чего нет.
+ */
+function PublicRoutes({
+  snapshot,
+  translator,
+}: {
+  snapshot: PluginsSnapshot;
+  translator: ScopedTranslator;
+}) {
+  const { t } = translator;
+  const open = snapshot.contributions.filter(
+    (registration) => registration.kind === "public-route" && registration.ownership === "plugin",
+  );
+
+  if (open.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <Notice tone="warning" title={t("plugins.public.title")}>
+      <ul className="plugins-reasons">
+        {open.map((registration) =>
+          registration.kind !== "public-route" ? undefined : (
+            <li key={registration.id}>
+              {t("plugins.public.item", {
+                method: registration.method,
+                url: routeAddress(registration),
+                plugin: registration.id,
+              })}
+            </li>
+          ),
+        )}
+      </ul>
+      {t("plugins.public.hint")}
+    </Notice>
   );
 }
 

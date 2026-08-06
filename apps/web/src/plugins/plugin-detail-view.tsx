@@ -24,7 +24,7 @@ import {
 } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
-import type { PluginsState } from "./state.ts";
+import { routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
   headingLevel?: 1 | 2;
@@ -253,18 +253,21 @@ function TechnicalData({
           ? registration.parameters
           : registration.kind === "hook"
             ? { event: registration.event, criticality: registration.criticality }
-            : registration.kind === "skill"
-              ? {
-                  location: registration.location,
-                  disableModelInvocation: registration.disableModelInvocation,
-                  metadata: registration.metadata,
-                }
-              : {
-                  model: registration.model,
-                  thinkingLevel: registration.thinkingLevel,
-                  tools: registration.tools,
-                  skills: registration.skills,
-                };
+            : registration.kind === "route" || registration.kind === "public-route"
+              ? // Адрес целиком, а не объявленный путь: по нему маршрут и зовут снаружи.
+                { method: registration.method, url: routeAddress(registration) }
+              : registration.kind === "skill"
+                ? {
+                    location: registration.location,
+                    disableModelInvocation: registration.disableModelInvocation,
+                    metadata: registration.metadata,
+                  }
+                : {
+                    model: registration.model,
+                    thinkingLevel: registration.thinkingLevel,
+                    tools: registration.tools,
+                    skills: registration.skills,
+                  };
   if (data === undefined) return undefined;
   return (
     <Disclosure

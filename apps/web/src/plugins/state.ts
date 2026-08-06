@@ -12,10 +12,26 @@ import {
   coreEventTypes,
   isPluginStreamEvent,
   streamGapType,
+  type ContributionRegistration,
   type PluginPreferences,
   type PluginsSnapshot,
   type BusStreamEvent,
 } from "@sovereign/protocol";
+
+/**
+ * Адрес маршрута плагина — `/p/<id плагина>/<путь>` (docs/web-api.md). Считается в одном месте на
+ * оба вью: список открытых наружу маршрутов и подробности вклада обязаны называть один и тот же
+ * адрес, иначе человек искал бы его глазами по двум экранам.
+ */
+export function routeAddress(
+  registration: Extract<ContributionRegistration, { kind: "route" | "public-route" }>,
+): string {
+  // Маршрут объявляет только плагин: standalone-корни дают файловых агентов и скилы.
+  const pluginId =
+    registration.ownership === "plugin" ? registration.pluginId : registration.source;
+
+  return registration.path === "" ? `/p/${pluginId}` : `/p/${pluginId}/${registration.path}`;
+}
 
 export type PluginsState = {
   snapshot?: PluginsSnapshot;
