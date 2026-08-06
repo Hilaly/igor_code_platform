@@ -114,7 +114,7 @@ describe("ProjectsView", () => {
   it("exposes active projects as one named list with separate row actions", () => {
     show(withProjects([project("alpha", { name: "Alpha" }), project("beta", { name: "Beta" })]));
 
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.getByRole("toolbar", { name: "Проекты" })).toBeDefined();
 
     const projects = screen.getByRole("list", { name: "Проекты" });

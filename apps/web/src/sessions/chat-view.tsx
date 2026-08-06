@@ -34,6 +34,7 @@ import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
 import { SessionUsage } from "./session-usage.tsx";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
+import { useShellHeader } from "../shell/header.tsx";
 
 export type ChatViewProps = {
   open: OpenSession;
@@ -189,6 +190,21 @@ export function ChatView(props: ChatViewProps) {
     </>
   );
 
+  const currentModel = model === "" ? undefined : model;
+  const context =
+    [
+      open.summary?.folder,
+      currentModel,
+      open.summary?.phase === undefined ? undefined : t(`sessions.phase.${open.summary.phase}`),
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
+  const hasShellHeader = useShellHeader({
+    title: open.summary?.title ?? t("sessions.new.title"),
+    context,
+    actions: headerActions,
+  });
+
   const notices = (
     <>
       {open.failure === undefined ? undefined : (
@@ -226,8 +242,12 @@ export function ChatView(props: ChatViewProps) {
 
   return (
     <section className="sessions-chat">
-      <ViewHeader title={open.summary?.title ?? t("sessions.new.title")} actions={headerActions} />
-
+      {hasShellHeader ? undefined : (
+        <ViewHeader
+          title={open.summary?.title ?? t("sessions.new.title")}
+          actions={headerActions}
+        />
+      )}
       <EntryTreeDrawer
         open={treeOpen}
         onClose={() => setTreeOpen(false)}

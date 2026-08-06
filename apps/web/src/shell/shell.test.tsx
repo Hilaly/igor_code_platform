@@ -74,7 +74,10 @@ describe("global shell header", () => {
     expect(screen.getByRole("heading", { name: "Проекты" })).toBeDefined();
     expect(screen.getByText("Рабочее пространство")).toBeDefined();
     expect(screen.getByRole("button", { name: "Создать" })).toBeDefined();
-    expect(screen.getByRole("banner").compareDocumentPosition(screen.getByText("список проектов")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen.getByRole("banner").compareDocumentPosition(screen.getByText("список проектов")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     view.again(defaultLayout, {
       header: { title: "Настройки", context: "Общие" },

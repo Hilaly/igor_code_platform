@@ -23,7 +23,6 @@ import {
   Button,
   Field,
   Form,
-  Heading,
   Link,
   ModelPicker,
   Notice,
@@ -194,7 +193,6 @@ export function NewSessionView(props: NewSessionViewProps) {
   return (
     <section className="new-session" aria-label={t("sessions.new.title")}>
       <header className="new-session-head">
-        <Heading level={1}>{t("sessions.new.title")}</Heading>
         <Text>{t("sessions.new.hint")}</Text>
       </header>
 

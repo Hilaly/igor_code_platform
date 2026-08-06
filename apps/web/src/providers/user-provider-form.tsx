@@ -156,9 +156,6 @@ export function UserProviderForm(props: UserProviderFormProps) {
   return (
     <div className="providers provider-form-page">
       <Button onClick={props.onBack}>{props.translator.t("providers.back")}</Button>
-      <Heading level={1}>
-        {props.mode === "create" ? t("providers.user.new") : t("providers.user.edit", { id })}
-      </Heading>
       {props.failure ? <Notice tone="danger" title={props.failure} /> : undefined}
       {diagnostics.length > 0 ? <Notice tone="danger" title={diagnostics.join("; ")} /> : undefined}
       <Panel>

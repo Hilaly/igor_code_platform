@@ -4,7 +4,6 @@ import {
   Button,
   Code,
   EmptyState,
-  Heading,
   Notice,
   Spinner,
   Text,
@@ -61,13 +60,7 @@ export function ProjectDetailView({
       <div className="project-detail-surface">
         <div className="project-detail-header">
           <div>
-            {headingLevel === 1 ? (
-              <Heading level={headingLevel}>
-                {project.ephemeral ? t("projects.ephemeral") : project.name}
-              </Heading>
-            ) : (
-              <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-            )}
+            <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
             <Code>{project.folder}</Code>
           </div>
           <Badge tone={project.availability === "available" ? "success" : "warning"}>

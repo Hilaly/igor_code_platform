@@ -76,11 +76,12 @@ describe("ProjectDetailView", () => {
       />,
     );
 
-    const heading = screen.getByText("Alpha");
+    const projectName = screen.getByText("Alpha");
     const toolbar = screen.getByRole("toolbar", { name: "Проекты" });
-    const detail = heading.closest("div");
+    const detail = projectName.closest("div");
 
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(projectName).toBeDefined();
     expect(detail).not.toBeNull();
     expect(detail?.contains(toolbar)).toBe(false);
   });

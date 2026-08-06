@@ -11,7 +11,10 @@ import {
 
 import type { ViewHeaderProps } from "@sovereign/ui-kit";
 
-export type ShellHeaderDescription = Pick<ViewHeaderProps, "title" | "context" | "level" | "actions">;
+export type ShellHeaderDescription = Pick<
+  ViewHeaderProps,
+  "title" | "context" | "level" | "actions"
+>;
 
 type ShellHeaderContextValue = {
   description: ShellHeaderDescription;
@@ -53,23 +56,23 @@ export function ShellHeaderProvider({
 
   const value = useMemo(() => ({ description, register }), [description, register]);
 
-  return (
-    <ShellHeaderContext.Provider value={value}>
-      {children}
-    </ShellHeaderContext.Provider>
-  );
+  return <ShellHeaderContext.Provider value={value}>{children}</ShellHeaderContext.Provider>;
 }
 
-export function useShellHeader(description: ShellHeaderDescription): void {
+export function useShellHeader(description: ShellHeaderDescription): boolean {
   const context = useContext(ShellHeaderContext);
-  if (context === null) {
-    throw new Error("useShellHeader must be used inside ShellHeaderProvider");
-  }
-
   useLayoutEffect(
-    () => context.register(description),
-    [context.register, description.title, description.context, description.level, description.actions],
+    () => (context === null ? undefined : context.register(description)),
+    [
+      context?.register,
+      description.title,
+      description.context,
+      description.level,
+      description.actions,
+    ],
   );
+
+  return context !== null;
 }
 
 export function useActiveShellHeader(): ShellHeaderDescription {
