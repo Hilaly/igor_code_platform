@@ -5,7 +5,12 @@
  * что снимок и поток говорят одинаково.
  */
 
-import { pluginsPath, type PluginPreferences, type PluginsSnapshot } from "@sovereign/protocol";
+import {
+  pluginsPath,
+  type PluginPreferences,
+  type PluginRouteConflict,
+  type PluginsSnapshot,
+} from "@sovereign/protocol";
 
 import type { ContributionRegistry } from "./contribution-registry.ts";
 import { respondWithJson, type Route } from "../http/public.ts";
@@ -50,12 +55,58 @@ export function buildPluginsSnapshot(sources: PluginsSnapshotSources): PluginsSn
     };
   }
 
+  const contributions = sources.registry.pluginContributions();
+
   return {
     revision: sources.registry.revision(),
     plugins: statuses,
-    contributions: sources.registry.pluginContributions(),
+    contributions,
     switchedOffContributions: sources.registry.switchedOff(),
     conflicts: sources.registry.conflicts(),
+    routeConflicts: routeConflictsOf(contributions),
     enablement,
   };
+}
+
+function routeConflictsOf(contributions: PluginsSnapshot["contributions"]): PluginRouteConflict[] {
+  const claims = new Map<
+    string,
+    { method: PluginRouteConflict["method"]; path: string; ids: string[] }
+  >();
+
+  for (const contribution of contributions) {
+    if (
+      contribution.ownership !== "plugin" ||
+      (contribution.kind !== "route" && contribution.kind !== "public-route")
+    ) {
+      continue;
+    }
+
+    const path = pathShape(contribution.path);
+    const key = `${contribution.method} ${contribution.pluginId} ${path}`;
+    const existing = claims.get(key);
+    if (existing === undefined) {
+      claims.set(key, {
+        method: contribution.method,
+        path,
+        ids: [contribution.id],
+      });
+    } else {
+      existing.ids.push(contribution.id);
+    }
+  }
+
+  return [...claims.values()]
+    .filter((claim) => claim.ids.length > 1)
+    .sort((left, right) =>
+      `${left.method} ${left.path}`.localeCompare(`${right.method} ${right.path}`, "en"),
+    )
+    .map(({ method, path, ids }) => ({ method, path, contributions: ids }));
+}
+
+function pathShape(path: string): string {
+  return path
+    .split("/")
+    .map((segment) => (segment.startsWith(":") ? ":" : segment))
+    .join("/");
 }

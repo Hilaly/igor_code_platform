@@ -255,7 +255,11 @@ function TechnicalData({
             ? { event: registration.event, criticality: registration.criticality }
             : registration.kind === "route" || registration.kind === "public-route"
               ? // Адрес целиком, а не объявленный путь: по нему маршрут и зовут снаружи.
-                { method: registration.method, url: routeAddress(registration) }
+                {
+                  method: registration.method,
+                  path: registration.path,
+                  url: routeAddress(registration),
+                }
               : registration.kind === "skill"
                 ? {
                     location: registration.location,

@@ -4,11 +4,23 @@
  * что подключился или потерял часть потока, начинает отсюда.
  */
 
-import type { ContributionConflict, ContributionRegistration } from "./contribution.ts";
+import type {
+  ContributionConflict,
+  ContributionRegistration,
+  PluginRouteMethod,
+} from "./contribution.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginPreferences } from "./settings.ts";
 
 export const pluginsPath = "/api/plugins";
+
+/** Действующие plugin-owned вклады, спорящие за один метод и адрес. Ни один из них не отвечает. */
+export type PluginRouteConflict = {
+  method: PluginRouteMethod;
+  /** Форма нормализованного пути вклада, без `/p/<pluginId>/`; все параметрические сегменты — `:`. */
+  path: string;
+  contributions: string[];
+};
 
 export type PluginsSnapshot = {
   /**
@@ -26,6 +38,8 @@ export type PluginsSnapshot = {
    */
   switchedOffContributions: ContributionRegistration[];
   conflicts: ContributionConflict[];
+  /** Конфликты адресов маршрутов. Объявления остаются в `contributions`, но HTTP их не публикует. */
+  routeConflicts: PluginRouteConflict[];
   /**
    * Действующее решение о включении по ключу плагина. Не содержимое файла: у плагина без записи
    * решение выведено по источнику, поэтому политика по умолчанию остаётся в демоне. Форма та же,

@@ -60,6 +60,7 @@ const snapshot: PluginsSnapshot = {
     },
   ],
   conflicts: [],
+  routeConflicts: [],
   enablement: { "data:example": { enabled: true, disabledContributions: ["missing.id"] } },
 };
 
@@ -155,6 +156,7 @@ it("names the kind of a public route and shows the address it answers at", () =>
   );
 
   expect(screen.getByText("public route")).toBeTruthy();
+  expect(screen.getByText(/"path": "webhooks\/github"/)).toBeTruthy();
   // Адрес целиком: по нему маршрут зовут снаружи, а объявленный путь без префикса не набрать.
   expect(screen.getByText(/\/p\/example\/webhooks\/github/)).toBeTruthy();
 });

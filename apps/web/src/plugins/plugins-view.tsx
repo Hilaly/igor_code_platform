@@ -108,6 +108,22 @@ export function PluginsView({
         </Notice>
       )}
 
+      {snapshot.routeConflicts.length === 0 ? undefined : (
+        <Notice tone="warning" title={t("plugins.routeConflicts.title")}>
+          <ul className="plugins-reasons">
+            {snapshot.routeConflicts.map((conflict) => (
+              <li key={`${conflict.method} ${conflict.path}`}>
+                {t("plugins.routeConflicts.item", {
+                  method: conflict.method,
+                  path: conflict.path,
+                  contributions: conflict.contributions.join(", "),
+                })}
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+
       <PublicRoutes snapshot={snapshot} translator={translator} />
 
       {snapshot.plugins.length === 0 ? (
@@ -145,8 +161,12 @@ function PublicRoutes({
   translator: ScopedTranslator;
 }) {
   const { t } = translator;
+  const conflicted = new Set(snapshot.routeConflicts.flatMap((conflict) => conflict.contributions));
   const open = snapshot.contributions.filter(
-    (registration) => registration.kind === "public-route" && registration.ownership === "plugin",
+    (registration) =>
+      registration.kind === "public-route" &&
+      registration.ownership === "plugin" &&
+      !conflicted.has(registration.id),
   );
 
   if (open.length === 0) {

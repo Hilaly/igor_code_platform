@@ -46,6 +46,7 @@ const snapshot: PluginsSnapshot = {
   ],
   switchedOffContributions: [],
   conflicts: [],
+  routeConflicts: [],
   enablement: { "data:example": { enabled: true, disabledContributions: [] } },
 };
 
@@ -186,4 +187,53 @@ it("collects the routes open to the outside in one place", () => {
   // другого в списке открытого быть не должно.
   expect(screen.queryByText(/\/p\/example\/board/)).toBeNull();
   expect(screen.queryByText(/webhooks\/other/)).toBeNull();
+});
+
+it("does not list a public route whose address is conflicted", () => {
+  const withConflict: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.first",
+        declaredId: "first",
+        method: "POST",
+        path: "hooks/github",
+      },
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.second",
+        declaredId: "second",
+        method: "POST",
+        path: "hooks/github",
+      },
+    ],
+    routeConflicts: [
+      {
+        method: "POST",
+        path: "hooks/github",
+        contributions: ["example.first", "example.second"],
+      },
+    ],
+  };
+
+  render(
+    <PluginsView
+      state={{ snapshot: withConflict, stale: false }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.queryByText(/POST \/p\/example\/hooks\/github/)).toBeNull();
+  expect(screen.getByText("Routes not applied")).toBeTruthy();
 });
