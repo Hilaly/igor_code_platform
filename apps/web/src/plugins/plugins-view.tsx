@@ -161,12 +161,16 @@ function PublicRoutes({
   translator: ScopedTranslator;
 }) {
   const { t } = translator;
-  const conflicted = new Set(snapshot.routeConflicts.flatMap((conflict) => conflict.contributions));
   const open = snapshot.contributions.filter(
     (registration) =>
       registration.kind === "public-route" &&
       registration.ownership === "plugin" &&
-      !conflicted.has(registration.id),
+      !snapshot.routeConflicts.some(
+        (conflict) =>
+          conflict.method === registration.method &&
+          conflict.path === routeShape(registration.path) &&
+          conflict.contributions.includes(registration.id),
+      ),
   );
 
   if (open.length === 0) {
@@ -191,6 +195,13 @@ function PublicRoutes({
       {t("plugins.public.hint")}
     </Notice>
   );
+}
+
+function routeShape(path: string): string {
+  return path
+    .split("/")
+    .map((segment) => (segment.startsWith(":") ? ":" : segment))
+    .join("/");
 }
 
 type PluginRowProps = {
