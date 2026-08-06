@@ -281,6 +281,15 @@ describe("the routes of a plugin", () => {
     );
   });
 
+  it("gives the address to nobody when parameter names differ but the shape overlaps", async () => {
+    const { call } = await serve([
+      { kind: "route", id: "first", method: "GET", path: "items/:id" },
+      { kind: "route", id: "second", method: "GET", path: "items/:name" },
+    ]);
+
+    assert.equal((await call("GET", "/p/tasks/items/new")).status, 404);
+  });
+
   it("drops the route of a contribution the human switched off", async () => {
     const registry = createContributionRegistry();
     const logger = createLogger({ source: "core", level: () => "error", write: () => {} });
@@ -305,6 +314,67 @@ describe("the routes of a plugin", () => {
     // Таблица пересобирается по ревизии реестра: выключенный вклад уносит свой адрес с собой.
     registry.apply(plugin, declared, new Set(["tasks.board"]));
     assert.deepEqual(routes.routes(), []);
+  });
+
+  it("does not call a route after reload while its body is still arriving", async () => {
+    const registry = createContributionRegistry();
+    const logger = createLogger({ source: "core", level: () => "error", write: () => {} });
+    const calls: PluginCall[] = [];
+    const declared = [
+      { kind: "public-route" as const, id: "hook", method: "POST" as const, path: "hook" },
+    ];
+    registry.apply(plugin, declared, new Set());
+    const routes = createPluginRoutes({
+      registry,
+      plugins: {
+        call: async (_key, request) => {
+          calls.push(request);
+          return { kind: "value", value: {} };
+        },
+      },
+      logger,
+      timeoutMilliseconds: () => 1000,
+      bodyLimitBytes: () => 1024,
+      requestsPerMinute: () => 60,
+    });
+    const server = createServer(
+      createDispatcher({
+        routes: [],
+        logger,
+        authenticate: () => ({ kind: "none" }),
+        pluginRoutes: () => routes.routes(),
+      }),
+    );
+
+    servers.push(server);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+    const answer = new Promise<number>((resolve, reject) => {
+      const outgoing = sendRequest(
+        {
+          host: "127.0.0.1",
+          port,
+          method: "POST",
+          path: "/p/tasks/hook",
+          headers: { "content-type": "text/plain", "content-length": "11" },
+        },
+        (incoming) => {
+          incoming.resume();
+          incoming.on("end", () => resolve(incoming.statusCode ?? 0));
+        },
+      );
+
+      outgoing.on("error", reject);
+      outgoing.write("partial");
+      setTimeout(() => {
+        registry.apply(plugin, declared, new Set(["tasks.hook"]));
+        outgoing.end("body");
+      }, 10);
+    });
+
+    assert.equal(await answer, 404);
+    assert.equal(calls.length, 0);
   });
 });
 

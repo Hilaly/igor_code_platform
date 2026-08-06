@@ -365,6 +365,19 @@ describe("createDispatcher", () => {
 });
 
 describe("the second source of table rows", () => {
+  it("prefers a literal segment over a parameter segment", async () => {
+    const { call } = await serve([], {
+      pluginRoutes: () => [
+        { ...echo("/p/tasks/items/:id"), access: "public" },
+        { ...echo("/p/tasks/items/new"), access: "public" },
+      ],
+    });
+
+    const answer = await call("GET", "/p/tasks/items/new");
+
+    assert.deepEqual(JSON.parse(answer.body).parameters, {});
+  });
+
   it("routes to a plugin route and stops routing to it once it is gone", async () => {
     let routes: Route[] = [echo("/p/tasks/board")];
     const { call } = await serve([echo("/api/health")], { pluginRoutes: () => routes });
@@ -444,4 +457,41 @@ describe("the second source of table rows", () => {
     assert.equal((await call("PUT", "/api/plugins", JSON.stringify(long))).status, 413);
     assert.equal((await call("POST", "/p/tasks/webhook", long)).status, 200);
   });
+});
+
+it("contains body-read failures instead of creating an unhandled rejection", async () => {
+  const records: LogRecord[] = [];
+  const logger = createLogger({
+    source: "core",
+    level: () => "debug",
+    write: (record) => records.push(record),
+  });
+  const response = {
+    headersSent: false,
+    destroyed: true,
+    destroy: () => {},
+  } as unknown as import("node:http").ServerResponse;
+  const request = {
+    method: "POST",
+    url: "/api/body",
+    headers: { "content-type": "application/json" },
+    socket: { remoteAddress: "127.0.0.1" },
+    [Symbol.asyncIterator](): AsyncIterator<Buffer> {
+      return {
+        next: async () => {
+          throw new Error("aborted");
+        },
+      };
+    },
+  } as unknown as IncomingMessage;
+  const dispatch = createDispatcher({
+    routes: [{ ...echo("/api/body", "POST") }],
+    logger,
+    authenticate: () => ({ kind: "session", id: "session" }),
+  });
+
+  dispatch(request, response);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(records.some((record) => record.message.includes("request handling failed")));
 });

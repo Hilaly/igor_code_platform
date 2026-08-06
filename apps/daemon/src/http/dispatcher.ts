@@ -102,15 +102,31 @@ export function respondWithError(response: ServerResponse, status: number, error
 export function createDispatcher(
   options: CreateDispatcherOptions,
 ): (request: IncomingMessage, response: ServerResponse) => void {
-  const table = options.routes.map((route) => ({ route, pattern: segmentsOf(route.path) }));
+  const table = options.routes.map((route, order) => tableRow(route, order));
   const bodyLimitBytes = options.bodyLimitBytes ?? defaultBodyLimitBytes;
   // Таблица плагинов пересчитывается на каждый запрос: разбор пути — это `split`, а живой снимок
   // важнее экономии на нём.
-  const pluginTable = (): { route: Route; pattern: string[] }[] =>
-    (options.pluginRoutes?.() ?? []).map((route) => ({ route, pattern: segmentsOf(route.path) }));
+  const pluginTable = (): TableRow[] =>
+    (options.pluginRoutes?.() ?? []).map((route, order) => tableRow(route, table.length + order));
 
   return (request, response) => {
-    void handle(request, response);
+    void handle(request, response).catch((cause: unknown) => {
+      options.logger.error("request handling failed", {
+        method: request.method,
+        path: request.url ?? "/",
+        reason: cause instanceof Error ? (cause.stack ?? cause.message) : String(cause),
+      });
+
+      if (request.destroyed || response.destroyed || response.headersSent) {
+        if (!response.destroyed && !response.headersSent) {
+          response.destroy();
+        }
+
+        return;
+      }
+
+      respondWithError(response, 400, "the request could not be read");
+    });
   };
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -118,10 +134,15 @@ export function createDispatcher(
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const segments = segmentsOf(url.pathname);
 
-    let matched: { route: Route; parameters: RouteParameters } | undefined;
+    const matches: {
+      route: Route;
+      parameters: RouteParameters;
+      specificity: number;
+      order: number;
+    }[] = [];
     const allowed = new Set<string>();
 
-    for (const { route, pattern } of [...table, ...pluginTable()]) {
+    for (const { route, pattern, order } of [...table, ...pluginTable()]) {
       const parameters = matchRoute(pattern, segments);
 
       if (parameters === undefined) {
@@ -130,10 +151,12 @@ export function createDispatcher(
 
       allowed.add(route.method);
 
-      if (route.method === request.method && matched === undefined) {
-        matched = { route, parameters };
-      }
+      matches.push({ route, parameters, specificity: staticSegments(pattern), order });
     }
+
+    const matched = matches
+      .filter(({ route }) => route.method === request.method)
+      .sort((left, right) => right.specificity - left.specificity || left.order - right.order)[0];
 
     if (matched === undefined) {
       // Путь есть, метод не тот — это не «нет такого адреса», и клиент имеет право знать разницу.
@@ -263,6 +286,16 @@ function refuseUnsafeRequest(
 
 function segmentsOf(path: string): string[] {
   return path.split("/").filter((segment) => segment.length > 0);
+}
+
+type TableRow = { route: Route; pattern: string[]; order: number };
+
+function tableRow(route: Route, order: number): TableRow {
+  return { route, pattern: segmentsOf(route.path), order };
+}
+
+function staticSegments(pattern: string[]): number {
+  return pattern.filter((segment) => !segment.startsWith(":")).length;
 }
 
 function matchRoute(pattern: string[], segments: string[]): RouteParameters | undefined {

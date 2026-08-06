@@ -94,7 +94,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
     return window.count <= limit;
   };
 
-  const build = (): Route[] => {
+  const build = (revision: number): Route[] => {
     const declared = registry
       .pluginContributions()
       .filter(
@@ -106,7 +106,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
     const claims = new Map<string, RouteRegistration[]>();
 
     for (const registration of declared) {
-      const claim = `${registration.method} ${pathOf(registration)}`;
+      const claim = `${registration.method} ${pathShape(registration)}`;
 
       claims.set(claim, [...(claims.get(claim) ?? []), registration]);
     }
@@ -128,13 +128,13 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
         continue;
       }
 
-      routes.push(routeOf(single));
+      routes.push(routeOf(single, revision));
     }
 
     return routes;
   };
 
-  const routeOf = (registration: RouteRegistration): Route => {
+  const routeOf = (registration: RouteRegistration, revision: number): Route => {
     const open = registration.kind === "public-route";
 
     return {
@@ -168,6 +168,18 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
           access: open ? "public" : "session",
           ...(open ? { caller } : {}),
         });
+
+        // The dispatcher may have matched this row before a plugin reload while it was reading
+        // the request body. Never send an in-flight request to the replacement worker.
+        if (registry.revision() !== revision) {
+          logger.info("a stale plugin route call was refused after reload", {
+            plugin: registration.pluginKey,
+            contribution: registration.id,
+          });
+          respondWithError(context.response, 404, "not found");
+
+          return;
+        }
 
         const outcome = await plugins.call(
           registration.pluginKey,
@@ -313,7 +325,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
       const bodyLimitBytes = options.bodyLimitBytes();
 
       if (built?.revision !== revision || built.bodyLimitBytes !== bodyLimitBytes) {
-        built = { revision, bodyLimitBytes, routes: build() };
+        built = { revision, bodyLimitBytes, routes: build(revision) };
       }
 
       return built.routes;
@@ -326,4 +338,13 @@ function pathOf(registration: RouteRegistration): string {
   return registration.path === ""
     ? `/p/${registration.pluginId}`
     : `/p/${registration.pluginId}/${registration.path}`;
+}
+
+function pathShape(registration: RouteRegistration): string {
+  const path = pathOf(registration);
+
+  return path
+    .split("/")
+    .map((segment) => (segment.startsWith(":") ? ":" : segment))
+    .join("/");
 }
