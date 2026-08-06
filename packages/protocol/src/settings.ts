@@ -54,6 +54,22 @@ export type Config = {
    * по сети (docs/hooks.md).
    */
   pluginToolTimeoutMilliseconds: number;
+  /**
+   * Сколько ждать ответ воркера на запрос к маршруту плагина (docs/web-api.md). Отдельно от
+   * инструмента: инструмент ждёт модель, а здесь ждёт живое HTTP-соединение, и держать его те же две
+   * минуты значит держать открытым сокет того, кто давно ушёл.
+   */
+  pluginRouteTimeoutMilliseconds: number;
+  /**
+   * Предел тела запроса к маршруту плагина. Отдельно от общего лимита ядра: тела наших запросов —
+   * короткий json, а вебхук приносит нагрузку чужого сервиса.
+   */
+  pluginRouteBodyLimitBytes: number;
+  /**
+   * Сколько вызовов в минуту принимает публичный маршрут с одного адреса. Часть механизма, а не
+   * пожелание: иначе один публичный маршрут превращает демон в мишень (docs/web-api.md).
+   */
+  publicRouteRequestsPerMinute: number;
 };
 
 /**
@@ -123,6 +139,9 @@ export const defaultConfig: Config = {
   // покажет, мало это или много (docs/hooks.md).
   hookTimeoutMilliseconds: 5000,
   pluginToolTimeoutMilliseconds: 120000,
+  pluginRouteTimeoutMilliseconds: 30000,
+  pluginRouteBodyLimitBytes: 1048576,
+  publicRouteRequestsPerMinute: 60,
 };
 export const defaultAppearance: Appearance = {
   colorScheme: builtInColorScheme,
@@ -158,6 +177,9 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     "compactionKeepRecentTokens",
     "hookTimeoutMilliseconds",
     "pluginToolTimeoutMilliseconds",
+    "pluginRouteTimeoutMilliseconds",
+    "pluginRouteBodyLimitBytes",
+    "publicRouteRequestsPerMinute",
   ]);
   const value: Config = { ...defaultConfig };
   const logLevel = fields["logLevel"];
@@ -214,6 +236,9 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     "compactionKeepRecentTokens",
     "hookTimeoutMilliseconds",
     "pluginToolTimeoutMilliseconds",
+    "pluginRouteTimeoutMilliseconds",
+    "pluginRouteBodyLimitBytes",
+    "publicRouteRequestsPerMinute",
   ] as const) {
     const tokens = fields[key];
 
