@@ -64,7 +64,6 @@ export type ProvidersViewProps = {
 };
 
 export function ProvidersView({
-  headingLevel = 1,
   state,
   providerId,
   onOpen,

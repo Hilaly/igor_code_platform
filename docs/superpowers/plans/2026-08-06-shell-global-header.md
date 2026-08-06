@@ -21,6 +21,7 @@
 ### Task 1: Extend the UI-kit `ViewHeader` primitive
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/view-header.tsx`
 - Modify: `packages/ui-kit/src/components/view-header.module.css`
 - Modify: `packages/ui-kit/src/components/rendering.test.tsx`
@@ -28,6 +29,7 @@
 - Modify: `docs/ui-kit.md`
 
 **Interfaces:**
+
 - Consumes: existing `ViewHeaderProps`, `Heading`, role/scale tokens.
 - Produces: `ViewHeaderProps = { title: ReactNode; context?: ReactNode; level?: 1 | 2 | 3; actions?: ReactNode }` with stable `.title`, `.context`, and `.actions` CSS-module slots.
 
@@ -41,6 +43,7 @@
 ### Task 2: Add the shell header contract and permanent two-row central layout
 
 **Files:**
+
 - Create: `apps/web/src/shell/header.tsx`
 - Modify: `apps/web/src/shell/shell.tsx`
 - Modify: `apps/web/src/shell/shell.css`
@@ -48,6 +51,7 @@
 - Modify: `apps/web/src/shell/styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: UI-kit `ViewHeader`, current `ShellProps`, `ShellLayout`, `contentMode`.
 - Produces: `ShellHeaderDescription`, `ShellHeaderProvider`, and `useShellHeader(description)`; `Shell` accepts a route-level `header` description and always renders a permanent central header.
 
@@ -61,6 +65,7 @@
 ### Task 3: Provide route-level headers and migrate every current view
 
 **Files:**
+
 - Modify: `apps/web/src/App.tsx`
 - Modify: `apps/web/src/shell/page.tsx`
 - Modify: `apps/web/src/sessions/chat-view.tsx`
@@ -76,6 +81,7 @@
 - Modify: `apps/web/src/shell/shell.test.tsx` and the affected view tests
 
 **Interfaces:**
+
 - Consumes: `ShellHeaderDescription`, `useShellHeader`, existing translators, route data and local view actions.
 - Produces: one shell-level heading/context/actions description for every `Page.kind`, with no duplicate top-level heading inside the page body.
 
@@ -89,11 +95,13 @@
 ### Task 4: Verify responsive scroll behavior and visual alignment
 
 **Files:**
+
 - Modify: `apps/web/src/shell/shell.css` only if focused visual checks identify a host-geometry defect
 - Modify: `apps/web/src/shell/styles.test.ts` and relevant component tests for regressions
 - Modify: `docs/ui-kit.md` and `docs/superpowers/specs/2026-08-06-shell-global-header-design.md` only if implementation clarifies a documented invariant
 
 **Interfaces:**
+
 - Consumes: completed UI-kit primitive, shell grid, all route registrations.
 - Produces: verified desktop and narrow layouts with fixed central header, independent body scrolling, and unchanged side-panel interactions.
 

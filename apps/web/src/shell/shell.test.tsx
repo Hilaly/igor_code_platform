@@ -106,6 +106,30 @@ describe("global shell header", () => {
     expect(screen.getByRole("heading", { name: "Базовый заголовок" })).toBeDefined();
     expect(screen.getByText("Маршрут")).toBeDefined();
   });
+
+  it("restores the most recently mounted registration when another registration unmounts", () => {
+    function RegisteredHeader({ title }: { title: string }): React.JSX.Element {
+      useShellHeader({ title });
+      return <div>{title}</div>;
+    }
+
+    const view = show({
+      header: { title: "База" },
+      children: (
+        <>
+          <RegisteredHeader title="Первый" />
+          <RegisteredHeader title="Второй" />
+        </>
+      ),
+    });
+
+    expect(screen.getByRole("heading", { name: "Второй" })).toBeDefined();
+    view.again(defaultLayout, {
+      header: { title: "База" },
+      children: <RegisteredHeader title="Первый" />,
+    });
+    expect(screen.getByRole("heading", { name: "Первый" })).toBeDefined();
+  });
 });
 
 function drag(separator: HTMLElement, startX: number, moves: number[]): void {

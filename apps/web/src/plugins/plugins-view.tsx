@@ -51,13 +51,7 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   failed: "danger",
 };
 
-export function PluginsView({
-  headingLevel = 1,
-  state,
-  onSwitch,
-  onOpen,
-  translator,
-}: PluginsViewProps) {
+export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
 

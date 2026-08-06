@@ -31,7 +31,7 @@ export function ShellHeaderProvider({
   children: ReactNode;
 }): React.JSX.Element {
   const baseRef = useRef(baseDescription);
-  const registrationsRef = useRef(new Set<symbol>());
+  const registrationsRef = useRef(new Map<symbol, ShellHeaderDescription>());
   const [description, setDescription] = useState(baseDescription);
 
   useLayoutEffect(() => {
@@ -43,14 +43,13 @@ export function ShellHeaderProvider({
 
   const register = useCallback((registeredDescription: ShellHeaderDescription): (() => void) => {
     const token = Symbol("shell-header");
-    registrationsRef.current.add(token);
+    registrationsRef.current.set(token, registeredDescription);
     setDescription(registeredDescription);
 
     return () => {
       registrationsRef.current.delete(token);
-      if (registrationsRef.current.size === 0) {
-        setDescription(baseRef.current);
-      }
+      const activeRegistration = [...registrationsRef.current.values()].at(-1);
+      setDescription(activeRegistration ?? baseRef.current);
     };
   }, []);
 

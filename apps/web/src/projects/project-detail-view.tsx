@@ -27,7 +27,6 @@ export function ProjectDetailView({
   failure,
   fileResources,
   loaded,
-  headingLevel = 1,
   onBack,
   onNewSession,
   translator,

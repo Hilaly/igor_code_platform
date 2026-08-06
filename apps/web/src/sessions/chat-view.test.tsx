@@ -153,15 +153,6 @@ function HeaderProbe(): React.JSX.Element {
   return <ViewHeader {...useActiveShellHeader()} />;
 }
 
-function renderChat(props: ChatViewProps): ReturnType<typeof render> {
-  return render(
-    <ShellHeaderProvider description={{ title: "Сессии" }}>
-      <HeaderProbe />
-      <ChatView {...props} />
-    </ShellHeaderProvider>,
-  );
-}
-
 function chooseModel(scope: HTMLElement, provider: string, reference: RegExp): void {
   fireEvent.click(within(scope).getByRole("combobox", { name: "Модель" }));
   fireEvent.click(screen.getByRole("treeitem", { name: provider }).querySelector("div")!);

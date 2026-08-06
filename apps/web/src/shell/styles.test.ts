@@ -172,14 +172,20 @@ describe("the style sheets of the application", () => {
   it("keeps the central page in a permanent header and body grid", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
-    expect(shell).toMatch(/\.shell-page\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\);/s);
-    expect(shell).toMatch(/\.shell-header[\s,]*\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s);
+    expect(shell).toMatch(
+      /\.shell-page\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\);/s,
+    );
+    expect(shell).toMatch(
+      /\.shell-header[\s,]*\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
+    );
     expect(shell).toMatch(/\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s);
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*hidden;/s);
     expect(shell).toMatch(/\.shell-body\s*\{[^}]*overflow:\s*auto;/s);
     expect(shell).not.toMatch(/\.shell-header[^}]*position:\s*(?:sticky|absolute)/s);
     expect(shell).not.toMatch(/\.shell-header[^}]*(?:100vh|100dvh)/s);
-    expect(shell).toMatch(/\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s,
+    );
   });
 
   it("scopes the composer option collapse to its own container", () => {

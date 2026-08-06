@@ -51,7 +51,6 @@ export function ProjectsView(props: ProjectsViewProps) {
   const snapshot = state.snapshot;
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
-  const headingLevel = props.headingLevel ?? 1;
 
   if (snapshot === undefined) {
     return (

@@ -51,7 +51,6 @@ type ContributionEntry = { registration: ContributionRegistration; off: boolean 
 
 export function PluginDetailView({
   state,
-  headingLevel = 1,
   pluginKey,
   onBack,
   onSwitch,
