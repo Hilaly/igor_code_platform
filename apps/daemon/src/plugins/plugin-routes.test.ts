@@ -307,3 +307,31 @@ describe("the routes of a plugin", () => {
     assert.deepEqual(routes.routes(), []);
   });
 });
+
+it("rebuilds the table when the limit of the body changed, not only when the registry did", async () => {
+  const registry = createContributionRegistry();
+  const logger = createLogger({ source: "core", level: () => "error", write: () => {} });
+  let bodyLimitBytes = 64;
+  const routes = createPluginRoutes({
+    registry,
+    plugins: { call: async () => ({ kind: "value", value: {} }) },
+    logger,
+    timeoutMilliseconds: () => 1000,
+    bodyLimitBytes: () => bodyLimitBytes,
+    requestsPerMinute: () => 60,
+  });
+
+  registry.apply(
+    plugin,
+    [{ kind: "route", id: "board", method: "POST", path: "board" }],
+    new Set(),
+  );
+
+  assert.equal(routes.routes()[0]?.bodyLimitBytes, 64);
+
+  // Правка `config.json` ревизию реестра не двигает, а предел лежит в строке таблицы: без этого
+  // маршрут отвечал бы прежним пределом до следующей перезагрузки плагина.
+  bodyLimitBytes = 128;
+
+  assert.equal(routes.routes()[0]?.bodyLimitBytes, 128);
+});

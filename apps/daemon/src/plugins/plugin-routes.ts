@@ -60,7 +60,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
   /** Окна лимита частоты по паре «вклад + адрес вызывающего» (docs/web-api.md). */
   const windows = new Map<string, { startedAt: number; count: number }>();
 
-  let built: { revision: number; routes: Route[] } | undefined;
+  let built: { revision: number; bodyLimitBytes: number; routes: Route[] } | undefined;
 
   const callerOf = (request: IncomingMessage): string =>
     request.socket.remoteAddress ?? "unknown caller";
@@ -306,9 +306,13 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
   return {
     routes: () => {
       const revision = registry.revision();
+      // Предел тела лежит в строке таблицы, поэтому он часть ключа снимка: правка `config.json`
+      // ревизию реестра не двигает, и без этого таблица отвечала бы прежним пределом до следующей
+      // перезагрузки плагина. Найдено проверкой запуском, а не тестом.
+      const bodyLimitBytes = options.bodyLimitBytes();
 
-      if (built?.revision !== revision) {
-        built = { revision, routes: build() };
+      if (built?.revision !== revision || built.bodyLimitBytes !== bodyLimitBytes) {
+        built = { revision, bodyLimitBytes, routes: build() };
       }
 
       return built.routes;
