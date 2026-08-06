@@ -193,9 +193,11 @@ export const Surfaces = () => (
 
 export const ViewHeaders = () => (
   <div style={column}>
+    <h3>Wide container</h3>
     <div style={{ display: "grid", gap: "var(--sovereign-space-3)" }}>
       <ViewHeader title="Системный журнал" />
       <ViewHeader title="Системный журнал" context="/workspace/sovereign-platform" />
+      <ViewHeader title="Системный журнал" actions={<Button size="sm" onClick={() => {}}>Обновить</Button>} />
       <ViewHeader
         title="Системный журнал"
         context="/workspace/sovereign-platform"
@@ -214,8 +216,11 @@ export const ViewHeaders = () => (
         }
       />
     </div>
+    <h3>Narrow container</h3>
     <div style={{ maxWidth: "22rem" }}>
+      <ViewHeader title="Системный журнал" />
       <ViewHeader title="Системный журнал" context="/workspace/sovereign-platform" />
+      <ViewHeader title="Системный журнал" actions={<Button size="sm" onClick={() => {}}>Обновить</Button>} />
       <ViewHeader
         title="Системный журнал"
         context="/workspace/sovereign-platform"

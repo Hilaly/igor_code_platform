@@ -19,7 +19,7 @@ export function ViewHeader({ title, context, level = 1, actions }: ViewHeaderPro
         <div className={styles.title}>
           <Heading level={level}>{title}</Heading>
         </div>
-        {context === undefined ? undefined : (
+        {context == null ? undefined : (
           <span
             className={styles.context}
             title={typeof context === "string" ? context : undefined}
@@ -28,7 +28,7 @@ export function ViewHeader({ title, context, level = 1, actions }: ViewHeaderPro
           </span>
         )}
       </div>
-      {actions === undefined ? undefined : <div className={styles.actions}>{actions}</div>}
+      {actions == null ? undefined : <div className={styles.actions}>{actions}</div>}
     </header>
   );
 }

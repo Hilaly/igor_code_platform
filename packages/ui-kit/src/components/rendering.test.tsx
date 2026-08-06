@@ -126,6 +126,13 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toMatch(/class="[^"]*actions[^"]*"/);
   });
 
+  it("omits null context and actions slots", () => {
+    const markup = renderToStaticMarkup(<ViewHeader title="Без слотов" context={null} actions={null} />);
+
+    expect(markup).not.toMatch(/class="[^"]*context[^"]*"/);
+    expect(markup).not.toMatch(/class="[^"]*actions[^"]*"/);
+  });
+
   it("renders context alongside the heading", () => {
     const markup = renderToStaticMarkup(
       <ViewHeader title="Проект" context="/workspace/project" level={3} />,
