@@ -42,10 +42,21 @@ export type Route = {
   /** Сегмент вида `:имя` попадает в `parameters`; остальные сравниваются буквально. */
   path: string;
   /**
-   * `open` — маршрут отвечает и без сессии. Поле необязательное, и его отсутствие значит «нужна
-   * сессия»: забытое поле делает новый маршрут защищённым, а не открытым.
+   * Кому маршрут отвечает. Поле необязательное, и его отсутствие значит «нужна сессия»: забытое
+   * поле делает новый маршрут защищённым, а не открытым.
+   *
+   * - `open` — маршрут ядра, отвечающий и без сессии: состояние входа, вход, регистрация и проба
+   *   здоровья. Проверки формы изменяющего запроса он проходит наравне с остальными — ровно на них
+   *   и держится защита открытых маршрутов от межсайтового запроса (docs/web-api.md).
+   * - `public` — публичный маршрут плагина, открытый **наружу**. Ни сессии, ни проверок формы: у
+   *   него нет cookie, которую эти проверки защищают, а `content-type` вызывающего ему не
+   *   принадлежит. Аутентифицирует себя такой маршрут сам (docs/web-api.md).
    */
-  access?: "open";
+  access?: "open" | "public";
+  /** Свой предел тела. Не сказано — общий: тела наших запросов короткие, а вебхук приносит чужие. */
+  bodyLimitBytes?: number;
+  /** `raw` отдаёт тело буфером, не разбирая его как json: форму тела знает только автор маршрута. */
+  body?: "json" | "raw";
   handle: RouteHandler;
 };
 
@@ -58,6 +69,13 @@ export type CreateDispatcherOptions = {
    */
   authenticate: (request: IncomingMessage) => Authentication;
   bodyLimitBytes?: number;
+  /**
+   * Второй источник строк таблицы — маршруты плагинов (docs/web-api.md). Функция, а не массив:
+   * набор меняется при каждой перезагрузке любого плагина, а регистрация и снятие строк в живой
+   * таблице — это ровно та ошибка, из-за которой отвергнут Hono: устаревший обработчик, который
+   * продолжает отвечать.
+   */
+  pluginRoutes?: () => Route[];
 };
 
 /**
@@ -86,6 +104,10 @@ export function createDispatcher(
 ): (request: IncomingMessage, response: ServerResponse) => void {
   const table = options.routes.map((route) => ({ route, pattern: segmentsOf(route.path) }));
   const bodyLimitBytes = options.bodyLimitBytes ?? defaultBodyLimitBytes;
+  // Таблица плагинов пересчитывается на каждый запрос: разбор пути — это `split`, а живой снимок
+  // важнее экономии на нём.
+  const pluginTable = (): { route: Route; pattern: string[] }[] =>
+    (options.pluginRoutes?.() ?? []).map((route) => ({ route, pattern: segmentsOf(route.path) }));
 
   return (request, response) => {
     void handle(request, response);
@@ -99,7 +121,7 @@ export function createDispatcher(
     let matched: { route: Route; parameters: RouteParameters } | undefined;
     const allowed = new Set<string>();
 
-    for (const { route, pattern } of table) {
+    for (const { route, pattern } of [...table, ...pluginTable()]) {
       const parameters = matchRoute(pattern, segments);
 
       if (parameters === undefined) {
@@ -128,8 +150,9 @@ export function createDispatcher(
     }
 
     // Форма запроса проверяется до сессии: ответ на негодный запрос не имеет права зависеть от
-    // того, есть ли cookie, — иначе отказ рассказывал бы о состоянии входа.
-    if (request.method !== "GET") {
+    // того, есть ли cookie, — иначе отказ рассказывал бы о состоянии входа. Публичный маршрут
+    // плагина её не проходит вовсе: защищать ею нечего, а отсекла бы она чужой вебхук.
+    if (request.method !== "GET" && matched.route.access !== "public") {
       const refusal = refuseUnsafeRequest(request);
 
       if (refusal !== undefined) {
@@ -145,7 +168,7 @@ export function createDispatcher(
     const authentication = options.authenticate(request);
     const session = authentication.kind === "session" ? { id: authentication.id } : undefined;
 
-    if (session === undefined && matched.route.access !== "open") {
+    if (session === undefined && matched.route.access === undefined) {
       respondWithError(response, 401, "the request needs a session");
 
       return;
@@ -156,10 +179,14 @@ export function createDispatcher(
     const body =
       request.method === "GET" || request.method === "DELETE"
         ? { kind: "absent" as const }
-        : await readJsonBody(request, bodyLimitBytes);
+        : await readBody(request, matched.route.bodyLimitBytes ?? bodyLimitBytes, matched.route);
 
     if (body.kind === "too-large") {
-      respondWithError(response, 413, `the request body must not exceed ${bodyLimitBytes} bytes`);
+      respondWithError(
+        response,
+        413,
+        `the request body must not exceed ${matched.route.bodyLimitBytes ?? bodyLimitBytes} bytes`,
+      );
 
       return;
     }
@@ -283,7 +310,16 @@ type BodyOutcome =
   | { kind: "too-large" }
   | { kind: "invalid"; reason: string };
 
-async function readJsonBody(request: IncomingMessage, limitBytes: number): Promise<BodyOutcome> {
+/**
+ * Тело маршрута ядра — всегда json, и негодный json это `400`. Тело маршрута плагина, наоборот, не
+ * разбирается вовсе: его форму знает только автор маршрута, а вебхук приносит что угодно —
+ * подписанный текст, форму, байты (docs/web-api.md).
+ */
+async function readBody(
+  request: IncomingMessage,
+  limitBytes: number,
+  route: Route,
+): Promise<BodyOutcome> {
   const chunks: Buffer[] = [];
   let size = 0;
 
@@ -303,8 +339,14 @@ async function readJsonBody(request: IncomingMessage, limitBytes: number): Promi
     return { kind: "absent" };
   }
 
+  const body = Buffer.concat(chunks);
+
+  if (route.body === "raw") {
+    return { kind: "parsed", value: body };
+  }
+
   try {
-    return { kind: "parsed", value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
+    return { kind: "parsed", value: JSON.parse(body.toString("utf8")) };
   } catch (cause) {
     return { kind: "invalid", reason: cause instanceof Error ? cause.message : String(cause) };
   }

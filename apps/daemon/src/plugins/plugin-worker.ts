@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 import { deliverEvent } from "@sovereign/sdk/events";
 import { installPluginHost } from "@sovereign/sdk/host";
 import { invokeHookHandler } from "@sovereign/sdk/hooks";
+import { invokeRoute } from "@sovereign/sdk/routes";
 import { invokeTool } from "@sovereign/sdk/tools";
 import type {
   LoginDialogue,
@@ -20,6 +21,7 @@ import type {
   PluginModule,
   ProviderResponse,
   SessionResponse,
+  StorageResponse,
 } from "@sovereign/sdk";
 
 import type {
@@ -45,9 +47,9 @@ const describe = (cause: unknown): string =>
   cause instanceof Error ? (cause.stack ?? cause.message) : String(cause);
 
 /**
- * Единственная пара «запрос-ответ» в канале (docs/models-and-providers.md). Счётчик локален для
- * воркера: ядро отвечает тому же воркеру, из которого пришёл запрос, поэтому глобальная
- * уникальность идентификатора не нужна.
+ * Пара «воркер спрашивает ядро» (docs/models-and-providers.md). Счётчик локален для воркера: ядро
+ * отвечает тому же воркеру, из которого пришёл запрос, поэтому глобальная уникальность
+ * идентификатора не нужна.
  */
 const awaitingAnswer = new Map<string, (response: PluginResponse) => void>();
 let requestsSent = 0;
@@ -99,6 +101,13 @@ installPluginHost({
       const requestId = nextRequestId();
 
       awaitingAnswer.set(requestId, (response) => resolve(response as SessionResponse));
+      send({ kind: "request", requestId, request });
+    }),
+  storage: (request) =>
+    new Promise((resolve) => {
+      const requestId = nextRequestId();
+
+      awaitingAnswer.set(requestId, (response) => resolve(response as StorageResponse));
       send({ kind: "request", requestId, request });
     }),
   login: (input) =>
@@ -192,6 +201,12 @@ const answerCall = async (callId: string, call: PluginCall): Promise<void> => {
     try {
       if (call.kind === "tool") {
         return { kind: "value", value: await invokeTool(call.contributionId, call.arguments) };
+      }
+
+      if (call.kind === "route") {
+        // Ответ маршрута — обычное значение: отказа у него нет вовсе, свой отказ маршрут выражает
+        // кодом ответа, а не исходом вызова (docs/web-api.md).
+        return { kind: "value", value: await invokeRoute(call.contributionId, call.request) };
       }
 
       const value = await invokeHookHandler(call.contributionId, call.payload);

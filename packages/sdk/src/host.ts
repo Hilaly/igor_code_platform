@@ -154,7 +154,8 @@ export type PluginContribution =
   | ({ kind: "agent" } & AgentContribution)
   | ({ kind: "hook" } & HookContribution)
   | ({ kind: "tool" } & ToolContribution)
-  | ({ kind: "route" | "public-route" } & RouteContribution);
+  | ({ kind: "route" } & RouteContribution)
+  | ({ kind: "public-route" } & RouteContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

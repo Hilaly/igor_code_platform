@@ -33,6 +33,8 @@ type ServeOptions = {
   bodyLimitBytes?: number;
   /** По умолчанию сессия есть: тесты маршрутизации не про вход. */
   authenticate?: (request: IncomingMessage) => Authentication;
+  /** Второй источник строк таблицы: маршруты плагинов появляются и исчезают на живом демоне. */
+  pluginRoutes?: () => Route[];
 };
 
 async function serve(routes: Route[], options: ServeOptions = {}) {
@@ -49,6 +51,7 @@ async function serve(routes: Route[], options: ServeOptions = {}) {
       logger,
       authenticate: options.authenticate ?? (() => ({ kind: "session", id: "the-session" })),
       ...(options.bodyLimitBytes === undefined ? {} : { bodyLimitBytes: options.bodyLimitBytes }),
+      ...(options.pluginRoutes === undefined ? {} : { pluginRoutes: options.pluginRoutes }),
     }),
   );
 
@@ -358,5 +361,87 @@ describe("createDispatcher", () => {
     ]);
 
     assert.deepEqual(JSON.parse((await call("GET", "/api/slow")).body), { done: true });
+  });
+});
+
+describe("the second source of table rows", () => {
+  it("routes to a plugin route and stops routing to it once it is gone", async () => {
+    let routes: Route[] = [echo("/p/tasks/board")];
+    const { call } = await serve([echo("/api/health")], { pluginRoutes: () => routes });
+
+    assert.equal((await call("GET", "/p/tasks/board")).status, 200);
+
+    // Перезагруженный плагин уносит свои строки с собой: устаревший обработчик, который продолжает
+    // отвечать, — худший исход (docs/web-api.md, «Почему так»).
+    routes = [];
+
+    assert.equal((await call("GET", "/p/tasks/board")).status, 404);
+  });
+
+  it("keeps the session check on an ordinary route of a plugin", async () => {
+    const { call } = await serve([], {
+      ...withoutSession,
+      pluginRoutes: () => [echo("/p/tasks/board")],
+    });
+
+    // Защита не в обработчике, поэтому маршрут чужого кода не может оказаться незащищённым
+    // случайно (docs/web-api.md).
+    assert.equal((await call("GET", "/p/tasks/board")).status, 401);
+  });
+
+  it("answers a public route of a plugin without a session and without the form checks", async () => {
+    const { call } = await serve([], {
+      ...withoutSession,
+      pluginRoutes: () => [{ ...echo("/p/tasks/webhook", "POST"), access: "public", body: "raw" }],
+    });
+
+    // Ни cookie, ни `application/json`: у публичного маршрута нет сессии, которую эти проверки
+    // защищают, а `content-type` чужого вебхука платформе не принадлежит.
+    const answer = await call("POST", "/p/tasks/webhook", "подписанный текст", {
+      "content-type": "text/plain",
+    });
+
+    assert.equal(answer.status, 200);
+    // Тело не разбирается как json: его форму знает только автор маршрута.
+    assert.deepEqual(JSON.parse(answer.body).body, {
+      type: "Buffer",
+      data: [...Buffer.from("подписанный текст")],
+    });
+  });
+
+  it("keeps the form checks on an open route of the core", async () => {
+    const { call } = await serve([{ ...echo("/api/account", "POST"), access: "open" }], {
+      ...withoutSession,
+    });
+
+    // Открытый маршрут ядра работает по cookie, которую он сам и выдаёт: на нём оба замка
+    // обязательны, и это единственное, что защищает чистый демон (docs/web-api.md).
+    assert.equal(
+      (await call("POST", "/api/account", "{}", { "content-type": "text/plain" })).status,
+      415,
+    );
+    assert.equal(
+      (
+        await call("POST", "/api/account", "{}", {
+          "content-type": "application/json",
+          "sec-fetch-site": "cross-site",
+        })
+      ).status,
+      403,
+    );
+  });
+
+  it("gives a plugin route its own limit of the body", async () => {
+    const { call } = await serve([echo("/api/plugins", "PUT")], {
+      bodyLimitBytes: 16,
+      pluginRoutes: () => [
+        { ...echo("/p/tasks/webhook", "POST"), bodyLimitBytes: 1024, body: "raw" },
+      ],
+    });
+
+    const long = "a".repeat(64);
+
+    assert.equal((await call("PUT", "/api/plugins", JSON.stringify(long))).status, 413);
+    assert.equal((await call("POST", "/p/tasks/webhook", long)).status, 200);
   });
 });

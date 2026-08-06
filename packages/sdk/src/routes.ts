@@ -15,8 +15,8 @@ export const pluginRouteMethods = ["GET", "POST", "PUT", "DELETE"] as const;
 export type PluginRouteMethod = (typeof pluginRouteMethods)[number];
 
 /**
- * Тело **буферизуется**: строка или байты. Потока здесь нет и не будет, пока граница воркера —
- * структурное клонирование; цена названа прямо в docs/web-api.md.
+ * Тело ответа **буферизуется**: строка или байты. Потока здесь нет и не будет, пока граница воркера
+ * — структурное клонирование; цена названа прямо в docs/web-api.md.
  */
 export type PluginRouteBody = string | Uint8Array;
 
@@ -30,7 +30,11 @@ export type PluginRouteRequest = {
   query: Record<string, string>;
   /** Заголовки как есть, именами в нижнем регистре: публичный маршрут аутентифицирует себя сам. */
   headers: Record<string, string>;
-  body?: PluginRouteBody;
+  /**
+   * Тело запроса всегда байтами, даже когда это json: форму тела знает автор маршрута, а не
+   * платформа, и декодирует его он же — `new TextDecoder().decode(body)`.
+   */
+  body?: Uint8Array;
   /**
    * Пришёл ли запрос без сессии. У публичного маршрута — всегда `true`, и это напоминание автору:
    * вызывающего платформа не проверяла вовсе.

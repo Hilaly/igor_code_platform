@@ -35,7 +35,9 @@ import { createModelCatalogStore } from "./providers/public.ts";
 import {
   createContributionRegistry,
   createPluginProviders,
+  createPluginRoutes,
   createPluginSessions,
+  createPluginStorage,
   createPluginSupervisor,
   createPluginWatcher,
   createStandaloneFileResourceService,
@@ -43,6 +45,7 @@ import {
   defaultPluginRoots,
   discoverPlugins,
   isSessionRequest,
+  isStorageRequest,
   pluginPreferencesRoute,
   pluginsRoute,
   projectPluginRoots,
@@ -236,6 +239,10 @@ const pluginProviders = createPluginProviders({
  */
 const pluginSessions: { answer?: PluginSessions["answer"] } = {};
 
+// Хранилище плагина: ключ-значение файлом и папка внутри директории данных (docs/plugins.md). Ключ
+// хранилища — источник плюс идентификатор, поэтому перекрывающая копия не работает с чужими данными.
+const pluginStorage = createPluginStorage({ directory, logger });
+
 const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
@@ -244,6 +251,12 @@ const plugins = createPluginSupervisor({
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),
   onRequest: async (plugin, request, call) => {
+    // Видов запроса три, и разводит их вид самого запроса: у сессий он начинается с `session-` или
+    // `agent-`, у хранилища — с `storage-`, остальное про провайдеров (docs/plugins.md).
+    if (isStorageRequest(request)) {
+      return pluginStorage.answer(plugin, request);
+    }
+
     if (!isSessionRequest(request)) {
       return pluginProviders.request(plugin, request, call);
     }
@@ -443,8 +456,23 @@ publishLoginOutcomes({
   },
 });
 
+/**
+ * Маршруты плагинов — второй источник строк таблицы диспетчера (docs/web-api.md). Функция, а не
+ * массив: набор меняется при каждой перезагрузке любого плагина.
+ */
+const pluginHttpRoutes = createPluginRoutes({
+  registry: contributions,
+  plugins,
+  logger,
+  // Все три читаются живьём, как остальные ключи `config.json`.
+  timeoutMilliseconds: () => settings.current().config.pluginRouteTimeoutMilliseconds,
+  bodyLimitBytes: () => settings.current().config.pluginRouteBodyLimitBytes,
+  requestsPerMinute: () => settings.current().config.publicRouteRequestsPerMinute,
+});
+
 const server = createDaemonServer({
   logger,
+  pluginRoutes: () => pluginHttpRoutes.routes(),
   // Проверка одна на все маршруты и живёт в диспетчере, а не в обработчиках: новый маршрут не может
   // случайно оказаться незащищённым, потому что защита не в нём (docs/web-api.md).
   authenticate: createSessionCheck({ sessions: loginSessions, account }),
@@ -461,6 +489,8 @@ const server = createDaemonServer({
       availability: (project) => projectAvailability.of(project.id),
       sessionCount: (folderKey) => sessions.countByFolderKey(folderKey),
       projectLifecycle,
+      // Данные плагинов из папки проекта уходят вместе с записью проекта (docs/plugins.md).
+      onRemoved: (projectId) => pluginStorage.removeProject(projectId),
     }),
     ...projectResourceRoutes({
       projects,

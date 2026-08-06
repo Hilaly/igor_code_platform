@@ -8,6 +8,7 @@ import { isRuntimeHookName } from "@sovereign/agent-runtime-pi";
 import {
   coreEventNamespace,
   isHookCriticality,
+  isPluginRouteMethod,
   isSubscribablePlatformHook,
   isThinkingLevel,
   pluginSourceRank,
@@ -33,6 +34,13 @@ const declaredIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
  * законная в остальных идентификаторах, здесь запрещена (docs/plugins.md).
  */
 const toolNamePattern = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * Сегмент пути маршрута плагина: обычный или `:имя` — его значение уезжает в параметры запроса.
+ * Пустой сегмент, `.` и `..` не проходят, поэтому объявленный путь не выходит за свой префикс
+ * (docs/web-api.md).
+ */
+const routeSegmentPattern = /^:?[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export type ContributionApplyOutcome = {
   registered: ContributionRegistration[];
@@ -744,6 +752,26 @@ function programmaticRegistration(
     return { ...common, kind: "tool", description, parameters: contribution.parameters };
   }
 
+  if (contribution.kind === "route" || contribution.kind === "public-route") {
+    if (!isPluginRouteMethod(contribution.method)) {
+      problems.push(
+        `the route ${id} names an unknown method ${JSON.stringify(contribution.method)}`,
+      );
+      return undefined;
+    }
+
+    const path = normalizeRoutePath(contribution.path);
+
+    if (path === undefined) {
+      problems.push(
+        `the route ${id} must declare a path of segments matching ${routeSegmentPattern.source}, got ${JSON.stringify(contribution.path)}`,
+      );
+      return undefined;
+    }
+
+    return { ...common, kind: contribution.kind, method: contribution.method, path };
+  }
+
   const instructions =
     typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
   if (instructions === "") {
@@ -782,6 +810,30 @@ function programmaticRegistration(
       : { thinkingLevel: contribution.thinkingLevel }),
     skills: { include: skillInclude, exclude: skillExclude },
   };
+}
+
+/**
+ * Приводит объявленный путь к виду таблицы: без ведущего и хвостового слэша, сегментами. Путь
+ * пустой — это адрес самого плагина (`/p/<id>/`), и он законен: плагину с одним маршрутом незачем
+ * придумывать ему имя.
+ */
+function normalizeRoutePath(declared: unknown): string | undefined {
+  if (typeof declared !== "string") {
+    return undefined;
+  }
+
+  const segments = declared.split("/").filter((segment) => segment.length > 0);
+
+  if (!segments.every((segment) => routeSegmentPattern.test(segment))) {
+    return undefined;
+  }
+
+  const parameters = segments
+    .filter((segment) => segment.startsWith(":"))
+    .map((segment) => segment.slice(1));
+
+  // Два одинаковых имени параметра означали бы, что одно значение молча съедает другое.
+  return new Set(parameters).size === parameters.length ? segments.join("/") : undefined;
 }
 
 function selectionPart(

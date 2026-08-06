@@ -41,6 +41,12 @@ export type ProjectsRouteOptions = {
    */
   sessionCount?: (folderKey: string) => number;
   projectLifecycle?: ProjectLifecycle;
+  /**
+   * Запись проекта удалена безвозвратно. Нужен тем, кто держит состояние по идентификатору проекта:
+   * хранилища плагинов из его папки уходят вместе с ним, иначе директория данных копит состояние
+   * плагинов из папок, которых больше нет (docs/plugins.md).
+   */
+  onRemoved?: (projectId: string) => void;
 };
 
 export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
@@ -260,6 +266,7 @@ export function projectsRoutes(options: ProjectsRouteOptions): Route[] {
 
           // Папку пользователя платформа не удаляет никогда (docs/sessions-and-projects.md): уходит
           // запись, а не работа.
+          options.onRemoved?.(id);
           logger.info("a project record was removed", { project: id });
           respondWithJson(response, 200, { id });
         });

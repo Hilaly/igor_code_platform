@@ -142,11 +142,16 @@ export function isPluginRouteMethod(value: unknown): value is PluginRouteMethod 
  * открытым наружу маршрутом слишком велика для булева поля, которое легко скопировать из чужого
  * примера вместе со значением (docs/web-api.md, «Почему так»).
  */
-export type RouteContributionRegistration = RegistrationCommon & {
-  kind: "route" | "public-route";
+type RouteRegistrationCommon = RegistrationCommon & {
   method: PluginRouteMethod;
   /** Без ведущего слэша, сегментами; сегмент вида `:имя` попадает в параметры запроса. */
   path: string;
+};
+
+export type RouteContributionRegistration = RouteRegistrationCommon & { kind: "route" };
+
+export type PublicRouteContributionRegistration = RouteRegistrationCommon & {
+  kind: "public-route";
 };
 
 export type ContributionRegistration =
@@ -156,7 +161,8 @@ export type ContributionRegistration =
   | SkillContributionRegistration
   | ToolContributionRegistration
   | HookSubscriptionContributionRegistration
-  | RouteContributionRegistration;
+  | RouteContributionRegistration
+  | PublicRouteContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
