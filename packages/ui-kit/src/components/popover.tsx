@@ -68,20 +68,26 @@ export function Popover({
       const contentRect = content.getBoundingClientRect();
       const roomRight = window.innerWidth - triggerRect.right;
       const roomLeft = triggerRect.left;
-      const width = Math.min(contentRect.width, Math.max(0, window.innerWidth - 16));
-      const height = Math.min(contentRect.height, Math.max(0, window.innerHeight - 16));
+      const gap = 8;
+      const maxWidth = Math.max(0, window.innerWidth - gap * 2);
+      const maxHeight = Math.max(0, window.innerHeight - gap * 2);
+      const width = Math.min(contentRect.width, maxWidth);
+      const height = Math.min(contentRect.height, maxHeight);
       content.style.maxWidth = `${width}px`;
       content.style.maxHeight = `${height}px`;
-      const gap = 8;
+      const nextSide =
+        side === "right" && roomRight < width && roomLeft >= width
+          ? "left"
+          : side === "left" && roomLeft < width && roomRight >= width
+            ? "right"
+            : side;
       const preferredLeft =
-        side === "left" ? triggerRect.left - width - gap : triggerRect.right + gap;
-      const horizontalLeft =
-        side === "right" && roomRight >= width
-          ? preferredLeft
-          : side === "left" && roomLeft >= width
-            ? preferredLeft
-            : Math.max(gap, Math.min(preferredLeft, window.innerWidth - width - gap));
-      const preferredTop = side === "top" ? triggerRect.top - height - gap : triggerRect.top;
+        nextSide === "left" ? triggerRect.left - gap - width : triggerRect.right + gap;
+      const horizontalLeft = Math.max(
+        gap,
+        Math.min(preferredLeft, window.innerWidth - width - gap),
+      );
+      const preferredTop = nextSide === "top" ? triggerRect.top - height - gap : triggerRect.top;
       const top = Math.max(gap, Math.min(preferredTop, window.innerHeight - height - gap));
       setViewportStyle({
         position: "fixed",
@@ -89,17 +95,7 @@ export function Popover({
         top: `${top}px`,
         transform: "none",
       });
-      if (side === "right" && roomRight < contentRect.width && roomLeft >= contentRect.width) {
-        setResolvedSide("left");
-      } else if (
-        side === "left" &&
-        roomLeft < contentRect.width &&
-        roomRight >= contentRect.width
-      ) {
-        setResolvedSide("right");
-      } else {
-        setResolvedSide(side);
-      }
+      setResolvedSide(nextSide);
     };
     resolveSide();
     window.addEventListener("resize", resolveSide);

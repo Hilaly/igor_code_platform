@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type ThinkingLevel } from "@sovereign/protocol";
 
 import { NextTurnPicker, type NextTurnPickerProps } from "./next-turn-picker.tsx";
+import { Popover } from "./popover.tsx";
 
 afterEach(cleanup);
 
@@ -132,7 +133,7 @@ describe("the NextTurnPicker", () => {
     expect(document.activeElement).toBe(screen.getByRole("tree"));
   });
 
-  it("closes on an outside pointer and flips a nested submenu when the right side overflows", async () => {
+  it("closes on an outside pointer and flips a nested submenu with the resolved left coordinate", async () => {
     render(<Harness />);
     const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
     fireEvent.click(trigger);
@@ -164,7 +165,11 @@ describe("the NextTurnPicker", () => {
       toJSON: () => ({}),
     });
     fireEvent.resize(window);
-    await waitFor(() => expect(nested.getAttribute("data-side")).toBe("left"));
+    await waitFor(() => {
+      expect(nested.getAttribute("data-side")).toBe("left");
+      expect(nested.style.position).toBe("fixed");
+      expect(Number.parseFloat(nested.style.left)).toBe(12);
+    });
 
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
@@ -207,6 +212,168 @@ describe("the NextTurnPicker", () => {
       expect(Number.parseFloat(nested.style.left)).toBeGreaterThanOrEqual(8);
       expect(Number.parseFloat(nested.style.top)).toBeLessThanOrEqual(92);
     });
+  });
+
+  it("flips a left-facing surface to the right and anchors it from the resolved side", async () => {
+    render(
+      <Popover side="left" viewportSafe trigger="Probe" ariaLabel="Probe">
+        <div>Content</div>
+      </Popover>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Probe" }));
+    const trigger = screen.getByRole("button", { name: "Probe" });
+    const content = screen.getByRole("dialog", { name: "Probe" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 20,
+      width: 20,
+      height: 20,
+      top: 20,
+      right: 20,
+      bottom: 40,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    vi.spyOn(content, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 60,
+      height: 20,
+      top: 0,
+      right: 60,
+      bottom: 20,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => {
+      expect(content.getAttribute("data-side")).toBe("right");
+      expect(Number.parseFloat(content.style.left)).toBe(28);
+    });
+  });
+
+  it("clamps oversized content to the viewport gap and keeps fixed bounds", async () => {
+    render(
+      <Popover side="right" viewportSafe trigger="Probe" ariaLabel="Probe">
+        <div>Content</div>
+      </Popover>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Probe" }));
+    const trigger = screen.getByRole("button", { name: "Probe" });
+    const content = screen.getByRole("dialog", { name: "Probe" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 40,
+      y: 40,
+      width: 20,
+      height: 20,
+      top: 40,
+      right: 60,
+      bottom: 60,
+      left: 40,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
+    vi.spyOn(content, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 200,
+      top: 0,
+      right: 200,
+      bottom: 200,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => {
+      const left = Number.parseFloat(content.style.left);
+      const top = Number.parseFloat(content.style.top);
+      const maxWidth = Number.parseFloat(content.style.maxWidth);
+      const maxHeight = Number.parseFloat(content.style.maxHeight);
+      expect(content.style.position).toBe("fixed");
+      expect(left).toBeGreaterThanOrEqual(8);
+      expect(top).toBeGreaterThanOrEqual(8);
+      expect(left + maxWidth).toBeLessThanOrEqual(92);
+      expect(top + maxHeight).toBeLessThanOrEqual(92);
+      expect(maxWidth).toBeLessThanOrEqual(84);
+      expect(maxHeight).toBeLessThanOrEqual(84);
+    });
+  });
+
+  it("clamps top-facing content at the top viewport gap", async () => {
+    render(
+      <Popover side="top" viewportSafe trigger="Probe" ariaLabel="Probe">
+        <div>Content</div>
+      </Popover>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Probe" }));
+    const trigger = screen.getByRole("button", { name: "Probe" });
+    const content = screen.getByRole("dialog", { name: "Probe" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 40,
+      y: 10,
+      width: 20,
+      height: 10,
+      top: 10,
+      right: 60,
+      bottom: 20,
+      left: 40,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
+    vi.spyOn(content, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 30,
+      height: 30,
+      top: 0,
+      right: 30,
+      bottom: 30,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => expect(Number.parseFloat(content.style.top)).toBe(8));
+  });
+
+  it("clamps bottom-facing content at the bottom viewport gap", async () => {
+    render(
+      <Popover side="bottom" viewportSafe trigger="Probe" ariaLabel="Probe">
+        <div>Content</div>
+      </Popover>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Probe" }));
+    const trigger = screen.getByRole("button", { name: "Probe" });
+    const content = screen.getByRole("dialog", { name: "Probe" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 40,
+      y: 90,
+      width: 20,
+      height: 10,
+      top: 90,
+      right: 60,
+      bottom: 100,
+      left: 40,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
+    vi.spyOn(content, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 30,
+      height: 30,
+      top: 0,
+      right: 30,
+      bottom: 30,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => expect(Number.parseFloat(content.style.top)).toBe(62));
   });
 
   it("opens provider-grouped model submenu and preserves lazy expansion callback", () => {

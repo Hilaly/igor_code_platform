@@ -32,6 +32,29 @@ Result: 14 test files, 183 tests passed; TypeScript typecheck passed; Prettier p
 - The package test setup does not install jest-dom matchers, so the brief's example `toBeVisible`/`toHaveAttribute` assertions use equivalent native DOM assertions in the committed tests.
 - No new localized messages were required; all labels and thinking-level strings remain caller-provided or use existing `thinking.*` catalog entries.
 
+## Round 4 scoped fixes
+
+- Fixed viewport-safe horizontal placement so a flipped submenu computes its coordinate from the final resolved side before clamping. Right-to-left and left-to-right flips now anchor against the trigger edge on the resolved side.
+- Added behavioral coverage for both horizontal flip directions with exact fixed coordinates.
+- Added oversized-content coverage asserting fixed positioning, viewport gap bounds, and max dimensions constrained to the viewport minus double gap.
+- Added explicit top and bottom vertical boundary assertions.
+
+### Round 4 verification
+
+```text
+pnpm --filter @sovereign/ui-kit test -- src/components/next-turn-picker.test.tsx
+```
+
+Result: 14 test files, 193 tests passed.
+
+```text
+pnpm --filter @sovereign/ui-kit typecheck
+pnpm exec prettier --check packages/ui-kit/src/components/next-turn-picker.tsx packages/ui-kit/src/components/next-turn-picker.test.tsx packages/ui-kit/src/components/model-picker.tsx packages/ui-kit/src/components/popover.tsx packages/ui-kit/src/components/next-turn-picker.module.css packages/ui-kit/src/components/model-picker.module.css packages/ui-kit/src/index.ts
+git diff --check
+```
+
+Result: TypeScript passed, all changed files matched Prettier, and the diff had no whitespace errors.
+
 ## Round 1 review fixes
 
 Addressed all four review findings:
