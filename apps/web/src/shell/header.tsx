@@ -75,6 +75,11 @@ export function useShellHeader(description: ShellHeaderDescription): boolean {
   return context !== null;
 }
 
+/** Whether the current view is rendered inside the shell-owned header provider. */
+export function useShellHeaderAvailable(): boolean {
+  return useContext(ShellHeaderContext) !== null;
+}
+
 export function useActiveShellHeader(): ShellHeaderDescription {
   const context = useContext(ShellHeaderContext);
   if (context === null) {

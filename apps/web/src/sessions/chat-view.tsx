@@ -22,10 +22,9 @@ import {
   Field,
   Input,
   Notice,
-  ViewHeader,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
@@ -168,26 +167,25 @@ export function ChatView(props: ChatViewProps) {
     }
   }, [agentAvailable]);
 
-  const headerActions = (
-    <>
-      {busy ? undefined : <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>}
-      {archived ? undefined : (
-        <Button
-          onClick={() => setCompacting(true)}
-          disabled={busy || !agentAvailable}
-          {...(busy ? { title: t("chat.busy.hint") } : {})}
-        >
-          {t("chat.compact")}
-        </Button>
-      )}
-      <Button
-        onClick={() => {
-          setTreeOpen(true);
-        }}
-      >
-        {t("chat.tree.open")}
-      </Button>
-    </>
+  const headerActions = useMemo(
+    () => (
+      <>
+        {busy ? undefined : (
+          <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
+        )}
+        {archived ? undefined : (
+          <Button
+            onClick={() => setCompacting(true)}
+            disabled={busy || !agentAvailable}
+            {...(busy ? { title: t("chat.busy.hint") } : {})}
+          >
+            {t("chat.compact")}
+          </Button>
+        )}
+        <Button onClick={() => setTreeOpen(true)}>{t("chat.tree.open")}</Button>
+      </>
+    ),
+    [agentAvailable, archived, busy, onFork, t],
   );
 
   const currentModel = model === "" ? undefined : model;
@@ -199,7 +197,7 @@ export function ChatView(props: ChatViewProps) {
     ]
       .filter(Boolean)
       .join(" · ") || undefined;
-  const hasShellHeader = useShellHeader({
+  useShellHeader({
     title: open.summary?.title ?? t("sessions.new.title"),
     context,
     actions: headerActions,
@@ -242,12 +240,6 @@ export function ChatView(props: ChatViewProps) {
 
   return (
     <section className="sessions-chat">
-      {hasShellHeader ? undefined : (
-        <ViewHeader
-          title={open.summary?.title ?? t("sessions.new.title")}
-          actions={headerActions}
-        />
-      )}
       <EntryTreeDrawer
         open={treeOpen}
         onClose={() => setTreeOpen(false)}

@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChatView, type ChatViewProps } from "./chat-view.tsx";
 import type { OpenSession } from "./state.ts";
+import { ShellHeaderProvider, useActiveShellHeader } from "../shell/header.tsx";
+import { ViewHeader } from "@sovereign/ui-kit";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -135,8 +137,30 @@ const show = (open: OpenSession, overrides: Partial<ChatViewProps> = {}) => {
   );
   props.onNavigate = onNavigate;
 
-  return { ...render(<ChatView {...props} />), onSubmit, props };
+  return {
+    ...render(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...props} />
+      </ShellHeaderProvider>,
+    ),
+    onSubmit,
+    props,
+  };
 };
+
+function HeaderProbe(): React.JSX.Element {
+  return <ViewHeader {...useActiveShellHeader()} />;
+}
+
+function renderChat(props: ChatViewProps): ReturnType<typeof render> {
+  return render(
+    <ShellHeaderProvider description={{ title: "Сессии" }}>
+      <HeaderProbe />
+      <ChatView {...props} />
+    </ShellHeaderProvider>,
+  );
+}
 
 function chooseModel(scope: HTMLElement, provider: string, reference: RegExp): void {
   fireEvent.click(within(scope).getByRole("combobox", { name: "Модель" }));
@@ -163,7 +187,10 @@ describe("the session chat view", () => {
     expect(screen.getByRole("log", { name: "Переписка" })).toBeDefined();
 
     view.rerender(
-      <ChatView {...view.props} open={openSession({ ...summary, title: undefined })} />,
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} open={openSession({ ...summary, title: undefined })} />
+      </ShellHeaderProvider>,
     );
     expect(screen.getByRole("heading", { level: 1, name: "Новая сессия" })).toBeDefined();
   });
@@ -186,23 +213,27 @@ describe("the session chat view", () => {
     const firstSubmit = vi.fn(() => new Promise<string | undefined>(() => undefined));
     const secondSubmit = vi.fn(() => new Promise<string | undefined>(() => undefined));
     render(
-      <>
-        <ChatView {...chatProps(openSession(summary), { onSubmit: firstSubmit })} />
-        <ChatView
-          {...chatProps(
-            openSession({
-              ...summary,
-              id: "0299",
-              title: "Вторая сессия",
-              thinkingLevel: "low",
-            }),
-            { onSubmit: secondSubmit },
-          )}
-        />
-      </>,
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <>
+          <ChatView {...chatProps(openSession(summary), { onSubmit: firstSubmit })} />
+          <ChatView
+            {...chatProps(
+              openSession({
+                ...summary,
+                id: "0299",
+                title: "Вторая сессия",
+                thinkingLevel: "low",
+              }),
+              { onSubmit: secondSubmit },
+            )}
+          />
+        </>
+      </ShellHeaderProvider>,
     );
-    const first = screen.getByRole("heading", { name: "План релиза" }).closest("section")!;
-    const second = screen.getByRole("heading", { name: "Вторая сессия" }).closest("section")!;
+    const [first, second] = Array.from(
+      document.querySelectorAll<HTMLElement>(".sessions-chat"),
+    ) as [HTMLElement, HTMLElement];
 
     fireEvent.change(within(first).getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "первая панель" },
@@ -268,7 +299,12 @@ describe("the session chat view", () => {
     });
     expect(onSubmit).not.toHaveBeenCalled();
 
-    view.rerender(<ChatView {...view.props} open={openSession(summary)} />);
+    view.rerender(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} open={openSession(summary)} />
+      </ShellHeaderProvider>,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     expect(onSubmit).toHaveBeenCalledWith({
       text: "следующий турн",
@@ -289,7 +325,12 @@ describe("the session chat view", () => {
       ).toBe("true"),
     );
 
-    view.rerender(<ChatView {...view.props} models={{}} />);
+    view.rerender(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} models={{}} />
+      </ShellHeaderProvider>,
+    );
     expect(
       screen.getByRole("combobox", { name: "Уровень рассуждений" }).getAttribute("aria-disabled"),
     ).toBe("false");
@@ -298,7 +339,12 @@ describe("the session chat view", () => {
   it("hydrates next-turn overrides when the first summary arrives for the open session", () => {
     const view = show(openSession(undefined));
 
-    view.rerender(<ChatView {...view.props} open={openSession(summary)} />);
+    view.rerender(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} open={openSession(summary)} />
+      </ShellHeaderProvider>,
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "привет" },
     });
@@ -317,7 +363,10 @@ describe("the session chat view", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Уровень рассуждений" }));
     fireEvent.click(screen.getByRole("option", { name: "Высокий" }));
     view.rerender(
-      <ChatView {...view.props} open={openSession({ ...summary, thinkingLevel: "medium" })} />,
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} open={openSession({ ...summary, thinkingLevel: "medium" })} />
+      </ShellHeaderProvider>,
     );
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "сохрани выбор" },

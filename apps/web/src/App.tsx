@@ -678,15 +678,15 @@ export function App() {
             }
             detailTitle={
               page.kind === "settings-plugin"
-                ? (plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
-                    ?.id ?? page.pluginKey)
+                ? plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
+                    ?.id
                 : page.kind === "settings-project"
                   ? projects.state.snapshot === undefined
-                    ? page.projectId
-                    : ([
+                    ? undefined
+                    : [
                         ...projects.state.snapshot.projects,
                         ...projects.state.snapshot.archived,
-                      ].find(({ id }) => id === page.projectId)?.name ?? page.projectId)
+                      ].find(({ id }) => id === page.projectId)?.name
                   : undefined
             }
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}

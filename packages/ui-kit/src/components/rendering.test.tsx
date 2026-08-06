@@ -90,6 +90,17 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain("undefined");
   });
 
+  it("can demote an embedded settings page heading below the shell heading", () => {
+    const markup = renderToStaticMarkup(
+      <SettingsPage title="Providers" headingLevel={2}>
+        <div>provider content</div>
+      </SettingsPage>,
+    );
+
+    expect(markup).toContain("<h2");
+    expect(markup).not.toContain("<h1");
+  });
+
   it("keeps a Select visually compact when its accessible label comes from a Settings row", () => {
     const markup = renderToStaticMarkup(
       <Select
@@ -127,7 +138,9 @@ describe("markup of the ported primitives", () => {
   });
 
   it("omits null context and actions slots", () => {
-    const markup = renderToStaticMarkup(<ViewHeader title="Без слотов" context={null} actions={null} />);
+    const markup = renderToStaticMarkup(
+      <ViewHeader title="Без слотов" context={null} actions={null} />,
+    );
 
     expect(markup).not.toMatch(/class="[^"]*context[^"]*"/);
     expect(markup).not.toMatch(/class="[^"]*actions[^"]*"/);
