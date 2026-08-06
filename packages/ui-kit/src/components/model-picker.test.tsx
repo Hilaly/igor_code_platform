@@ -64,6 +64,18 @@ describe("the ModelPicker", () => {
     ]);
   });
 
+  it("preserves expanded groups after closing and reopening", () => {
+    show();
+    const trigger = screen.getByRole("combobox", { name: "Модель" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+    expect(screen.getByRole("treeitem", { name: "Anthropic" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
   it("renders the grouped menu body without another picker trigger", () => {
     render(
       <ModelPickerMenu

@@ -1,5 +1,5 @@
 import { thinkingLevels, type ThinkingLevel } from "@sovereign/protocol";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ModelPickerMenu, type ModelPickerGroup } from "./model-picker.tsx";
 import { Popover } from "./popover.tsx";
@@ -43,6 +43,8 @@ export function NextTurnPicker({
   const [outerOpen, setOuterOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const reasoningMenuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const shownThinkingLevel: ThinkingLevel = reasoningSupported ? thinkingLevel : "off";
   const thinkingLabel = translator.t(`thinking.${shownThinkingLevel}`);
 
@@ -58,6 +60,35 @@ export function NextTurnPicker({
     setModelOpen(false);
     setReasoningOpen(false);
     setOuterOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (modelOpen) {
+      document.querySelector<HTMLElement>(`[role="tree"][aria-label="${modelLabel}"]`)?.focus();
+    }
+  }, [modelOpen]);
+  useEffect(() => {
+    if (reasoningOpen) reasoningMenuRef.current?.focus();
+  }, [reasoningOpen]);
+
+  const handleReasoningKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    const options = Array.from(
+      reasoningMenuRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? [],
+    );
+    const active = options.findIndex((option) => option === document.activeElement);
+    let next = active;
+    if (event.key === "ArrowDown") next = Math.min(options.length - 1, active + 1);
+    else if (event.key === "ArrowUp") next = Math.max(0, active - 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = options.length - 1;
+    else if (event.key === "Enter" || event.key === " ") {
+      (document.activeElement as HTMLElement | null)?.click();
+      event.preventDefault();
+      return;
+    } else return;
+    event.preventDefault();
+    options[next]?.focus();
   };
 
   return (
@@ -69,6 +100,7 @@ export function NextTurnPicker({
         if (!open) {
           setModelOpen(false);
           setReasoningOpen(false);
+          if (!open) triggerRef.current?.focus();
         }
       }}
       contentRole="menu"
@@ -79,6 +111,7 @@ export function NextTurnPicker({
         <Tooltip content={triggerLabel} side="top">
           <button
             type="button"
+            ref={triggerRef}
             className={`${styles.trigger}${disabled ? ` ${styles.disabled}` : ""}`}
             aria-label={`${selectedModelLabel} · ${thinkingLabel}`}
             aria-haspopup="menu"
@@ -98,6 +131,7 @@ export function NextTurnPicker({
     >
       <Popover
         side="right"
+        viewportSafe
         open={modelOpen}
         onOpenChange={(open) => {
           setModelOpen(open);
@@ -140,6 +174,7 @@ export function NextTurnPicker({
 
       <Popover
         side="right"
+        viewportSafe
         open={reasoningOpen}
         onOpenChange={(open) => {
           if (!reasoningSupported) return;
@@ -168,7 +203,14 @@ export function NextTurnPicker({
           </button>
         )}
       >
-        <div className={styles.options} role="listbox" aria-label={reasoningLabel}>
+        <div
+          ref={reasoningMenuRef}
+          className={styles.options}
+          role="listbox"
+          aria-label={reasoningLabel}
+          tabIndex={-1}
+          onKeyDown={handleReasoningKeyDown}
+        >
           {thinkingLevels.map((level) => {
             const selected = level === shownThinkingLevel;
             return (
@@ -177,6 +219,7 @@ export function NextTurnPicker({
                 type="button"
                 role="option"
                 aria-selected={selected}
+                tabIndex={-1}
                 className={`${styles.option}${selected ? ` ${styles.selected}` : ""}`}
                 onClick={() => {
                   onThinkingLevelChange(level);

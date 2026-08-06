@@ -71,6 +71,8 @@ export type ModelPickerMenuProps = {
   placeholder: string;
   emptyText: string;
   disabled?: boolean;
+  expandedGroups?: ReadonlySet<string>;
+  onExpandedGroupsChange?: (groups: ReadonlySet<string>) => void;
 };
 
 type Row = { kind: "header"; groupId: string } | { kind: "option"; groupId: string; value: string };
@@ -100,6 +102,7 @@ export function ModelPicker({
   side = "bottom",
 }: ModelPickerProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set());
   const [activeRowId, setActiveRowId] = useState<string | undefined>();
   const controllerRef = useRef<MenuController | null>(null);
 
@@ -150,7 +153,7 @@ export function ModelPicker({
           side={side}
           open={open}
           onOpenChange={setOpen}
-          contentRole="tree"
+          contentRole="dialog"
           ariaLabel={label}
           rootClassName={styles.popover}
           contentClassName={styles.dropdown}
@@ -187,6 +190,8 @@ export function ModelPicker({
             placeholder={placeholder}
             emptyText={emptyText}
             disabled={disabled}
+            expandedGroups={expandedGroups}
+            onExpandedGroupsChange={setExpandedGroups}
           />
         </Popover>
       </ModelPickerMenuContext.Provider>
@@ -202,10 +207,20 @@ export function ModelPickerMenu({
   label,
   emptyText,
   disabled = false,
+  expandedGroups,
+  onExpandedGroupsChange,
 }: ModelPickerMenuProps): React.JSX.Element {
   const parent = useContext(ModelPickerMenuContext);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [localExpanded, setLocalExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const expanded = expandedGroups ?? localExpanded;
+  const updateExpanded = (
+    updater: (previous: ReadonlySet<string>) => ReadonlySet<string>,
+  ): void => {
+    const next = updater(expanded);
+    if (onExpandedGroupsChange) onExpandedGroupsChange(next);
+    else setLocalExpanded(next);
+  };
   const listId = useId();
   const safeListId = `model-picker-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
@@ -254,7 +269,7 @@ export function ModelPickerMenu({
 
   function toggleGroup(groupId: string): void {
     const willExpand = !expanded.has(groupId);
-    setExpanded((previous) => {
+    updateExpanded((previous) => {
       const next = new Set(previous);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
@@ -269,7 +284,7 @@ export function ModelPickerMenu({
         group.options.some((option) => option.value === value),
       );
       if (selectedGroup !== undefined && !expanded.has(selectedGroup.id)) {
-        setExpanded((previous) => new Set(previous).add(selectedGroup.id));
+        updateExpanded((previous) => new Set(previous).add(selectedGroup.id));
         return;
       }
       const selectedIndex = rows.findIndex((row) => row.kind === "option" && row.value === value);
@@ -304,7 +319,7 @@ export function ModelPickerMenu({
         const row = rows[activeIndex];
         if (row?.kind === "header" && expanded.has(row.groupId)) {
           event.preventDefault();
-          setExpanded((previous) => {
+          updateExpanded((previous) => {
             const next = new Set(previous);
             next.delete(row.groupId);
             return next;
@@ -341,8 +356,8 @@ export function ModelPickerMenu({
   return (
     <div
       className={styles.menuBody}
-      role={parent === null ? "tree" : undefined}
-      aria-label={parent === null ? label : undefined}
+      role="tree"
+      aria-label={label}
       data-side={parent?.side}
       aria-activedescendant={activeRowId}
       tabIndex={-1}

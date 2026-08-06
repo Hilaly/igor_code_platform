@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -78,6 +78,83 @@ describe("the NextTurnPicker", () => {
     expect(screen.getByRole("menu", { name: "Параметры следующего турна" })).not.toBeNull();
     expect(screen.getByRole("menuitem", { name: /Модель/ })).not.toBeNull();
     expect(screen.getByRole("menuitem", { name: /Уровень рассуждений/ })).not.toBeNull();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+  });
+
+  it("transfers focus into the model submenu, changes the controlled model, and restores trigger focus", () => {
+    const onModelChange = vi.fn();
+    render(<Harness onModelChange={onModelChange} />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+
+    expect(document.activeElement).toBe(screen.getByRole("tree", { name: "Модель" }));
+    fireEvent.click(screen.getByRole("treeitem", { name: "Google" }).querySelector("div")!);
+    fireEvent.click(screen.getByRole("treeitem", { name: /gemini/ }));
+
+    expect(onModelChange).toHaveBeenCalledWith("google/gemini");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("navigates reasoning options with arrows and restores focus after Escape", () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
+    const listbox = screen.getByRole("listbox", { name: "Уровень рассуждений" });
+
+    expect(document.activeElement).toBe(listbox);
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    fireEvent.keyDown(listbox, { key: "Enter" });
+    expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
+    fireEvent.keyDown(screen.getByRole("listbox", { name: "Уровень рассуждений" }), {
+      key: "Escape",
+    });
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("closes on an outside pointer and flips a nested submenu when the right side overflows", async () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    const modelRow = screen.getByRole("menuitem", { name: /Модель/ });
+    const rowRoot = modelRow.parentElement!;
+    vi.spyOn(modelRow, "getBoundingClientRect").mockReturnValue({
+      x: 80,
+      y: 0,
+      width: 20,
+      height: 20,
+      top: 0,
+      right: 100,
+      bottom: 20,
+      left: 80,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    const nested = screen.getByRole("tree", { name: "Модель" }).parentElement!;
+    vi.spyOn(nested, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 60,
+      height: 100,
+      top: 0,
+      right: 60,
+      bottom: 100,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.resize(window);
+    await waitFor(() => expect(nested.getAttribute("data-side")).toBe("left"));
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("opens provider-grouped model submenu and preserves lazy expansion callback", () => {

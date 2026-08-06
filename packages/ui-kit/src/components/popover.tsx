@@ -2,7 +2,7 @@
  * Универсальный всплывающий контейнер Popover для произвольного содержимого.
  */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import styles from "./popover.module.css";
 
@@ -19,6 +19,7 @@ export type PopoverProps = {
   contentClassName?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  viewportSafe?: boolean;
 };
 
 export function Popover({
@@ -32,20 +33,56 @@ export function Popover({
   contentClassName,
   open: controlledOpen,
   onOpenChange,
+  viewportSafe = false,
 }: PopoverProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const [resolvedSide, setResolvedSide] = useState(side);
 
   const setOpen = (next: boolean): void => {
+    if (next && !open && typeof document !== "undefined") {
+      restoreFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     if (controlledOpen === undefined) {
       setUncontrolledOpen(next);
     }
     onOpenChange?.(next);
+    if (!next) restoreFocusRef.current?.focus();
   };
 
   const toggle = (): void => setOpen(!open);
+
+  useLayoutEffect(() => {
+    if (!open || !viewportSafe || typeof window === "undefined") return;
+    const resolveSide = (): void => {
+      const root = rootRef.current;
+      const content = root?.querySelector<HTMLElement>(`[role="${contentRole}"]`);
+      const trigger = root?.firstElementChild as HTMLElement | null;
+      if (!root || !content || !trigger) return;
+      const triggerRect = trigger.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const roomRight = window.innerWidth - triggerRect.right;
+      const roomLeft = triggerRect.left;
+      if (side === "right" && roomRight < contentRect.width && roomLeft >= contentRect.width) {
+        setResolvedSide("left");
+      } else if (
+        side === "left" &&
+        roomLeft < contentRect.width &&
+        roomRight >= contentRect.width
+      ) {
+        setResolvedSide("right");
+      } else {
+        setResolvedSide(side);
+      }
+    };
+    resolveSide();
+    window.addEventListener("resize", resolveSide);
+    return () => window.removeEventListener("resize", resolveSide);
+  }, [contentRole, open, side, viewportSafe]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,8 +126,8 @@ export function Popover({
       {open ? (
         <div
           id={popoverId}
-          className={`${styles.content} ${styles[side]}${contentClassName ? ` ${contentClassName}` : ""}`}
-          data-side={side}
+          className={`${styles.content} ${styles[resolvedSide]}${contentClassName ? ` ${contentClassName}` : ""}`}
+          data-side={resolvedSide}
           role={contentRole}
           aria-label={ariaLabel}
         >
