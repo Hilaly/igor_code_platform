@@ -317,7 +317,7 @@ describe("the session chat view", () => {
   it("does not overwrite a prepared thinking level when the first summary arrives", () => {
     const view = show(openSession(undefined));
 
-    fireEvent.click(screen.getByRole("button", { name: /\/.*·/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Выберите.*Выключены/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
     fireEvent.click(screen.getByRole("option", { name: "Высокий" }));
     view.rerender(

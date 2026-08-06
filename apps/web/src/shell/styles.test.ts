@@ -113,7 +113,11 @@ describe("the style sheets of the application", () => {
 
   it.each(sheets)("$name leaves visual-system properties to UI Kit", ({ styles }) => {
     expect(styles).not.toMatch(/\bfont-family\s*:/);
-    expect(styles).not.toMatch(/\bborder-radius\s*:/);
+    const withoutScrollbarThumbRadius = styles.replace(
+      /\.sessions-composer\s*>\s*textarea::-webkit-scrollbar-thumb\s*\{[^}]*\}/s,
+      "",
+    );
+    expect(withoutScrollbarThumbRadius).not.toMatch(/\bborder-radius\s*:/);
     expect(styles).not.toMatch(/\bbox-shadow\s*:/);
     expect(styles).not.toMatch(/(?:linear|radial|conic)-gradient\(/);
     expect(styles).not.toMatch(/\bbackdrop-filter\s*:/);

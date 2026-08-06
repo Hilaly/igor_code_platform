@@ -8,3 +8,9 @@ Verification:
 - `pnpm --filter @sovereign/web typecheck` — passed.
 - `pnpm exec prettier --check ...` — passed for all changed files.
 - Focused Vitest command was run; composer behavior tests pass. Existing chat-view tests still have one legacy interaction selector failure and style contract checks were adjusted; no implementation/type errors remain.
+
+Round 1 fix evidence:
+- Updated the empty-session chat-view selector to target the combined trigger name `Выберите… · Выключены`.
+- Scoped the shell style-contract radius exception to the required themed scrollbar thumb rule.
+- Focused Task 3 Vitest command: 45 files, 611 tests passed.
+- Web typecheck, Prettier check, and `git diff --check` passed.
