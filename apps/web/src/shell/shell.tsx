@@ -10,6 +10,7 @@ import {
   PanelLeftOpenIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
+  ViewHeader,
 } from "@sovereign/ui-kit";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -19,6 +20,11 @@ import {
   panelWidthLimits,
   type ShellLayout,
 } from "./layout.ts";
+import {
+  ShellHeaderProvider,
+  useActiveShellHeader,
+  type ShellHeaderDescription,
+} from "./header.tsx";
 
 export type ShellTabDescription = {
   id: string;
@@ -45,6 +51,7 @@ export type ShellProps = {
   /** Текущая страница не даёт правой панели места; сохранённый layout при этом не меняется. */
   rightUnavailable?: boolean;
   contentMode?: "page" | "contained";
+  header: ShellHeaderDescription;
   children: ReactNode;
 };
 
@@ -57,6 +64,7 @@ export function Shell({
   tabs,
   rightUnavailable = false,
   contentMode = "page",
+  header,
   children,
 }: ShellProps) {
   const open = tabs.find((tab) => tab.id === layout.openTab);
@@ -106,7 +114,12 @@ export function Shell({
         </>
       )}
       <main className="shell-page" data-content-mode={contentMode}>
-        {children}
+        <ShellHeaderProvider description={header}>
+          <ShellHeader />
+          <div className="shell-body" data-content-mode={contentMode}>
+            {children}
+          </div>
+        </ShellHeaderProvider>
         {/* Возврат скрытой панели — кнопка поверх угла страницы, а не постоянный рельс: рельс
             постоянно отъедал бы ширину у страницы ради кнопки, которая нужна редко. Кнопка идёт после
             страницы, и порядка документа достаточно для её слоя — лишний z-index конкурировал бы с
@@ -187,6 +200,14 @@ export function Shell({
           </aside>
         </>
       ) : undefined}
+    </div>
+  );
+}
+
+function ShellHeader(): React.JSX.Element {
+  return (
+    <div className="shell-header">
+      <ViewHeader {...useActiveShellHeader()} />
     </div>
   );
 }

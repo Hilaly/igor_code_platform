@@ -9,6 +9,7 @@ import { initialPluginsState } from "../plugins/state.ts";
 import { ProvidersView } from "../providers/providers-view.tsx";
 import { initialProvidersState } from "../providers/state.ts";
 import { SettingsView } from "./settings-view.tsx";
+import { ShellHeaderProvider } from "../shell/header.tsx";
 
 afterEach(cleanup);
 
@@ -57,6 +58,27 @@ it("shows one selected settings section and only its content", () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Проекты" }));
   expect(onSectionChange).toHaveBeenLastCalledWith("projects");
+});
+
+it("demotes its embedded page heading when the shell owns the page heading", () => {
+  render(
+    <ShellHeaderProvider description={{ title: "Настройки" }}>
+      <SettingsView
+        section="providers"
+        onSectionChange={vi.fn()}
+        projects={<div>project content</div>}
+        appearance={<div>appearance content</div>}
+        providers={<div>provider content</div>}
+        plugins={<div>plugin content</div>}
+        daemon={<div>daemon</div>}
+        diagnostics={<div>diagnostics</div>}
+        translator={translator}
+      />
+    </ShellHeaderProvider>,
+  );
+
+  expect(screen.getByRole("heading", { level: 2, name: "Провайдеры" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { level: 1, name: "Провайдеры" })).toBeNull();
 });
 
 it.each([

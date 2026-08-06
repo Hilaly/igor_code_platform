@@ -8,8 +8,26 @@
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+.headingGroup {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sovereign-space-2);
+}
+
 .title {
   min-width: 0;
+  flex: 0 1 auto;
+}
+
+.context {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sovereign-text-muted);
 }
 
 .actions {

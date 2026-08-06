@@ -129,7 +129,7 @@ describe("the screen that creates a session", () => {
     show();
 
     const region = screen.getByRole("region", { name: "Новая сессия" });
-    expect(within(region).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(region).queryByRole("heading", { level: 1 })).toBeNull();
     expect(region.querySelector("form")).not.toBeNull();
   });
 
@@ -141,7 +141,7 @@ describe("the screen that creates a session", () => {
 
     expect(region.querySelector("hgroup")).toBeNull();
     expect(header).not.toBeNull();
-    expect(within(header!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(header!).queryByRole("heading", { level: 1 })).toBeNull();
     expect(
       within(header!).getByText("Выбери проект, агента и модель — и сразу напиши, с чего начать."),
     ).not.toBeNull();

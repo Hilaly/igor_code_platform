@@ -17,6 +17,7 @@ import {
 import type { ReactNode } from "react";
 
 import { settingsSections, type SettingsSection } from "../router.ts";
+import { useShellHeaderAvailable } from "../shell/header.tsx";
 
 export type SettingsViewProps = {
   /** Выбранный раздел уже канонизирован маршрутизатором и всегда записан в адресе. */
@@ -45,6 +46,7 @@ export function SettingsView({
   translator,
 }: SettingsViewProps) {
   const { t } = translator;
+  const embedded = useShellHeaderAvailable();
 
   const content =
     section === "projects"
@@ -81,6 +83,7 @@ export function SettingsView({
     >
       <SettingsPage
         title={title}
+        headingLevel={embedded ? 2 : 1}
         description={
           detailTitle === undefined ? t(`settings.section.description.${section}`) : undefined
         }

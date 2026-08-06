@@ -75,7 +75,6 @@ export function ArchiveSessionsView({
 
   return (
     <div className="sessions archive-sessions">
-      <Heading level={1}>{t("sessions.archive.title")}</Heading>
       {actionFailure === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.failed", { reason: actionFailure })} />
       )}

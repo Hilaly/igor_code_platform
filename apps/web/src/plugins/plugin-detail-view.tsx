@@ -51,7 +51,6 @@ type ContributionEntry = { registration: ContributionRegistration; off: boolean 
 
 export function PluginDetailView({
   state,
-  headingLevel = 1,
   pluginKey,
   onBack,
   onSwitch,
@@ -108,11 +107,7 @@ export function PluginDetailView({
         <header className="plugin-detail-header">
           <div className="plugin-detail-hero">
             <div>
-              {headingLevel === 1 ? (
-                <Heading level={headingLevel}>{status.id ?? status.key}</Heading>
-              ) : (
-                <Text>{status.id ?? status.key}</Text>
-              )}
+              <Text>{status.id ?? status.key}</Text>
               <Code>{status.key}</Code>
             </div>
             <Text tone="muted">{t("plugins.detail.enabled")}</Text>

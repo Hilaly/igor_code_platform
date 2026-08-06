@@ -22,10 +22,9 @@ import {
   Field,
   Input,
   Notice,
-  ViewHeader,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
@@ -34,6 +33,7 @@ import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
 import { SessionUsage } from "./session-usage.tsx";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
+import { useShellHeader } from "../shell/header.tsx";
 
 export type ChatViewProps = {
   open: OpenSession;
@@ -167,27 +167,41 @@ export function ChatView(props: ChatViewProps) {
     }
   }, [agentAvailable]);
 
-  const headerActions = (
-    <>
-      {busy ? undefined : <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>}
-      {archived ? undefined : (
-        <Button
-          onClick={() => setCompacting(true)}
-          disabled={busy || !agentAvailable}
-          {...(busy ? { title: t("chat.busy.hint") } : {})}
-        >
-          {t("chat.compact")}
-        </Button>
-      )}
-      <Button
-        onClick={() => {
-          setTreeOpen(true);
-        }}
-      >
-        {t("chat.tree.open")}
-      </Button>
-    </>
+  const headerActions = useMemo(
+    () => (
+      <>
+        {busy ? undefined : (
+          <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
+        )}
+        {archived ? undefined : (
+          <Button
+            onClick={() => setCompacting(true)}
+            disabled={busy || !agentAvailable}
+            {...(busy ? { title: t("chat.busy.hint") } : {})}
+          >
+            {t("chat.compact")}
+          </Button>
+        )}
+        <Button onClick={() => setTreeOpen(true)}>{t("chat.tree.open")}</Button>
+      </>
+    ),
+    [agentAvailable, archived, busy, onFork, t],
   );
+
+  const currentModel = model === "" ? undefined : model;
+  const context =
+    [
+      open.summary?.folder,
+      currentModel,
+      open.summary?.phase === undefined ? undefined : t(`sessions.phase.${open.summary.phase}`),
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
+  useShellHeader({
+    title: open.summary?.title ?? t("sessions.new.title"),
+    context,
+    actions: headerActions,
+  });
 
   const notices = (
     <>
@@ -226,8 +240,6 @@ export function ChatView(props: ChatViewProps) {
 
   return (
     <section className="sessions-chat">
-      <ViewHeader title={open.summary?.title ?? t("sessions.new.title")} actions={headerActions} />
-
       <EntryTreeDrawer
         open={treeOpen}
         onClose={() => setTreeOpen(false)}

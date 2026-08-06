@@ -51,14 +51,10 @@ export function ProjectsView(props: ProjectsViewProps) {
   const snapshot = state.snapshot;
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
-  const headingLevel = props.headingLevel ?? 1;
 
   if (snapshot === undefined) {
     return (
       <div className="projects">
-        {headingLevel === 1 ? (
-          <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
-        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -70,10 +66,6 @@ export function ProjectsView(props: ProjectsViewProps) {
 
   return (
     <div className="projects">
-      {headingLevel === 1 ? (
-        <Heading level={headingLevel}>{t("page.projects.title")}</Heading>
-      ) : undefined}
-
       {state.stale ? (
         <Notice tone="warning" title={t("projects.stale.title")}>
           {t("projects.stale.hint")}

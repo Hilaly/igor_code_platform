@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 
 import { Shell, type ShellProps } from "./shell.tsx";
+import { useShellHeader } from "./header.tsx";
 import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -44,6 +45,7 @@ function show(overrides: Partial<ShellProps> = {}) {
     navigation: <div>навигация</div>,
     status: <div>статус демона</div>,
     tabs: [],
+    header: { title: "Страница" },
     children: <div>страница</div>,
     ...overrides,
   };
@@ -56,6 +58,79 @@ function show(overrides: Partial<ShellProps> = {}) {
       rerender(<Shell {...props} {...nextOverrides} layout={layout} />),
   };
 }
+
+describe("global shell header", () => {
+  it("renders the route header before page content and updates it with the route", () => {
+    const view = show({
+      header: {
+        title: "Проекты",
+        context: "Рабочее пространство",
+        actions: <button>Создать</button>,
+      },
+      children: <div>список проектов</div>,
+    });
+
+    expect(screen.getByRole("banner")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Проекты" })).toBeDefined();
+    expect(screen.getByText("Рабочее пространство")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Создать" })).toBeDefined();
+    expect(
+      screen.getByRole("banner").compareDocumentPosition(screen.getByText("список проектов")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    view.again(defaultLayout, {
+      header: { title: "Настройки", context: "Общие" },
+      children: <div>форма настроек</div>,
+    });
+
+    expect(screen.getByRole("heading", { name: "Настройки" })).toBeDefined();
+    expect(screen.getByText("Общие")).toBeDefined();
+    expect(screen.getByText("форма настроек")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Проекты" })).toBeNull();
+  });
+
+  it("temporarily replaces the route header from a mounted descendant and restores it on unmount", () => {
+    function DynamicHeader(): React.JSX.Element {
+      useShellHeader({ title: "Динамический заголовок", context: "Сейчас" });
+      return <div>динамическая страница</div>;
+    }
+
+    const view = show({
+      header: { title: "Базовый заголовок", context: "Маршрут" },
+      children: <DynamicHeader />,
+    });
+
+    expect(screen.getByRole("heading", { name: "Динамический заголовок" })).toBeDefined();
+    view.again(defaultLayout, { children: <div>без динамики</div> });
+    expect(screen.getByRole("heading", { name: "Базовый заголовок" })).toBeDefined();
+    expect(screen.getByText("Маршрут")).toBeDefined();
+  });
+
+  it("restores the most recently mounted registration when another registration unmounts", () => {
+    function RegisteredHeader({ title }: { title: string }): React.JSX.Element {
+      useShellHeader({ title });
+      return <div>{title}</div>;
+    }
+
+    const view = show({
+      header: { title: "База" },
+      children: (
+        <>
+          <RegisteredHeader title="Первый" />
+          <RegisteredHeader title="Второй" />
+        </>
+      ),
+    });
+
+    expect(screen.getByRole("heading", { name: "Второй" })).toBeDefined();
+    view.again(defaultLayout, {
+      header: { title: "База" },
+      children: <RegisteredHeader title="Первый" />,
+    });
+    expect(screen.getByRole("heading", { name: "Первый" })).toBeDefined();
+  });
+});
 
 function drag(separator: HTMLElement, startX: number, moves: number[]): void {
   fireEvent.pointerDown(separator, { clientX: startX });

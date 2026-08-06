@@ -71,7 +71,7 @@ import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
 import { SettingsView } from "./settings/settings-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
-import { PageView } from "./shell/page.tsx";
+import { describePage, PageView } from "./shell/page.tsx";
 import { Shell } from "./shell/shell.tsx";
 
 const catalogs = [coreEnglish, coreRussian];
@@ -349,6 +349,25 @@ export function App() {
     [preferences.locale, diagnostics],
   );
 
+  const pageHeader = describePage(page, translator, {
+    session: sessions.state.open?.summary,
+    project:
+      page.kind === "settings-project"
+        ? [
+            ...(projects.state.snapshot?.projects ?? []),
+            ...(projects.state.snapshot?.archived ?? []),
+          ].find(({ id }) => id === page.projectId)
+        : undefined,
+    provider:
+      page.kind === "settings" || page.kind === "edit-provider"
+        ? providers.state.snapshot?.providers.find(({ id }) => id === page.providerId)
+        : undefined,
+    plugin:
+      page.kind === "settings-plugin"
+        ? plugins.state.snapshot?.plugins.find(({ key }) => key === page.pluginKey)
+        : undefined,
+  });
+
   // Номер последней отправленной записи внешнего вида. Два быстрых переключения рвут договор:
   // второе wins локально, но первый ответ резолвится первым и затирает второе решение ответом на
   // первое. Ответ применяется, только если он последний отправленный; протухший молча отбрасывается
@@ -436,6 +455,7 @@ export function App() {
       layout={layout}
       onLayoutChange={setLayout}
       contentMode={page.kind === "session" ? "contained" : "page"}
+      header={pageHeader}
       labels={{
         left: translator.t("panel.left"),
         right: translator.t("panel.right"),
@@ -658,15 +678,15 @@ export function App() {
             }
             detailTitle={
               page.kind === "settings-plugin"
-                ? (plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
-                    ?.id ?? page.pluginKey)
+                ? plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
+                    ?.id
                 : page.kind === "settings-project"
                   ? projects.state.snapshot === undefined
-                    ? page.projectId
-                    : ([
+                    ? undefined
+                    : [
                         ...projects.state.snapshot.projects,
                         ...projects.state.snapshot.archived,
-                      ].find(({ id }) => id === page.projectId)?.name ?? page.projectId)
+                      ].find(({ id }) => id === page.projectId)?.name
                   : undefined
             }
             onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}

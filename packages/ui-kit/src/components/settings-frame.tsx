@@ -56,17 +56,37 @@ export function SettingsNavigationItem({
 export type SettingsPageProps = {
   title: ReactNode;
   description?: ReactNode;
+  /** Standalone Settings pages own the document heading; embedded pages are subordinate to shell. */
+  headingLevel?: 1 | 2 | 3;
   children: ReactNode;
 };
 
 /** Owns the single document heading and the scrollable body of a Settings route. */
-export function SettingsPage({ title, description, children }: SettingsPageProps) {
+export function SettingsPage({
+  title,
+  description,
+  headingLevel = 1,
+  children,
+}: SettingsPageProps) {
+  const heading =
+    headingLevel === 1 ? (
+      <h1 className={styles.pageTitle} id="settings-page-title">
+        {title}
+      </h1>
+    ) : headingLevel === 2 ? (
+      <h2 className={styles.pageTitle} id="settings-page-title">
+        {title}
+      </h2>
+    ) : (
+      <h3 className={styles.pageTitle} id="settings-page-title">
+        {title}
+      </h3>
+    );
+
   return (
     <section className={styles.page} aria-labelledby="settings-page-title">
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle} id="settings-page-title">
-          {title}
-        </h1>
+        {heading}
         {description === undefined ? undefined : (
           <p className={styles.pageDescription}>{description}</p>
         )}

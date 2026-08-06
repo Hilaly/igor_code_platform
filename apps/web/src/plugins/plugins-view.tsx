@@ -17,7 +17,6 @@ import {
   Badge,
   Button,
   EmptyState,
-  Heading,
   List,
   ListRow,
   Notice,
@@ -52,22 +51,13 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   failed: "danger",
 };
 
-export function PluginsView({
-  headingLevel = 1,
-  state,
-  onSwitch,
-  onOpen,
-  translator,
-}: PluginsViewProps) {
+export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
 
   if (snapshot === undefined) {
     return (
       <div className="plugins">
-        {headingLevel === 1 ? (
-          <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
-        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -79,10 +69,6 @@ export function PluginsView({
 
   return (
     <div className="plugins">
-      {headingLevel === 1 ? (
-        <Heading level={headingLevel}>{t("page.plugins.title")}</Heading>
-      ) : undefined}
-
       {state.stale ? (
         <Notice tone="warning" title={t("plugins.stale.title")}>
           {t("plugins.stale.hint")}

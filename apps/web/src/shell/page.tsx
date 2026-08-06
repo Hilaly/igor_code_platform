@@ -4,10 +4,68 @@
  * (docs/ui-extension-model.md).
  */
 
-import { EmptyState, Heading, type ScopedTranslator } from "@sovereign/ui-kit";
+import type { PluginStatus, Project, ProviderSummary, Session } from "@sovereign/protocol";
+import { EmptyState, type ScopedTranslator } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import type { Page } from "../router.ts";
+import type { ShellHeaderDescription } from "./header.tsx";
+
+export type PageHeaderData = {
+  session?: Session;
+  project?: Project;
+  provider?: ProviderSummary;
+  plugin?: PluginStatus;
+};
+
+/** Stable route-level title/context. Missing remote data is intentionally not guessed. */
+export function describePage(
+  page: Page,
+  translator: ScopedTranslator,
+  data: PageHeaderData = {},
+): ShellHeaderDescription {
+  const { t } = translator;
+
+  switch (page.kind) {
+    case "home":
+      return { title: t("page.home.title") };
+    case "session":
+      return {
+        title: t("page.sessions.title"),
+        context: data.session?.folder,
+      };
+    case "session-archive":
+      return { title: t("sessions.archive.title") };
+    case "new-session":
+      return { title: t("sessions.new.title") };
+    case "new-provider":
+      return { title: t("providers.user.new") };
+    case "edit-provider":
+      return {
+        title: data.provider?.name ?? t("providers.user.edit", { id: page.providerId }),
+        context: data.provider?.baseUrl,
+      };
+    case "settings":
+      return {
+        title: t(`settings.section.${page.section}`),
+        context: page.providerId === undefined ? undefined : data.provider?.name,
+      };
+    case "settings-project":
+      return {
+        title: data.project?.name ?? t("settings.section.projects"),
+        context: data.project?.folder,
+      };
+    case "settings-plugin":
+      return {
+        title: data.plugin?.id ?? t("settings.section.plugins"),
+        context: data.plugin?.key,
+      };
+    case "plugin":
+      return { title: t("page.plugin.title"), context: `${page.pluginId}/${page.pageId}` };
+    case "unknown":
+      return { title: t("page.unknown.title") };
+  }
+}
 
 export type PageViewProps = {
   page: Page;
@@ -78,7 +136,6 @@ export function PageView({
 
   return (
     <div className="shell-home">
-      <Heading level={1}>{t("page.home.title")}</Heading>
       <EmptyState title={t("state.empty")} hint={t("page.home.hint")} />
     </div>
   );

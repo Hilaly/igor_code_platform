@@ -161,12 +161,39 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(
       /\.sessions-chat[^}]*(?:position:\s*(?:sticky|absolute)|100vh|100dvh)/s,
     );
-    expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-body\s*\{[^}]*overflow:\s*auto;/s);
     expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*hidden;[^}]*min-height:\s*0;/s,
+      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s,
     );
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
+  });
+
+  it("keeps the central page in a permanent header and body grid", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-page\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\);/s,
+    );
+    expect(shell).toMatch(
+      /\.shell-header[\s,]*\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
+    );
+    expect(shell).toMatch(/\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s);
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(shell).toMatch(/\.shell-body\s*\{[^}]*overflow:\s*auto;/s);
+    expect(shell).not.toMatch(/\.shell-header[^}]*position:\s*(?:sticky|absolute)/s);
+    expect(shell).not.toMatch(/\.shell-header[^}]*(?:100vh|100dvh)/s);
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s,
+    );
+  });
+
+  it("lets contained content fill the shell body", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;/s,
+    );
   });
 
   it("scopes the composer option collapse to its own container", () => {
