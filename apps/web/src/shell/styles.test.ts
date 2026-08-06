@@ -142,6 +142,18 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/\.sessions-composer(?:-surface)?\s*\{[^}]*overflow\s*:/s);
   });
 
+  it("keeps overflow scoped to the textarea", () => {
+    const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
+
+    expect(sessions).toMatch(/\.sessions-composer\s*\{[^}]*display:\s*grid;/s);
+    expect(sessions).toMatch(
+      /\.sessions-composer\s*>\s*textarea\s*\{[^}]*scrollbar-width:\s*thin;/s,
+    );
+    expect(sessions).toMatch(/\.sessions-composer\s*>\s*textarea::-webkit-scrollbar-thumb/);
+    expect(sessions).not.toMatch(/\.sessions-composer\s*\{[^}]*overflow(?:-y)?\s*:/s);
+    expect(sessions).not.toMatch(/\.sessions-composer-surface\s*\{[^}]*overflow(?:-y)?\s*:/s);
+  });
+
   it("reveals a project folder tooltip when its selectable row has keyboard focus", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
