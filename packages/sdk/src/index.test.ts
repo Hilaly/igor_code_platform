@@ -931,6 +931,26 @@ describe("a route of a plugin", () => {
     ]);
   });
 
+  it("keeps route and public-route handlers distinct when their ids match", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await contribute.route({
+      id: "shared",
+      path: "private",
+      handle: () => ({ body: "private" }),
+    });
+    await contribute.publicRoute({
+      id: "shared",
+      path: "public",
+      handle: () => ({ body: "public" }),
+    });
+
+    assert.deepEqual(await host.callRoute("shared", request), { body: "private" });
+    assert.deepEqual(await host.callRoute("shared", { ...request, public: true }), {
+      body: "public",
+    });
+  });
+
   it("answers a call with the response the dispatcher will write", async () => {
     const host = installTestHost({ id: "tasks" });
     const seen: PluginRouteRequest[] = [];

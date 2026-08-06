@@ -12,6 +12,7 @@ import {
   clearRouteHandlers,
   invokeRoute,
   type PluginRouteRequest,
+  type PluginRouteKind,
   type PluginRouteResponse,
 } from "./routes.ts";
 import { clearToolInvocations, invokeTool } from "./tools.ts";
@@ -226,7 +227,12 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     deliver: deliverEvent,
     callHook: invokeHookHandler,
     callTool: invokeTool,
-    callRoute: invokeRoute,
+    callRoute: (declaredId, request) =>
+      invokeRoute(
+        (request.public ? "public-route" : "route") satisfies PluginRouteKind,
+        declaredId,
+        request,
+      ),
     stored,
     answerStorageDirectory: (path) => {
       storageDirectory = path;

@@ -14,6 +14,8 @@ export const pluginRouteMethods = ["GET", "POST", "PUT", "DELETE"] as const;
 
 export type PluginRouteMethod = (typeof pluginRouteMethods)[number];
 
+export type PluginRouteKind = "route" | "public-route";
+
 /**
  * Тело ответа **буферизуется**: строка или байты. Потока здесь нет и не будет, пока граница воркера
  * — структурное клонирование; цена названа прямо в docs/web-api.md.
@@ -73,8 +75,16 @@ export function clearRouteHandlers(): void {
   delete (globalThis as Record<symbol, unknown>)[handlersSymbol];
 }
 
-export function rememberRouteHandler(declaredId: string, handle: PluginRouteHandler): void {
-  handlers().set(declaredId, handle);
+function handlerKey(kind: PluginRouteKind, declaredId: string): string {
+  return `${kind}:${declaredId}`;
+}
+
+export function rememberRouteHandler(
+  kind: PluginRouteKind,
+  declaredId: string,
+  handle: PluginRouteHandler,
+): void {
+  handlers().set(handlerKey(kind, declaredId), handle);
 }
 
 /**
@@ -82,10 +92,11 @@ export function rememberRouteHandler(declaredId: string, handle: PluginRouteHand
  * автора, а не в демоне: демону негодный ответ виден только как `500`, а плагину — как своя ошибка.
  */
 export async function invokeRoute(
+  kind: PluginRouteKind,
   declaredId: string,
   request: PluginRouteRequest,
 ): Promise<PluginRouteResponse> {
-  const handle = handlers().get(declaredId);
+  const handle = handlers().get(handlerKey(kind, declaredId));
 
   if (handle === undefined) {
     throw new Error(`the plugin has no handler for the route ${declaredId}`);

@@ -21,6 +21,7 @@ import type {
   LoginStep,
   PluginContribution,
   PluginLogLevel,
+  PluginRouteKind,
   PluginRouteRequest,
   ProviderRequest,
   ProviderResponse,
@@ -52,7 +53,12 @@ export type PluginResponse = ProviderResponse | SessionResponse | StorageRespons
 export type PluginCall =
   | { kind: "hook"; contributionId: string; event: string; payload: unknown }
   | { kind: "tool"; contributionId: string; arguments: unknown }
-  | { kind: "route"; contributionId: string; request: PluginRouteRequest };
+  | {
+      kind: "route";
+      routeKind: PluginRouteKind;
+      contributionId: string;
+      request: PluginRouteRequest;
+    };
 
 /**
  * Чем плагин отвечает на вызов. Отказ и сбой разведены: отказ решающего хука — это исход по делу,

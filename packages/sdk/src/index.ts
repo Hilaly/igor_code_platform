@@ -70,6 +70,7 @@ export { pluginRouteMethods } from "./routes.ts";
 export type {
   PluginRouteBody,
   PluginRouteHandler,
+  PluginRouteKind,
   PluginRouteMethod,
   PluginRouteRequest,
   PluginRouteResponse,
@@ -312,7 +313,7 @@ async function declareRoute(
   const { handle, method, ...declaration } = route;
 
   // Обработчик запоминается до объявления: ядро вправе позвать маршрут сразу, как о нём узнало.
-  rememberRouteHandler(declaration.id, handle);
+  rememberRouteHandler(kind, declaration.id, handle);
 
   await currentPluginHost().contribute({ kind, ...declaration, method: method ?? "GET" });
 }

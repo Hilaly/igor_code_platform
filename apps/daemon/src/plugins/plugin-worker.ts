@@ -206,7 +206,10 @@ const answerCall = async (callId: string, call: PluginCall): Promise<void> => {
       if (call.kind === "route") {
         // Ответ маршрута — обычное значение: отказа у него нет вовсе, свой отказ маршрут выражает
         // кодом ответа, а не исходом вызова (docs/web-api.md).
-        return { kind: "value", value: await invokeRoute(call.contributionId, call.request) };
+        return {
+          kind: "value",
+          value: await invokeRoute(call.routeKind, call.contributionId, call.request),
+        };
       }
 
       const value = await invokeHookHandler(call.contributionId, call.payload);

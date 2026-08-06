@@ -173,6 +173,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
           registration.pluginKey,
           {
             kind: "route",
+            routeKind: registration.kind,
             contributionId: registration.declaredId,
             request: requestFor(registration, context, open),
           },
