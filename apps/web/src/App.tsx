@@ -436,6 +436,7 @@ export function App() {
       layout={layout}
       onLayoutChange={setLayout}
       contentMode={page.kind === "session" ? "contained" : "page"}
+      header={{ title: page.kind === "session" ? "Сессия" : "Sovereign" }}
       labels={{
         left: translator.t("panel.left"),
         right: translator.t("panel.right"),
