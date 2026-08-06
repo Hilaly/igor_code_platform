@@ -27,6 +27,8 @@ import {
   CopyIcon,
   ForkBeforeIcon,
   ForkThroughIcon,
+  FolderIcon,
+  FolderOpenIcon,
   MoreIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -52,8 +54,94 @@ import {
 import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
+import { Tree } from "./tree.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("keeps a contextual Tree icon decorative and the label as its accessible name", () => {
+    const markup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        actionsVisibility="interaction"
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            icon: <FolderIcon />,
+            context: <div>Project facts</div>,
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Projects"');
+    expect(markup).toContain('data-actions-visibility="interaction"');
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain(">Alpha<");
+    expect(markup).not.toContain("Project facts");
+  });
+
+  it("can render a folder as the disclosure icon", () => {
+    const collapsedMarkup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: (expanded) => (expanded ? <FolderOpenIcon /> : <FolderIcon />),
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    const expandedMarkup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        expandedIds={["alpha"]}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: (expanded) => (expanded ? <FolderOpenIcon /> : <FolderIcon />),
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(collapsedMarkup).toContain('aria-label="Projects"');
+    expect(collapsedMarkup).toContain('aria-expanded="false"');
+    expect(collapsedMarkup).not.toContain("lucide-chevron-right");
+    expect(collapsedMarkup).toContain("lucide-folder");
+    expect(expandedMarkup).toContain('aria-expanded="true"');
+    expect(expandedMarkup).toContain("lucide-folder-open");
+  });
+
+  it("can align child labels with a custom disclosure icon", () => {
+    const markup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        disclosureAlignment="label"
+        expandedIds={["alpha"]}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: <FolderIcon />,
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain('data-disclosure-alignment="label"');
+  });
+
   it("renders the compact settings view, selected navigation, page, and property row", () => {
     const markup = renderToStaticMarkup(
       <SettingsView

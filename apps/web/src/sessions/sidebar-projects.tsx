@@ -5,6 +5,8 @@ import {
   ConfirmDialog,
   Dialog,
   Field,
+  FolderIcon,
+  FolderOpenIcon,
   Input,
   Menu,
   MoreIcon,
@@ -12,6 +14,9 @@ import {
   Spinner,
   Text,
   Tree,
+  TreeContextCard,
+  TreeContextCardFact,
+  TreeContextCardHeader,
   type ScopedTranslator,
   type TreeNode,
 } from "@sovereign/ui-kit";
@@ -51,6 +56,19 @@ function readExpanded(storage: Pick<Storage, "getItem">): string[] {
 
 function sessionTitle(session: Session): { title?: string } {
   return session.title === undefined ? {} : { title: session.title };
+}
+
+function relativeAge(
+  createdAt: string,
+  now = Date.now(),
+): { amount: number; unit: "seconds" | "minutes" | "hours" | "days" } {
+  const seconds = Math.max(0, Math.floor((now - Date.parse(createdAt)) / 1000));
+  if (seconds < 60) return { amount: seconds, unit: "seconds" };
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return { amount: minutes, unit: "minutes" };
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return { amount: hours, unit: "hours" };
+  return { amount: Math.floor(hours / 24), unit: "days" };
 }
 
 export function SidebarProjects(props: SidebarProjectsProps) {
@@ -123,6 +141,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
           trigger={<MoreIcon size="sm" />}
           triggerLabel={t("projects.actions", { name: project.name })}
           compact
+          openOnHover
           items={[
             {
               id: "rename",
@@ -160,6 +179,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         trigger={<MoreIcon size="sm" />}
         triggerLabel={t("sessions.actions", { name: title })}
         compact
+        openOnHover
         items={[
           {
             id: "rename",
@@ -196,6 +216,24 @@ export function SidebarProjects(props: SidebarProjectsProps) {
       ? { badge: { tone: "warning" as const, text: t("projects.availability.missing") } }
       : {}),
     actions: projectActions(project),
+    disclosureIcon: (expanded) =>
+      expanded ? <FolderOpenIcon size="sm" /> : <FolderIcon size="sm" />,
+    context: (
+      <TreeContextCard>
+        <TreeContextCardHeader
+          icon={<FolderIcon size="sm" />}
+          aside={
+            project.availability === "missing" ? t("projects.availability.missing") : undefined
+          }
+        >
+          {project.ephemeral ? t("projects.ephemeral") : project.name}
+        </TreeContextCardHeader>
+        <TreeContextCardFact>
+          {t("projects.sessions.active", { count: project.sessionCount })}
+        </TreeContextCardFact>
+        <TreeContextCardFact icon={<FolderIcon size="sm" />}>{project.folder}</TreeContextCardFact>
+      </TreeContextCard>
+    ),
     children: (props.sessions ?? [])
       .filter((session) => session.projectId === project.id && !session.archived)
       .map((session) => ({
@@ -203,6 +241,24 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         label: session.title ?? t("sessions.untitled"),
         title: session.title ?? t("sessions.untitled"),
         actions: sessionActions(session),
+        context: (
+          <TreeContextCard>
+            <TreeContextCardHeader>{session.title ?? t("sessions.untitled")}</TreeContextCardHeader>
+            <TreeContextCardFact>
+              {t("sessions.project", { project: project.name })}
+            </TreeContextCardFact>
+            <TreeContextCardFact>
+              {t("sessions.created", {
+                age: t(`duration.${relativeAge(session.createdAt).unit}`, {
+                  count: relativeAge(session.createdAt).amount,
+                }),
+              })}
+            </TreeContextCardFact>
+            <TreeContextCardFact icon={<FolderIcon size="sm" />}>
+              {project.folder}
+            </TreeContextCardFact>
+          </TreeContextCard>
+        ),
       })),
   }));
 
@@ -224,6 +280,8 @@ export function SidebarProjects(props: SidebarProjectsProps) {
       <Tree
         label={t("sidebar.projects")}
         nodes={nodes}
+        actionsVisibility="interaction"
+        disclosureAlignment="label"
         selectedId={
           props.selectedSessionId === undefined ? undefined : `session:${props.selectedSessionId}`
         }

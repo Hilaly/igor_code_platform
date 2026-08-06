@@ -3,6 +3,8 @@
 import {
   ChevronRight,
   Copy,
+  Folder,
+  FolderOpen,
   GitBranchPlus,
   GitFork,
   MoreHorizontal,
@@ -15,6 +17,7 @@ import {
   Square,
   Tag,
   TagX,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +47,9 @@ export const SendIcon = actionIcon(Send);
 export const AppendIcon = actionIcon(Plus);
 export const StopIcon = actionIcon(Square);
 export const MoreIcon = actionIcon(MoreHorizontal);
+export const FolderIcon = actionIcon(Folder);
+export const FolderOpenIcon = actionIcon(FolderOpen);
+export const UserIcon = actionIcon(UserRound);
 export const ChevronRightIcon = actionIcon(ChevronRight);
 export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);
 export const PanelLeftOpenIcon = actionIcon(PanelLeftOpen);

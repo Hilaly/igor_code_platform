@@ -63,6 +63,7 @@ export * from "./components/toggle.tsx";
 export * from "./components/tool-call.tsx";
 export * from "./components/tooltip.tsx";
 export * from "./components/tree.tsx";
+export * from "./components/tree-context-card.tsx";
 export * from "./components/view-header.tsx";
 export * from "./i18n/catalog.ts";
 export * from "./i18n/messages/en.ts";

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Combobox } from "./combobox.tsx";
@@ -101,6 +101,50 @@ describe("interactive components", () => {
     );
   });
 
+  it("keeps a Tree context open across the pointer bridge and also opens it from focus", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Tree
+          label="Projects"
+          toggleLabel={treeToggleLabel}
+          actionsVisibility="interaction"
+          nodes={[
+            {
+              id: "project",
+              label: "Alpha",
+              actions: <button type="button">Project actions</button>,
+              context: <div>Project facts</div>,
+            },
+          ]}
+        />,
+      );
+
+      const tree = screen.getByRole("tree", { name: "Projects" });
+      expect(tree.getAttribute("data-actions-visibility")).toBe("interaction");
+      const project = screen.getByRole("treeitem", { name: "Alpha" });
+
+      fireEvent.pointerEnter(project);
+      const context = screen.getByRole("tooltip", { name: "Alpha" });
+      expect(context.parentElement).toBe(document.body);
+      expect(screen.getByText("Project facts")).toBeTruthy();
+
+      fireEvent.pointerLeave(project);
+      fireEvent.pointerEnter(context);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.getByText("Project facts")).toBeTruthy();
+
+      fireEvent.pointerLeave(context);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.queryByText("Project facts")).toBeNull();
+
+      fireEvent.focus(project);
+      expect(screen.getByText("Project facts")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders a compact menu popup in the document body", () => {
     render(
       <Menu
@@ -146,6 +190,43 @@ describe("interactive components", () => {
     const menu = screen.getByRole("menu", { name: "Действия" });
     expect(menu.style.maxWidth).toBe("calc(100vw - 16px)");
     expect(menu.style.left).toBe("220px");
+  });
+
+  it("keeps a hover-opened compact menu available while the pointer crosses into it", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Menu
+          label="Project actions"
+          trigger="…"
+          triggerLabel="Open project actions"
+          compact
+          openOnHover
+          items={[{ id: "rename", label: "Rename", onSelect: () => {} }]}
+        />,
+      );
+
+      const trigger = screen.getByRole("button", { name: "Open project actions" });
+      fireEvent.pointerEnter(trigger);
+      const menu = screen.getByRole("menu", { name: "Project actions" });
+
+      fireEvent.pointerLeave(trigger);
+      fireEvent.pointerEnter(menu);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.getByRole("menu", { name: "Project actions" })).toBeTruthy();
+
+      fireEvent.pointerLeave(menu);
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.queryByRole("menu", { name: "Project actions" })).toBeNull();
+
+      fireEvent.click(trigger);
+      expect(screen.getByRole("menu", { name: "Project actions" })).toBeTruthy();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("menu", { name: "Project actions" })).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets a controlled picker render its own trigger and popup role through Popover", () => {

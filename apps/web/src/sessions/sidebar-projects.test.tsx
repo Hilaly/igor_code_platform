@@ -131,6 +131,25 @@ it("creates a session in a project without selecting the row", () => {
   expect(onOpenSession).not.toHaveBeenCalled();
 });
 
+it("shows folder-led projects and contextual project and session facts", () => {
+  values.clear();
+  show();
+
+  const projectItem = screen.getByRole("treeitem", { name: "Alpha" });
+  expect(projectItem.querySelector("svg")).toBeTruthy();
+  fireEvent.pointerEnter(projectItem);
+  expect(screen.getByRole("tooltip", { name: "Alpha" })).toBeTruthy();
+  expect(screen.getByText("/code/alpha")).toBeTruthy();
+  expect(screen.getByText("1 активная сессия")).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+  const sessionItem = screen.getByRole("treeitem", { name: "Session A" });
+  fireEvent.pointerEnter(sessionItem);
+  expect(screen.getByRole("tooltip", { name: "Session A" })).toBeTruthy();
+  expect(screen.getByText("Проект: Alpha")).toBeTruthy();
+  expect(screen.getByText(/Создана/)).toBeTruthy();
+});
+
 it("keeps truncated project and session names available to people and actions", () => {
   values.clear();
   const { onOpenSession, onNewSession } = show({

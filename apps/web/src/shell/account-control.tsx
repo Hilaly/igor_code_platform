@@ -1,4 +1,4 @@
-import { Menu, StatusDot, type ScopedTranslator } from "@sovereign/ui-kit";
+import { Menu, StatusDot, UserIcon, type ScopedTranslator } from "@sovereign/ui-kit";
 
 import type { StreamStatus } from "../events/stream.ts";
 
@@ -25,13 +25,17 @@ export function AccountControl({
 
   return (
     <div className="shell-account">
-      <span className="shell-account-status">
-        <StatusDot tone={tone} label={label} />
-      </span>
       <Menu
         label={translator.t("account.menu")}
-        trigger={translator.t("account.menu")}
+        trigger={
+          <>
+            <UserIcon size="sm" />
+            <span>{translator.t("account.menu")}</span>
+            <StatusDot tone={tone} label={label} />
+          </>
+        }
         placement="above"
+        triggerLabel={translator.t("account.menu")}
         block
         items={[
           {

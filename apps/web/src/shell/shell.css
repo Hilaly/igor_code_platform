@@ -26,7 +26,8 @@
   padding: var(--sovereign-space-2);
   background: var(--sovereign-panel-surface);
   border-right: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  overflow: hidden auto;
+  overflow: hidden;
+  min-width: 0;
   flex: 0 0 auto;
 }
 
@@ -38,12 +39,21 @@
   /* Навигация прижата к верху: шапка и основной блок стоят в начале панели, а `shell-left-bottom`
      (статус демона) оттесняется вниз распором. Так список вью не висит посередине пустой панели. */
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.shell-left-nav-header {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding-block-end: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .shell-left-bottom {
   flex: 0 0 auto;
   border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   padding-top: var(--sovereign-space-2);
+  min-width: 0;
 }
 
 /* Шапка панели: единственная кнопка «скрыть», прижатая к правому краю. */
@@ -196,12 +206,30 @@
 .shell-nav {
   min-height: 0;
   flex: 1;
+  min-width: 0;
 }
 
 .shell-projects {
   min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   flex: 1;
+}
+
+.shell-left-projects {
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.shell-nav-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
 }
 
 .sidebar-project-actions,

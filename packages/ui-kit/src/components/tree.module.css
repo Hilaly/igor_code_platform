@@ -1,6 +1,9 @@
 .root {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
   gap: var(--sovereign-space-1);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);
@@ -12,6 +15,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   min-width: 0;
+  width: 100%;
 }
 
 .node {
@@ -32,7 +36,8 @@
     var(--sovereign-space-2) + var(--sovereign-row-height-compact) * 2 + var(--sovereign-space-1)
   );
   padding-block: var(--sovereign-space-1);
-  box-sizing: content-box;
+  width: 100%;
+  box-sizing: border-box;
   border-radius: var(--sovereign-radius-xs);
   color: var(--sovereign-text);
   cursor: pointer;
@@ -74,6 +79,15 @@
 
 .indent {
   flex: 0 0 var(--sovereign-space-4);
+}
+
+.root[data-disclosure-alignment="label"] .togglePlaceholder {
+  width: 0;
+  overflow: hidden;
+}
+
+.root[data-disclosure-alignment="label"] .indent {
+  flex-basis: 1rem;
 }
 
 .content {
@@ -127,6 +141,24 @@
   flex: none;
   justify-self: end;
   z-index: 1;
+}
+
+.root[data-actions-visibility="interaction"] .actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.root[data-actions-visibility="interaction"] .item:hover > .actions,
+.root[data-actions-visibility="interaction"] .item:focus-within > .actions,
+.root[data-actions-visibility="interaction"] .actions:has([aria-expanded="true"]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.context {
+  position: fixed;
+  z-index: var(--sovereign-z-overlay);
 }
 
 .children {

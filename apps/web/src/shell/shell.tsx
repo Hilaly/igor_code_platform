@@ -45,6 +45,8 @@ export type ShellProps = {
     showRight: string;
   };
   navigation: ReactNode;
+  /** Верхняя секция навигации: бренд и главное действие. */
+  navigationHeader?: ReactNode;
   /** Низ левой панели: индикатор связи с демоном. Он виден всегда, а не по переходу на страницу. */
   status: ReactNode;
   tabs: ShellTabDescription[];
@@ -60,6 +62,7 @@ export function Shell({
   onLayoutChange,
   labels,
   navigation,
+  navigationHeader,
   status,
   tabs,
   rightUnavailable = false,
@@ -101,8 +104,19 @@ export function Shell({
                 <PanelLeftCloseIcon size="sm" />
               </Button>
             </div>
-            <div className="shell-left-main">{navigation}</div>
-            <div className="shell-left-bottom">{status}</div>
+            <div className="shell-left-main">
+              {navigationHeader === undefined ? null : (
+                <div className="shell-left-nav-header" data-testid="shell-left-header">
+                  {navigationHeader}
+                </div>
+              )}
+              <div className="shell-left-projects" data-testid="shell-left-projects">
+                {navigation}
+              </div>
+            </div>
+            <div className="shell-left-bottom" data-testid="shell-left-footer">
+              {status}
+            </div>
           </nav>
           <PanelResizer
             edge="left"
