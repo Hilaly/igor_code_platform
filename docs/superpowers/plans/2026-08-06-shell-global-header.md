@@ -107,7 +107,7 @@
 
 - [ ] **Step 1: Run focused checks from the worktree.** Run `pnpm --filter @sovereign/ui-kit test`, `pnpm --filter @sovereign/web test`, and both package typechecks; record any Node-24-only limitation separately rather than weakening project checks.
 - [ ] **Step 2: Run formatting and lint checks.** Run `pnpm exec prettier --check .` and `pnpm exec eslint .`; fix only feature-related failures and keep user-owned staged files outside commits.
-- [ ] **Step 3: Run builds.** Run `pnpm --recursive run build`; verify the UI-kit catalog can import the updated story and the web build emits no new warnings.
+- [ ] **Step 3: Run builds.** Run `pnpm --recursive run build` for workspace package builds, then run `pnpm --filter @sovereign/ui-kit exec ladle build` separately for the UI-kit catalog. Verify the updated story imports successfully and the web build emits no new warnings; do not describe the recursive package build as a Ladle build.
 - [ ] **Step 4: Perform browser QA.** Check a long session history, archive, Settings, provider/plugin details, unknown route, narrow central width, hidden/restored side panels, and a long title/context. Confirm the header stays fixed while only the body scrolls and no controls overlap.
 - [ ] **Step 5: Commit documentation/verification adjustments.** If no documentation change is required, do not create a no-op commit; otherwise use `docs(ui): document global shell header verification`.
 
