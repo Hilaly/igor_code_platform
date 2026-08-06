@@ -468,6 +468,7 @@ const pluginHttpRoutes = createPluginRoutes({
   timeoutMilliseconds: () => settings.current().config.pluginRouteTimeoutMilliseconds,
   bodyLimitBytes: () => settings.current().config.pluginRouteBodyLimitBytes,
   requestsPerMinute: () => settings.current().config.publicRouteRequestsPerMinute,
+  routeGeneration: plugins.routeGeneration,
 });
 
 const server = createDaemonServer({

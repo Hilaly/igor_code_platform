@@ -50,6 +50,10 @@ import type {
 
 export type PluginSupervisor = {
   statuses: () => PluginStatus[];
+  /** Поколение HTTP-маршрутов: меняется сразу при перезагрузке, до остановки старого воркера. */
+  routeGeneration: () => number;
+  /** Есть ли сейчас воркер, которому можно передать HTTP-вызов. */
+  isRunning: (pluginKey: string) => boolean;
   /** Привести живое к желаемому: поднять включённые, погасить выключенные, забыть исчезнувшие. */
   apply: (discovery: PluginDiscovery, preferences: Preferences) => Promise<void>;
   /** Поднять заново включённые плагины из перечисленных папок: их исходники изменились. */
@@ -197,6 +201,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
+  let routeGeneration = 0;
 
   const events = createPluginEvents({
     registry,
@@ -393,7 +398,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     // Выгружающийся воркер ещё вправе договорить: ответ на вызов, пришедший по ходу выгрузки, — это
     // ответ того самого воркера, которого спрашивали, и он лучше выдуманного сбоя.
     const stoppingMayStillSpeak =
-      message.kind === "log" || message.kind === "deactivated" || message.kind === "call-result";
+      message.kind === "log" ||
+      message.kind === "deactivated" ||
+      message.kind === "call-result" ||
+      message.kind === "request";
 
     if (!current && !(stopping && stoppingMayStillSpeak)) {
       return;
@@ -438,7 +446,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         const requestId = message.requestId;
         const sendLoginStep = (step: LoginStep): void => {
           // Тот же вопрос, что и с ответом: воркер мог смениться, пока шёл диалог.
-          if (entry.worker === worker) {
+          if (entry.worker === worker || (entry.stoppingWorker === worker && stopping)) {
             const carried: PluginIncoming = { kind: "login-step", requestId, step };
 
             worker.postMessage(carried);
@@ -456,7 +464,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           .then((response) => {
             // Воркер мог умереть, пока мост отвечал: отвечать в чужой воркер, поднятый на его
             // месте, нельзя — `requestId` уникален только внутри одного воркера.
-            if (entry.worker === worker) {
+            if (entry.worker === worker || (entry.stoppingWorker === worker && stopping)) {
               const answer: PluginIncoming = { kind: "response", requestId, response };
 
               worker.postMessage(answer);
@@ -818,6 +826,12 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
   return {
     statuses: () => [...[...supervised.values()].map(statusOf), ...refused.values()],
+    routeGeneration: () => routeGeneration,
+    isRunning: (pluginKey) => {
+      const entry = supervised.get(pluginKey);
+
+      return entry?.worker !== undefined && entry.state === "running";
+    },
     apply,
     call,
     reload: async (directories) => {
@@ -838,6 +852,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
         logger.info("the plugin sources changed, reloading", { plugin: entry.plugin.key });
 
+        // HTTP keeps the old contribution snapshot while the replacement activates so other
+        // consumers see an atomic switch. Routes need a separate generation, however: a request
+        // whose body finishes during this gap must not be sent to a replacement worker.
+        routeGeneration += 1;
         await stop(entry, "stopped", true);
         const refreshed = rediscoverPlugin(entry.plugin);
         if (refreshed === undefined) {

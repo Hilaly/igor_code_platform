@@ -422,6 +422,59 @@ describe("the second source of table rows", () => {
     });
   });
 
+  it("closes a request whose body does not arrive before the route deadline", async () => {
+    let handled = false;
+    const server = createServer(
+      createDispatcher({
+        routes: [
+          {
+            method: "POST",
+            path: "/api/slow-body",
+            body: "raw",
+            bodyReadTimeoutMilliseconds: 10,
+            handle: () => {
+              handled = true;
+            },
+          },
+        ],
+        logger: createLogger({ source: "core", level: () => "error", write: () => {} }),
+        authenticate: () => ({ kind: "session", id: "session" }),
+      }),
+    );
+
+    servers.push(server);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+
+    const startedAt = Date.now();
+    const outcome = await new Promise<{ kind: "closed" | "answered"; status?: number }>(
+      (resolve) => {
+        const request = sendRequest(
+          {
+            host: "127.0.0.1",
+            port,
+            method: "POST",
+            path: "/api/slow-body",
+            headers: { "content-length": "100", "content-type": "application/json" },
+          },
+          (response) => {
+            response.resume();
+            response.on("end", () => resolve({ kind: "answered", status: response.statusCode }));
+          },
+        );
+
+        request.on("error", () => resolve({ kind: "closed" }));
+        request.write("partial");
+        setTimeout(() => request.end("body"), 30).unref();
+      },
+    );
+
+    assert.ok(Date.now() - startedAt >= 5);
+    assert.ok(outcome.kind === "closed" || outcome.status === 408 || outcome.status === 400);
+    assert.equal(handled, false);
+  });
+
   it("keeps the form checks on an open route of the core", async () => {
     const { call } = await serve([{ ...echo("/api/account", "POST"), access: "open" }], {
       ...withoutSession,

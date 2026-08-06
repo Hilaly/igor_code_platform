@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 import type { LogRecord } from "@sovereign/protocol";
 import type { PluginRouteRequest } from "@sovereign/sdk";
 
-import { createContributionRegistry } from "./contribution-registry.ts";
+import { createContributionRegistry, type ContributingPlugin } from "./contribution-registry.ts";
 import { createPluginRoutes } from "./plugin-routes.ts";
 import type { PluginCall, PluginCallResult } from "./plugin-wire.ts";
 import type { PluginCallOutcome } from "./plugin-supervisor.ts";
@@ -24,6 +24,7 @@ after(async () => {
 });
 
 const plugin = { key: "data:tasks", id: "tasks", source: "data" as const };
+type Contributions = Parameters<ReturnType<typeof createContributionRegistry>["apply"]>[1];
 
 type Answer = { status: number; headers: Record<string, string | undefined>; body: Buffer };
 
@@ -32,6 +33,9 @@ type ServeOptions = {
   session?: boolean;
   requestsPerMinute?: number;
   bodyLimitBytes?: number;
+  routeGeneration?: () => number;
+  plugin?: ContributingPlugin;
+  extraPlugins?: { plugin: ContributingPlugin; contributions: Contributions }[];
 };
 
 async function serve(
@@ -47,7 +51,10 @@ async function serve(
   const registry = createContributionRegistry();
   const calls: PluginCall[] = [];
 
-  registry.apply(plugin, contributions, new Set());
+  registry.apply(options.plugin ?? plugin, contributions, new Set());
+  for (const extra of options.extraPlugins ?? []) {
+    registry.apply(extra.plugin, extra.contributions, new Set());
+  }
 
   const routes = createPluginRoutes({
     registry,
@@ -65,6 +72,7 @@ async function serve(
     timeoutMilliseconds: () => 1000,
     bodyLimitBytes: () => options.bodyLimitBytes ?? 1024,
     requestsPerMinute: () => options.requestsPerMinute ?? 60,
+    routeGeneration: options.routeGeneration,
   });
 
   const server = createServer(
@@ -159,6 +167,39 @@ describe("the routes of a plugin", () => {
 
     assert.deepEqual(request.body, new Uint8Array(Buffer.from("не json вовсе")));
     assert.equal(request.public, true);
+  });
+
+  it("does not pass the platform session cookie to a public route", async () => {
+    const { call, calls } = await serve([
+      { kind: "public-route", id: "hook", method: "GET", path: "hook" },
+    ]);
+
+    await call("GET", "/p/tasks/hook", undefined, { cookie: "sovereign_session=secret" });
+
+    const request = (calls[0] as { request: PluginRouteRequest }).request;
+
+    assert.equal(request.headers.cookie, undefined);
+  });
+
+  it("keeps public rate limits separate for same-id claims from different sources", async () => {
+    const projectPlugin = { key: "project:p:tasks", id: "tasks", source: "project:p" as const };
+    const { call } = await serve(
+      [{ kind: "public-route", id: "hook", method: "GET", path: "one" }],
+      {
+        requestsPerMinute: 1,
+        extraPlugins: [
+          {
+            plugin: projectPlugin,
+            contributions: [{ kind: "public-route", id: "hook", method: "GET", path: "two" }],
+          },
+        ],
+      },
+    );
+
+    assert.equal((await call("GET", "/p/tasks/one")).status, 200);
+    assert.equal((await call("GET", "/p/tasks/two")).status, 200);
+    assert.equal((await call("GET", "/p/tasks/one")).status, 429);
+    assert.equal((await call("GET", "/p/tasks/two")).status, 429);
   });
 
   it("needs a session on an ordinary route and none on a public one", async () => {
@@ -320,6 +361,7 @@ describe("the routes of a plugin", () => {
     const registry = createContributionRegistry();
     const logger = createLogger({ source: "core", level: () => "error", write: () => {} });
     const calls: PluginCall[] = [];
+    let generation = 0;
     const declared = [
       { kind: "public-route" as const, id: "hook", method: "POST" as const, path: "hook" },
     ];
@@ -336,6 +378,7 @@ describe("the routes of a plugin", () => {
       timeoutMilliseconds: () => 1000,
       bodyLimitBytes: () => 1024,
       requestsPerMinute: () => 60,
+      routeGeneration: () => generation,
     });
     const server = createServer(
       createDispatcher({
@@ -368,7 +411,7 @@ describe("the routes of a plugin", () => {
       outgoing.on("error", reject);
       outgoing.write("partial");
       setTimeout(() => {
-        registry.apply(plugin, declared, new Set(["tasks.hook"]));
+        generation += 1;
         outgoing.end("body");
       }, 10);
     });

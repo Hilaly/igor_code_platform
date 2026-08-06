@@ -55,6 +55,8 @@ export type Route = {
   access?: "open" | "public";
   /** Свой предел тела. Не сказано — общий: тела наших запросов короткие, а вебхук приносит чужие. */
   bodyLimitBytes?: number;
+  /** Предельное время чтения тела; после него соединение закрывается, чтобы поток не держал демон. */
+  bodyReadTimeoutMilliseconds?: number;
   /** `raw` отдаёт тело буфером, не разбирая его как json: форму тела знает только автор маршрута. */
   body?: "json" | "raw";
   handle: RouteHandler;
@@ -83,6 +85,7 @@ export type CreateDispatcherOptions = {
  * больше, это ошибка клиента или попытка занять память демона, а не большой запрос.
  */
 const defaultBodyLimitBytes = 64 * 1024;
+const defaultBodyReadTimeoutMilliseconds = 30_000;
 
 export function respondWithJson(response: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
@@ -202,7 +205,13 @@ export function createDispatcher(
     const body =
       request.method === "GET" || request.method === "DELETE"
         ? { kind: "absent" as const }
-        : await readBody(request, matched.route.bodyLimitBytes ?? bodyLimitBytes, matched.route);
+        : await readBody(
+            request,
+            response,
+            matched.route.bodyLimitBytes ?? bodyLimitBytes,
+            matched.route,
+            matched.route.bodyReadTimeoutMilliseconds ?? defaultBodyReadTimeoutMilliseconds,
+          );
 
     if (body.kind === "too-large") {
       respondWithError(
@@ -210,6 +219,14 @@ export function createDispatcher(
         413,
         `the request body must not exceed ${matched.route.bodyLimitBytes ?? bodyLimitBytes} bytes`,
       );
+
+      return;
+    }
+
+    if (body.kind === "timed-out") {
+      if (!request.destroyed && !response.destroyed) {
+        respondWithError(response, 408, "the request body took too long to arrive");
+      }
 
       return;
     }
@@ -341,6 +358,7 @@ type BodyOutcome =
   | { kind: "absent" }
   | { kind: "parsed"; value: unknown }
   | { kind: "too-large" }
+  | { kind: "timed-out" }
   | { kind: "invalid"; reason: string };
 
 /**
@@ -350,22 +368,53 @@ type BodyOutcome =
  */
 async function readBody(
   request: IncomingMessage,
+  response: ServerResponse,
   limitBytes: number,
   route: Route,
+  timeoutMilliseconds: number,
 ): Promise<BodyOutcome> {
   const chunks: Buffer[] = [];
   let size = 0;
+  let timedOut = false;
+  const timeout =
+    timeoutMilliseconds > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          if (!response.destroyed && !response.headersSent) {
+            respondWithError(response, 408, "the request body took too long to arrive");
+          }
+          request.destroy();
+        }, timeoutMilliseconds)
+      : undefined;
 
-  for await (const chunk of request) {
-    size += chunk.length;
+  timeout?.unref();
 
-    // Выход из цикла закрывает поток: слушать до конца то, что мы уже отказались принимать, — это
-    // ровно та трата памяти, от которой защищает лимит.
-    if (size > limitBytes) {
-      return { kind: "too-large" };
+  try {
+    for await (const chunk of request) {
+      size += chunk.length;
+
+      // Выход из цикла закрывает поток: слушать до конца то, что мы уже отказались принимать, — это
+      // ровно та трата памяти, от которой защищает лимит.
+      if (size > limitBytes) {
+        return { kind: "too-large" };
+      }
+
+      chunks.push(chunk as Buffer);
     }
 
-    chunks.push(chunk as Buffer);
+    if (timedOut) {
+      return { kind: "timed-out" };
+    }
+  } catch (cause) {
+    if (timedOut) {
+      return { kind: "timed-out" };
+    }
+
+    throw cause;
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
   }
 
   if (size === 0) {

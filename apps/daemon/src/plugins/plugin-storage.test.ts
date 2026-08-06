@@ -185,6 +185,22 @@ describe("the key-value storage of a plugin", () => {
     assert.ok(records.some((record) => record.level === "error"));
   });
 
+  it("refuses a stored non-finite number instead of rewriting it as null", async () => {
+    mkdirSync(join(directory, "plugin-storage"), { recursive: true });
+    const path = join(directory, "plugin-storage", "data%3Atasks.json");
+    const original = '{\n  "values": { "broken": 1e400 }\n}\n';
+    writeFileSync(path, original);
+
+    const store = storage();
+
+    assert.equal((await store.answer(data, { kind: "storage-get", key: "broken" })).kind, "failed");
+    assert.equal(
+      (await store.answer(data, { kind: "storage-set", key: "new", value: 1 })).kind,
+      "failed",
+    );
+    assert.equal(readFileSync(path, "utf8"), original);
+  });
+
   it("keeps the storage of one plugin readable when another one is broken", async () => {
     mkdirSync(join(directory, "plugin-storage"), { recursive: true });
     writeFileSync(join(directory, "plugin-storage", "data%3Atasks.json"), "битый");

@@ -35,12 +35,14 @@ export type PluginRoutes = {
 export type CreatePluginRoutesOptions = {
   registry: ContributionRegistry;
   /** Кого зовём. Нужен только `call`: поднимать и гасить плагины маршруты не имеют права. */
-  plugins: Pick<PluginSupervisor, "call">;
+  plugins: Pick<PluginSupervisor, "call"> & Partial<Pick<PluginSupervisor, "isRunning">>;
   logger: Logger;
   /** Ключи `config.json`, читаются живьём — как остальные (docs/data-directory.md). */
   timeoutMilliseconds: () => number;
   bodyLimitBytes: () => number;
   requestsPerMinute: () => number;
+  /** Поколение перезагрузки маршрутов; не зависит от ревизии других контекстов реестра. */
+  routeGeneration?: () => number;
   now?: () => number;
 };
 
@@ -56,11 +58,20 @@ const reservedHeaders = new Set([
 export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRoutes {
   const { registry, plugins, logger } = options;
   const now = options.now ?? (() => Date.now());
+  const routeGeneration = options.routeGeneration ?? (() => registry.revision());
 
   /** Окна лимита частоты по паре «вклад + адрес вызывающего» (docs/web-api.md). */
   const windows = new Map<string, { startedAt: number; count: number }>();
 
-  let built: { revision: number; bodyLimitBytes: number; routes: Route[] } | undefined;
+  let built:
+    | {
+        revision: number;
+        generation: number;
+        bodyLimitBytes: number;
+        bodyReadTimeoutMilliseconds: number;
+        routes: Route[];
+      }
+    | undefined;
 
   const callerOf = (request: IncomingMessage): string =>
     request.socket.remoteAddress ?? "unknown caller";
@@ -94,7 +105,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
     return window.count <= limit;
   };
 
-  const build = (revision: number): Route[] => {
+  const build = (generation: number, bodyReadTimeoutMilliseconds: number): Route[] => {
     const declared = registry
       .pluginContributions()
       .filter(
@@ -128,13 +139,17 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
         continue;
       }
 
-      routes.push(routeOf(single, revision));
+      routes.push(routeOf(single, generation, bodyReadTimeoutMilliseconds));
     }
 
     return routes;
   };
 
-  const routeOf = (registration: RouteRegistration, revision: number): Route => {
+  const routeOf = (
+    registration: RouteRegistration,
+    generation: number,
+    bodyReadTimeoutMilliseconds: number,
+  ): Route => {
     const open = registration.kind === "public-route";
 
     return {
@@ -144,10 +159,14 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
       // Тело не разбирается как json: его форму знает автор маршрута, а вебхук приносит что угодно.
       body: "raw",
       bodyLimitBytes: options.bodyLimitBytes(),
+      bodyReadTimeoutMilliseconds,
       handle: async (context) => {
         const caller = callerOf(context.request);
 
-        if (open && !withinLimit(`${registration.id}|${caller}`)) {
+        if (
+          open &&
+          !withinLimit(`${registration.pluginKey}|${registration.declaredId}|${caller}`)
+        ) {
           logger.warn("the public route of a plugin was called too often and refused", {
             plugin: registration.pluginKey,
             contribution: registration.id,
@@ -171,11 +190,17 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
 
         // The dispatcher may have matched this row before a plugin reload while it was reading
         // the request body. Never send an in-flight request to the replacement worker.
-        if (registry.revision() !== revision) {
+        if (routeGeneration() !== generation) {
           logger.info("a stale plugin route call was refused after reload", {
             plugin: registration.pluginKey,
             contribution: registration.id,
           });
+          respondWithError(context.response, 404, "not found");
+
+          return;
+        }
+
+        if (plugins.isRunning !== undefined && !plugins.isRunning(registration.pluginKey)) {
           respondWithError(context.response, 404, "not found");
 
           return;
@@ -224,10 +249,12 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
   };
 
   /** Заголовки как есть, именами в нижнем регистре: публичный маршрут аутентифицирует себя сам. */
-  const headersOf = (request: IncomingMessage): Record<string, string> =>
+  const headersOf = (request: IncomingMessage, open: boolean): Record<string, string> =>
     Object.fromEntries(
       Object.entries(request.headers).flatMap(([name, value]) =>
-        value === undefined ? [] : [[name, Array.isArray(value) ? value.join(", ") : value]],
+        value === undefined || (open && name === "cookie")
+          ? []
+          : [[name, Array.isArray(value) ? value.join(", ") : value]],
       ),
     );
 
@@ -248,7 +275,9 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
       path: registration.path,
       parameters: context.parameters,
       query: Object.fromEntries(context.url.searchParams),
-      headers: headersOf(context.request),
+      // Cookie is platform session state, not webhook input. Do not leak the HttpOnly cookie to a
+      // public plugin route when a same-origin browser request happens to carry it.
+      headers: headersOf(context.request, open),
       // Тело едет байтами всегда: копия, а не сам буфер, потому что структурное клонирование иначе
       // унесло бы кусок общего пула Node вместе с чужими данными рядом.
       ...(body instanceof Buffer && body.length > 0
@@ -323,9 +352,23 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
       // ревизию реестра не двигает, и без этого таблица отвечала бы прежним пределом до следующей
       // перезагрузки плагина. Найдено проверкой запуском, а не тестом.
       const bodyLimitBytes = options.bodyLimitBytes();
+      const bodyReadTimeoutMilliseconds = options.timeoutMilliseconds();
 
-      if (built?.revision !== revision || built.bodyLimitBytes !== bodyLimitBytes) {
-        built = { revision, bodyLimitBytes, routes: build(revision) };
+      const generation = routeGeneration();
+
+      if (
+        built?.revision !== revision ||
+        built.generation !== generation ||
+        built.bodyLimitBytes !== bodyLimitBytes ||
+        built.bodyReadTimeoutMilliseconds !== bodyReadTimeoutMilliseconds
+      ) {
+        built = {
+          revision,
+          generation,
+          bodyLimitBytes,
+          bodyReadTimeoutMilliseconds,
+          routes: build(generation, bodyReadTimeoutMilliseconds),
+        };
       }
 
       return built.routes;

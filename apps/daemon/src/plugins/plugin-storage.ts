@@ -97,7 +97,12 @@ export function createPluginStorage(options: CreatePluginStorageOptions): Plugin
 
     const values = (parsed as { values?: unknown } | null)?.values;
 
-    if (typeof values !== "object" || values === null || Array.isArray(values)) {
+    if (
+      typeof values !== "object" ||
+      values === null ||
+      Array.isArray(values) ||
+      !isJsonValue(values)
+    ) {
       logger.error("the storage file of the plugin has no values object and was not overwritten", {
         plugin: pluginKey,
       });
