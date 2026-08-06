@@ -118,6 +118,27 @@ describe("markup of the ported primitives", () => {
     expect(expandedMarkup).toContain("lucide-folder-open");
   });
 
+  it("can align child labels with a custom disclosure icon", () => {
+    const markup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        disclosureAlignment="label"
+        expandedIds={["alpha"]}
+        nodes={[
+          {
+            id: "alpha",
+            label: "Alpha",
+            disclosureIcon: <FolderIcon />,
+            children: [{ id: "session", label: "Session" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain('data-disclosure-alignment="label"');
+  });
+
   it("renders the compact settings view, selected navigation, page, and property row", () => {
     const markup = renderToStaticMarkup(
       <SettingsView

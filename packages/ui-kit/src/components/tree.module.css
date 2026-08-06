@@ -81,6 +81,16 @@
   flex: 0 0 var(--sovereign-space-4);
 }
 
+.root[data-disclosure-alignment="label"] .toggle,
+.root[data-disclosure-alignment="label"] .togglePlaceholder {
+  width: 0;
+  overflow: hidden;
+}
+
+.root[data-disclosure-alignment="label"] .indent {
+  flex-basis: calc(1rem + var(--sovereign-space-2));
+}
+
 .content {
   display: flex;
   flex: 1;

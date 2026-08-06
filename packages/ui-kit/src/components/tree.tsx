@@ -94,6 +94,8 @@ export type TreeProps = {
   onExpandedChange?: (expandedIds: string[]) => void;
   /** В покое прячет рельс действий, показывая его наведением и фокусом. */
   actionsVisibility?: "always" | "interaction";
+  /** Выравнивает дочерние подписи по подписи родителя вместо добавления слота раскрытия. */
+  disclosureAlignment?: "control" | "label";
 };
 
 type FlatNode = {
@@ -140,6 +142,7 @@ export function Tree({
   expandedIds,
   onExpandedChange,
   actionsVisibility = "always",
+  disclosureAlignment = "control",
 }: TreeProps) {
   const [ownExpandedIds, setOwnExpandedIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -426,6 +429,7 @@ export function Tree({
         role="tree"
         aria-label={label}
         data-actions-visibility={actionsVisibility}
+        data-disclosure-alignment={disclosureAlignment}
       >
         {renderNodes(nodes)}
       </div>

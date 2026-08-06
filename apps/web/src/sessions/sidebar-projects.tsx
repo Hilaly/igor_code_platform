@@ -281,6 +281,7 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         label={t("sidebar.projects")}
         nodes={nodes}
         actionsVisibility="interaction"
+        disclosureAlignment="label"
         selectedId={
           props.selectedSessionId === undefined ? undefined : `session:${props.selectedSessionId}`
         }
