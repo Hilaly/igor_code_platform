@@ -133,9 +133,22 @@
 }
 
 .settings-appearance,
-.settings-daemon {
+.settings-daemon,
+.settings-config {
   display: flex;
   flex-direction: column;
+}
+
+/* Конфиг идёт после фактов о демоне: заголовку нужен воздух, чтобы форма не слиплась со строками. */
+.settings-config {
+  gap: var(--sovereign-space-2);
+  margin-top: var(--sovereign-space-4);
+}
+
+.settings-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--sovereign-space-2);
 }
 
 .settings-appearance-buttons {

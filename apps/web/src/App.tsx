@@ -63,6 +63,7 @@ import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearanceSection } from "./settings/appearance-section.tsx";
 import { DaemonSection } from "./settings/daemon-section.tsx";
 import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
+import { useConfig } from "./settings/use-config.ts";
 import { SettingsView } from "./settings/settings-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
@@ -283,6 +284,7 @@ export function App() {
     cacheAppearance(localStorage, preferences);
   }, [preferences, prefersDark, diagnostics, schemes, contributions]);
 
+  const config = useConfig({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
   const fileResources = useFileResources(
     page.kind === "settings-project" ? page.projectId : undefined,
@@ -813,6 +815,8 @@ export function App() {
                 health={health}
                 failure={failure}
                 locale={preferences.locale}
+                config={config.state}
+                onSaveConfig={config.save}
                 translator={translator}
               />
             }

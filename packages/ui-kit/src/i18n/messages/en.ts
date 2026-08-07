@@ -431,6 +431,40 @@ export const coreEnglish: CatalogRegistration = {
     "settings.sections": "Settings sections",
     "settings.context.aria": "Settings context",
     "settings.context.title": "Settings",
+    "settings.config.title": "Configuration",
+    "settings.config.save": "Save",
+    "settings.config.unreadable": "The configuration could not be read: {reason}",
+    "settings.config.notNumbers": "These values are not numbers: {keys}",
+    "settings.config.collision": "config.json changed on disk while you were editing it",
+    "settings.config.takeFile": "Take the file",
+    "settings.config.key.logLevel": "Log level",
+    "settings.config.hint.logLevel": "How much the daemon writes to its journal",
+    "settings.config.key.maxConcurrentTurns": "Concurrent turns",
+    "settings.config.hint.maxConcurrentTurns": "How many sessions may reach a model at once",
+    "settings.config.key.compactionThreshold": "Compaction threshold",
+    "settings.config.hint.compactionThreshold":
+      "Share of the context window after which compaction starts by itself; 0 turns it off",
+    "settings.config.key.compactionReserveTokens": "Tokens reserved for the answer",
+    "settings.config.hint.compactionReserveTokens":
+      "How much of the window compaction leaves for the model to answer in",
+    "settings.config.key.compactionKeepRecentTokens": "Recent tokens kept",
+    "settings.config.hint.compactionKeepRecentTokens":
+      "How much of the tail of the conversation compaction leaves untouched",
+    "settings.config.key.hookTimeoutMilliseconds": "Hook timeout, ms",
+    "settings.config.hint.hookTimeoutMilliseconds":
+      "How long a plugin hook is waited for inside a turn",
+    "settings.config.key.pluginToolTimeoutMilliseconds": "Plugin tool timeout, ms",
+    "settings.config.hint.pluginToolTimeoutMilliseconds":
+      "How long a tool called by a model is waited for",
+    "settings.config.key.pluginRouteTimeoutMilliseconds": "Plugin route timeout, ms",
+    "settings.config.hint.pluginRouteTimeoutMilliseconds":
+      "How long an open HTTP connection to a plugin route is held",
+    "settings.config.key.pluginRouteBodyLimitBytes": "Plugin route body limit, bytes",
+    "settings.config.hint.pluginRouteBodyLimitBytes":
+      "The largest request body a plugin route accepts",
+    "settings.config.key.publicRouteRequestsPerMinute": "Public route calls per minute",
+    "settings.config.hint.publicRouteRequestsPerMinute":
+      "How many calls a public route takes from one address",
     "settings.appearance.schemeHint": "Changes colour, not geometry",
     "settings.appearance.variantHint": "Follow the environment or choose explicitly",
     "settings.appearance.scaleHint": "Content density stays contextual",

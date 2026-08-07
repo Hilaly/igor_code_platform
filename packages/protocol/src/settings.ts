@@ -605,6 +605,7 @@ function isAppearanceVariant(value: unknown): value is AppearanceVariant {
   return appearanceVariants.includes(value as AppearanceVariant);
 }
 
-function isLogLevel(value: unknown): value is LogLevel {
+/** Нужен и снаружи: форма конфига получает от выпадающего списка строку и обязана её сузить. */
+export function isLogLevel(value: unknown): value is LogLevel {
   return logLevels.includes(value as LogLevel);
 }

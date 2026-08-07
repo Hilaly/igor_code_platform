@@ -1,4 +1,4 @@
-import { contributionKinds } from "@sovereign/protocol";
+import { configKeys, contributionKinds } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { shippedSchemes } from "../tokens/schemes/shipped.ts";
@@ -199,6 +199,18 @@ describe("the shipped catalogs", () => {
     for (const catalog of [coreEnglish, coreRussian]) {
       const missing = contributionKinds
         .map((kind) => `plugins.kind.${kind}`)
+        .filter((key) => catalog.messages[key] === undefined);
+
+      expect(missing, catalog.locale).toEqual([]);
+    }
+  });
+
+  it("name and explain every key of the daemon config", () => {
+    // Форма конфига строится по `configKeys`: ключ без подписи доезжает до строки настроек своим
+    // именем из файла, а подсказки у него нет вовсе — и понять, что означает число, негде.
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const missing = configKeys
+        .flatMap((key) => [`settings.config.key.${key}`, `settings.config.hint.${key}`])
         .filter((key) => catalog.messages[key] === undefined);
 
       expect(missing, catalog.locale).toEqual([]);
