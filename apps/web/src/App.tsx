@@ -15,15 +15,7 @@ import {
   type LoginStepFrame,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
-import {
-  Button,
-  coreEnglish,
-  coreNamespace,
-  coreRussian,
-  createTranslator,
-  Heading,
-  Spinner,
-} from "@sovereign/ui-kit";
+import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -37,6 +29,7 @@ import {
   shippedSchemes,
   writeAppearance,
 } from "./appearance.ts";
+import { availableLocales, pluginCatalogs, shippedCatalogs } from "./catalogs.ts";
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
@@ -75,9 +68,6 @@ import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { describePage, PageView } from "./shell/page.tsx";
 import { Shell } from "./shell/shell.tsx";
-
-const catalogs = [coreEnglish, coreRussian];
-const shippedLocales = catalogs.map((catalog) => catalog.locale);
 
 /** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
 type Access = AuthenticationState | "asking";
@@ -270,6 +260,12 @@ export function App() {
     () => [...shippedSchemes, ...pluginColorSchemes(contributions ?? [], diagnostics.record)],
     [contributions, diagnostics],
   );
+  // Каталоги плагинов идут после наших: побеждает последний объявивший сообщение (docs/ui-kit.md).
+  const catalogs = useMemo(
+    () => [...shippedCatalogs, ...pluginCatalogs(contributions ?? [])],
+    [contributions],
+  );
+  const locales = useMemo(() => availableLocales(catalogs), [catalogs]);
 
   // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
   // дерева, поэтому переключение стоит одинаково на пустой странице и на полной (docs/ui-kit.md).
@@ -357,7 +353,7 @@ export function App() {
         catalogs,
         onDiagnostic: diagnostics.record,
       }),
-    [preferences.locale, diagnostics],
+    [preferences.locale, catalogs, diagnostics],
   );
 
   const pageHeader = describePage(page, translator, {
@@ -744,7 +740,7 @@ export function App() {
               <AppearanceSection
                 preferences={preferences}
                 schemes={describeSchemes(schemes, contributions ?? [], translator)}
-                locales={shippedLocales}
+                locales={locales}
                 onChange={change}
                 refusal={refusal}
                 translator={translator}
