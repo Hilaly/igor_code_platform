@@ -37,6 +37,26 @@ describe("UserProviderForm", () => {
     expect(
       screen.getByRole("combobox", { name: "Формат запросов" }).closest('[role="group"]'),
     ).not.toBeNull();
+    const expectTooltipToggles = (name: string, count: number) => {
+      const toggles = screen.getAllByRole("checkbox", { name });
+      expect(toggles).toHaveLength(count);
+      expect(screen.getAllByRole("tooltip", { name })).toHaveLength(count);
+      for (const toggle of toggles) {
+        expect(
+          toggle.closest("label")?.querySelector('[class*="visuallyHidden"]')?.textContent,
+        ).toBe(name);
+      }
+    };
+    for (const name of [
+      "Загружать модели автоматически",
+      "Модели поддерживают reasoning",
+      "Модели принимают изображения",
+    ]) {
+      expectTooltipToggles(name, 1);
+    }
+    fireEvent.click(screen.getByRole("button", { name: /Добавить ручную модель/ }));
+    expectTooltipToggles("Модели поддерживают reasoning", 2);
+    expectTooltipToggles("Модели принимают изображения", 2);
     expect(document.querySelector("[class*='panel']")).toBeNull();
   });
 

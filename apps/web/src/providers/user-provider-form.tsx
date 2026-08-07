@@ -192,6 +192,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
               checked={automatic}
               onChange={setAutomatic}
               label={t("providers.user.models.automatic")}
+              labelDisplay="tooltip"
             />
           </SettingsRow>
           {automatic ? (
@@ -237,6 +238,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
               checked={reasoning}
               onChange={setReasoning}
               label={t("providers.user.reasoning")}
+              labelDisplay="tooltip"
             />
           </SettingsRow>
           <SettingsRow label={<span>{t("providers.user.images")}</span>}>
@@ -244,6 +246,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
               checked={imageInput}
               onChange={setImageInput}
               label={t("providers.user.images")}
+              labelDisplay="tooltip"
             />
           </SettingsRow>
           <SettingsRow label={<span>{t("providers.user.cost.input")}</span>}>
@@ -360,6 +363,7 @@ function ManualModelsEditor({
               checked={model.reasoning ?? false}
               onChange={(reasoning) => update(index, { reasoning })}
               label={t("providers.user.reasoning")}
+              labelDisplay="tooltip"
             />
           </SettingsRow>
           <SettingsRow label={<span>{t("providers.user.images")}</span>}>
@@ -367,6 +371,7 @@ function ManualModelsEditor({
               checked={(model.input ?? ["text"]).includes("image")}
               onChange={(image) => update(index, { input: image ? ["text", "image"] : ["text"] })}
               label={t("providers.user.images")}
+              labelDisplay="tooltip"
             />
           </SettingsRow>
           <SettingsRow label={<span>{t("providers.user.cost.input")}</span>}>

@@ -89,9 +89,18 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
   expect(container.querySelector(".plugin-detail-surface")).toBeNull();
-  expect(screen.getByRole("checkbox", { name: "Switched on" })).toHaveProperty("checked", true);
-  expect(screen.getByRole("checkbox", { name: "Example event" })).toHaveProperty("checked", true);
-  expect(screen.getByRole("checkbox", { name: "Example skill" })).toHaveProperty("checked", false);
+  for (const [name, checked] of [
+    ["Switched on", true],
+    ["Example event", true],
+    ["Example skill", false],
+  ] as const) {
+    const toggle = screen.getByRole("checkbox", { name });
+    expect(toggle).toHaveProperty("checked", checked);
+    expect(screen.getByRole("tooltip", { name })).toBeTruthy();
+    expect(toggle.closest("label")?.querySelector('[class*="visuallyHidden"]')?.textContent).toBe(
+      name,
+    );
+  }
 
   fireEvent.click(screen.getByRole("checkbox", { name: "Example event" }));
   expect(onSwitch).toHaveBeenCalledWith("data:example", {

@@ -74,6 +74,10 @@ it("opens the nested detail from the whole compact row but keeps its toggle inde
   const pluginToggle = within(row).getByRole("checkbox", { name: "Switched on" });
 
   expect(pluginToggle).toHaveProperty("checked", true);
+  expect(within(row).getByRole("tooltip", { name: "Switched on" })).toBeTruthy();
+  expect(
+    pluginToggle.closest("label")?.querySelector('[class*="visuallyHidden"]')?.textContent,
+  ).toBe("Switched on");
 
   fireEvent.click(pluginToggle);
   expect(onSwitch).toHaveBeenNthCalledWith(1, "data:example", {

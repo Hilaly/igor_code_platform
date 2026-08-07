@@ -112,6 +112,7 @@ export function PluginDetailView({
                 : onSwitch(status.key, { ...preferences, enabled })
             }
             label={t("plugins.toggle.plugin")}
+            labelDisplay="tooltip"
             {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
           />
         </SettingsRow>
@@ -183,6 +184,7 @@ export function PluginDetailView({
                       disabled={preferences === undefined}
                       onChange={(on) => switchContribution(registration.id, on)}
                       label={registration.title ?? registration.declaredId}
+                      labelDisplay="tooltip"
                     />
                   </div>
                 </SettingsRow>

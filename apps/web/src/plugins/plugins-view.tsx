@@ -214,6 +214,7 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
           : onSwitch(status.key, { ...preferences, enabled: on })
       }
       label={t("plugins.toggle.plugin")}
+      labelDisplay="tooltip"
       size="xs"
       {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
     />
