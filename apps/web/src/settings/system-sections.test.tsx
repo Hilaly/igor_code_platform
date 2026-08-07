@@ -92,6 +92,25 @@ it("keeps daemon loading and failure states in the uptime value column", () => {
   expect(within(uptime).queryByText("Loading…")).toBeNull();
 });
 
+it("keeps every visible uptime unit in the accessible timer name after an hour", () => {
+  render(
+    <DaemonSection
+      stream="open"
+      health={{ status: "ok", startedAt: "2026-08-07T11:29:59.000Z", uptimeSeconds: 3_601 }}
+      failure={undefined}
+      locale="en-GB"
+      translator={translator}
+    />,
+  );
+
+  const uptime = screen.getByRole("group", { name: "Uptime" });
+  expect(within(uptime).getByRole("group", { name: "up 1h 0m 1s" })).toBeTruthy();
+
+  act(() => vi.advanceTimersByTime(1_000));
+
+  expect(within(uptime).getByRole("group", { name: "up 1h 0m 2s" })).toBeTruthy();
+});
+
 it("renders diagnostics as a named flat technical stream", () => {
   render(
     <DiagnosticsSection

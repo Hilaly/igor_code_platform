@@ -11,6 +11,10 @@ export type DurationUnits = {
   seconds: (count: number) => string;
 };
 
+export type FullDurationUnits = DurationUnits & {
+  days: (count: number) => string;
+};
+
 export function formatUptime(totalSeconds: number, units: DurationUnits): string {
   if (totalSeconds < 60) {
     return units.seconds(totalSeconds);
@@ -24,6 +28,29 @@ export function formatUptime(totalSeconds: number, units: DurationUnits): string
 
   // Секунды на этом масштабе не сообщают ничего, кроме дребезга при каждой перерисовке.
   return `${units.hours(Math.floor(minutes / 60))} ${units.minutes(minutes % 60)}`;
+}
+
+/** Полное доступное имя цифрового таймера: ни одна видимая единица не теряется при тике. */
+export function formatFullUptime(totalSeconds: number, units: FullDurationUnits): string {
+  const elapsedSeconds = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(elapsedSeconds / 86_400);
+  const hours = Math.floor((elapsedSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((elapsedSeconds % 3_600) / 60);
+  const seconds = elapsedSeconds % 60;
+
+  if (days > 0) {
+    return `${units.days(days)} ${units.hours(hours)} ${units.minutes(minutes)} ${units.seconds(seconds)}`;
+  }
+
+  if (hours > 0) {
+    return `${units.hours(hours)} ${units.minutes(minutes)} ${units.seconds(seconds)}`;
+  }
+
+  if (minutes > 0) {
+    return `${units.minutes(minutes)} ${units.seconds(seconds)}`;
+  }
+
+  return units.seconds(seconds);
 }
 import type { Health } from "@sovereign/protocol";
 import { useEffect, useState } from "react";

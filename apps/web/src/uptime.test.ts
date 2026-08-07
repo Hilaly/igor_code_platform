@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatUptime, type DurationUnits } from "./uptime.ts";
+import {
+  formatFullUptime,
+  formatUptime,
+  type DurationUnits,
+  type FullDurationUnits,
+} from "./uptime.ts";
 
 /** Русские единицы, как их отдал бы каталог ядра: формат не должен зависеть от языка. */
 const russian: DurationUnits = {
@@ -13,6 +18,11 @@ const english: DurationUnits = {
   hours: (count) => `${count}h`,
   minutes: (count) => `${count}m`,
   seconds: (count) => `${count}s`,
+};
+
+const fullEnglish: FullDurationUnits = {
+  ...english,
+  days: (count) => `${count}d`,
 };
 
 describe("formatUptime", () => {
@@ -30,5 +40,15 @@ describe("formatUptime", () => {
 
   it("says the same thing in another language", () => {
     expect(formatUptime(90, english)).toBe("1m 30s");
+  });
+});
+
+describe("formatFullUptime", () => {
+  it("keeps seconds and zero-valued intermediate units after an hour", () => {
+    expect(formatFullUptime(3_601, fullEnglish)).toBe("1h 0m 1s");
+  });
+
+  it("matches the timer's day, hour, minute, and second groups", () => {
+    expect(formatFullUptime(176_461, fullEnglish)).toBe("2d 1h 1m 1s");
   });
 });

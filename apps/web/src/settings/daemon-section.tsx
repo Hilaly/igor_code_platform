@@ -15,8 +15,7 @@ import {
 } from "@sovereign/ui-kit";
 
 import type { StreamStatus } from "../events/stream.ts";
-import { useUptimeSeconds } from "../uptime.ts";
-import { formatUptime } from "../uptime.ts";
+import { formatFullUptime, useUptimeSeconds } from "../uptime.ts";
 
 const tones: Record<StreamStatus, BadgeTone> = {
   connecting: "neutral",
@@ -69,7 +68,8 @@ export function DaemonSection({ stream, health, failure, locale, translator }: D
               totalSeconds={uptimeSeconds}
               labels={timerLabels}
               accessibleLabel={t("daemon.uptime", {
-                duration: formatUptime(uptimeSeconds, {
+                duration: formatFullUptime(uptimeSeconds, {
+                  days: (count) => t("duration.days", { count }),
                   hours: (count) => t("duration.hours", { count }),
                   minutes: (count) => t("duration.minutes", { count }),
                   seconds: (count) => t("duration.seconds", { count }),
