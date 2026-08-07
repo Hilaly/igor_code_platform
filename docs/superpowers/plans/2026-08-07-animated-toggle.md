@@ -110,7 +110,7 @@ Run: `make check && make build && git diff --check`.
 
 - [ ] **Step 2: Inspect all live contexts**
 
-Using the running `http://localhost:5274`, inspect Plugins list/detail and a provider form at wide and narrow viewport widths. Verify switch animation, tooltip on hover and keyboard focus, independent row click behavior, no horizontal overflow, focus ring, and disabled rendering. Inspect the session-tree Toggle to confirm its label remains visible.
+Using the running `http://localhost:5274`, inspect Plugins list/detail and a provider form at wide and narrow viewport widths. Verify switch animation, Toggle tooltip on hover only (click/focus must not leave it open), independent row click behavior, no horizontal overflow, focus ring, and disabled rendering. Inspect the session-tree Toggle to confirm its label remains visible.
 
 - [ ] **Step 3: Request independent review**
 
