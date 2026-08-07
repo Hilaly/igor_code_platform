@@ -49,6 +49,22 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("styles DurationTimer as flat compact bold tabular body text", () => {
+    const timerCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "duration-timer.module.css"), "utf8"),
+    );
+
+    expect(timerCss).toMatch(
+      /\.timer\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
+    );
+    expect(timerCss).toMatch(/\.digits\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-lg\);/s);
+    expect(timerCss).toMatch(
+      /\.digits\s*\{[^}]*font-weight:\s*var\(--sovereign-font-weight-bold\);/s,
+    );
+    expect(timerCss).toMatch(/\.digits\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/s);
+    expect(timerCss).not.toMatch(/(?:background|border|box-shadow)\s*:/);
+  });
+
   it("defines the animated switch track, thumb, sizes, and motion fallback", () => {
     const toggleCss = withoutComments(
       readFileSync(join(kitRoot, "components", "toggle.module.css"), "utf8"),

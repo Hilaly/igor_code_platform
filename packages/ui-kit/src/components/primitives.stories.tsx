@@ -14,6 +14,7 @@ import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { ConfirmDialog } from "./dialog.tsx";
 import { Disclosure } from "./disclosure.tsx";
+import { DurationTimer } from "./duration-timer.tsx";
 import { Input } from "./input.tsx";
 import { BrandMark } from "./icons.tsx";
 import { Link } from "./link.tsx";
@@ -133,6 +134,21 @@ export const Controls = () => {
     </div>
   );
 };
+
+export const DurationTimers = () => (
+  <div style={column}>
+    <DurationTimer
+      totalSeconds={3_661}
+      labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
+      accessibleLabel="1 час 1 минута 1 секунда"
+    />
+    <DurationTimer
+      totalSeconds={176_461}
+      labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
+      accessibleLabel="2 дня 1 час 1 минута 1 секунда"
+    />
+  </div>
+);
 
 const pickerGroups: ModelPickerGroup[] = [
   {
