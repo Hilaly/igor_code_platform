@@ -27,6 +27,21 @@ const options = [
 const treeToggleLabel = (node: TreeNode, expanded: boolean) =>
   `${expanded ? "Свернуть" : "Развернуть"} ${node.label}`;
 
+function rect(values: Partial<DOMRect> = {}): DOMRect {
+  return {
+    x: 0,
+    y: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    toJSON: () => ({}),
+    ...values,
+  };
+}
+
 afterEach(cleanup);
 
 describe("interactive components", () => {
@@ -142,6 +157,42 @@ describe("interactive components", () => {
       expect(screen.getByText("Project facts")).toBeTruthy();
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("anchors a Tree context to the visible row and shrinks it on the right", () => {
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+
+    try {
+      render(
+        <Tree
+          label="Projects"
+          toggleLabel={treeToggleLabel}
+          nodes={[{ id: "project", label: "Alpha", context: <div>Project facts</div> }]}
+        />,
+      );
+
+      const project = screen.getByRole("treeitem", { name: "Alpha" });
+      const row = project.firstElementChild as HTMLElement;
+      vi.spyOn(project, "getBoundingClientRect").mockReturnValue(rect());
+      vi.spyOn(row, "getBoundingClientRect").mockReturnValue(
+        rect({ left: 16, right: 316, top: 240, bottom: 280, width: 300, height: 40 }),
+      );
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 600 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 360 });
+
+      fireEvent.pointerEnter(project);
+      const context = screen.getByRole("tooltip", { name: "Alpha" });
+      vi.spyOn(context, "getBoundingClientRect").mockReturnValue(rect({ width: 384, height: 180 }));
+      fireEvent(window, new Event("resize"));
+
+      expect(context.style.left).toBe("324px");
+      expect(context.style.width).toBe("268px");
+      expect(context.style.top).toBe("172px");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
     }
   });
 

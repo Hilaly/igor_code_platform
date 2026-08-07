@@ -153,10 +153,10 @@ export function Tree({
   const contextElement = useRef<HTMLDivElement | null>(null);
   const contextCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [activeContext, setActiveContext] = useState<
-    { node: TreeNode; anchor: HTMLDivElement } | undefined
+    { node: TreeNode; anchor: HTMLElement } | undefined
   >();
   const [contextPosition, setContextPosition] = useState<
-    { top: number; left: number } | undefined
+    { top: number; left: number; width: number } | undefined
   >();
 
   const cancelContextClose = (): void => {
@@ -166,7 +166,11 @@ export function Tree({
   const openContext = (node: TreeNode, anchor: HTMLDivElement): void => {
     if (node.context === undefined) return;
     cancelContextClose();
-    setActiveContext({ node, anchor });
+    const visibleRow = anchor.firstElementChild;
+    setActiveContext({
+      node,
+      anchor: visibleRow instanceof HTMLElement ? visibleRow : anchor,
+    });
   };
 
   const scheduleContextClose = (): void => {
@@ -189,16 +193,13 @@ export function Tree({
       const height = context?.height ?? 0;
       const viewportPadding = 8;
       const gap = 8;
-      const preferredLeft = anchor.right + gap;
-      const left = Math.min(
-        Math.max(preferredLeft, viewportPadding),
-        Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
-      );
+      const left = anchor.right + gap;
+      const availableWidth = Math.max(0, window.innerWidth - viewportPadding - left);
       const top = Math.min(
         Math.max(anchor.top, viewportPadding),
         Math.max(viewportPadding, window.innerHeight - height - viewportPadding),
       );
-      setContextPosition({ top, left });
+      setContextPosition({ top, left, width: Math.min(width, availableWidth) });
     };
 
     updatePosition();
