@@ -97,8 +97,21 @@ describe("stylesheets of the kit", () => {
 
     expect(tooltipCss).toMatch(/\.tip\s*\{[^}]*display:\s*none;/s);
     expect(tooltipCss).toMatch(
-      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
     );
+  });
+
+  it("shows compact Toggle labels only on hover without removing focus tooltips elsewhere", () => {
+    const tooltipCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),
+    );
+    const toggle = readFileSync(join(kitRoot, "components", "toggle.tsx"), "utf8");
+
+    expect(tooltipCss).toMatch(
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+    );
+    expect(tooltipCss).not.toMatch(/\.hoverOnly:focus-within\s*>\s*\.tip/);
+    expect(toggle).toMatch(/<Tooltip\s+content=\{label\}\s+hoverOnly>[\s\S]*\{toggle\}/);
   });
 
   it("ships the approved voice, interface, and machine fonts locally", () => {

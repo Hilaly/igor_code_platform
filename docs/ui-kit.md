@@ -280,7 +280,7 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
 - **`List` и `ListRow`** — семантический список и его строка. `ListRow` принимает `selected`,
   `onSelect`, `onDoubleClick`, `actions` и `describedBy`: при наличии `onSelect` строка становится
   кнопкой и получает `aria-describedby`, а действия остаются рядом, не вкладывая кнопку в кнопку.
-- **`Tooltip`** — `content`, `side`, необязательный явный `id` и `children`. Явный `id` связывает
+- **`Tooltip`** — `content`, `side`, необязательный явный `id`, `hoverOnly` и `children`. Явный `id` связывает
   подсказку с фокусируемым предком триггера; без него компонент создаёт идентификатор сам.
 - **`Input` и `Textarea`** — `value`, `onChange(value)`, `placeholder`, `invalid`, `disabled`, `id`,
   `describedBy`; у поля ещё `type` (`text` | `password` | `search`), `autoComplete`
@@ -379,7 +379,7 @@ contents`): раскладку задаёт внутренний контейн�
   `options`, `value`, `onChange(value)`, `label`, `disabled`, а `RadioGroup` ещё `name`. Недоступные
   варианты отключены нативно.
 - **`Tabs`** — `tabs` (`id`, `label`, `disabled`, `content`), `value`, `onChange`, `label`.
-- **`Tooltip`** — `content`, `side`, необязательный явный `id`, `children`. Целиком на CSS;
+- **`Tooltip`** — `content`, `side`, необязательный явный `id`, `hoverOnly`, `children`. Целиком на CSS;
   клонирует единственный элемент-триггер, добавляя ему `aria-describedby` с идентификатором пузыря
   `role="tooltip"`. Без явного `id` создаёт его сам; явный нужен, когда описание связывается не с
   клонируемым элементом, а с фокусируемым предком.
@@ -926,7 +926,7 @@ UI kit: компактный context bar, плотная выбранная ст
 длительности и easing UI Kit; при `prefers-reduced-motion: reduce` переходы отключены. `label` всегда
 даёт checkbox доступное имя. `labelDisplay="visible"` по умолчанию показывает подпись рядом с
 переключателем; `labelDisplay="tooltip"` скрывает её только визуально и показывает в стандартном
-`Tooltip` при наведении и keyboard focus. Все `Toggle` внутри `SettingsRow` используют `tooltip`,
+`Tooltip` в режиме `hoverOnly` только при наведении. Все `Toggle` внутри `SettingsRow` используют `tooltip`,
 поскольку их назначение уже подписано слева; самостоятельные контролы, например действия дерева
 сессий, сохраняют видимую подпись. `Toggle` по умолчанию использует размер `sm`, а `size="xs"` даёт
 компактную подпись для плотных строк объектов. `SettingsView` только

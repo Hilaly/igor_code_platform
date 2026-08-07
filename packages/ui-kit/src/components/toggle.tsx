@@ -49,5 +49,11 @@ export function Toggle({
     </label>
   );
 
-  return labelDisplay === "tooltip" ? <Tooltip content={label}>{toggle}</Tooltip> : toggle;
+  return labelDisplay === "tooltip" ? (
+    <Tooltip content={label} hoverOnly>
+      {toggle}
+    </Tooltip>
+  ) : (
+    toggle
+  );
 }
