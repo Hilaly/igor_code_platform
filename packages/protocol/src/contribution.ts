@@ -178,6 +178,35 @@ export type PublicRouteContributionRegistration = RouteRegistrationCommon & {
   kind: "public-route";
 };
 
+/**
+ * Цветовая схема, приехавшая от плагина (docs/ui-kit.md). Схема — **данные**: ни одной функции она
+ * не предоставляет, поэтому браузерного кода плагину для неё не нужно вовсе.
+ *
+ * Форма нарочно структурная, без знания о палитре. Какие ключи в палитре обязательны и какой мажор
+ * контракта токенов действует, знает кит, а он зависит от протокола — обратный импорт был бы циклом.
+ * Отсюда разделение: **демон проверяет форму, кит проверяет контракт.** Схема с верной формой, но
+ * чужим мажором или неполной палитрой доезжает до браузера и отвергается там, с диагностикой.
+ */
+export type ColorSchemeDocument = {
+  /** Мажор контракта токенов кита, на который схема рассчитана. */
+  tokenContract: number;
+  /** Палитры по имени варианта; какие варианты и ключи обязательны — знает кит. */
+  variants: Record<string, Record<string, string>>;
+  /** Точечные переопределения ролей: имена ролей тоже принадлежат киту. */
+  roleOverrides?: Record<string, string>;
+};
+
+/**
+ * Своего имени у схемы нет: имя, которым её выбирают, — это `id` вклада с неймспейсом
+ * (`themed.midnight`), он же стоит в `preferences.json`. Второе имя рядом с идентификатором было бы
+ * вторым способом сказать то же — тот же довод, которым у инструмента отвергнуто отдельное поле
+ * имени, — и переключение вклада и выбор схемы работают одним ключом.
+ */
+export type ColorSchemeContributionRegistration = RegistrationCommon & {
+  kind: "color-scheme";
+  scheme: ColorSchemeDocument;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -186,9 +215,32 @@ export type ContributionRegistration =
   | ToolContributionRegistration
   | HookSubscriptionContributionRegistration
   | RouteContributionRegistration
-  | PublicRouteContributionRegistration;
+  | PublicRouteContributionRegistration
+  | ColorSchemeContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
+
+/**
+ * Все виды, перечисленные явно. `Record<ContributionKind, true>` требует каждого ключа и не терпит
+ * лишнего, поэтому вид, добавленный в union и забытый здесь, ломает сборку, а не находится глазами.
+ */
+const everyKind = {
+  custom: true,
+  event: true,
+  agent: true,
+  skill: true,
+  tool: true,
+  hook: true,
+  route: true,
+  "public-route": true,
+  "color-scheme": true,
+} satisfies Record<ContributionKind, true>;
+
+/**
+ * Виды списком: типа в рантайме нет, а перебрать виды нужно — например, чтобы проверить, что у
+ * каждого есть подпись в каталоге интерфейса.
+ */
+export const contributionKinds = Object.keys(everyKind) as readonly ContributionKind[];
 
 /**
  * Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника: не применяется ни

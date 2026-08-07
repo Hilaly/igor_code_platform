@@ -147,6 +147,32 @@ export type RouteContribution = {
   path: string;
 };
 
+/**
+ * Документ цветовой схемы (docs/ui-kit.md). Копия формы из протокола, как и остальные типы SDK:
+ * внутренние пакеты в папку плагина не тянутся. Копия при этом структурная: имена вариантов, ключи
+ * палитры и имена ролей знает кит, а не SDK — иначе публикуемая поверхность потянула бы за собой
+ * ещё и контракт токенов, который движется по своему мажору.
+ */
+export type ColorSchemeDocument = {
+  tokenContract: number;
+  variants: Record<string, Record<string, string>>;
+  roleOverrides?: Record<string, string>;
+};
+
+/**
+ * Объявление цветовой схемы. Браузерного кода не требует вовсе: схема — данные, и плагин, который
+ * приносит только тему, остаётся плагином из одного объявления.
+ *
+ * Имя, которым схему выбирают, — это `id` вклада: отдельного поля имени нет по тому же доводу, что
+ * у инструмента.
+ */
+export type ColorSchemeContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  scheme: ColorSchemeDocument;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
@@ -155,7 +181,8 @@ export type PluginContribution =
   | ({ kind: "hook" } & HookContribution)
   | ({ kind: "tool" } & ToolContribution)
   | ({ kind: "route" } & RouteContribution)
-  | ({ kind: "public-route" } & RouteContribution);
+  | ({ kind: "public-route" } & RouteContribution)
+  | ({ kind: "color-scheme" } & ColorSchemeContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

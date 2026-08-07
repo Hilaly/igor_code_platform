@@ -385,6 +385,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.forgotten.title": "Switched off, but no longer declared",
     "plugins.forgotten.hint": "The choice is kept: the contribution may come back with the plugin.",
     "plugins.kind.agent": "agent",
+    "plugins.kind.color-scheme": "colour scheme",
     "plugins.kind.custom": "contribution",
     "plugins.kind.event": "event",
     "plugins.kind.hook": "subscription",

@@ -261,12 +261,14 @@ function TechnicalData({
                     disableModelInvocation: registration.disableModelInvocation,
                     metadata: registration.metadata,
                   }
-                : {
-                    model: registration.model,
-                    thinkingLevel: registration.thinkingLevel,
-                    tools: registration.tools,
-                    skills: registration.skills,
-                  };
+                : registration.kind === "color-scheme"
+                  ? registration.scheme
+                  : {
+                      model: registration.model,
+                      thinkingLevel: registration.thinkingLevel,
+                      tools: registration.tools,
+                      skills: registration.skills,
+                    };
   if (data === undefined) return undefined;
   return (
     <Disclosure

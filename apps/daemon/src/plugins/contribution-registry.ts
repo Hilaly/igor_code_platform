@@ -12,6 +12,7 @@ import {
   isSubscribablePlatformHook,
   isThinkingLevel,
   pluginSourceRank,
+  type ColorSchemeDocument,
   type ContributionConflict,
   type ContributionKind,
   type ContributionRegistration,
@@ -772,6 +773,19 @@ function programmaticRegistration(
     return { ...common, kind: contribution.kind, method: contribution.method, path };
   }
 
+  if (contribution.kind === "color-scheme") {
+    const scheme = parseColorSchemeDocument(contribution.scheme);
+
+    if (scheme === undefined) {
+      problems.push(
+        `the colour scheme ${id} must declare an integer tokenContract and palettes of string values`,
+      );
+      return undefined;
+    }
+
+    return { ...common, kind: "color-scheme", scheme };
+  }
+
   const instructions =
     typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
   if (instructions === "") {
@@ -810,6 +824,69 @@ function programmaticRegistration(
       : { thinkingLevel: contribution.thinkingLevel }),
     skills: { include: skillInclude, exclude: skillExclude },
   };
+}
+
+/** Объект, не массив и не `null`: массив тоже `typeof "object"`, а палитрой быть не может. */
+function plainObject(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function stringMap(value: unknown): Record<string, string> | undefined {
+  const object = plainObject(value);
+
+  return object !== undefined && Object.values(object).every((each) => typeof each === "string")
+    ? (object as Record<string, string>)
+    : undefined;
+}
+
+/**
+ * Проверяет **форму** документа схемы, но не её содержание (docs/ui-kit.md). Полноту палитры,
+ * имена вариантов и мажор контракта токенов проверяет кит уже в браузере: `paletteKeys` и
+ * `tokenContractMajor` принадлежат ему, а демон от кита не зависит и не должен зависеть — иначе
+ * версия кита стала бы частью контракта демона.
+ */
+function parseColorSchemeDocument(declared: unknown): ColorSchemeDocument | undefined {
+  const document = plainObject(declared);
+
+  if (document === undefined) {
+    return undefined;
+  }
+
+  const tokenContract = document["tokenContract"];
+
+  if (typeof tokenContract !== "number" || !Number.isInteger(tokenContract) || tokenContract < 1) {
+    return undefined;
+  }
+
+  const declaredVariants = plainObject(document["variants"]);
+
+  if (declaredVariants === undefined || Object.keys(declaredVariants).length === 0) {
+    return undefined;
+  }
+
+  const variants: Record<string, Record<string, string>> = {};
+
+  for (const [name, palette] of Object.entries(declaredVariants)) {
+    const values = stringMap(palette);
+
+    if (values === undefined) {
+      return undefined;
+    }
+
+    variants[name] = values;
+  }
+
+  const declaredOverrides = document["roleOverrides"];
+
+  if (declaredOverrides === undefined) {
+    return { tokenContract, variants };
+  }
+
+  const roleOverrides = stringMap(declaredOverrides);
+
+  return roleOverrides === undefined ? undefined : { tokenContract, variants, roleOverrides };
 }
 
 /**

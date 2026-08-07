@@ -1,3 +1,4 @@
+import { contributionKinds } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { shippedSchemes } from "../tokens/schemes/shipped.ts";
@@ -168,6 +169,18 @@ describe("the shipped catalogs", () => {
     for (const catalog of [coreEnglish, coreRussian]) {
       const missing = shippedSchemes
         .map((scheme) => `appearance.scheme.${scheme.id}`)
+        .filter((key) => catalog.messages[key] === undefined);
+
+      expect(missing, catalog.locale).toEqual([]);
+    }
+  });
+
+  it("name every kind of contribution the platform knows", () => {
+    // Новый вид вклада добавляется в четырёх местах, и подпись во вью — последнее из них: без неё
+    // человек видит в карточке плагина `plugins.kind.color-scheme` вместо слова.
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const missing = contributionKinds
+        .map((kind) => `plugins.kind.${kind}`)
         .filter((key) => catalog.messages[key] === undefined);
 
       expect(missing, catalog.locale).toEqual([]);

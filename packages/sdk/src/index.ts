@@ -11,6 +11,7 @@ import { subscribeToEvent } from "./events.ts";
 import {
   currentPluginHost,
   type AgentContribution,
+  type ColorSchemeContribution,
   type CustomContribution,
   type HookCriticality,
   type PluginLogLevel,
@@ -28,6 +29,8 @@ export type {
   AgentContribution,
   AgentSkillSelection,
   AgentToolSelection,
+  ColorSchemeContribution,
+  ColorSchemeDocument,
   CustomContribution,
   EventContribution,
   HookContribution,
@@ -298,6 +301,16 @@ export const contribute = {
    */
   publicRoute: async (route: RouteDeclaration): Promise<void> =>
     declareRoute("public-route", route),
+
+  /**
+   * Объявить цветовую схему (docs/ui-kit.md). Браузерного кода не требует: схема — данные, и
+   * поэтому плагин с одной темой не собирается сборщиком вовсе.
+   *
+   * Имя, которым человек выбирает схему, — это `id` вклада с неймспейсом плагина. Полноту палитры и
+   * мажор контракта токенов проверяет кит, уже в браузере: SDK о палитре не знает.
+   */
+  colorScheme: async (contribution: ColorSchemeContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "color-scheme", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {

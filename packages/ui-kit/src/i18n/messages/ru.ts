@@ -384,6 +384,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.forgotten.title": "Выключено, но больше не объявлено",
     "plugins.forgotten.hint": "Решение сохраняется: вклад может вернуться вместе с плагином.",
     "plugins.kind.agent": "агент",
+    "plugins.kind.color-scheme": "цветовая схема",
     "plugins.kind.custom": "вклад",
     "plugins.kind.event": "событие",
     "plugins.kind.hook": "подписка",
