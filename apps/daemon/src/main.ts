@@ -76,8 +76,10 @@ import { userProviderRoutes } from "./providers/public.ts";
 import { createDaemonServer } from "./http/public.ts";
 import {
   appearancePreferencesRoutes,
+  configRoutes,
   createSettingsStore,
   publishAppearanceChanges,
+  publishConfigChanges,
 } from "./settings/public.ts";
 
 const parsed = parseArguments(process.argv.slice(2));
@@ -344,6 +346,7 @@ settings.subscribe((snapshot) => {
 });
 
 publishAppearanceChanges({ settings, bus });
+publishConfigChanges({ settings, bus });
 publishProjectChanges({ projects, bus });
 
 // Список проектов меняет набор корней: созданный проект приносит источник, архивированный уносит.
@@ -483,6 +486,7 @@ const server = createDaemonServer({
     pluginsRoute({ plugins, registry: contributions, settings }),
     pluginPreferencesRoute({ settings, plugins, logger }),
     ...appearancePreferencesRoutes({ settings, logger }),
+    ...configRoutes({ settings, logger }),
     ...projectsRoutes({
       projects,
       logger,

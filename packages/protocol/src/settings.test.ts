@@ -6,8 +6,10 @@ import {
   defaultConfig,
   defaultPreferences,
   builtInColorScheme,
+  configKeys,
   interfaceScales,
   parseConfig,
+  parseConfigUpdate,
   parsePreferences,
   type Preferences,
 } from "./settings.ts";
@@ -259,5 +261,56 @@ describe("parseConfig", () => {
         assert.equal(parseConfig({ [key]: value }).kind, "rejected", `${key}=${String(value)}`);
       }
     }
+  });
+});
+
+describe("parseConfigUpdate", () => {
+  it("names every key of the config, so none of them is unreachable from the interface", () => {
+    // Ключ, забытый в `configKeys`, попал бы в незнакомые и молча игнорировался при записи.
+    assert.deepEqual([...configKeys].sort(), Object.keys(defaultConfig).sort());
+  });
+
+  it("takes a document that names all the keys", () => {
+    const result = parseConfigUpdate({ ...defaultConfig, maxConcurrentTurns: 8 });
+
+    assert.equal(result.kind, "parsed");
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      ...defaultConfig,
+      maxConcurrentTurns: 8,
+    });
+  });
+
+  it("refuses a document that leaves a key out and names the missing ones", () => {
+    // Умолчание вместо пропущенного ключа откатило бы настройку, стоявшую в файле, — а человек в
+    // этот момент менял соседнюю (docs/web-api.md).
+    const named = Object.fromEntries(
+      Object.entries(defaultConfig).filter(
+        ([key]) => key !== "logLevel" && key !== "maxConcurrentTurns",
+      ),
+    );
+    const result = parseConfigUpdate(named);
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join("; "), /logLevel, maxConcurrentTurns is required/);
+  });
+
+  it("refuses a wrong value the same way reading the file does", () => {
+    const result = parseConfigUpdate({ ...defaultConfig, publicRouteRequestsPerMinute: 0 });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join("; "), /publicRouteRequestsPerMinute must be an integer/);
+  });
+
+  it("keeps an unknown key as a diagnostic instead of refusing", () => {
+    // Тот же довод, что и при чтении файла: понижение версии платформы не обязано ломать форму.
+    const result = parseConfigUpdate({ ...defaultConfig, futureKey: 1 });
+
+    assert.equal(result.kind, "parsed");
+    assert.match(result.diagnostics.join("; "), /unknown key "futureKey" is ignored/);
+  });
+
+  it("refuses a body that is not an object", () => {
+    assert.equal(parseConfigUpdate([]).kind, "rejected");
+    assert.equal(parseConfigUpdate("info").kind, "rejected");
   });
 });

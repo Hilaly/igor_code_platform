@@ -162,6 +162,31 @@ export type SettingsParseResult<Value> =
   /** Файл прочитан, но применить его нельзя: частичного применения нет (docs/data-directory.md). */
   | { kind: "rejected"; diagnostics: string[] };
 
+/**
+ * Ключи конфига одним списком: по нему проверяется и незнакомый ключ в файле, и полнота документа,
+ * приехавшего через API. Собирается из объекта-таблицы, а не пишется массивом: `satisfies` тогда
+ * ловит забытый ключ, а забытый здесь ключ означал бы настройку, которую нельзя изменить из
+ * интерфейса, — и обнаружилось бы это только запуском.
+ */
+const everyConfigKey = {
+  logLevel: true,
+  maxConcurrentTurns: true,
+  compactionThreshold: true,
+  compactionReserveTokens: true,
+  compactionKeepRecentTokens: true,
+  hookTimeoutMilliseconds: true,
+  pluginToolTimeoutMilliseconds: true,
+  pluginRouteTimeoutMilliseconds: true,
+  pluginRouteBodyLimitBytes: true,
+  publicRouteRequestsPerMinute: true,
+} satisfies Record<keyof Config, true>;
+
+export const configKeys = Object.keys(everyConfigKey) as (keyof Config)[];
+
+/**
+ * Чтение файла: отсутствующий ключ берёт значение по умолчанию. Умолчания живут в коде, поэтому
+ * пустой `config.json` — это не «всё выключено», а «ничего не сказано» (docs/data-directory.md).
+ */
 export function parseConfig(raw: unknown): SettingsParseResult<Config> {
   const fields = asObject(raw);
 
@@ -169,18 +194,40 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
   }
 
-  const diagnostics = diagnoseUnknownKeys(configFileName, fields, [
-    "logLevel",
-    "maxConcurrentTurns",
-    "compactionThreshold",
-    "compactionReserveTokens",
-    "compactionKeepRecentTokens",
-    "hookTimeoutMilliseconds",
-    "pluginToolTimeoutMilliseconds",
-    "pluginRouteTimeoutMilliseconds",
-    "pluginRouteBodyLimitBytes",
-    "publicRouteRequestsPerMinute",
-  ]);
+  return parseConfigFields(fields, diagnoseUnknownKeys(configFileName, fields, configKeys));
+}
+
+/**
+ * Тело записи конфига (docs/web-api.md). **Все ключи обязательны**, в отличие от чтения файла:
+ * запись заменяет документ целиком, и тело без ключа молча вернуло бы настройку к умолчанию, тогда
+ * как в файле у неё стояло другое значение.
+ */
+export function parseConfigUpdate(raw: unknown): SettingsParseResult<Config> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys);
+  const missing = configKeys.filter((key) => fields[key] === undefined);
+
+  if (missing.length > 0) {
+    diagnostics.push(
+      `${configFileName}: ${missing.join(", ")} is required: the write replaces the whole document`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return parseConfigFields(fields, diagnostics);
+}
+
+/** Проверка значений, общая для чтения файла и записи через API: правило у ключа одно. */
+function parseConfigFields(
+  fields: Record<string, unknown>,
+  diagnostics: string[],
+): SettingsParseResult<Config> {
   const value: Config = { ...defaultConfig };
   const logLevel = fields["logLevel"];
 

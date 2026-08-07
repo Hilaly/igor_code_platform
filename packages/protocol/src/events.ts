@@ -33,6 +33,11 @@ export const coreEventTypes = {
    */
   preferencesChanged: "core.preferences.changed",
   /**
+   * Конфиг демона изменился. Отдельно от `core.preferences.changed`: файлы разные, и вью внешнего
+   * вида не должно просыпаться на правку таймаута хука, а форма конфига — на смену темы.
+   */
+  configChanged: "core.config.changed",
+  /**
    * Список проектов или доступность чьей-нибудь папки изменились
    * (docs/sessions-and-projects.md). Одно событие на всё: создание, переименование, архивацию,
    * восстановление, удаление и смену доступности — подписчик всё равно перечитывает список целиком.
@@ -94,6 +99,9 @@ export type ContributionsChanged = { revision: number };
  */
 export type PreferencesChanged = Record<string, never>;
 
+/** Нагрузки нет по той же причине: состояние спрашивается у владельца — `GET /api/config`. */
+export type ConfigChanged = Record<string, never>;
+
 /**
  * Нагрузки нет по той же причине, что у `PreferencesChanged`: состояние спрашивается у владельца —
  * `GET /api/projects`. Доступность папки к тому же меняется сама по себе, и значение из события
@@ -152,6 +160,7 @@ export type CoreEventPayloads = {
   "core.plugin.contributions": PluginContributionsChanged;
   "core.contributions.changed": ContributionsChanged;
   "core.preferences.changed": PreferencesChanged;
+  "core.config.changed": ConfigChanged;
   "core.projects.changed": ProjectsChanged;
   "core.sessions.changed": SessionsChanged;
   "core.sessions.degraded": SessionDegraded;
