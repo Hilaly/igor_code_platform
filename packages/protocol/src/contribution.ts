@@ -116,13 +116,53 @@ export type HookSubscriptionContributionRegistration = RegistrationCommon & {
   criticality: HookCriticality;
 };
 
+/**
+ * Методы, которыми плагин объявляет свой маршрут. Список тот же, что у таблицы маршрутов ядра: на
+ * `OPTIONS` платформа не отвечает вовсе (docs/web-api.md), а `PATCH` не понадобился ни одному
+ * маршруту ядра — вид сообщения появится вместе со своим потребителем.
+ */
+export const pluginRouteMethods = ["GET", "POST", "PUT", "DELETE"] as const;
+
+export type PluginRouteMethod = (typeof pluginRouteMethods)[number];
+
+export function isPluginRouteMethod(value: unknown): value is PluginRouteMethod {
+  return pluginRouteMethods.includes(value as PluginRouteMethod);
+}
+
+/**
+ * HTTP-маршрут плагина (docs/web-api.md). Адрес — `/p/<id плагина>/<path>`; идентификатор плагина, а
+ * не его ключ: адрес попадает во внешние системы, и `project%3Ab7Kq%3Ahello` в вебхуке не наберёт
+ * руками никто. Перекрытие при этом уже разрешено реестром — вклад один, победитель один.
+ *
+ * **`path` — не идентификатор вклада.** Идентификатором вклад переключается человеком и живёт в
+ * `preferences.json`, а путь — часть внешнего адреса: связать их значило бы менять адрес при
+ * переименовании вклада.
+ *
+ * Публичный маршрут — **отдельный вид**, а не флаг у обычного: разница между защищённым сессией и
+ * открытым наружу маршрутом слишком велика для булева поля, которое легко скопировать из чужого
+ * примера вместе со значением (docs/web-api.md, «Почему так»).
+ */
+type RouteRegistrationCommon = RegistrationCommon & {
+  method: PluginRouteMethod;
+  /** Без ведущего слэша, сегментами; сегмент вида `:имя` попадает в параметры запроса. */
+  path: string;
+};
+
+export type RouteContributionRegistration = RouteRegistrationCommon & { kind: "route" };
+
+export type PublicRouteContributionRegistration = RouteRegistrationCommon & {
+  kind: "public-route";
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
   | AgentContributionRegistration
   | SkillContributionRegistration
   | ToolContributionRegistration
-  | HookSubscriptionContributionRegistration;
+  | HookSubscriptionContributionRegistration
+  | RouteContributionRegistration
+  | PublicRouteContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 

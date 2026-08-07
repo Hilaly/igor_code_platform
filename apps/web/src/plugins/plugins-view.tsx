@@ -27,7 +27,7 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
-import type { PluginsState } from "./state.ts";
+import { routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginsViewProps = {
   /** Внутри страницы настроек заголовок раздела уже `h1`; самостоятельное вью по умолчанию владеет им. */
@@ -94,6 +94,25 @@ export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsView
         </Notice>
       )}
 
+      {snapshot.routeConflicts.length === 0 ? undefined : (
+        <Notice tone="warning" title={t("plugins.routeConflicts.title")}>
+          <ul className="plugins-reasons">
+            {snapshot.routeConflicts.map((conflict) => (
+              <li key={`${conflict.method} ${conflict.path}`}>
+                {t("plugins.routeConflicts.item", {
+                  method: conflict.method,
+                  path: conflict.path,
+                  contributions: conflict.contributions.join(", "),
+                  plugins: conflict.pluginKeys.join(", "),
+                })}
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+
+      <PublicRoutes snapshot={snapshot} translator={translator} />
+
       {snapshot.plugins.length === 0 ? (
         <EmptyState title={t("plugins.empty")} />
       ) : (
@@ -112,6 +131,66 @@ export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsView
       )}
     </div>
   );
+}
+
+/**
+ * Публичные маршруты собраны в одном месте, а не разложены по карточкам плагинов: это единственная
+ * поверхность платформы, открытая наружу, и человек обязан видеть её целиком (docs/web-api.md).
+ *
+ * Выключенные вклады сюда не входят: выключенный маршрут не отвечает, и показывать его открытым
+ * значило бы пугать тем, чего нет.
+ */
+function PublicRoutes({
+  snapshot,
+  translator,
+}: {
+  snapshot: PluginsSnapshot;
+  translator: ScopedTranslator;
+}) {
+  const { t } = translator;
+  const open = snapshot.contributions.filter(
+    (registration) =>
+      registration.kind === "public-route" &&
+      registration.ownership === "plugin" &&
+      !snapshot.routeConflicts.some(
+        (conflict) =>
+          conflict.method === registration.method &&
+          conflict.path === routeShape(registration.path) &&
+          conflict.contributions.includes(registration.id),
+      ),
+  );
+
+  if (open.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <Notice tone="warning" title={t("plugins.public.title")}>
+      <ul className="plugins-reasons">
+        {open.map((registration) =>
+          registration.kind !== "public-route" ? undefined : (
+            <li
+              key={`${registration.source}:${registration.id}:${registration.method}:${registration.path}`}
+            >
+              {t("plugins.public.item", {
+                method: registration.method,
+                url: routeAddress(registration),
+                plugin: registration.id,
+              })}
+            </li>
+          ),
+        )}
+      </ul>
+      {t("plugins.public.hint")}
+    </Notice>
+  );
+}
+
+function routeShape(path: string): string {
+  return path
+    .split("/")
+    .map((segment) => (segment.startsWith(":") ? ":" : segment))
+    .join("/");
 }
 
 type PluginRowProps = {

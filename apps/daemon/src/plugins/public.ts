@@ -9,6 +9,7 @@ export { standaloneResourceRoots, type StandaloneResourceRoot } from "./file-res
 export { createFileResourceWatcher, type FileResourceWatcher } from "./file-resource-watcher.ts";
 export { pluginPreferencesRoute } from "./plugin-preferences.ts";
 export { createPluginProviders } from "./plugin-providers.ts";
+export { createPluginRoutes, type PluginRoutes } from "./plugin-routes.ts";
 export { createPluginSessions, isSessionRequest, type PluginSessions } from "./plugin-sessions.ts";
 export {
   defaultPluginRoots,
@@ -17,6 +18,12 @@ export {
   type PluginRoot,
 } from "./plugin-sources.ts";
 export { createPluginHooks, type PluginHooks } from "./plugin-hooks.ts";
+export {
+  createPluginStorage,
+  encodePluginKey,
+  isStorageRequest,
+  type PluginStorage,
+} from "./plugin-storage.ts";
 export { createPluginSupervisor } from "./plugin-supervisor.ts";
 export { pluginToolSource } from "./plugin-tools.ts";
 export { createPluginWatcher, type ChangedPluginDirectory } from "./plugin-watcher.ts";

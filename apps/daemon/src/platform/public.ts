@@ -3,6 +3,8 @@ export { writeFileAtomically } from "./atomic-file.ts";
 export {
   archivedSessionsDirectoryName,
   ensureDataDirectory,
+  pluginFilesDirectoryName,
+  pluginStorageDirectoryName,
   sessionsDirectoryName,
   workDirectoryName,
 } from "./data-directory.ts";

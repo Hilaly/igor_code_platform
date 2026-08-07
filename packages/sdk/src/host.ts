@@ -15,7 +15,9 @@ import type {
   ProviderRequest,
   ProviderResponse,
 } from "./providers.ts";
+import type { PluginRouteMethod } from "./routes.ts";
 import type { SessionRequest, SessionResponse } from "./sessions.ts";
+import type { StorageRequest, StorageResponse } from "./storage.ts";
 
 const hostSymbol = Symbol.for("sovereign.plugin.host");
 
@@ -130,13 +132,30 @@ export type ToolContribution = {
   parameters: PayloadSchema;
 };
 
+/**
+ * Объявление HTTP-маршрута — то, что уходит хосту (docs/web-api.md). Обработчик остаётся в воркере,
+ * как и у подписки на хук.
+ *
+ * Путь и идентификатор — разные вещи: идентификатором вклад переключается человеком, а путь входит
+ * во внешний адрес `/p/<id плагина>/<path>`.
+ */
+export type RouteContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  method: PluginRouteMethod;
+  path: string;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
   | ({ kind: "event" } & EventContribution)
   | ({ kind: "agent" } & AgentContribution)
   | ({ kind: "hook" } & HookContribution)
-  | ({ kind: "tool" } & ToolContribution);
+  | ({ kind: "tool" } & ToolContribution)
+  | ({ kind: "route" } & RouteContribution)
+  | ({ kind: "public-route" } & RouteContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;
@@ -154,17 +173,22 @@ export type PluginHost = {
   subscribeEvent: (type: string) => Promise<void>;
   unsubscribeEvent: (type: string) => Promise<void>;
   /**
-   * Один из двух методов хоста, у которых есть ответ. Односторонность канала — правило, а не
-   * недоделка, и исключений ровно два: провайдеры и сессии. Список, статус и вход бессмысленны без
-   * ответа, а общего RPC у платформы нет (docs/plugins.md, docs/models-and-providers.md).
+   * Один из трёх методов хоста, у которых есть ответ. Односторонность канала — правило, а не
+   * недоделка; провайдеры, сессии и хранилище бессмысленны без ответа, а общего RPC у платформы
+   * нет (docs/plugins.md, docs/models-and-providers.md).
    */
   providers: (request: ProviderRequest) => Promise<ProviderResponse>;
   /**
-   * Вторая пара «запрос-ответ» в канале плагина — сессии агента. Односторонность канала остаётся
-   * правилом: исключений ровно два, и оба сделаны там, где операция без ответа бессмысленна
-   * (docs/plugins.md, docs/sessions-and-projects.md).
+   * Второй метод «запрос-ответ» в канале плагина — сессии агента. Это отдельный вид запроса, а не
+   * общий RPC: операция без ответа бессмысленна (docs/plugins.md, docs/sessions-and-projects.md).
    */
   sessions: (request: SessionRequest) => Promise<SessionResponse>;
+  /**
+   * Третий вид запроса в той же паре — хранилище плагина (docs/plugins.md). Пар по-прежнему две, и
+   * различает их направление, а не предмет: новая пара сообщений повторяла бы корреляцию и ответ
+   * висящим запросам при смерти воркера.
+   */
+  storage: (request: StorageRequest) => Promise<StorageResponse>;
   /**
    * Вход стоит отдельно от остальных операций, потому что у него есть обратный канал: вопросы
    * приходят по ходу диалога. Сам диалог границу воркера не пересекает — в нём функции, а граница

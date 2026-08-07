@@ -42,10 +42,23 @@ export type Route = {
   /** Сегмент вида `:имя` попадает в `parameters`; остальные сравниваются буквально. */
   path: string;
   /**
-   * `open` — маршрут отвечает и без сессии. Поле необязательное, и его отсутствие значит «нужна
-   * сессия»: забытое поле делает новый маршрут защищённым, а не открытым.
+   * Кому маршрут отвечает. Поле необязательное, и его отсутствие значит «нужна сессия»: забытое
+   * поле делает новый маршрут защищённым, а не открытым.
+   *
+   * - `open` — маршрут ядра, отвечающий и без сессии: состояние входа, вход, регистрация и проба
+   *   здоровья. Проверки формы изменяющего запроса он проходит наравне с остальными — ровно на них
+   *   и держится защита открытых маршрутов от межсайтового запроса (docs/web-api.md).
+   * - `public` — публичный маршрут плагина, открытый **наружу**. Ни сессии, ни проверок формы: у
+   *   него нет cookie, которую эти проверки защищают, а `content-type` вызывающего ему не
+   *   принадлежит. Аутентифицирует себя такой маршрут сам (docs/web-api.md).
    */
-  access?: "open";
+  access?: "open" | "public";
+  /** Свой предел тела. Не сказано — общий: тела наших запросов короткие, а вебхук приносит чужие. */
+  bodyLimitBytes?: number;
+  /** Предельное время чтения тела; после него соединение закрывается, чтобы поток не держал демон. */
+  bodyReadTimeoutMilliseconds?: number;
+  /** `raw` отдаёт тело буфером, не разбирая его как json: форму тела знает только автор маршрута. */
+  body?: "json" | "raw";
   handle: RouteHandler;
 };
 
@@ -58,6 +71,13 @@ export type CreateDispatcherOptions = {
    */
   authenticate: (request: IncomingMessage) => Authentication;
   bodyLimitBytes?: number;
+  /**
+   * Второй источник строк таблицы — маршруты плагинов (docs/web-api.md). Функция, а не массив:
+   * набор меняется при каждой перезагрузке любого плагина, а регистрация и снятие строк в живой
+   * таблице — это ровно та ошибка, из-за которой отвергнут Hono: устаревший обработчик, который
+   * продолжает отвечать.
+   */
+  pluginRoutes?: () => Route[];
 };
 
 /**
@@ -65,6 +85,7 @@ export type CreateDispatcherOptions = {
  * больше, это ошибка клиента или попытка занять память демона, а не большой запрос.
  */
 const defaultBodyLimitBytes = 64 * 1024;
+const defaultBodyReadTimeoutMilliseconds = 30_000;
 
 export function respondWithJson(response: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
@@ -84,11 +105,31 @@ export function respondWithError(response: ServerResponse, status: number, error
 export function createDispatcher(
   options: CreateDispatcherOptions,
 ): (request: IncomingMessage, response: ServerResponse) => void {
-  const table = options.routes.map((route) => ({ route, pattern: segmentsOf(route.path) }));
+  const table = options.routes.map((route, order) => tableRow(route, order));
   const bodyLimitBytes = options.bodyLimitBytes ?? defaultBodyLimitBytes;
+  // Таблица плагинов пересчитывается на каждый запрос: разбор пути — это `split`, а живой снимок
+  // важнее экономии на нём.
+  const pluginTable = (): TableRow[] =>
+    (options.pluginRoutes?.() ?? []).map((route, order) => tableRow(route, table.length + order));
 
   return (request, response) => {
-    void handle(request, response);
+    void handle(request, response).catch((cause: unknown) => {
+      options.logger.error("request handling failed", {
+        method: request.method,
+        path: request.url ?? "/",
+        reason: cause instanceof Error ? (cause.stack ?? cause.message) : String(cause),
+      });
+
+      if (request.destroyed || response.destroyed || response.headersSent) {
+        if (!response.destroyed && !response.headersSent) {
+          response.destroy();
+        }
+
+        return;
+      }
+
+      respondWithError(response, 400, "the request could not be read");
+    });
   };
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -96,10 +137,15 @@ export function createDispatcher(
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const segments = segmentsOf(url.pathname);
 
-    let matched: { route: Route; parameters: RouteParameters } | undefined;
+    const matches: {
+      route: Route;
+      parameters: RouteParameters;
+      specificity: number;
+      order: number;
+    }[] = [];
     const allowed = new Set<string>();
 
-    for (const { route, pattern } of table) {
+    for (const { route, pattern, order } of [...table, ...pluginTable()]) {
       const parameters = matchRoute(pattern, segments);
 
       if (parameters === undefined) {
@@ -108,10 +154,12 @@ export function createDispatcher(
 
       allowed.add(route.method);
 
-      if (route.method === request.method && matched === undefined) {
-        matched = { route, parameters };
-      }
+      matches.push({ route, parameters, specificity: staticSegments(pattern), order });
     }
+
+    const matched = matches
+      .filter(({ route }) => route.method === request.method)
+      .sort((left, right) => right.specificity - left.specificity || left.order - right.order)[0];
 
     if (matched === undefined) {
       // Путь есть, метод не тот — это не «нет такого адреса», и клиент имеет право знать разницу.
@@ -128,8 +176,9 @@ export function createDispatcher(
     }
 
     // Форма запроса проверяется до сессии: ответ на негодный запрос не имеет права зависеть от
-    // того, есть ли cookie, — иначе отказ рассказывал бы о состоянии входа.
-    if (request.method !== "GET") {
+    // того, есть ли cookie, — иначе отказ рассказывал бы о состоянии входа. Публичный маршрут
+    // плагина её не проходит вовсе: защищать ею нечего, а отсекла бы она чужой вебхук.
+    if (request.method !== "GET" && matched.route.access !== "public") {
       const refusal = refuseUnsafeRequest(request);
 
       if (refusal !== undefined) {
@@ -145,7 +194,7 @@ export function createDispatcher(
     const authentication = options.authenticate(request);
     const session = authentication.kind === "session" ? { id: authentication.id } : undefined;
 
-    if (session === undefined && matched.route.access !== "open") {
+    if (session === undefined && matched.route.access === undefined) {
       respondWithError(response, 401, "the request needs a session");
 
       return;
@@ -156,10 +205,28 @@ export function createDispatcher(
     const body =
       request.method === "GET" || request.method === "DELETE"
         ? { kind: "absent" as const }
-        : await readJsonBody(request, bodyLimitBytes);
+        : await readBody(
+            request,
+            response,
+            matched.route.bodyLimitBytes ?? bodyLimitBytes,
+            matched.route,
+            matched.route.bodyReadTimeoutMilliseconds ?? defaultBodyReadTimeoutMilliseconds,
+          );
 
     if (body.kind === "too-large") {
-      respondWithError(response, 413, `the request body must not exceed ${bodyLimitBytes} bytes`);
+      respondWithError(
+        response,
+        413,
+        `the request body must not exceed ${matched.route.bodyLimitBytes ?? bodyLimitBytes} bytes`,
+      );
+
+      return;
+    }
+
+    if (body.kind === "timed-out") {
+      if (!request.destroyed && !response.destroyed) {
+        respondWithError(response, 408, "the request body took too long to arrive");
+      }
 
       return;
     }
@@ -238,6 +305,16 @@ function segmentsOf(path: string): string[] {
   return path.split("/").filter((segment) => segment.length > 0);
 }
 
+type TableRow = { route: Route; pattern: string[]; order: number };
+
+function tableRow(route: Route, order: number): TableRow {
+  return { route, pattern: segmentsOf(route.path), order };
+}
+
+function staticSegments(pattern: string[]): number {
+  return pattern.filter((segment) => !segment.startsWith(":")).length;
+}
+
 function matchRoute(pattern: string[], segments: string[]): RouteParameters | undefined {
   if (pattern.length !== segments.length) {
     return undefined;
@@ -281,30 +358,77 @@ type BodyOutcome =
   | { kind: "absent" }
   | { kind: "parsed"; value: unknown }
   | { kind: "too-large" }
+  | { kind: "timed-out" }
   | { kind: "invalid"; reason: string };
 
-async function readJsonBody(request: IncomingMessage, limitBytes: number): Promise<BodyOutcome> {
+/**
+ * Тело маршрута ядра — всегда json, и негодный json это `400`. Тело маршрута плагина, наоборот, не
+ * разбирается вовсе: его форму знает только автор маршрута, а вебхук приносит что угодно —
+ * подписанный текст, форму, байты (docs/web-api.md).
+ */
+async function readBody(
+  request: IncomingMessage,
+  response: ServerResponse,
+  limitBytes: number,
+  route: Route,
+  timeoutMilliseconds: number,
+): Promise<BodyOutcome> {
   const chunks: Buffer[] = [];
   let size = 0;
+  let timedOut = false;
+  const timeout =
+    timeoutMilliseconds > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          if (!response.destroyed && !response.headersSent) {
+            respondWithError(response, 408, "the request body took too long to arrive");
+          }
+          request.destroy();
+        }, timeoutMilliseconds)
+      : undefined;
 
-  for await (const chunk of request) {
-    size += chunk.length;
+  timeout?.unref();
 
-    // Выход из цикла закрывает поток: слушать до конца то, что мы уже отказались принимать, — это
-    // ровно та трата памяти, от которой защищает лимит.
-    if (size > limitBytes) {
-      return { kind: "too-large" };
+  try {
+    for await (const chunk of request) {
+      size += chunk.length;
+
+      // Выход из цикла закрывает поток: слушать до конца то, что мы уже отказались принимать, — это
+      // ровно та трата памяти, от которой защищает лимит.
+      if (size > limitBytes) {
+        return { kind: "too-large" };
+      }
+
+      chunks.push(chunk as Buffer);
     }
 
-    chunks.push(chunk as Buffer);
+    if (timedOut) {
+      return { kind: "timed-out" };
+    }
+  } catch (cause) {
+    if (timedOut) {
+      return { kind: "timed-out" };
+    }
+
+    throw cause;
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
   }
 
   if (size === 0) {
     return { kind: "absent" };
   }
 
+  const body = Buffer.concat(chunks);
+
+  if (route.body === "raw") {
+    return { kind: "parsed", value: body };
+  }
+
   try {
-    return { kind: "parsed", value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
+    return { kind: "parsed", value: JSON.parse(body.toString("utf8")) };
   } catch (cause) {
     return { kind: "invalid", reason: cause instanceof Error ? cause.message : String(cause) };
   }

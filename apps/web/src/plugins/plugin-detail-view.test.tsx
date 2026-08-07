@@ -60,6 +60,7 @@ const snapshot: PluginsSnapshot = {
     },
   ],
   conflicts: [],
+  routeConflicts: [],
   enablement: { "data:example": { enabled: true, disabledContributions: ["missing.id"] } },
 };
 
@@ -122,4 +123,40 @@ it("shows a not-found state for an unknown plugin key", () => {
     />,
   );
   expect(screen.getByText(/not found/i)).toBeTruthy();
+});
+
+it("names the kind of a public route and shows the address it answers at", () => {
+  const withRoute: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.github-webhook",
+        declaredId: "github-webhook",
+        title: "GitHub webhook",
+        method: "POST",
+        path: "webhooks/github",
+      },
+    ],
+    switchedOffContributions: [],
+  };
+
+  render(
+    <PluginDetailView
+      state={{ snapshot: withRoute, stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("public route")).toBeTruthy();
+  expect(screen.getByText(/"path": "webhooks\/github"/)).toBeTruthy();
+  // Адрес целиком: по нему маршрут зовут снаружи, а объявленный путь без префикса не набрать.
+  expect(screen.getByText(/\/p\/example\/webhooks\/github/)).toBeTruthy();
 });

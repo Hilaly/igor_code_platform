@@ -4,6 +4,7 @@ import { afterEach, describe, it } from "node:test";
 import { clearEventHandlers } from "./events.ts";
 import { removePluginHost } from "./host.ts";
 import { clearHookHandlers } from "./hooks.ts";
+import { clearRouteHandlers } from "./routes.ts";
 import { clearToolInvocations } from "./tools.ts";
 import {
   contribute,
@@ -14,9 +15,15 @@ import {
   log,
   providers,
   sessions,
+  storage,
   z,
 } from "./index.ts";
-import type { AgentSummary, CustomProviderDefinition, ProviderSummary } from "./index.ts";
+import type {
+  AgentSummary,
+  CustomProviderDefinition,
+  PluginRouteRequest,
+  ProviderSummary,
+} from "./index.ts";
 import { installTestHost } from "./testing.ts";
 
 const anthropic: ProviderSummary = {
@@ -34,6 +41,7 @@ afterEach(() => {
   clearEventHandlers();
   clearHookHandlers();
   clearToolInvocations();
+  clearRouteHandlers();
   removePluginHost();
 });
 
@@ -866,5 +874,164 @@ describe("a tool of a plugin", () => {
       () => host.callTool("never-declared", {}),
       /no implementation for the tool never-declared/,
     );
+  });
+});
+
+describe("a route of a plugin", () => {
+  const request: PluginRouteRequest = {
+    method: "GET",
+    path: "board/:boardId",
+    parameters: { boardId: "7" },
+    query: { full: "yes" },
+    headers: { accept: "application/json" },
+    public: false,
+  };
+
+  it("declares the address and keeps the handler in the worker", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await contribute.route({
+      id: "board",
+      title: "Board",
+      method: "GET",
+      path: "board/:boardId",
+      handle: () => ({ body: "{}" }),
+    });
+
+    // Обработчик через границу не едет: в объявлении его нет вовсе, а само объявление обязано
+    // пережить структурное клонирование (docs/web-api.md).
+    assert.deepEqual(host.contributions, [
+      { kind: "route", id: "board", title: "Board", method: "GET", path: "board/:boardId" },
+    ]);
+    assert.deepEqual(structuredClone(host.contributions), host.contributions);
+  });
+
+  it("reads a route without a method as a read", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await contribute.route({ id: "board", path: "board", handle: () => ({}) });
+
+    assert.deepEqual(host.contributions, [
+      { kind: "route", id: "board", method: "GET", path: "board" },
+    ]);
+  });
+
+  it("marks a public route with its own kind, not with a flag", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await contribute.publicRoute({
+      id: "github-webhook",
+      method: "POST",
+      path: "webhooks/github",
+      handle: () => ({ status: 204 }),
+    });
+
+    assert.deepEqual(host.contributions, [
+      { kind: "public-route", id: "github-webhook", method: "POST", path: "webhooks/github" },
+    ]);
+  });
+
+  it("keeps route and public-route handlers distinct when their ids match", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await contribute.route({
+      id: "shared",
+      path: "private",
+      handle: () => ({ body: "private" }),
+    });
+    await contribute.publicRoute({
+      id: "shared",
+      path: "public",
+      handle: () => ({ body: "public" }),
+    });
+
+    assert.deepEqual(await host.callRoute("shared", request), { body: "private" });
+    assert.deepEqual(await host.callRoute("shared", { ...request, public: true }), {
+      body: "public",
+    });
+  });
+
+  it("answers a call with the response the dispatcher will write", async () => {
+    const host = installTestHost({ id: "tasks" });
+    const seen: PluginRouteRequest[] = [];
+
+    await contribute.route({
+      id: "board",
+      path: "board/:boardId",
+      handle: (incoming) => {
+        seen.push(incoming);
+
+        return { status: 200, headers: { "content-type": "application/json" }, body: '{"id":"7"}' };
+      },
+    });
+
+    assert.deepEqual(await host.callRoute("board", request), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: '{"id":"7"}',
+    });
+    assert.deepEqual(seen, [request]);
+  });
+
+  it("names the route the core asked about but the plugin never declared", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await assert.rejects(
+      () => host.callRoute("never-declared", request),
+      /no handler for the route never-declared/,
+    );
+  });
+
+  it("refuses an answer that is not a response", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    // @ts-expect-error — автор ошибся в форме ответа; проверка обязана поймать это и в рантайме.
+    await contribute.route({ id: "board", path: "board", handle: () => "просто текст" });
+
+    await assert.rejects(
+      () => host.callRoute("board", request),
+      /the route board answered with something that is not a response/,
+    );
+  });
+});
+
+describe("the storage of a plugin", () => {
+  it("keeps what it was given and answers undefined for what it was not", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    await storage.set("last-seen", { id: "42" });
+
+    assert.deepEqual(await storage.get("last-seen"), { id: "42" });
+    assert.equal(await storage.get("never-written"), undefined);
+    assert.deepEqual(host.stored.get("last-seen"), { id: "42" });
+  });
+
+  it("lists its keys and forgets a deleted one", async () => {
+    installTestHost({ id: "tasks" });
+
+    await storage.set("b", 2);
+    await storage.set("a", 1);
+
+    assert.deepEqual(await storage.keys(), ["a", "b"]);
+
+    await storage.delete("a");
+    // Удаление того, чего нет, — не ошибка: платформа отвечает тем же «записано».
+    await storage.delete("a");
+
+    assert.deepEqual(await storage.keys(), ["b"]);
+  });
+
+  it("hands out the folder of the plugin", async () => {
+    const host = installTestHost({ id: "tasks" });
+
+    host.answerStorageDirectory("/data/plugin-files/data%3Atasks");
+
+    assert.equal(await storage.directory(), "/data/plugin-files/data%3Atasks");
+  });
+
+  it("explains itself instead of failing on undefined without a host", async () => {
+    await assert.rejects(() => storage.get("last-seen"), /sdk is not initialised/);
+    await assert.rejects(() => storage.set("last-seen", 1), /sdk is not initialised/);
+    await assert.rejects(() => storage.directory(), /sdk is not initialised/);
   });
 });

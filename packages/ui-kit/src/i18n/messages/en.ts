@@ -388,9 +388,18 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.kind.custom": "contribution",
     "plugins.kind.event": "event",
     "plugins.kind.hook": "subscription",
+    "plugins.kind.public-route": "public route",
+    "plugins.kind.route": "route",
     "plugins.kind.skill": "skill",
     "plugins.kind.tool": "tool",
     "plugins.parameters": "Argument schema",
+    "plugins.public.title": "Open to the outside",
+    "plugins.public.hint":
+      "A public route answers without a session; the plugin authenticates incoming requests.",
+    "plugins.public.item": "{method} {url} — {plugin}",
+    "plugins.routeConflicts.title": "Routes not applied",
+    "plugins.routeConflicts.item":
+      "{method} {path}: claimed by {contributions} ({plugins}), so none answers",
     "plugins.payloadSchema": "Payload schema",
     "plugins.problems.title": "Declared, but not applied",
     "plugins.reason": "Reason",

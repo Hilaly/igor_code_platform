@@ -40,6 +40,19 @@ export const sessionsDirectoryName = "sessions";
  */
 export const archivedSessionsDirectoryName = "sessions-archived";
 
+/**
+ * Хранилища плагинов: ключ-значение по файлу на плагин и папка на плагин (docs/plugins.md). Имя
+ * внутри — ключ плагина `<источник>:<id>` с `%3A` вместо двоеточия: двоеточие в имени файла
+ * незаконно на Windows, а идентификаторы плагина и проекта состоят из `[a-z0-9-]`, поэтому
+ * кодировать больше нечего и кодирование обратимо.
+ *
+ * Оба корня создаются по надобности, а не при старте: класть в них человеку нечего — пишет туда
+ * платформа.
+ */
+export const pluginStorageDirectoryName = "plugin-storage";
+
+export const pluginFilesDirectoryName = "plugin-files";
+
 export function ensureDataDirectory(path: string): string {
   const directory = resolveDataDirectory(path);
   const existing = statSync(directory, { throwIfNoEntry: false });

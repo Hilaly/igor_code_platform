@@ -387,9 +387,18 @@ export const coreRussian: CatalogRegistration = {
     "plugins.kind.custom": "вклад",
     "plugins.kind.event": "событие",
     "plugins.kind.hook": "подписка",
+    "plugins.kind.public-route": "публичный маршрут",
+    "plugins.kind.route": "маршрут",
     "plugins.kind.skill": "скил",
     "plugins.kind.tool": "инструмент",
     "plugins.parameters": "Схема аргументов",
+    "plugins.public.title": "Открыто наружу",
+    "plugins.public.hint":
+      "Публичный маршрут отвечает без сессии; плагин сам аутентифицирует входящие запросы.",
+    "plugins.public.item": "{method} {url} — {plugin}",
+    "plugins.routeConflicts.title": "Маршруты не применены",
+    "plugins.routeConflicts.item":
+      "{method} {path}: на адрес претендуют {contributions} ({plugins}), поэтому маршрут не отвечает",
     "plugins.payloadSchema": "Схема нагрузки",
     "plugins.problems.title": "Объявлено, но не применено",
     "plugins.reason": "Причина",

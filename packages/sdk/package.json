@@ -9,7 +9,9 @@
     "./host": "./src/host.ts",
     "./events": "./src/events.ts",
     "./hooks": "./src/hooks.ts",
-    "./tools": "./src/tools.ts"
+    "./tools": "./src/tools.ts",
+    "./routes": "./src/routes.ts",
+    "./storage": "./src/storage.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

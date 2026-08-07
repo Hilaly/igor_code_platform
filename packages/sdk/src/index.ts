@@ -14,8 +14,10 @@ import {
   type CustomContribution,
   type HookCriticality,
   type PluginLogLevel,
+  type RouteContribution,
 } from "./host.ts";
 import { rememberHookHandler, type HookHandler, type HookName } from "./hooks.ts";
+import { rememberRouteHandler, type PluginRouteHandler } from "./routes.ts";
 import { rememberToolInvoke, type PluginToolInvoke } from "./tools.ts";
 
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
@@ -35,6 +37,7 @@ export type {
   PluginHost,
   PluginIdentity,
   PluginLogLevel,
+  RouteContribution,
   ThinkingLevel,
   ToolContribution,
 } from "./host.ts";
@@ -57,6 +60,26 @@ export type {
 } from "./hooks.ts";
 
 export type { PluginToolInvoke, PluginToolOutcome } from "./tools.ts";
+
+/**
+ * HTTP-маршруты плагина (docs/web-api.md). Публичный маршрут открыт наружу и аутентифицирует себя
+ * сам — это единственная поверхность платформы без проверки сессии.
+ */
+export { pluginRouteMethods } from "./routes.ts";
+
+export type {
+  PluginRouteBody,
+  PluginRouteHandler,
+  PluginRouteKind,
+  PluginRouteMethod,
+  PluginRouteRequest,
+  PluginRouteResponse,
+} from "./routes.ts";
+
+/** Хранилище плагина: ключ-значение и своя папка (docs/plugins.md). */
+export { storage } from "./storage.ts";
+
+export type { StorageRequest, StorageResponse } from "./storage.ts";
 
 /** Провайдеры LLM: операции над ними и типы, которыми платформа о них рассказывает. */
 export { providers } from "./providers.ts";
@@ -261,7 +284,39 @@ export const contribute = {
       parameters: { ...z.toJSONSchema(parameters) },
     });
   },
+
+  /**
+   * Объявить HTTP-маршрут (docs/web-api.md). Адрес — `/p/<id плагина>/<path>`; проверку сессии
+   * ставит диспетчер, а не обработчик, поэтому обычный маршрут защищён по построению.
+   */
+  route: async (route: RouteDeclaration): Promise<void> => declareRoute("route", route),
+
+  /**
+   * Объявить **публичный** маршрут: он отвечает без сессии. Это единственная поверхность платформы,
+   * открытая наружу, и ответственность за неё целиком на авторе плагина — платформа своей схемы
+   * аутентификации не навязывает, а лимит частоты и лимит тела ставит сама (docs/web-api.md).
+   */
+  publicRoute: async (route: RouteDeclaration): Promise<void> =>
+    declareRoute("public-route", route),
 };
+
+type RouteDeclaration = Omit<RouteContribution, "method"> & {
+  /** Не сказано — `GET`: маршрут без метода читается как чтение, а не как запись. */
+  method?: RouteContribution["method"];
+  handle: PluginRouteHandler;
+};
+
+async function declareRoute(
+  kind: "route" | "public-route",
+  route: RouteDeclaration,
+): Promise<void> {
+  const { handle, method, ...declaration } = route;
+
+  // Обработчик запоминается до объявления: ядро вправе позвать маршрут сразу, как о нём узнало.
+  rememberRouteHandler(kind, declaration.id, handle);
+
+  await currentPluginHost().contribute({ kind, ...declaration, method: method ?? "GET" });
+}
 
 export const events = {
   /**

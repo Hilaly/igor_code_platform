@@ -230,8 +230,31 @@ describe("parseConfig", () => {
     assert.equal(defaultConfig.pluginToolTimeoutMilliseconds, 120000);
   });
 
+  it("reads the three limits of a plugin route", () => {
+    // Единственная поверхность платформы, открытая наружу, настраивается под свой случай, а не под
+    // наш: вебхук приносит нагрузку чужого сервиса и зовётся с чужой частотой (docs/web-api.md).
+    const value = parsedConfig({
+      pluginRouteTimeoutMilliseconds: 5000,
+      pluginRouteBodyLimitBytes: 4096,
+      publicRouteRequestsPerMinute: 5,
+    });
+
+    assert.equal(value.pluginRouteTimeoutMilliseconds, 5000);
+    assert.equal(value.pluginRouteBodyLimitBytes, 4096);
+    assert.equal(value.publicRouteRequestsPerMinute, 5);
+    assert.equal(defaultConfig.pluginRouteTimeoutMilliseconds, 30000);
+    assert.equal(defaultConfig.pluginRouteBodyLimitBytes, 1048576);
+    assert.equal(defaultConfig.publicRouteRequestsPerMinute, 60);
+  });
+
   it("refuses a wait that is not a positive whole number of milliseconds", () => {
-    for (const key of ["hookTimeoutMilliseconds", "pluginToolTimeoutMilliseconds"]) {
+    for (const key of [
+      "hookTimeoutMilliseconds",
+      "pluginToolTimeoutMilliseconds",
+      "pluginRouteTimeoutMilliseconds",
+      "pluginRouteBodyLimitBytes",
+      "publicRouteRequestsPerMinute",
+    ]) {
       for (const value of [0, -1, 1.5, "500", null]) {
         assert.equal(parseConfig({ [key]: value }).kind, "rejected", `${key}=${String(value)}`);
       }

@@ -74,6 +74,7 @@ describe("buildPluginsSnapshot", () => {
       ],
       switchedOffContributions: [],
       conflicts: [],
+      routeConflicts: [],
       // У плагина из данных нет записи, значит решение выведено по источнику: включает человек.
       enablement: { "data:hello": { enabled: false, disabledContributions: [] } },
     });
@@ -128,6 +129,7 @@ describe("buildPluginsSnapshot", () => {
     assert.deepEqual(snapshot.conflicts, [
       { id: "hello.greeting", source: "data", plugins: ["data:hello", "data:notes"] },
     ]);
+    assert.deepEqual(snapshot.routeConflicts, []);
     assert.deepEqual(snapshot.contributions, []);
     assert.equal(snapshot.revision, state.registry.revision());
   });
@@ -165,6 +167,55 @@ describe("buildPluginsSnapshot", () => {
       buildPluginsSnapshot(state).contributions.map((registration) => registration.source),
       ["project:p1", "project:p2"],
     );
+  });
+
+  it("reports route address conflicts separately from effective contributions", () => {
+    const state = sources([running]);
+
+    state.registry.apply(
+      { key: "data:hello", id: "hello", source: "data" },
+      [
+        { kind: "public-route", id: "first", method: "POST", path: "hooks/github" },
+        { kind: "public-route", id: "second", method: "POST", path: "hooks/github" },
+      ],
+      new Set(),
+    );
+
+    const snapshot = buildPluginsSnapshot(state);
+
+    assert.deepEqual(snapshot.routeConflicts, [
+      {
+        method: "POST",
+        path: "hooks/github",
+        contributions: ["hello.first", "hello.second"],
+        pluginKeys: ["data:hello", "data:hello"],
+      },
+    ]);
+    // The administrative contribution snapshot keeps both declarations so the operator can fix them;
+    // the route table decides that neither one is effective.
+    assert.equal(snapshot.contributions.length, 2);
+  });
+
+  it("uses route parameter shape when reporting an address conflict", () => {
+    const state = sources([running]);
+
+    state.registry.apply(
+      { key: "data:hello", id: "hello", source: "data" },
+      [
+        { kind: "route", id: "by-id", method: "GET", path: "items/:id" },
+        { kind: "route", id: "by-name", method: "GET", path: "items/:name" },
+      ],
+      new Set(),
+    );
+
+    assert.deepEqual(buildPluginsSnapshot(state).routeConflicts, [
+      {
+        method: "GET",
+        path: "items/:",
+        contributions: ["hello.by-id", "hello.by-name"],
+        pluginKeys: ["data:hello", "data:hello"],
+      },
+    ]);
   });
 
   it("keeps standalone conflicts in project resources rather than plugin management", () => {
@@ -212,6 +263,7 @@ describe("buildPluginsSnapshot", () => {
     });
 
     assert.deepEqual(buildPluginsSnapshot(state).conflicts, []);
+    assert.deepEqual(buildPluginsSnapshot(state).routeConflicts, []);
   });
 });
 

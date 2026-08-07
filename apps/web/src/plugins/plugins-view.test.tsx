@@ -46,6 +46,7 @@ const snapshot: PluginsSnapshot = {
   ],
   switchedOffContributions: [],
   conflicts: [],
+  routeConflicts: [],
   enablement: { "data:example": { enabled: true, disabledContributions: [] } },
 };
 
@@ -126,4 +127,160 @@ it("labels every shipped contribution kind without reporting a missing translati
   );
 
   expect(screen.getByText("3 contributions")).toBeTruthy();
+});
+
+it("collects the routes open to the outside in one place", () => {
+  const withRoutes: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      ...snapshot.contributions,
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.github-webhook",
+        declaredId: "github-webhook",
+        method: "POST",
+        path: "webhooks/github",
+      },
+      {
+        kind: "route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.board",
+        declaredId: "board",
+        method: "GET",
+        path: "board",
+      },
+    ],
+    switchedOffContributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.switched-off",
+        declaredId: "switched-off",
+        method: "POST",
+        path: "webhooks/other",
+      },
+    ],
+  };
+
+  render(
+    <PluginsView
+      state={{ snapshot: withRoutes, stale: false }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("Open to the outside")).toBeTruthy();
+  expect(screen.getByText("POST /p/example/webhooks/github — example.github-webhook")).toBeTruthy();
+  // Обычный маршрут наружу не открыт, а выключенный публичный не отвечает вовсе: ни того, ни
+  // другого в списке открытого быть не должно.
+  expect(screen.queryByText(/\/p\/example\/board/)).toBeNull();
+  expect(screen.queryByText(/webhooks\/other/)).toBeNull();
+});
+
+it("does not list a public route whose address is conflicted", () => {
+  const withConflict: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.first",
+        declaredId: "first",
+        method: "POST",
+        path: "hooks/github",
+      },
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "data:example",
+        pluginId: "example",
+        source: "data",
+        id: "example.second",
+        declaredId: "second",
+        method: "POST",
+        path: "hooks/github",
+      },
+    ],
+    routeConflicts: [
+      {
+        method: "POST",
+        path: "hooks/github",
+        contributions: ["example.first", "example.second"],
+        pluginKeys: ["data:example", "data:example"],
+      },
+    ],
+  };
+
+  render(
+    <PluginsView
+      state={{ snapshot: withConflict, stale: false }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.queryByText(/POST \/p\/example\/hooks\/github/)).toBeNull();
+  expect(screen.getByText("Routes not applied")).toBeTruthy();
+});
+
+it("keeps same-id routes from different project sources distinct", () => {
+  const withSameId: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "project:p1:example",
+        pluginId: "example",
+        source: "project:p1",
+        id: "example.hook",
+        declaredId: "hook",
+        method: "POST",
+        path: "hooks/p1",
+      },
+      {
+        kind: "public-route",
+        ownership: "plugin",
+        pluginKey: "project:p2:example",
+        pluginId: "example",
+        source: "project:p2",
+        id: "example.hook",
+        declaredId: "hook",
+        method: "POST",
+        path: "hooks/p2",
+      },
+    ],
+  };
+
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  render(
+    <PluginsView
+      state={{ snapshot: withSameId, stale: false }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("POST /p/example/hooks/p1 — example.hook")).toBeTruthy();
+  expect(screen.getByText("POST /p/example/hooks/p2 — example.hook")).toBeTruthy();
+  expect(error).not.toHaveBeenCalledWith(expect.stringContaining("same key"));
+  error.mockRestore();
 });

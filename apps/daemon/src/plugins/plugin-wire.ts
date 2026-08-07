@@ -8,9 +8,10 @@
  * узнаёт событием жизненного цикла, а не исключением на месте вызова (docs/plugins.md).
  *
  * Пар «запрос-ответ» здесь две, и они направлены в разные стороны. `request`/`response` идёт от
- * воркера к ядру и ограничена провайдерами и сессиями (docs/models-and-providers.md): список, статус
- * и вход бессмысленны без ответа. `call`/`call-result` идёт от ядра к воркеру: хук и инструмент
- * плагина — это ядро, которое зовёт чужой код и **ждёт значение** (docs/hooks.md).
+ * воркера к ядру, и видов запроса в ней три: провайдеры, сессии и хранилище плагина
+ * (docs/models-and-providers.md, docs/plugins.md) — все три бессмысленны без ответа.
+ * `call`/`call-result` идёт от ядра к воркеру: хук, инструмент и маршрут плагина — это ядро,
+ * которое зовёт чужой код и **ждёт значение** (docs/hooks.md, docs/web-api.md).
  *
  * Общего RPC ни из той, ни из другой не делается: вид запроса и вид вызова — закрытые объединения, а
  * не произвольное имя метода.
@@ -20,10 +21,14 @@ import type {
   LoginStep,
   PluginContribution,
   PluginLogLevel,
+  PluginRouteKind,
+  PluginRouteRequest,
   ProviderRequest,
   ProviderResponse,
   SessionRequest,
   SessionResponse,
+  StorageRequest,
+  StorageResponse,
 } from "@sovereign/sdk";
 import type { PluginEventOrigin, PluginSource } from "@sovereign/protocol";
 
@@ -35,19 +40,25 @@ export type PluginWorkerData = {
   workerEntry: string;
 };
 
-/** Оба канала «запрос-ответ» в канале плагина (docs/plugins.md). */
-export type PluginRequest = ProviderRequest | SessionRequest;
+/** Все три вида запроса в направлении «воркер спрашивает ядро» (docs/plugins.md). */
+export type PluginRequest = ProviderRequest | SessionRequest | StorageRequest;
 
-export type PluginResponse = ProviderResponse | SessionResponse;
+export type PluginResponse = ProviderResponse | SessionResponse | StorageResponse;
 
 /**
- * Что ядро зовёт у плагина. Вид закрыт: маршрут плагина добавит своим видом, а не именем метода.
- * Идентификатор вклада — единственный адрес: им же ключуется таблица обработчиков в воркере, и им же
- * человек включает и выключает вклад (docs/hooks.md).
+ * Что ядро зовёт у плагина. Вид закрыт: общего RPC из пары не делается, произвольного имени метода
+ * в воркере нет. Идентификатор вклада — единственный адрес: им же ключуется таблица обработчиков в
+ * воркере, и им же человек включает и выключает вклад (docs/hooks.md).
  */
 export type PluginCall =
   | { kind: "hook"; contributionId: string; event: string; payload: unknown }
-  | { kind: "tool"; contributionId: string; arguments: unknown };
+  | { kind: "tool"; contributionId: string; arguments: unknown }
+  | {
+      kind: "route";
+      routeKind: PluginRouteKind;
+      contributionId: string;
+      request: PluginRouteRequest;
+    };
 
 /**
  * Чем плагин отвечает на вызов. Отказ и сбой разведены: отказ решающего хука — это исход по делу,
@@ -55,6 +66,7 @@ export type PluginCall =
  * Оба доезжают значением, а не исключением: исключение из хука роняет турн Pi (docs/hooks.md).
  */
 export type PluginCallResult =
+  /** Форму значения задаёт вид вызова: у маршрута это `PluginRouteResponse`, у инструмента — исход. */
   | { kind: "value"; value: unknown }
   | { kind: "refused"; reason: string }
   | { kind: "failed"; reason: string };
@@ -74,7 +86,7 @@ export type PluginOutgoing =
   | { kind: "unsubscribe"; type: string }
   /**
    * Запрос к платформе. `requestId` уникален внутри воркера — этого хватает: пара живёт в нём.
-   * Каналов запроса-ответа два, провайдеры и сессии, и оба ходят одним видом сообщения: второй
+   * Видов запроса три — провайдеры, сессии и хранилище, — и все ходят одним видом сообщения: второй
    * счётчик идентификаторов на один воркер сломал бы сопоставление ответа с вызовом.
    */
   | { kind: "request"; requestId: string; request: PluginRequest }

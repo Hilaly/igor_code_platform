@@ -1331,6 +1331,7 @@ describe("createPluginSupervisor", () => {
     await supervisor.apply(only("hello"), enabled("data:hello"));
     await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
     const beforeReload = registry.revision();
+    const beforeRouteGeneration = supervisor.routeGeneration();
 
     await supervisor.reload([{ directory: hello.directory, fileResourcesChanged: false }]);
     await recorded.waitFor(reachedState("data:hello", "stopped"), "hello stopped for the reload");
@@ -1350,6 +1351,7 @@ describe("createPluginSupervisor", () => {
       ["hello.board"],
     );
     assert.equal(registry.revision(), beforeReload);
+    assert.equal(supervisor.routeGeneration(), beforeRouteGeneration + 1);
   });
 
   it("bumps the contribution revision once for a sibling file-resource change", async () => {

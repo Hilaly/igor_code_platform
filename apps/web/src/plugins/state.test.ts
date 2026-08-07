@@ -39,6 +39,7 @@ const snapshot = (revision: number, plugins: PluginStatus[] = [hello]): PluginsS
   contributions: [board],
   switchedOffContributions: [],
   conflicts: [],
+  routeConflicts: [],
   enablement: { "data:hello": { enabled: true, disabledContributions: [] } },
 });
 
