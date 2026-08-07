@@ -152,6 +152,7 @@
 
 /* Фокус живёт на кнопке строки, а не на вложенном `Code`: показываем тот же полный путь, что hover. */
 .projects-list > li > button:focus-visible .projects-row-facts [role="tooltip"] {
+  display: block;
   opacity: 1;
 }
 

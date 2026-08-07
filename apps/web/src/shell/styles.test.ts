@@ -176,7 +176,7 @@ describe("the style sheets of the application", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
     expect(projects).toMatch(
-      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*opacity:\s*1;/s,
+      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
     );
   });
 
