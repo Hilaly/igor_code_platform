@@ -8,7 +8,7 @@
  */
 
 import type { HookCriticality } from "./hook.ts";
-import type { PluginSource } from "./plugin.ts";
+import { projectOfPluginSource, type PluginSource } from "./plugin.ts";
 import type { ThinkingLevel } from "./session.ts";
 import type { AgentSkillSelection, AgentToolSelection } from "./tool-pattern.ts";
 
@@ -33,6 +33,21 @@ export type ContributionOwnership =
       scope: "user" | "project";
       projectId?: string;
     };
+
+/**
+ * Какому проекту принадлежит вклад; у вклада всего узла — никакому. Владения два, и признак проекта
+ * у них записан по-разному (источник плагина против явной области standalone-корня), поэтому вопрос
+ * задаётся функцией: иначе каждый спрашивающий воспроизводил бы обе ветки, а забыть одну легко.
+ *
+ * Снимок `/api/plugins` — каталог **объявлений**, а не решение одного контекста: в нём лежат и
+ * проектные вклады, иначе их нечем было бы показать и включить. Значит спрашивать обязан всякий, кто
+ * применяет вклад не в контексте проекта.
+ */
+export function projectOfContribution(ownership: ContributionOwnership): string | undefined {
+  return ownership.ownership === "plugin"
+    ? projectOfPluginSource(ownership.source)
+    : ownership.projectId;
+}
 
 export type RegistrationCommon = ContributionOwnership & {
   /** С неймспейсом: `<pluginId>.<объявленный>` (docs/ui-extension-model.md, docs/event-bus.md). */

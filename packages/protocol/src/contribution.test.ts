@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import * as protocol from "./index.ts";
-import { pluginRouteAddress, pluginRoutePrefix } from "./contribution.ts";
+import { pluginRouteAddress, pluginRoutePrefix, projectOfContribution } from "./contribution.ts";
+
+const pluginOwnership = {
+  ownership: "plugin",
+  pluginKey: "data:themed",
+  pluginId: "themed",
+} as const;
 
 describe("pluginRouteAddress", () => {
   it("puts the plugin identifier and the declared path behind the prefix", () => {
@@ -33,5 +39,29 @@ describe("the plugin route prefix", () => {
 
   it("is itself under /api, so the daemon can tell a route from a page of a plugin", () => {
     assert.equal(pluginRoutePrefix.startsWith("/api/"), true);
+  });
+});
+
+describe("projectOfContribution", () => {
+  it("names the project of a plugin from a project folder and nobody else's", () => {
+    assert.equal(projectOfContribution({ ...pluginOwnership, source: "project:work" }), "work");
+    assert.equal(projectOfContribution({ ...pluginOwnership, source: "data" }), undefined);
+    assert.equal(projectOfContribution({ ...pluginOwnership, source: "builtin" }), undefined);
+  });
+
+  it("reads the same answer off a standalone root, where the scope is written out", () => {
+    assert.equal(
+      projectOfContribution({
+        ownership: "standalone",
+        source: "native:hello",
+        scope: "project",
+        projectId: "work",
+      }),
+      "work",
+    );
+    assert.equal(
+      projectOfContribution({ ownership: "standalone", source: "native:hello", scope: "user" }),
+      undefined,
+    );
   });
 });

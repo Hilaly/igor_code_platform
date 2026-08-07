@@ -37,6 +37,7 @@ import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
+import { windowWideContributions } from "./plugins/window-wide.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { ProjectDetailView } from "./projects/project-detail-view.tsx";
 import { FileResourcesPanel } from "./projects/file-resources-panel.tsx";
@@ -257,7 +258,10 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const contributions = plugins.state.snapshot?.contributions;
-  const declaredSchemes = useMemo(() => pluginColorSchemes(contributions ?? []), [contributions]);
+  // Схема и каталог применяются ко всему окну, а снимок несёт объявления всех контекстов сразу:
+  // копия плагина в папке проекта пришла бы вторым `themed.midnight` в тот же список.
+  const windowWide = useMemo(() => windowWideContributions(contributions ?? []), [contributions]);
+  const declaredSchemes = useMemo(() => pluginColorSchemes(windowWide), [windowWide]);
   const schemes = useMemo(() => [...shippedSchemes, ...declaredSchemes.schemes], [declaredSchemes]);
   // Отвергнутая схема называется один раз, а не на каждый снимок плагинов: снимок приезжает на любое
   // изменение любого плагина, а сломанная схема остаётся той же самой.
@@ -274,10 +278,7 @@ export function App() {
     }
   }, [declaredSchemes, diagnostics]);
   // Каталоги плагинов идут после наших: побеждает последний объявивший сообщение (docs/ui-kit.md).
-  const catalogs = useMemo(
-    () => [...shippedCatalogs, ...pluginCatalogs(contributions ?? [])],
-    [contributions],
-  );
+  const catalogs = useMemo(() => [...shippedCatalogs, ...pluginCatalogs(windowWide)], [windowWide]);
   const locales = useMemo(() => availableLocales(catalogs), [catalogs]);
 
   // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
@@ -753,7 +754,7 @@ export function App() {
             appearance={
               <AppearanceSection
                 preferences={preferences}
-                schemes={describeSchemes(schemes, contributions ?? [], translator)}
+                schemes={describeSchemes(schemes, windowWide, translator)}
                 locales={locales}
                 onChange={change}
                 refusal={refusal}
