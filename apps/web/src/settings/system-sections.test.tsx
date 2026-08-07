@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -28,8 +28,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it("lays daemon facts out as compact Appearance-style property rows", () => {
-  render(
+it("lays daemon facts out as compact Appearance-style property rows and ticks uptime", () => {
+  const { unmount } = render(
     <DaemonSection
       stream="open"
       health={{ status: "ok", startedAt: "2026-08-07T12:00:00.000Z", uptimeSeconds: 1_800 }}
@@ -39,13 +39,57 @@ it("lays daemon facts out as compact Appearance-style property rows", () => {
     />,
   );
 
-  const rows = screen.getAllByRole("group");
+  const daemon = screen.getByRole("group", { name: "Connection" }).parentElement;
+  const rows = Array.from(daemon?.children ?? []).filter(
+    (child) => child.getAttribute("role") === "group",
+  );
   expect(rows).toHaveLength(2);
   expect(rows[0]?.getAttribute("aria-label")).toBe("Connection");
 
   const uptime = screen.getByRole("group", { name: "Uptime" });
   expect(within(uptime).getByText(/^Started: 7 Aug 2026, \d{2}:00$/)).toBeTruthy();
-  expect(within(uptime).getByText("up 30m 0s")).toBeTruthy();
+  const timer = within(uptime).getByRole("group", { name: "up 30m 0s" });
+  expect(within(timer).getAllByText("00")).toHaveLength(2);
+  expect(within(timer).getByText("30")).toBeTruthy();
+  expect(within(timer).getAllByText(":")).toHaveLength(2);
+
+  act(() => vi.advanceTimersByTime(1_000));
+
+  const tickedTimer = within(uptime).getByRole("group", { name: "up 30m 1s" });
+  expect(within(tickedTimer).getByText("01")).toBeTruthy();
+  expect(vi.getTimerCount()).toBe(1);
+
+  unmount();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("keeps daemon loading and failure states in the uptime value column", () => {
+  const view = render(
+    <DaemonSection
+      stream="connecting"
+      health={undefined}
+      failure={undefined}
+      locale="en-GB"
+      translator={translator}
+    />,
+  );
+
+  const uptime = screen.getByRole("group", { name: "Uptime" });
+  expect(within(uptime).getByText("Loading…")).toBeTruthy();
+  expect(within(uptime).queryByRole("group", { name: /^up / })).toBeNull();
+
+  view.rerender(
+    <DaemonSection
+      stream="reconnecting"
+      health={undefined}
+      failure="connection refused"
+      locale="en-GB"
+      translator={translator}
+    />,
+  );
+
+  expect(within(uptime).getByText("Unreachable: connection refused")).toBeTruthy();
+  expect(within(uptime).queryByText("Loading…")).toBeNull();
 });
 
 it("renders diagnostics as a named flat technical stream", () => {

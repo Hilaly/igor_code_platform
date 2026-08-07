@@ -28,7 +28,7 @@ export function formatUptime(totalSeconds: number, units: DurationUnits): string
 import type { Health } from "@sovereign/protocol";
 import { useEffect, useState } from "react";
 
-const tickMilliseconds = 10_000;
+const tickMilliseconds = 1_000;
 
 /** Живое время работы для подробного раздела демона; компактный sidebar его не показывает. */
 export function useUptimeSeconds(health: Health | undefined): number | undefined {

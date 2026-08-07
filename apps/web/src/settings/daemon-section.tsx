@@ -5,7 +5,14 @@
  */
 
 import type { Health } from "@sovereign/protocol";
-import { Badge, SettingsRow, type BadgeTone, type ScopedTranslator } from "@sovereign/ui-kit";
+import {
+  Badge,
+  DurationTimer,
+  SettingsRow,
+  type BadgeTone,
+  type DurationTimerProps,
+  type ScopedTranslator,
+} from "@sovereign/ui-kit";
 
 import type { StreamStatus } from "../events/stream.ts";
 import { useUptimeSeconds } from "../uptime.ts";
@@ -29,6 +36,12 @@ export type DaemonSectionProps = {
 export function DaemonSection({ stream, health, failure, locale, translator }: DaemonSectionProps) {
   const { t } = translator;
   const uptimeSeconds = useUptimeSeconds(health);
+  const timerLabels: DurationTimerProps["labels"] = {
+    days: t("duration.days.short"),
+    hours: t("duration.hours.short"),
+    minutes: t("duration.minutes.short"),
+    seconds: t("duration.seconds.short"),
+  };
 
   return (
     <div className="settings-daemon">
@@ -48,19 +61,25 @@ export function DaemonSection({ stream, health, failure, locale, translator }: D
               })
         }
       >
-        <span>
-          {failure === undefined
-            ? uptimeSeconds === undefined
-              ? t("state.loading")
-              : t("daemon.uptime", {
-                  duration: formatUptime(uptimeSeconds, {
-                    hours: (count) => t("duration.hours", { count }),
-                    minutes: (count) => t("duration.minutes", { count }),
-                    seconds: (count) => t("duration.seconds", { count }),
-                  }),
-                })
-            : t("daemon.unreachable", { reason: failure })}
-        </span>
+        {failure === undefined ? (
+          uptimeSeconds === undefined ? (
+            <span>{t("state.loading")}</span>
+          ) : (
+            <DurationTimer
+              totalSeconds={uptimeSeconds}
+              labels={timerLabels}
+              accessibleLabel={t("daemon.uptime", {
+                duration: formatUptime(uptimeSeconds, {
+                  hours: (count) => t("duration.hours", { count }),
+                  minutes: (count) => t("duration.minutes", { count }),
+                  seconds: (count) => t("duration.seconds", { count }),
+                }),
+              })}
+            />
+          )
+        ) : (
+          <span>{t("daemon.unreachable", { reason: failure })}</span>
+        )}
       </SettingsRow>
     </div>
   );
