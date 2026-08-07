@@ -67,7 +67,7 @@ const snapshot: PluginsSnapshot = {
 it("shows plugin facts, controls each contribution, and exposes technical data", () => {
   const onSwitch = vi.fn();
   const onBack = vi.fn();
-  render(
+  const { container } = render(
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
@@ -82,6 +82,13 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(screen.getByText("/plugins/example")).toBeTruthy();
   expect(screen.getByText("bad contribution")).toBeTruthy();
   expect(screen.getByText("missing.id")).toBeTruthy();
+  expect(screen.getByRole("group", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Lifecycle" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Source" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
+  expect(container.querySelector(".plugin-detail-surface")).toBeNull();
   expect(screen.getByRole("checkbox", { name: "Switched on" })).toHaveProperty("checked", true);
   expect(screen.getByRole("checkbox", { name: "Example event" })).toHaveProperty("checked", true);
   expect(screen.getByRole("checkbox", { name: "Example skill" })).toHaveProperty("checked", false);

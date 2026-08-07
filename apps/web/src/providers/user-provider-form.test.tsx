@@ -21,6 +21,25 @@ const translator = createTranslator({
 });
 
 describe("UserProviderForm", () => {
+  it("uses settings rows instead of nested panels for every provider property", () => {
+    render(
+      <UserProviderForm
+        mode="create"
+        onBack={vi.fn()}
+        onSubmit={vi.fn(async () => undefined)}
+        translator={translator}
+      />,
+    );
+
+    for (const name of ["Идентификатор", "Название", "Базовый URL API"]) {
+      expect(screen.getByRole("textbox", { name }).closest('[role="group"]')).not.toBeNull();
+    }
+    expect(
+      screen.getByRole("combobox", { name: "Формат запросов" }).closest('[role="group"]'),
+    ).not.toBeNull();
+    expect(document.querySelector("[class*='panel']")).toBeNull();
+  });
+
   it("creates a persistent provider with protocol defaults and manual models", async () => {
     const onSubmit = vi.fn(async () => undefined);
 

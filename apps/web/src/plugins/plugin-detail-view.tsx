@@ -13,16 +13,14 @@ import {
   Disclosure,
   EmptyState,
   Heading,
-  List,
-  ListRow,
   Notice,
+  SettingsRow,
   Spinner,
   Text,
   Toggle,
   type BadgeTone,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import type { ReactNode } from "react";
 
 import { routeAddress, type PluginsState } from "./state.ts";
 
@@ -103,15 +101,8 @@ export function PluginDetailView({
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
       </div>
 
-      <div className="plugin-detail-surface">
-        <header className="plugin-detail-header">
-          <div className="plugin-detail-hero">
-            <div>
-              <Text>{status.id ?? status.key}</Text>
-              <Code>{status.key}</Code>
-            </div>
-            <Text tone="muted">{t("plugins.detail.enabled")}</Text>
-          </div>
+      <div className="plugin-detail-rows">
+        <SettingsRow label={status.id ?? status.key} description={<Code>{status.key}</Code>}>
           <Toggle
             checked={preferences?.enabled ?? false}
             disabled={preferences === undefined}
@@ -123,27 +114,27 @@ export function PluginDetailView({
             label={t("plugins.toggle.plugin")}
             {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
           />
-        </header>
+        </SettingsRow>
       </div>
 
       <section className="plugin-detail-section" aria-labelledby="plugin-detail-plugin">
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
-        <div className="plugin-detail-facts" id="plugin-detail-plugin">
-          <Fact
-            label={t("plugins.detail.lifecycle")}
-            value={
-              <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
-            }
-          />
-          <Fact
-            label={t("plugins.detail.source")}
-            value={
-              status.source === "builtin" ? t("plugins.source.builtin") : t("plugins.source.data")
-            }
-          />
-          <Fact label={t("plugins.detail.path")} value={<Code>{status.directory}</Code>} />
+        <div className="plugin-detail-rows" id="plugin-detail-plugin">
+          <SettingsRow label={t("plugins.detail.lifecycle")}>
+            <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+          </SettingsRow>
+          <SettingsRow label={t("plugins.detail.source")}>
+            <Text>
+              {status.source === "builtin" ? t("plugins.source.builtin") : t("plugins.source.data")}
+            </Text>
+          </SettingsRow>
+          <SettingsRow label={t("plugins.detail.path")}>
+            <Code>{status.directory}</Code>
+          </SettingsRow>
           {status.attempt === undefined ? undefined : (
-            <Fact label={t("plugins.detail.attempt")} value={String(status.attempt)} />
+            <SettingsRow label={t("plugins.detail.attempt")}>
+              <Text>{String(status.attempt)}</Text>
+            </SettingsRow>
           )}
         </div>
       </section>
@@ -170,28 +161,34 @@ export function PluginDetailView({
         {declared.length === 0 ? (
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (
-          <List>
+          <div className="plugin-detail-contributions" role="list">
             {declared.map(({ registration, off }) => (
-              <ListRow key={registration.id}>
-                <div className="plugin-detail-contribution">
-                  <Toggle
-                    checked={!off}
-                    disabled={preferences === undefined}
-                    onChange={(on) => switchContribution(registration.id, on)}
-                    label={registration.title ?? registration.declaredId}
-                  />
-                  <div className="plugin-detail-contribution-meta">
-                    <Badge tone="neutral">{t(`plugins.kind.${registration.kind}`)}</Badge>
-                    <Code>{registration.id}</Code>
-                    {off ? (
-                      <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
-                    ) : undefined}
+              <div role="listitem" key={registration.id}>
+                <SettingsRow
+                  label={registration.title ?? registration.declaredId}
+                  description={
+                    <div className="plugin-detail-contribution-meta">
+                      <Badge tone="neutral">{t(`plugins.kind.${registration.kind}`)}</Badge>
+                      <Code>{registration.id}</Code>
+                      {off ? (
+                        <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                      ) : undefined}
+                    </div>
+                  }
+                >
+                  <div className="plugin-detail-contribution-controls">
+                    <TechnicalData registration={registration} translator={translator} />
+                    <Toggle
+                      checked={!off}
+                      disabled={preferences === undefined}
+                      onChange={(on) => switchContribution(registration.id, on)}
+                      label={registration.title ?? registration.declaredId}
+                    />
                   </div>
-                  <TechnicalData registration={registration} translator={translator} />
-                </div>
-              </ListRow>
+                </SettingsRow>
+              </div>
             ))}
-          </List>
+          </div>
         )}
       </section>
 
@@ -220,15 +217,6 @@ function contributionsFor(snapshot: PluginsSnapshot, status: PluginStatus): Cont
       .filter(mine)
       .map((registration) => ({ registration, off: true })),
   ].sort((left, right) => left.registration.id.localeCompare(right.registration.id));
-}
-
-function Fact({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="plugin-detail-fact">
-      <Text tone="muted">{label}</Text>
-      <span>{value}</span>
-    </div>
-  );
 }
 
 function TechnicalData({

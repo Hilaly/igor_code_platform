@@ -35,7 +35,19 @@ export function DaemonSection({ stream, health, failure, locale, translator }: D
       <SettingsRow label={t("daemon.connection")}>
         <Badge tone={tones[stream]}>{t(`connection.${stream}`)}</Badge>
       </SettingsRow>
-      <SettingsRow label={t("daemon.uptimeLabel")}>
+      <SettingsRow
+        label={t("daemon.uptimeLabel")}
+        description={
+          health === undefined
+            ? undefined
+            : t("daemon.started", {
+                when: new Intl.DateTimeFormat(locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(health.startedAt)),
+              })
+        }
+      >
         <span>
           {failure === undefined
             ? uptimeSeconds === undefined
@@ -50,18 +62,6 @@ export function DaemonSection({ stream, health, failure, locale, translator }: D
             : t("daemon.unreachable", { reason: failure })}
         </span>
       </SettingsRow>
-      {health === undefined ? undefined : (
-        <SettingsRow label={t("daemon.startedLabel")}>
-          <span>
-            {t("daemon.started", {
-              when: new Intl.DateTimeFormat(locale, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }).format(new Date(health.startedAt)),
-            })}
-          </span>
-        </SettingsRow>
-      )}
     </div>
   );
 }

@@ -17,13 +17,13 @@ import {
   Field,
   FilePicker,
   Form,
-  Heading,
   Input,
   ListRow,
   Menu,
   MoreIcon,
   Notice,
   Spinner,
+  SettingsRow,
   Text,
   Tooltip,
   type ScopedTranslator,
@@ -226,7 +226,6 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
 
   return (
     <section className="projects-new-surface" aria-label={t("projects.new.title")}>
-      <Heading level={2}>{t("projects.new.title")}</Heading>
       {/* Форма перехватывает Enter в любом поле и сабмитит создание; ручные `onKeyDown` на полях
           больше не нужны. Кнопка «Обзор» не сабмитит: у кит-`Button` тип `button`, не `submit`. */}
       <Form onSubmit={submit} disabled={busy || !ready}>
@@ -239,10 +238,13 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
             </Notice>
           )}
 
-          <Field label={t("projects.field.folder")} hint={t("projects.field.folder.hint")}>
-            {(control) => (
+          <SettingsRow
+            label={<span>{t("projects.field.folder")}</span>}
+            description={t("projects.field.folder.hint")}
+          >
+            <div className="projects-folder-control">
               <Input
-                {...control}
+                aria-label={t("projects.field.folder")}
                 value={folder}
                 onChange={(value) => {
                   onDismissComplaints();
@@ -250,26 +252,32 @@ function NewProject({ onCreate, onDismissComplaints, conflict, translator }: New
                 }}
                 disabled={busy}
               />
-            )}
-          </Field>
+              <Button
+                onClick={() => {
+                  navigatePicker("/");
+                  setPickerOpen(true);
+                }}
+                disabled={busy}
+              >
+                {t("projects.field.folder.browse")}
+              </Button>
+            </div>
+          </SettingsRow>
 
-          <Button
-            onClick={() => {
-              navigatePicker("/");
-              setPickerOpen(true);
-            }}
-            disabled={busy}
-          >
-            {t("projects.field.folder.browse")}
-          </Button>
+          <SettingsRow label={<span>{t("projects.field.name")}</span>}>
+            <Input
+              aria-label={t("projects.field.name")}
+              value={name}
+              onChange={setName}
+              disabled={busy}
+            />
+          </SettingsRow>
 
-          <Field label={t("projects.field.name")}>
-            {(control) => <Input {...control} value={name} onChange={setName} disabled={busy} />}
-          </Field>
-
-          <Button type="submit" tone="accent" disabled={!ready} busy={busy}>
-            {t("projects.new.submit")}
-          </Button>
+          <div className="projects-form-actions">
+            <Button type="submit" tone="accent" disabled={!ready} busy={busy}>
+              {t("projects.new.submit")}
+            </Button>
+          </div>
         </div>
       </Form>
 

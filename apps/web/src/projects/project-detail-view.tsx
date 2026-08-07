@@ -5,6 +5,7 @@ import {
   Code,
   EmptyState,
   Notice,
+  SettingsRow,
   Spinner,
   Text,
   type ScopedTranslator,
@@ -56,24 +57,24 @@ export function ProjectDetailView({
           {t("sessions.new")}
         </Button>
       </div>
-      <div className="project-detail-surface">
-        <div className="project-detail-header">
-          <div>
-            <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-            <Code>{project.folder}</Code>
-          </div>
+      <div className="project-detail-rows">
+        <SettingsRow
+          label={project.ephemeral ? t("projects.ephemeral") : project.name}
+          description={<Code>{project.folder}</Code>}
+        >
           <Badge tone={project.availability === "available" ? "success" : "warning"}>
             {project.availability === "available"
               ? t("projects.available")
               : t("projects.availability.missing")}
           </Badge>
-        </div>
-        <div className="project-detail-summary">
-          <Text tone="muted">{t("projects.sessions.count", { count: project.sessionCount })}</Text>
+        </SettingsRow>
+        <SettingsRow label={t("projects.sessions.count", { count: project.sessionCount })}>
           {project.ephemeral ? (
             <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
-          ) : undefined}
-        </div>
+          ) : (
+            <Text tone="muted">{project.sessionCount}</Text>
+          )}
+        </SettingsRow>
       </div>
       {fileResources}
     </div>

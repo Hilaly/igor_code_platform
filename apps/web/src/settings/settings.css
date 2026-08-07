@@ -10,56 +10,46 @@
 .plugin-detail {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  gap: var(--sovereign-space-4);
   min-width: 0;
 }
 
-.plugins > ul {
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugins-row {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) auto auto auto auto;
-  align-items: center;
-  gap: var(--sovereign-space-3);
-  min-height: var(--sovereign-row-height-compact);
-  padding: var(--sovereign-space-2) 0;
-}
-
-.plugins-row-main {
+.plugins-notices {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-1);
+  gap: var(--sovereign-space-2);
+}
+
+.plugins-notices:empty {
+  display: none;
+}
+
+.plugins-list,
+.plugin-detail-rows,
+.plugin-detail-contributions {
   min-width: 0;
 }
 
-.plugins-row-main h2 {
-  margin: 0;
+/* Обёртки сохраняют семантику списка, но соседние SettingsRow делят одну линию, как в Appearance. */
+.plugins-list > [role="listitem"] + [role="listitem"] > [role="group"],
+.plugin-detail-contributions > [role="listitem"] + [role="listitem"] > [role="group"] {
+  border-block-start: 0;
+}
+
+.plugins-row-controls,
+.plugin-detail-contribution-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
 }
 
 .plugin-detail-back {
   align-self: flex-start;
 }
 
-.plugin-detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sovereign-space-3);
-  padding-block: var(--sovereign-space-3);
-  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugin-detail-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex: 1 1 auto;
-  gap: var(--sovereign-space-3);
-}
-
-.plugin-detail-surface,
 .project-detail-surface {
   padding-block: var(--sovereign-space-3);
   border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
@@ -77,58 +67,18 @@
   margin: 0;
 }
 
-.plugin-detail-facts {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugin-detail-fact {
-  flex: 1 1 45%;
-  flex-direction: column;
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sovereign-space-2);
-  min-width: 0;
-  padding: var(--sovereign-space-2) 0;
-  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugin-detail-fact > span:last-child {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  text-align: start;
-}
-
-.plugin-detail-contribution {
-  display: grid;
-  grid-template-columns: minmax(10rem, 1fr) auto minmax(12rem, auto);
-  align-items: center;
-  gap: var(--sovereign-space-2);
-  width: 100%;
-  min-width: 0;
-}
-
 .plugin-detail-contribution-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sovereign-space-2);
   min-width: 0;
 }
 
 @container (width < 40rem) {
-  .plugins-row,
-  .plugin-detail-contribution {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .plugins-row > :nth-child(2),
-  .plugins-row > :nth-child(3),
-  .plugin-detail-contribution-meta,
-  .plugin-detail-contribution details {
-    grid-column: 1 / -1;
+  .plugins-row-controls,
+  .plugin-detail-contribution-controls {
+    justify-content: flex-start;
   }
 }
 
@@ -149,4 +99,43 @@
 
 .settings-appearance-buttons {
   flex-wrap: wrap;
+}
+
+.settings-diagnostics-stream {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  list-style: none;
+}
+
+.settings-diagnostics-stream > li {
+  display: grid;
+  grid-template-columns: minmax(var(--sovereign-space-8), auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+  padding-block: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.settings-diagnostics-index,
+.settings-diagnostics-stream code {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.settings-diagnostics-stream code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-diagnostics-empty {
+  margin: 0;
+  padding-block: var(--sovereign-space-3);
+  border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
 }

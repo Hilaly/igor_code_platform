@@ -3,7 +3,7 @@
  * некуда. Прежде это была вкладка `diagnostics` правой панели; логика не менялась.
  */
 
-import { EmptyState, List, ListRow, Text, type ScopedTranslator } from "@sovereign/ui-kit";
+import type { ScopedTranslator } from "@sovereign/ui-kit";
 
 import type { Diagnostic } from "../diagnostics.ts";
 
@@ -14,16 +14,23 @@ export type DiagnosticsSectionProps = {
 
 export function DiagnosticsSection({ diagnostics, translator }: DiagnosticsSectionProps) {
   if (diagnostics.length === 0) {
-    return <EmptyState title={translator.t("diagnostics.empty")} />;
+    return (
+      <p className="settings-diagnostics-empty" role="status">
+        {translator.t("diagnostics.empty")}
+      </p>
+    );
   }
 
   return (
-    <List>
+    <ol className="settings-diagnostics-stream" aria-label={translator.t("diagnostics.title")}>
       {diagnostics.map((diagnostic) => (
-        <ListRow key={diagnostic.index}>
-          <Text tone="muted">{diagnostic.text}</Text>
-        </ListRow>
+        <li key={diagnostic.index}>
+          <span className="settings-diagnostics-index" aria-hidden="true">
+            {diagnostic.index.toString().padStart(3, "0")}
+          </span>
+          <code>{diagnostic.text}</code>
+        </li>
       ))}
-    </List>
+    </ol>
   );
 }
