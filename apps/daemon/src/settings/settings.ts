@@ -62,7 +62,13 @@ export type SettingsStore = {
 export type WriteOutcome =
   | { kind: "written" }
   /** Файл на диске не читается. Записать поверх — значит стереть чужую правку (docs/data-directory.md). */
-  | { kind: "refused"; reason: string };
+  | { kind: "refused"; reason: string }
+  /**
+   * Запись не удалась: права, место на диске, чужая блокировка. Отделено от `refused`, потому что
+   * ответы разные — там спор с чужой правкой, здесь отказ файловой системы, — а общее у них одно:
+   * причину обязан увидеть человек, а не только журнал.
+   */
+  | { kind: "failed"; reason: string };
 
 export type CreateSettingsStoreOptions = {
   directory: string;
@@ -208,10 +214,20 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       return stored;
     }
 
-    writeFileAtomically(
-      join(directory, fileName),
-      `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
-    );
+    try {
+      writeFileAtomically(
+        join(directory, fileName),
+        `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
+      );
+    } catch (cause) {
+      // Файловая система отказала: директория без права записи, кончилось место, файл держит кто-то
+      // ещё. Исключение отсюда доходило бы до диспетчера, а он отвечает «internal error» — человек
+      // видел бы поломку демона вместо причины, которую может починить только он.
+      return {
+        kind: "failed",
+        reason: `${fileName} was not written: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
 
     // Наблюдатель принесёт своё событие следом и вызовет перечитывание второй раз. Второе ничего не
     // сделает: совпавший снимок никого не будит.

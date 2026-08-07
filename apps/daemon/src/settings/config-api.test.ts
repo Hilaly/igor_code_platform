@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, request as sendRequest, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -203,6 +211,28 @@ describe("configRoutes", () => {
     assert.equal(answer.status, 409);
     assert.equal(readFileSync(join(directory, configFileName), "utf8"), "{ broken");
   });
+
+  // Права проверяются ядром, а root их не спрашивает: под ним запись прошла бы и проверка стала бы
+  // ложно красной.
+  it(
+    "names the reason when the file system refuses the write",
+    { skip: process.getuid?.() === 0 },
+    async () => {
+      const { directory, put } = await serve();
+
+      chmodSync(directory, 0o555);
+
+      try {
+        const answer = await put({ ...defaultConfig, maxConcurrentTurns: 8 });
+
+        // Не `internal error`: причину отказа чинит человек, и без неё он не знает, что чинить.
+        assert.equal(answer.status, 500);
+        assert.match(answer.body, /config\.json was not written: /);
+      } finally {
+        chmodSync(directory, 0o755);
+      }
+    },
+  );
 });
 
 describe("publishConfigChanges", () => {

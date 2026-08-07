@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -286,6 +294,32 @@ test("an unreadable preferences file is refused instead of overwritten", () => {
   assert.equal(outcome.kind, "refused");
   assert.equal(readFileSync(join(directory, preferencesFileName), "utf8"), "{ broken");
 });
+
+// Права проверяются ядром, а root их не спрашивает: под ним директория без права записи пишется, и
+// проверка стала бы ложно красной.
+test(
+  "a directory that refuses the write is reported, not thrown",
+  { skip: process.getuid?.() === 0 },
+  () => {
+    const directory = freshDirectory();
+    const { store } = startedStore(directory);
+
+    chmodSync(directory, 0o555);
+
+    try {
+      const outcome = store.writeConfig({ ...defaultConfig, maxConcurrentTurns: 8 });
+
+      assert.equal(outcome.kind, "failed");
+      assert.match(
+        outcome.kind === "failed" ? outcome.reason : "",
+        /^config\.json was not written: /,
+      );
+    } finally {
+      // Иначе не убрать рабочую директорию после прогона.
+      chmodSync(directory, 0o755);
+    }
+  },
+);
 
 test("the write leaves no temporary file behind", () => {
   const directory = freshDirectory();
