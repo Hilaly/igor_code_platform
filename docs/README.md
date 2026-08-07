@@ -163,6 +163,8 @@
   и полной визуальной проверки.
 - [Выравнивание содержимого Settings](superpowers/specs/2026-08-07-settings-content-alignment-design.md) —
   утверждённый единый плоский визуальный контракт Appearance для всех разделов и detail-страниц.
+- [Анимированный тумблер UI Kit](superpowers/specs/2026-08-07-animated-toggle-design.md) — единый
+  switch-контрол, режимы видимой подписи и tooltip для плотных строк Settings.
 - [План выравнивания содержимого Settings](superpowers/plans/2026-08-07-settings-content-alignment.md) —
   TDD-срезы системных вкладок, объектных списков и вложенных страниц с полной визуальной проверкой.
 
