@@ -155,18 +155,23 @@ const colorSchemeContributions = (
  * Второе нужно из-за мажора контракта токенов — `parseColorScheme` его не смотрит, а схема с чужим
  * мажором не применится ни в одном варианте. Вариант здесь любой: отказ по мажору стоит до того, как
  * `resolveScheme` возьмётся за палитру.
+ *
+ * Причины отказов возвращаются, а не пишутся колбэком: разбор идёт на каждый снимок плагинов, и
+ * запись из него была бы побочным действием в вычислении — та же жалоба повторялась бы с каждым
+ * снимком. Кто и когда её покажет, решает вызывающий.
  */
-export function pluginColorSchemes(
-  contributions: readonly ContributionRegistration[],
-  onDiagnostic: (diagnostic: string) => void,
-): ColorScheme[] {
+export function pluginColorSchemes(contributions: readonly ContributionRegistration[]): {
+  schemes: ColorScheme[];
+  refusals: string[];
+} {
   const schemes: ColorScheme[] = [];
+  const refusals: string[] = [];
 
   for (const registration of colorSchemeContributions(contributions)) {
     const parsed = parseColorScheme(registration.id, registration.scheme);
 
     if (parsed.kind === "refused") {
-      onDiagnostic(parsed.reason);
+      refusals.push(parsed.reason);
 
       continue;
     }
@@ -174,9 +179,7 @@ export function pluginColorSchemes(
     const resolved = resolveScheme(parsed.scheme, "light");
 
     if (resolved.kind === "rejected") {
-      for (const diagnostic of resolved.diagnostics) {
-        onDiagnostic(diagnostic);
-      }
+      refusals.push(...resolved.diagnostics);
 
       continue;
     }
@@ -184,7 +187,7 @@ export function pluginColorSchemes(
     schemes.push(parsed.scheme);
   }
 
-  return schemes;
+  return { schemes, refusals };
 }
 
 /** Схема в выпадающем списке: секции нужны подписи, а не цвета. */

@@ -167,10 +167,9 @@ describe("applyAppearance", () => {
 
 describe("colour schemes brought by plugins", () => {
   const diagnosed = (contributions: ContributionRegistration[]) => {
-    const diagnostics: string[] = [];
-    const schemes = pluginColorSchemes(contributions, (diagnostic) => diagnostics.push(diagnostic));
+    const { schemes, refusals } = pluginColorSchemes(contributions);
 
-    return { schemes, diagnostics };
+    return { schemes, diagnostics: refusals };
   };
 
   it("parses a declared scheme and names it by the contribution identifier", () => {
@@ -279,7 +278,7 @@ describe("describeSchemes", () => {
         messages: { "appearance.scheme.midnight": "Полночь" },
       },
     ]);
-    const [scheme] = pluginColorSchemes([midnight], () => {});
+    const [scheme] = pluginColorSchemes([midnight]).schemes;
 
     expect(describeSchemes([scheme!], [midnight], named)).toEqual([
       { id: "themed.midnight", label: "Полночь" },
@@ -296,7 +295,7 @@ describe("describeSchemes", () => {
       "Midnight",
     );
     const contributions = [midnight, titled];
-    const schemes = pluginColorSchemes(contributions, () => {});
+    const { schemes } = pluginColorSchemes(contributions);
 
     expect(describeSchemes(schemes, contributions, translator())).toEqual([
       { id: "themed.midnight", label: "themed.midnight" },

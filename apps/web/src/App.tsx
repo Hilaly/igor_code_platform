@@ -257,10 +257,22 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const contributions = plugins.state.snapshot?.contributions;
-  const schemes = useMemo(
-    () => [...shippedSchemes, ...pluginColorSchemes(contributions ?? [], diagnostics.record)],
-    [contributions, diagnostics],
-  );
+  const declaredSchemes = useMemo(() => pluginColorSchemes(contributions ?? []), [contributions]);
+  const schemes = useMemo(() => [...shippedSchemes, ...declaredSchemes.schemes], [declaredSchemes]);
+  // Отвергнутая схема называется один раз, а не на каждый снимок плагинов: снимок приезжает на любое
+  // изменение любого плагина, а сломанная схема остаётся той же самой.
+  const namedRefusals = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const refusal of declaredSchemes.refusals) {
+      if (namedRefusals.current.has(refusal)) {
+        continue;
+      }
+
+      namedRefusals.current.add(refusal);
+      diagnostics.record(refusal);
+    }
+  }, [declaredSchemes, diagnostics]);
   // Каталоги плагинов идут после наших: побеждает последний объявивший сообщение (docs/ui-kit.md).
   const catalogs = useMemo(
     () => [...shippedCatalogs, ...pluginCatalogs(contributions ?? [])],
