@@ -150,6 +150,11 @@ const colorSchemeContributions = (
  * Схемы, приехавшие от плагинов (docs/plugins.md). Разбирает их кит: полнота палитры — его дело, а не
  * демона. Отвергнутая схема уходит диагностикой и просто не попадает в список: выбрать её нельзя,
  * потому что применить её нечем.
+ *
+ * Негодность проверяется дважды и обеими проверками кита: разбором документа и пробным разрешением.
+ * Второе нужно из-за мажора контракта токенов — `parseColorScheme` его не смотрит, а схема с чужим
+ * мажором не применится ни в одном варианте. Вариант здесь любой: отказ по мажору стоит до того, как
+ * `resolveScheme` возьмётся за палитру.
  */
 export function pluginColorSchemes(
   contributions: readonly ContributionRegistration[],
@@ -162,6 +167,16 @@ export function pluginColorSchemes(
 
     if (parsed.kind === "refused") {
       onDiagnostic(parsed.reason);
+
+      continue;
+    }
+
+    const resolved = resolveScheme(parsed.scheme, "light");
+
+    if (resolved.kind === "rejected") {
+      for (const diagnostic of resolved.diagnostics) {
+        onDiagnostic(diagnostic);
+      }
 
       continue;
     }

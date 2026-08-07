@@ -197,6 +197,23 @@ describe("colour schemes brought by plugins", () => {
     expect(diagnostics.join("\n")).toMatch(/themed.sparse has no surface/);
   });
 
+  it("keeps a scheme written for another token contract out of the list and says why", () => {
+    // Мажор чужой — значит схема не применится ни в одном варианте, и предлагать её нечестно:
+    // выбор молча оставил бы человека на встроенной схеме.
+    const { schemes, diagnostics } = diagnosed([
+      midnight,
+      colorScheme("ancient", {
+        tokenContract: tokenContractMajor - 1,
+        variants: { light: midnightPalette, dark: midnightPalette },
+      }),
+    ]);
+
+    expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.midnight"]);
+    expect(diagnostics.join("\n")).toMatch(
+      new RegExp(`themed.ancient declares token contract ${tokenContractMajor - 1}`),
+    );
+  });
+
   it("applies the scheme of a plugin and falls back to Imperium once the plugin is gone", () => {
     const preferences: AppearancePreferences = {
       appearance: { colorScheme: "themed.midnight", variant: "light", scale: "default" },
@@ -217,23 +234,21 @@ describe("colour schemes brought by plugins", () => {
     expect(withoutPlugin.diagnostics.join("\n")).toMatch(/no colour scheme themed.midnight/);
   });
 
-  it("refuses a scheme written for another token contract without losing its neighbours", () => {
-    const ancient = colorScheme("ancient", {
-      tokenContract: tokenContractMajor + 1,
-      variants: { light: midnightPalette, dark: midnightPalette },
-    });
-    const { schemes } = diagnosed([ancient]);
+  it("falls back to Imperium if a scheme with another token contract reaches applying anyway", () => {
+    // Вторая половина той же защиты: в список такая схема не попадает, но проверка при применении
+    // остаётся — она одна на схемы поставки и на чужие, и снимать её вслед за первой нельзя.
     const { written, diagnostics } = applied(
       {
         appearance: { colorScheme: "themed.ancient", variant: "light", scale: "default" },
         locale: "en",
       },
       false,
-      [...shippedSchemes, ...schemes],
+      [
+        ...shippedSchemes,
+        { ...oledScheme, id: "themed.ancient", tokenContract: tokenContractMajor + 1 },
+      ],
     );
 
-    // Форму демон принял, поэтому схема в списке есть; отвергает её кит, уже при применении.
-    expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.ancient"]);
     expect(written.get(rolePropertyName("pageSurface"))).toBe(
       imperiumScheme.variants.light.surface,
     );
