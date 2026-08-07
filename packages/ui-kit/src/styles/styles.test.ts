@@ -90,6 +90,17 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  it("keeps an idle tooltip out of scroll overflow until interaction reveals it", () => {
+    const tooltipCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),
+    );
+
+    expect(tooltipCss).toMatch(/\.tip\s*\{[^}]*display:\s*none;/s);
+    expect(tooltipCss).toMatch(
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+    );
+  });
+
   it("ships the approved voice, interface, and machine fonts locally", () => {
     const entry = readFileSync(join(kitRoot, "styles", "index.css"), "utf8");
     const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");

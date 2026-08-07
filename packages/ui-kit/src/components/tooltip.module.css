@@ -10,6 +10,7 @@
 .tip {
   position: absolute;
   z-index: var(--sovereign-z-overlay);
+  display: none;
   width: max-content;
   /* Предел строки подсказки, а не шаг отступа: дальше текст перестаёт читаться одним взглядом. */
   max-width: 16rem;
@@ -22,14 +23,12 @@
   line-height: var(--sovereign-line-height-normal);
   /* Пузырь не перехватывает мышь: иначе он загораживает то, к чему относится. */
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 /* Наведение на любой участок обёртки и фокус на любом её потомке — то же самое событие. */
 .wrap:hover > .tip,
 .wrap:focus-within > .tip {
-  opacity: 1;
+  display: block;
 }
 
 .top {
