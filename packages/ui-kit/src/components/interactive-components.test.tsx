@@ -184,12 +184,18 @@ describe("interactive components", () => {
 
       fireEvent.pointerEnter(project);
       const context = screen.getByRole("tooltip", { name: "Alpha" });
-      vi.spyOn(context, "getBoundingClientRect").mockReturnValue(rect({ width: 384, height: 180 }));
+      vi.spyOn(context, "getBoundingClientRect").mockImplementation(() =>
+        rect({ width: Number.parseFloat(context.style.width) || 384, height: 180 }),
+      );
       fireEvent(window, new Event("resize"));
 
       expect(context.style.left).toBe("324px");
       expect(context.style.width).toBe("268px");
       expect(context.style.top).toBe("172px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
+      fireEvent(window, new Event("resize"));
+      expect(context.style.width).toBe("384px");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
       Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });

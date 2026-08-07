@@ -151,6 +151,7 @@ export function Tree({
   const treeId = useId();
   const itemElements = useRef(new Map<string, HTMLDivElement>());
   const contextElement = useRef<HTMLDivElement | null>(null);
+  const contextNaturalWidth = useRef<number | undefined>(undefined);
   const contextCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [activeContext, setActiveContext] = useState<
     { node: TreeNode; anchor: HTMLElement } | undefined
@@ -167,6 +168,8 @@ export function Tree({
     if (node.context === undefined) return;
     cancelContextClose();
     const visibleRow = anchor.firstElementChild;
+    contextNaturalWidth.current = undefined;
+    setContextPosition(undefined);
     setActiveContext({
       node,
       anchor: visibleRow instanceof HTMLElement ? visibleRow : anchor,
@@ -189,7 +192,14 @@ export function Tree({
     const updatePosition = (): void => {
       const anchor = activeContext.anchor.getBoundingClientRect();
       const context = contextElement.current?.getBoundingClientRect();
-      const width = context?.width ?? 0;
+      const measuredWidth = context?.width ?? 0;
+      if (
+        contextNaturalWidth.current === undefined ||
+        (contextNaturalWidth.current === 0 && measuredWidth > 0)
+      ) {
+        contextNaturalWidth.current = measuredWidth;
+      }
+      const naturalWidth = contextNaturalWidth.current;
       const height = context?.height ?? 0;
       const viewportPadding = 8;
       const gap = 8;
@@ -199,7 +209,7 @@ export function Tree({
         Math.max(anchor.top, viewportPadding),
         Math.max(viewportPadding, window.innerHeight - height - viewportPadding),
       );
-      setContextPosition({ top, left, width: Math.min(width, availableWidth) });
+      setContextPosition({ top, left, width: Math.min(naturalWidth, availableWidth) });
     };
 
     updatePosition();
