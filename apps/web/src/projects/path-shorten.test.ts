@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shortenPath } from "./path-shorten.ts";
+import { shortenPath, shortenPathMiddle } from "./path-shorten.ts";
 
 describe("shortenPath", () => {
   it("returns a short path untouched", () => {
@@ -105,5 +105,25 @@ describe("shortenPath", () => {
     const long = "workspace/команда/модуль/проект";
 
     expect(shortenPath(long, 15)).toBe("…/модуль/проект");
+  });
+});
+
+describe("shortenPathMiddle", () => {
+  it("keeps a short path untouched", () => {
+    expect(shortenPathMiddle("/code/alpha", 20)).toBe("/code/alpha");
+  });
+
+  it("strictly keeps the start and end within twenty characters", () => {
+    const shortened = shortenPathMiddle("/Users/user/repos/sovereign_platform_node", 20);
+
+    expect(shortened).toBe("/Users/use…form_node");
+    expect(Array.from(shortened)).toHaveLength(20);
+  });
+
+  it("does not split Unicode surrogate pairs", () => {
+    const shortened = shortenPathMiddle("/Users/😀😀😀/sovereign_platform_node", 20);
+
+    expect(Array.from(shortened)).toHaveLength(20);
+    expect(shortened).not.toContain("�");
   });
 });

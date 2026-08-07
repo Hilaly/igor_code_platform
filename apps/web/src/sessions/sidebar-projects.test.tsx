@@ -59,6 +59,9 @@ const longSession: Session = {
   title: longSessionTitle,
 };
 
+const longFolder = "/Users/user/repos/sovereign_platform_node";
+const shortenedLongFolder = "/Users/use…form_node";
+
 const values = new Map<string, string>();
 const storage = {
   getItem: (key: string) => values.get(key) ?? null,
@@ -148,6 +151,24 @@ it("shows folder-led projects and contextual project and session facts", () => {
   expect(screen.getByRole("tooltip", { name: "Session A" })).toBeTruthy();
   expect(screen.getByText("Проект: Alpha")).toBeTruthy();
   expect(screen.getByText(/Создана/)).toBeTruthy();
+});
+
+it("shortens contextual paths to twenty characters and preserves the full value", () => {
+  values.clear();
+  show({
+    projects: [{ ...project, folder: longFolder, folderKey: longFolder }],
+    sessions: [{ ...session, folder: longFolder }],
+  });
+
+  const projectItem = screen.getByRole("treeitem", { name: "Alpha" });
+  fireEvent.pointerEnter(projectItem);
+  expect(screen.getByText(shortenedLongFolder).getAttribute("title")).toBe(longFolder);
+  expect(Array.from(shortenedLongFolder)).toHaveLength(20);
+
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+  const sessionItem = screen.getByRole("treeitem", { name: "Session A" });
+  fireEvent.pointerEnter(sessionItem);
+  expect(screen.getByText(shortenedLongFolder).getAttribute("title")).toBe(longFolder);
 });
 
 it("keeps truncated project and session names available to people and actions", () => {

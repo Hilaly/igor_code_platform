@@ -55,8 +55,17 @@ import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 import { Tree } from "./tree.tsx";
+import { TreeContextCardFact } from "./tree-context-card.tsx";
 
 describe("markup of the ported primitives", () => {
+  it("keeps a complete Tree context fact available when its text is shortened", () => {
+    const markup = renderToStaticMarkup(
+      <TreeContextCardFact title="/complete/project/folder">short path</TreeContextCardFact>,
+    );
+
+    expect(markup).toContain('title="/complete/project/folder"');
+  });
+
   it("keeps a contextual Tree icon decorative and the label as its accessible name", () => {
     const markup = renderToStaticMarkup(
       <Tree

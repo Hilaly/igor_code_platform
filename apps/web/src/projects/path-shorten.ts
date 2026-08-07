@@ -104,3 +104,18 @@ export function shortenPath(folder: string, max = 40): string {
 
   return shortened;
 }
+
+/** Строгое серединное усечение для тесных контекстных карточек. */
+export function shortenPathMiddle(folder: string, max = 40): string {
+  const characters = Array.from(folder);
+  if (characters.length <= max) return folder;
+  if (max <= 1) return ELLIPSIS;
+
+  const remaining = max - 1;
+  const headLength = Math.ceil(remaining / 2);
+  const tailLength = Math.floor(remaining / 2);
+
+  return `${characters.slice(0, headLength).join("")}${ELLIPSIS}${characters
+    .slice(-tailLength)
+    .join("")}`;
+}

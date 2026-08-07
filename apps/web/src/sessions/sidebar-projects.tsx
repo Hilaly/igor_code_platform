@@ -22,7 +22,10 @@ import {
 } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useState } from "react";
 
+import { shortenPathMiddle } from "../projects/path-shorten.ts";
+
 const expandedProjectsKey = "sovereign.sidebar.expanded-projects";
+const sidebarPathLength = 20;
 
 export type SidebarProjectsProps = {
   projects: Project[] | undefined;
@@ -231,7 +234,9 @@ export function SidebarProjects(props: SidebarProjectsProps) {
         <TreeContextCardFact>
           {t("projects.sessions.active", { count: project.sessionCount })}
         </TreeContextCardFact>
-        <TreeContextCardFact icon={<FolderIcon size="sm" />}>{project.folder}</TreeContextCardFact>
+        <TreeContextCardFact icon={<FolderIcon size="sm" />} title={project.folder}>
+          {shortenPathMiddle(project.folder, sidebarPathLength)}
+        </TreeContextCardFact>
       </TreeContextCard>
     ),
     children: (props.sessions ?? [])
@@ -254,8 +259,8 @@ export function SidebarProjects(props: SidebarProjectsProps) {
                 }),
               })}
             </TreeContextCardFact>
-            <TreeContextCardFact icon={<FolderIcon size="sm" />}>
-              {project.folder}
+            <TreeContextCardFact icon={<FolderIcon size="sm" />} title={project.folder}>
+              {shortenPathMiddle(project.folder, sidebarPathLength)}
             </TreeContextCardFact>
           </TreeContextCard>
         ),

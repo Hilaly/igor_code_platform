@@ -34,7 +34,7 @@
 - Consumes: the existing `TreeNode.context?: ReactNode`, portaled context layer, and `.row` element rendered as the first direct child of each `role="treeitem"`.
 - Produces: `{ top: number; left: number; width: number }` inline context geometry anchored from the visible row's `DOMRect`; a context card that can shrink to the wrapper width.
 
-- [ ] **Step 1: Write the failing geometry regression test**
+- [x] **Step 1: Write the failing geometry regression test**
 
 Add a test after the existing Tree context interaction test. Render one contextual node, enter its treeitem, then mock the visible row and tooltip rectangles:
 
@@ -59,7 +59,7 @@ expect(context.style.top).toBe("172px");
 
 Define a local `rect` test helper that fills all required `DOMRect` fields from partial numeric input. The production mutation this catches is measuring the `display: contents` treeitem or clamping `left` back over the row.
 
-- [ ] **Step 2: Run the target test and verify RED**
+- [x] **Step 2: Run the target test and verify RED**
 
 Run:
 
@@ -69,7 +69,7 @@ pnpm --filter @sovereign/ui-kit test -- src/components/interactive-components.te
 
 Expected: the new test fails because `left` is derived from the mocked zero-width treeitem and the layer does not receive the expected explicit width.
 
-- [ ] **Step 3: Implement minimal row measurement and right-side sizing**
+- [x] **Step 3: Implement minimal row measurement and right-side sizing**
 
 In `Tree`, resolve the context anchor from `event.currentTarget.firstElementChild` when it is an `HTMLDivElement`, falling back to the treeitem only when the row is absent. Keep the active context type as an HTML element anchor. In `updatePosition` calculate:
 
@@ -88,7 +88,7 @@ setContextPosition({ top, left, width });
 
 Update the context position state type to include `width`. In `tree-context-card.module.css`, make `.card` use `box-sizing: border-box`, `width: 100%`, `min-width: min(15rem, 100%)`, and `max-width: 100%` so its intrinsic minimum cannot overflow the sized portal wrapper. Do not alter the close timer or focus handlers.
 
-- [ ] **Step 4: Run UI-kit tests and verify GREEN**
+- [x] **Step 4: Run UI-kit tests and verify GREEN**
 
 Run:
 
@@ -98,7 +98,7 @@ pnpm --filter @sovereign/ui-kit test
 
 Expected: 206 or more UI-kit tests pass with zero failures and no new warnings.
 
-- [ ] **Step 5: Commit the geometry fix**
+- [x] **Step 5: Commit the geometry fix**
 
 ```bash
 git add packages/ui-kit/src/components/tree.tsx packages/ui-kit/src/components/tree.module.css packages/ui-kit/src/components/tree-context-card.module.css packages/ui-kit/src/components/interactive-components.test.tsx
@@ -126,7 +126,7 @@ git commit -m "fix(ui-kit): anchor tree context cards to rows"
 - Consumes: the unchanged `shortenPath(folder: string, max?: number): string` and both project/session `folder` values already present in snapshots.
 - Produces: `shortenPathMiddle(folder: string, max?: number): string`; `TreeContextCardFact({ icon?, title?, children })`; visible paths of at most 20 Unicode code points with full paths in `title`.
 
-- [ ] **Step 1: Write failing strict truncation tests**
+- [x] **Step 1: Write failing strict truncation tests**
 
 Add focused cases to `path-shorten.test.ts`:
 
@@ -152,7 +152,7 @@ describe("shortenPathMiddle", () => {
 
 Import `shortenPathMiddle` alongside `shortenPath`. The production mutation this catches is returning the existing soft limit when the final folder name alone exceeds 20 characters.
 
-- [ ] **Step 2: Write failing card title and sidebar path tests**
+- [x] **Step 2: Write failing card title and sidebar path tests**
 
 In `rendering.test.tsx`, render `<TreeContextCardFact title="/full/path">short</TreeContextCardFact>` and assert the fact text carries `title="/full/path"`.
 
@@ -166,7 +166,7 @@ expect(Array.from(visiblePath)).toHaveLength(20);
 
 Close the project card by moving to the session row before looking up the session value so the duplicate portaled path cannot make the query ambiguous.
 
-- [ ] **Step 3: Run targets and verify RED**
+- [x] **Step 3: Run targets and verify RED**
 
 Run:
 
@@ -177,7 +177,7 @@ pnpm --filter @sovereign/ui-kit test -- src/components/rendering.test.tsx
 
 Expected: compilation or assertions fail because `shortenPathMiddle` and the `title` prop do not exist and sidebar cards still render full paths.
 
-- [ ] **Step 4: Implement the minimal strict helper and title plumbing**
+- [x] **Step 4: Implement the minimal strict helper and title plumbing**
 
 Add this sibling helper in `path-shorten.ts` without changing `shortenPath`:
 
@@ -196,11 +196,11 @@ export function shortenPathMiddle(folder: string, max = 40): string {
 
 Extend `TreeContextCardFact` with `title?: string` and put it on `.factText`. Import `shortenPathMiddle` into `sidebar-projects.tsx`, define `const sidebarPathLength = 20`, and use `shortenPathMiddle(project.folder, sidebarPathLength)` for both project and session cards while passing `title={project.folder}`.
 
-- [ ] **Step 5: Update durable documentation**
+- [x] **Step 5: Update durable documentation**
 
 Update the sidebar paragraph in `docs/ui-kit.md` to state that context cards remain right-anchored, shrink into viewport space, and show a 20-character middle-shortened folder with the full value in `title`. Add this implementation plan next to its design entry in `docs/README.md`.
 
-- [ ] **Step 6: Format and run target tests GREEN**
+- [x] **Step 6: Format and run target tests GREEN**
 
 Run:
 
@@ -212,7 +212,7 @@ pnpm --filter @sovereign/ui-kit test -- src/components/rendering.test.tsx
 
 Expected: both web files and the UI-kit rendering target pass with zero failures.
 
-- [ ] **Step 7: Run full verification**
+- [x] **Step 7: Run full verification**
 
 Run:
 
@@ -227,7 +227,7 @@ make build
 
 Expected: every command exits 0; UI kit reports at least 206 passing tests, web reports at least 637 passing tests, and Vite produces the web build without new warnings.
 
-- [ ] **Step 8: Commit the path behavior and documentation**
+- [x] **Step 8: Commit the path behavior and documentation**
 
 ```bash
 git add apps/web/src/projects/path-shorten.ts apps/web/src/projects/path-shorten.test.ts apps/web/src/sessions/sidebar-projects.tsx apps/web/src/sessions/sidebar-projects.test.tsx packages/ui-kit/src/components/tree-context-card.tsx packages/ui-kit/src/components/rendering.test.tsx docs/ui-kit.md docs/README.md docs/superpowers

@@ -30,9 +30,11 @@ export function TreeContextCardHeader({
 
 export function TreeContextCardFact({
   icon,
+  title,
   children,
 }: {
   icon?: ReactNode;
+  title?: string;
   children: ReactNode;
 }): React.JSX.Element {
   return (
@@ -42,7 +44,9 @@ export function TreeContextCardFact({
           {icon}
         </span>
       )}
-      <span className={styles.factText}>{children}</span>
+      <span className={styles.factText} title={title}>
+        {children}
+      </span>
     </div>
   );
 }
