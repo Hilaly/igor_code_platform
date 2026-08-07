@@ -12,8 +12,15 @@
   align-items: center;
   gap: var(--sovereign-space-2);
   color: var(--sovereign-text);
-  font-size: var(--sovereign-font-size-sm);
   cursor: pointer;
+}
+
+.sm {
+  font-size: var(--sovereign-font-size-sm);
+}
+
+.xs {
+  font-size: var(--sovereign-font-size-xs);
 }
 
 .input {

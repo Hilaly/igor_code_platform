@@ -15,7 +15,6 @@ import type {
 } from "@sovereign/protocol";
 import {
   Badge,
-  Button,
   EmptyState,
   Notice,
   SettingsRow,
@@ -215,29 +214,41 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
           : onSwitch(status.key, { ...preferences, enabled: on })
       }
       label={t("plugins.toggle.plugin")}
+      size="xs"
       {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
     />
   );
   const contributions = [...snapshot.contributions, ...snapshot.switchedOffContributions].filter(
     (registration) => registration.ownership === "plugin" && registration.pluginKey === status.key,
   ).length;
+  const rowContents = (
+    <div className="plugins-row-controls">
+      <div className="plugins-row-meta">
+        <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+        <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
+      </div>
+      {pluginToggle}
+    </div>
+  );
   return (
     <div role="listitem">
-      <SettingsRow
-        label={status.id ?? status.key}
-        description={<Text tone="muted">{status.key}</Text>}
-      >
-        <div className="plugins-row-controls">
-          <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
-          <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
-          {pluginToggle}
-          {onOpen === undefined ? undefined : (
-            <Button size="sm" onClick={() => onOpen(status.key)}>
-              {t("plugins.detail.open")}
-            </Button>
-          )}
-        </div>
-      </SettingsRow>
+      {onOpen === undefined ? (
+        <SettingsRow
+          label={status.id ?? status.key}
+          description={<Text tone="muted">{status.key}</Text>}
+        >
+          {rowContents}
+        </SettingsRow>
+      ) : (
+        <SettingsRow
+          label={status.id ?? status.key}
+          description={<Text tone="muted">{status.key}</Text>}
+          onSelect={() => onOpen(status.key)}
+          selectLabel={`${t("plugins.detail.open")} ${status.id ?? status.key}`}
+        >
+          {rowContents}
+        </SettingsRow>
+      )}
     </div>
   );
 }

@@ -30,13 +30,28 @@
   min-width: 0;
 }
 
+.plugins-list > [role="listitem"] {
+  position: relative;
+}
+
 /* Обёртки сохраняют семантику списка, но соседние SettingsRow делят одну линию, как в Appearance. */
 .plugins-list > [role="listitem"] + [role="listitem"] > [role="group"],
 .plugin-detail-contributions > [role="listitem"] + [role="listitem"] > [role="group"] {
   border-block-start: 0;
 }
 
-.plugins-row-controls,
+.plugins-row-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.plugins-row-meta,
 .plugin-detail-contribution-controls {
   display: flex;
   align-items: center;
@@ -44,6 +59,10 @@
   flex-wrap: wrap;
   gap: var(--sovereign-space-2);
   min-width: 0;
+}
+
+.plugins-row-meta {
+  font-size: var(--sovereign-font-size-xs);
 }
 
 .plugin-detail-back {
@@ -78,6 +97,7 @@
 @container (width < 40rem) {
   .plugins-row-controls,
   .plugin-detail-contribution-controls {
+    align-items: flex-start;
     justify-content: flex-start;
   }
 }

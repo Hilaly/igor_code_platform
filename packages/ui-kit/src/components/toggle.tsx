@@ -15,11 +15,19 @@ export type ToggleProps = {
   disabled?: boolean;
   /** Почему выключено: у выключенного переключателя это единственное объяснение. */
   hint?: string;
+  size?: "sm" | "xs";
 };
 
-export function Toggle({ checked, onChange, label, disabled = false, hint }: ToggleProps) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  hint,
+  size = "sm",
+}: ToggleProps) {
   return (
-    <label className={styles.toggle} title={hint}>
+    <label className={`${styles.toggle} ${styles[size]}`} title={hint}>
       <input
         type="checkbox"
         className={styles.input}

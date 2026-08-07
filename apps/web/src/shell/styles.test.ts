@@ -282,4 +282,18 @@ describe("the style sheets of the application", () => {
     expect(settings).toMatch(/\.plugin-detail-rows[\s,]*\.plugin-detail-contributions\s*\{/s);
     expect(settings).toMatch(/\.plugin-detail-contribution-controls\s*\{[^}]*min-width:\s*0;/s);
   });
+
+  it("keeps the plugin list row target full-size and its metadata in two compact lines", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
+
+    expect(settings).toMatch(
+      /\.plugins-list\s*>\s*\[role="listitem"\]\s*\{[^}]*position:\s*relative;/s,
+    );
+    expect(settings).toMatch(
+      /\.plugins-row-controls\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
+    );
+    expect(settings).toMatch(
+      /\.plugins-row-meta\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-xs\);/s,
+    );
+  });
 });

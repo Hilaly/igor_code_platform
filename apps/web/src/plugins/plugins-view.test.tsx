@@ -50,7 +50,7 @@ const snapshot: PluginsSnapshot = {
   enablement: { "data:example": { enabled: true, disabledContributions: [] } },
 };
 
-it("presents a compact plugin row and opens the nested detail page", () => {
+it("opens the nested detail from the whole compact row but keeps its toggle independent", () => {
   const onSwitch = vi.fn();
   const onOpen = vi.fn();
   const { container } = render(
@@ -69,6 +69,7 @@ it("presents a compact plugin row and opens the nested detail page", () => {
   expect(within(row).getByText("Running")).toBeTruthy();
   expect(within(row).getByText("1 contribution")).toBeTruthy();
   expect(within(row).queryByText("Example action")).toBeNull();
+  expect(within(row).queryByText("Open")).toBeNull();
 
   const pluginToggle = within(row).getByRole("checkbox", { name: "Switched on" });
 
@@ -79,8 +80,9 @@ it("presents a compact plugin row and opens the nested detail page", () => {
     enabled: false,
     disabledContributions: [],
   });
+  expect(onOpen).not.toHaveBeenCalled();
 
-  fireEvent.click(within(row).getByRole("button", { name: "Open" }));
+  fireEvent.click(within(row).getByRole("button", { name: "Open example" }));
   expect(onOpen).toHaveBeenCalledWith("data:example");
 });
 

@@ -185,6 +185,13 @@ describe("stylesheets of the kit", () => {
       /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
     );
     expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
+    expect(settingsFrameCss).toMatch(/\.rowSelect\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/s);
+    expect(settingsFrameCss).toMatch(
+      /\.rowSelectable \.rowCopy,[\s\S]*?\.rowSelectable \.rowControl\s*\{[^}]*pointer-events:\s*none;/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /\.rowSelectable \.rowControl :is\([^}]+\)\s*\{[^}]*pointer-events:\s*auto;/s,
+    );
     expect(settingsFrameCss).toMatch(
       /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*\{[^}]*overflow-x:\s*auto;/s,
     );
