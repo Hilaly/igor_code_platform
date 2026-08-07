@@ -6,6 +6,7 @@
 
 import { isRuntimeHookName } from "@sovereign/agent-runtime-pi";
 import {
+  coreCatalogNamespace,
   coreEventNamespace,
   isHookCriticality,
   isPluginRouteMethod,
@@ -786,6 +787,43 @@ function programmaticRegistration(
     return { ...common, kind: "color-scheme", scheme };
   }
 
+  if (contribution.kind === "locale-catalog") {
+    // Чужой неймспейс запрещён: разрешить его потом можно, никого не сломав, а запретить потом —
+    // нельзя. Занять `core` вкладом плагин при этом не может, а прислать для него каталог — может.
+    if (contribution.namespace !== coreCatalogNamespace && contribution.namespace !== plugin.id) {
+      problems.push(
+        `the catalogue ${id} must name the namespace ${coreCatalogNamespace} or ${plugin.id}, got ${JSON.stringify(contribution.namespace)}`,
+      );
+      return undefined;
+    }
+
+    const locale = canonicalLocale(contribution.locale);
+
+    if (locale === undefined) {
+      problems.push(
+        `the catalogue ${id} must name a locale tag like "en" or "ru", got ${JSON.stringify(contribution.locale)}`,
+      );
+      return undefined;
+    }
+
+    const messages = stringMap(contribution.messages);
+
+    if (messages === undefined || Object.keys(messages).length === 0) {
+      problems.push(
+        `the catalogue ${id} must declare at least one message, and all of them strings`,
+      );
+      return undefined;
+    }
+
+    return {
+      ...common,
+      kind: "locale-catalog",
+      namespace: contribution.namespace,
+      locale,
+      messages,
+    };
+  }
+
   const instructions =
     typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
   if (instructions === "") {
@@ -839,6 +877,25 @@ function stringMap(value: unknown): Record<string, string> | undefined {
   return object !== undefined && Object.values(object).every((each) => typeof each === "string")
     ? (object as Record<string, string>)
     : undefined;
+}
+
+/**
+ * Годность тега локали знает `Intl`, а не наш шаблон: список тегов нам не принадлежит — тот же приём,
+ * что у `parseLocale` в настройках.
+ *
+ * Возвращается канонический тег, а не объявленный: `EO` и `eo` — один язык, и два вида одного тега
+ * дали бы в списке языков две строки, различить которые человеку нечем.
+ */
+function canonicalLocale(declared: unknown): string | undefined {
+  if (typeof declared !== "string") {
+    return undefined;
+  }
+
+  try {
+    return Intl.getCanonicalLocales(declared)[0];
+  } catch {
+    return undefined;
+  }
 }
 
 /**

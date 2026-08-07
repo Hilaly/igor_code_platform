@@ -207,6 +207,28 @@ export type ColorSchemeContributionRegistration = RegistrationCommon & {
   scheme: ColorSchemeDocument;
 };
 
+/**
+ * Неймспейс каталога сообщений, принадлежащий ядру (docs/ui-kit.md). Живёт в протоколе, а не в ките,
+ * потому что по нему принимает решение демон: занять этот неймспейс своим вкладом плагин не может, но
+ * **прислать для него каталог** может — так на платформе появляется новый язык интерфейса.
+ */
+export const coreCatalogNamespace = "core";
+
+/**
+ * Каталог сообщений, приехавший от плагина (docs/ui-kit.md). Как и цветовая схема, это **данные**:
+ * браузерного кода плагину для него не нужно вовсе.
+ *
+ * Неймспейс — либо `core`, либо идентификатор самого плагина. Чужой запрещён: разрешить его потом
+ * можно, никого не сломав, а запретить потом — нельзя.
+ */
+export type LocaleCatalogContributionRegistration = RegistrationCommon & {
+  kind: "locale-catalog";
+  namespace: string;
+  /** Канонический тег локали: годность тега знает `Intl`, а не наш шаблон. */
+  locale: string;
+  messages: Record<string, string>;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -216,7 +238,8 @@ export type ContributionRegistration =
   | HookSubscriptionContributionRegistration
   | RouteContributionRegistration
   | PublicRouteContributionRegistration
-  | ColorSchemeContributionRegistration;
+  | ColorSchemeContributionRegistration
+  | LocaleCatalogContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
@@ -234,6 +257,7 @@ const everyKind = {
   route: true,
   "public-route": true,
   "color-scheme": true,
+  "locale-catalog": true,
 } satisfies Record<ContributionKind, true>;
 
 /**

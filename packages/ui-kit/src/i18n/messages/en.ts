@@ -389,6 +389,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.kind.custom": "contribution",
     "plugins.kind.event": "event",
     "plugins.kind.hook": "subscription",
+    "plugins.kind.locale-catalog": "message catalogue",
     "plugins.kind.public-route": "public route",
     "plugins.kind.route": "route",
     "plugins.kind.skill": "skill",

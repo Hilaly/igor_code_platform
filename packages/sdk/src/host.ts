@@ -173,6 +173,22 @@ export type ColorSchemeContribution = {
   scheme: ColorSchemeDocument;
 };
 
+/**
+ * Объявление каталога сообщений (docs/ui-kit.md). Тоже данные и тоже без браузерного кода.
+ *
+ * Неймспейс объявляется явно, а не подставляется по идентичности плагина: `core` и свой неймспейс —
+ * это два разных намерения (заменить строку платформы либо назвать своё), и умолчание прятало бы
+ * выбор между ними в поведении SDK.
+ */
+export type LocaleCatalogContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  namespace: string;
+  locale: string;
+  messages: Record<string, string>;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
@@ -182,7 +198,8 @@ export type PluginContribution =
   | ({ kind: "tool" } & ToolContribution)
   | ({ kind: "route" } & RouteContribution)
   | ({ kind: "public-route" } & RouteContribution)
-  | ({ kind: "color-scheme" } & ColorSchemeContribution);
+  | ({ kind: "color-scheme" } & ColorSchemeContribution)
+  | ({ kind: "locale-catalog" } & LocaleCatalogContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

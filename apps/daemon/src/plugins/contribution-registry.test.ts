@@ -743,3 +743,106 @@ describe("the colour scheme, a contribution made of nothing but data", () => {
     );
   });
 });
+
+describe("the message catalogue, the second contribution made of nothing but data", () => {
+  const esperanto: PluginContribution = {
+    kind: "locale-catalog",
+    id: "core-eo",
+    namespace: "core",
+    locale: "eo",
+    messages: { "state.loading": "Ŝargado…" },
+  };
+
+  it("registers a catalogue for the namespace of the core: that is how a language appears", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(dataHello, [esperanto], nothingDisabled);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(outcome.registered, [
+      {
+        ownership: "plugin",
+        kind: "locale-catalog",
+        id: "hello.core-eo",
+        declaredId: "core-eo",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        namespace: "core",
+        locale: "eo",
+        messages: { "state.loading": "Ŝargado…" },
+      },
+    ]);
+  });
+
+  it("registers a catalogue for the namespace of the plugin itself", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [{ ...esperanto, id: "own", namespace: dataHello.id }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(ids(outcome.registered), ["hello.own"]);
+  });
+
+  it("refuses the namespace of somebody else, and names both it may have", () => {
+    const registry = createContributionRegistry();
+
+    // Разрешить чужой неймспейс потом можно, никого не сломав; запретить потом — уже нельзя.
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [{ ...esperanto, id: "stolen", namespace: "tracker" }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.registered, []);
+    assert.equal(outcome.problems.length, 1);
+    assert.match(outcome.problems[0] ?? "", /hello\.stolen must name the namespace core or hello/);
+  });
+
+  it("keeps the canonical tag, so one language does not become two entries", () => {
+    const registry = createContributionRegistry();
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [{ ...esperanto, id: "brazil", locale: "pt-br" }],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(outcome.problems, []);
+    assert.equal(
+      outcome.registered[0]?.kind === "locale-catalog" ? outcome.registered[0].locale : undefined,
+      "pt-BR",
+    );
+  });
+
+  it("refuses a broken catalogue and keeps its valid siblings", () => {
+    const registry = createContributionRegistry();
+
+    const broken = (id: string, fields: Record<string, unknown>): PluginContribution =>
+      ({ ...esperanto, id, ...fields }) as unknown as PluginContribution;
+
+    const outcome = registry.applyPlugin(
+      dataHello,
+      [
+        esperanto,
+        broken("nameless", { locale: "not a tag at all" }),
+        broken("numbered", { locale: 42 }),
+        // Пустой каталог для `core` добавил бы в выбор языков язык без единой переведённой строки.
+        broken("hollow", { messages: {} }),
+        broken("listed", { messages: ["Ŝargado…"] }),
+        broken("nested", { messages: { "state.loading": { text: "Ŝargado…" } } }),
+      ],
+      nothingDisabled,
+    );
+
+    assert.deepEqual(ids(outcome.registered), ["hello.core-eo"]);
+    assert.deepEqual(
+      outcome.problems.map((problem) => problem.split(" ")[2]),
+      ["hello.nameless", "hello.numbered", "hello.hollow", "hello.listed", "hello.nested"],
+    );
+  });
+});

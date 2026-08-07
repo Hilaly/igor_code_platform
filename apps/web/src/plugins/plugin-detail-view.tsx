@@ -263,12 +263,19 @@ function TechnicalData({
                   }
                 : registration.kind === "color-scheme"
                   ? registration.scheme
-                  : {
-                      model: registration.model,
-                      thinkingLevel: registration.thinkingLevel,
-                      tools: registration.tools,
-                      skills: registration.skills,
-                    };
+                  : registration.kind === "locale-catalog"
+                    ? // Сами сообщения не показываются: сотни строк в блоке кода — шум, а не данные.
+                      {
+                        namespace: registration.namespace,
+                        locale: registration.locale,
+                        messages: Object.keys(registration.messages).length,
+                      }
+                    : {
+                        model: registration.model,
+                        thinkingLevel: registration.thinkingLevel,
+                        tools: registration.tools,
+                        skills: registration.skills,
+                      };
   if (data === undefined) return undefined;
   return (
     <Disclosure

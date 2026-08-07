@@ -388,6 +388,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.kind.custom": "вклад",
     "plugins.kind.event": "событие",
     "plugins.kind.hook": "подписка",
+    "plugins.kind.locale-catalog": "каталог сообщений",
     "plugins.kind.public-route": "публичный маршрут",
     "plugins.kind.route": "маршрут",
     "plugins.kind.skill": "скил",

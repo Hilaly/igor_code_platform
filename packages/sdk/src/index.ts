@@ -14,6 +14,7 @@ import {
   type ColorSchemeContribution,
   type CustomContribution,
   type HookCriticality,
+  type LocaleCatalogContribution,
   type PluginLogLevel,
   type RouteContribution,
 } from "./host.ts";
@@ -35,6 +36,7 @@ export type {
   EventContribution,
   HookContribution,
   HookCriticality,
+  LocaleCatalogContribution,
   PayloadSchema,
   PluginContribution,
   PluginHost,
@@ -311,6 +313,14 @@ export const contribute = {
    */
   colorScheme: async (contribution: ColorSchemeContribution): Promise<void> =>
     currentPluginHost().contribute({ kind: "color-scheme", ...contribution }),
+
+  /**
+   * Объявить каталог сообщений (docs/ui-kit.md). Каталог для неймспейса `core` заменяет строки
+   * платформы — и добавляет платформе язык, если такого ещё нет; каталог для своего неймспейса
+   * называет строки самого плагина. Чужой неймспейс платформа не примет.
+   */
+  localeCatalog: async (contribution: LocaleCatalogContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "locale-catalog", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {
