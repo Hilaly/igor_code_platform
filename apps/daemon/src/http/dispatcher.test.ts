@@ -365,52 +365,69 @@ describe("createDispatcher", () => {
 });
 
 describe("the second source of table rows", () => {
+  it("keeps core routes and plugin routes apart under the shared /api root", async () => {
+    // Маршруты плагинов живут под `/api/p/`, потому что `/p/` целиком отдан их страницам
+    // (docs/ui-extension-model.md). Общий корень безопасен, пока `p` не второй сегмент маршрута
+    // ядра: за этим следит тест протокола, а здесь проверяется, что диспетчер их не путает.
+    const { call } = await serve([echo("/api/plugins/:key/preferences", "PUT")], {
+      pluginRoutes: () => [echo("/api/p/tasks/board/:id")],
+    });
+
+    const core = await call("PUT", "/api/plugins/tasks/preferences", "{}");
+    const plugin = await call("GET", "/api/p/tasks/board/7");
+
+    assert.deepEqual(JSON.parse(core.body).parameters, { key: "tasks" });
+    assert.deepEqual(JSON.parse(plugin.body).parameters, { id: "7" });
+  });
+
   it("prefers a literal segment over a parameter segment", async () => {
     const { call } = await serve([], {
       pluginRoutes: () => [
-        { ...echo("/p/tasks/items/:id"), access: "public" },
-        { ...echo("/p/tasks/items/new"), access: "public" },
+        { ...echo("/api/p/tasks/items/:id"), access: "public" },
+        { ...echo("/api/p/tasks/items/new"), access: "public" },
       ],
     });
 
-    const answer = await call("GET", "/p/tasks/items/new");
+    const answer = await call("GET", "/api/p/tasks/items/new");
 
     assert.deepEqual(JSON.parse(answer.body).parameters, {});
   });
 
   it("routes to a plugin route and stops routing to it once it is gone", async () => {
-    let routes: Route[] = [echo("/p/tasks/board")];
+    let routes: Route[] = [echo("/api/p/tasks/board")];
     const { call } = await serve([echo("/api/health")], { pluginRoutes: () => routes });
 
-    assert.equal((await call("GET", "/p/tasks/board")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/board")).status, 200);
 
     // Перезагруженный плагин уносит свои строки с собой: устаревший обработчик, который продолжает
     // отвечать, — худший исход (docs/web-api.md, «Почему так»).
     routes = [];
 
-    assert.equal((await call("GET", "/p/tasks/board")).status, 404);
+    assert.equal((await call("GET", "/api/p/tasks/board")).status, 404);
   });
 
   it("keeps the session check on an ordinary route of a plugin", async () => {
     const { call } = await serve([], {
       ...withoutSession,
-      pluginRoutes: () => [echo("/p/tasks/board")],
+      pluginRoutes: () => [echo("/api/p/tasks/board")],
     });
 
     // Защита не в обработчике, поэтому маршрут чужого кода не может оказаться незащищённым
     // случайно (docs/web-api.md).
-    assert.equal((await call("GET", "/p/tasks/board")).status, 401);
+    assert.equal((await call("GET", "/api/p/tasks/board")).status, 401);
   });
 
   it("answers a public route of a plugin without a session and without the form checks", async () => {
     const { call } = await serve([], {
       ...withoutSession,
-      pluginRoutes: () => [{ ...echo("/p/tasks/webhook", "POST"), access: "public", body: "raw" }],
+      pluginRoutes: () => [
+        { ...echo("/api/p/tasks/webhook", "POST"), access: "public", body: "raw" },
+      ],
     });
 
     // Ни cookie, ни `application/json`: у публичного маршрута нет сессии, которую эти проверки
     // защищают, а `content-type` чужого вебхука платформе не принадлежит.
-    const answer = await call("POST", "/p/tasks/webhook", "подписанный текст", {
+    const answer = await call("POST", "/api/p/tasks/webhook", "подписанный текст", {
       "content-type": "text/plain",
     });
 
@@ -501,14 +518,14 @@ describe("the second source of table rows", () => {
     const { call } = await serve([echo("/api/plugins", "PUT")], {
       bodyLimitBytes: 16,
       pluginRoutes: () => [
-        { ...echo("/p/tasks/webhook", "POST"), bodyLimitBytes: 1024, body: "raw" },
+        { ...echo("/api/p/tasks/webhook", "POST"), bodyLimitBytes: 1024, body: "raw" },
       ],
     });
 
     const long = "a".repeat(64);
 
     assert.equal((await call("PUT", "/api/plugins", JSON.stringify(long))).status, 413);
-    assert.equal((await call("POST", "/p/tasks/webhook", long)).status, 200);
+    assert.equal((await call("POST", "/api/p/tasks/webhook", long)).status, 200);
   });
 });
 

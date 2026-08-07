@@ -381,11 +381,17 @@ failed` в журнал ядра и до рантайма не доходит.
 хватает симлинка `node_modules/@sovereign/sdk` на `packages/sdk`.
 
 ```bash
-curl -b jar 'http://localhost:5273/p/routed/board/7?full=yes'   # 200, ответ плагина
-curl 'http://localhost:5273/p/routed/board/7'                    # 401: сессия нужна
+curl -b jar 'http://localhost:5273/api/p/routed/board/7?full=yes'   # 200, ответ плагина
+curl 'http://localhost:5273/api/p/routed/board/7'                    # 401: сессия нужна
 curl -X POST -H 'content-type: text/plain' -d 'тело' \
-  http://localhost:5273/p/routed/webhooks/github                 # 202: публичный, без сессии
+  http://localhost:5273/api/p/routed/webhooks/github                 # 202: публичный, без сессии
 ```
+
+Адрес — под `/api`, а не рядом с ним: корень `/p/` отдан браузерным страницам плагина
+([web-api.md](web-api.md)). Побочный итог переезда стоит проверить отдельно: в dev-режиме прокси Vite
+отправляет демону только `/api`, поэтому раньше маршрут плагина на `:5273` отвечал выдачей
+интерфейса, а не плагином. Те же три команды на порту dev-сервера теперь дают те же коды, что и на
+порту демона.
 
 Что стоит посмотреть, кроме кодов ответа:
 

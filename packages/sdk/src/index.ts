@@ -286,7 +286,7 @@ export const contribute = {
   },
 
   /**
-   * Объявить HTTP-маршрут (docs/web-api.md). Адрес — `/p/<id плагина>/<path>`; проверку сессии
+   * Объявить HTTP-маршрут (docs/web-api.md). Адрес — `/api/p/<id плагина>/<path>`; проверку сессии
    * ставит диспетчер, а не обработчик, поэтому обычный маршрут защищён по построению.
    */
   route: async (route: RouteDeclaration): Promise<void> => declareRoute("route", route),

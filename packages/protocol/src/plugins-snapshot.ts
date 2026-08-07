@@ -17,7 +17,7 @@ export const pluginsPath = "/api/plugins";
 /** Действующие plugin-owned вклады, спорящие за один метод и адрес. Ни один из них не отвечает. */
 export type PluginRouteConflict = {
   method: PluginRouteMethod;
-  /** Форма нормализованного пути вклада, без `/p/<pluginId>/`; все параметрические сегменты — `:`. */
+  /** Форма нормализованного пути вклада, без `/api/p/<pluginId>/`; все параметрические сегменты — `:`. */
   path: string;
   contributions: string[];
   /** Ключи источников, чтобы одинаковые id из разных project-контекстов различались. */

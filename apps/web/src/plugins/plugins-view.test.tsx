@@ -182,7 +182,9 @@ it("collects the routes open to the outside in one place", () => {
   );
 
   expect(screen.getByText("Open to the outside")).toBeTruthy();
-  expect(screen.getByText("POST /p/example/webhooks/github — example.github-webhook")).toBeTruthy();
+  expect(
+    screen.getByText("POST /api/p/example/webhooks/github — example.github-webhook"),
+  ).toBeTruthy();
   // Обычный маршрут наружу не открыт, а выключенный публичный не отвечает вовсе: ни того, ни
   // другого в списке открытого быть не должно.
   expect(screen.queryByText(/\/p\/example\/board/)).toBeNull();
@@ -279,8 +281,8 @@ it("keeps same-id routes from different project sources distinct", () => {
     />,
   );
 
-  expect(screen.getByText("POST /p/example/hooks/p1 — example.hook")).toBeTruthy();
-  expect(screen.getByText("POST /p/example/hooks/p2 — example.hook")).toBeTruthy();
+  expect(screen.getByText("POST /api/p/example/hooks/p1 — example.hook")).toBeTruthy();
+  expect(screen.getByText("POST /api/p/example/hooks/p2 — example.hook")).toBeTruthy();
   expect(error).not.toHaveBeenCalledWith(expect.stringContaining("same key"));
   error.mockRestore();
 });

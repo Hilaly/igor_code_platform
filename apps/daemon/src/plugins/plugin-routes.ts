@@ -10,7 +10,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import type { ContributionRegistration } from "@sovereign/protocol";
+import { pluginRouteAddress, type ContributionRegistration } from "@sovereign/protocol";
 import type { PluginRouteRequest, PluginRouteResponse } from "@sovereign/sdk";
 
 import type { ContributionRegistry } from "./contribution-registry.ts";
@@ -154,7 +154,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
 
     return {
       method: registration.method,
-      path: pathOf(registration),
+      path: pluginRouteAddress(registration.pluginId, registration.path),
       ...(open ? { access: "public" as const } : {}),
       // Тело не разбирается как json: его форму знает автор маршрута, а вебхук приносит что угодно.
       body: "raw",
@@ -183,7 +183,7 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
           plugin: registration.pluginKey,
           contribution: registration.id,
           method: registration.method,
-          path: pathOf(registration),
+          path: pluginRouteAddress(registration.pluginId, registration.path),
           access: open ? "public" : "session",
           ...(open ? { caller } : {}),
         });
@@ -376,15 +376,8 @@ export function createPluginRoutes(options: CreatePluginRoutesOptions): PluginRo
   };
 }
 
-/** Адрес маршрута: `/p/<id плагина>/<путь>`. Пустой путь — сам плагин, и это законный адрес. */
-function pathOf(registration: RouteRegistration): string {
-  return registration.path === ""
-    ? `/p/${registration.pluginId}`
-    : `/p/${registration.pluginId}/${registration.path}`;
-}
-
 function pathShape(registration: RouteRegistration): string {
-  const path = pathOf(registration);
+  const path = pluginRouteAddress(registration.pluginId, registration.path);
 
   return path
     .split("/")
