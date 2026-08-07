@@ -10,18 +10,17 @@ import {
   interfaceScales,
   type AppearancePreferences,
 } from "@sovereign/protocol";
-import {
-  Button,
-  Notice,
-  Select,
-  SettingsRow,
-  type ColorScheme,
-  type ScopedTranslator,
-} from "@sovereign/ui-kit";
+import { Button, Notice, Select, SettingsRow, type ScopedTranslator } from "@sovereign/ui-kit";
+
+import type { SchemeChoice } from "../appearance.ts";
 
 export type AppearanceSectionProps = {
   preferences: AppearancePreferences;
-  schemes: readonly ColorScheme[];
+  /**
+   * Уже подписанные схемы: подпись схемы плагина берётся из его каталога и названия вклада
+   * (docs/plugins.md), и второй способ её вычислить разошёлся бы с первым.
+   */
+  schemes: readonly SchemeChoice[];
   locales: string[];
   onChange: (preferences: AppearancePreferences) => void;
   /** Отказ записи: файл на диске правил кто-то ещё, и это дело человека, а не повтора запроса. */
@@ -47,10 +46,7 @@ export function AppearanceSection({
           label=""
           ariaLabel={t("appearance.scheme")}
           value={preferences.appearance.colorScheme}
-          options={schemes.map((scheme) => ({
-            value: scheme.id,
-            label: t(`appearance.scheme.${scheme.id}`),
-          }))}
+          options={schemes.map((scheme) => ({ value: scheme.id, label: scheme.label }))}
           onChange={(colorScheme) =>
             onChange({ ...preferences, appearance: { ...preferences.appearance, colorScheme } })
           }

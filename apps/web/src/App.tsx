@@ -30,7 +30,9 @@ import {
   applyAppearance,
   cacheAppearance,
   defaultAppearancePreferences,
+  describeSchemes,
   fetchAppearance,
+  pluginColorSchemes,
   readCachedAppearance,
   shippedSchemes,
   writeAppearance,
@@ -146,19 +148,6 @@ export function App() {
   useEffect(() => {
     writeLayout(localStorage, layout);
   }, [layout]);
-
-  // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
-  // дерева, поэтому переключение стоит одинаково на пустой странице и на полной (docs/ui-kit.md).
-  useEffect(() => {
-    applyAppearance({
-      preferences,
-      prefersDark,
-      target: document.documentElement.style,
-      root: document.documentElement,
-      onDiagnostic: diagnostics.record,
-    });
-    cacheAppearance(localStorage, preferences);
-  }, [preferences, prefersDark, diagnostics]);
 
   useEffect(() => {
     const query = matchMedia("(prefers-color-scheme: dark)");
@@ -276,6 +265,28 @@ export function App() {
   }, [stream]);
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
+  const contributions = plugins.state.snapshot?.contributions;
+  const schemes = useMemo(
+    () => [...shippedSchemes, ...pluginColorSchemes(contributions ?? [], diagnostics.record)],
+    [contributions, diagnostics],
+  );
+
+  // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
+  // дерева, поэтому переключение стоит одинаково на пустой странице и на полной (docs/ui-kit.md).
+  useEffect(() => {
+    applyAppearance({
+      preferences,
+      prefersDark,
+      schemes,
+      target: document.documentElement.style,
+      root: document.documentElement,
+      // Пока снимок плагинов не приехал, схемы плагина ещё нет ни в одном списке, и жалоба на её
+      // отсутствие была бы ложной — на каждой загрузке страницы, у каждого, кто её выбрал.
+      onDiagnostic: contributions === undefined ? () => {} : diagnostics.record,
+    });
+    cacheAppearance(localStorage, preferences);
+  }, [preferences, prefersDark, diagnostics, schemes, contributions]);
+
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
   const fileResources = useFileResources(
     page.kind === "settings-project" ? page.projectId : undefined,
@@ -732,7 +743,7 @@ export function App() {
             appearance={
               <AppearanceSection
                 preferences={preferences}
-                schemes={shippedSchemes}
+                schemes={describeSchemes(schemes, contributions ?? [], translator)}
                 locales={shippedLocales}
                 onChange={change}
                 refusal={refusal}

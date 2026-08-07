@@ -10,12 +10,14 @@ import {
   applyRoles,
   applyScale,
   imperiumScheme,
+  parseColorScheme,
   resolveScheme,
   shippedSchemes,
   type ColorScheme,
   type PaletteVariant,
   type ScaleTarget,
   type StyleTarget,
+  type Translator,
 } from "@sovereign/ui-kit";
 import {
   defaultAppearance,
@@ -24,6 +26,7 @@ import {
   preferencesPath,
   type AppearancePreferences,
   type AppearanceVariant,
+  type ContributionRegistration,
 } from "@sovereign/protocol";
 
 /** Схемы поставки перечисляет кит: он же их и объявляет (docs/ui-kit.md). */
@@ -132,6 +135,76 @@ export function applyAppearance(options: ApplyAppearanceOptions): void {
   }
 
   applyRoles(resolved.roles, options.target);
+}
+
+type ColorSchemeRegistration = Extract<ContributionRegistration, { kind: "color-scheme" }>;
+
+const colorSchemeContributions = (
+  contributions: readonly ContributionRegistration[],
+): ColorSchemeRegistration[] =>
+  contributions.filter(
+    (registration): registration is ColorSchemeRegistration => registration.kind === "color-scheme",
+  );
+
+/**
+ * Схемы, приехавшие от плагинов (docs/plugins.md). Разбирает их кит: полнота палитры — его дело, а не
+ * демона. Отвергнутая схема уходит диагностикой и просто не попадает в список: выбрать её нельзя,
+ * потому что применить её нечем.
+ */
+export function pluginColorSchemes(
+  contributions: readonly ContributionRegistration[],
+  onDiagnostic: (diagnostic: string) => void,
+): ColorScheme[] {
+  const schemes: ColorScheme[] = [];
+
+  for (const registration of colorSchemeContributions(contributions)) {
+    const parsed = parseColorScheme(registration.id, registration.scheme);
+
+    if (parsed.kind === "refused") {
+      onDiagnostic(parsed.reason);
+
+      continue;
+    }
+
+    schemes.push(parsed.scheme);
+  }
+
+  return schemes;
+}
+
+/** Схема в выпадающем списке: секции нужны подписи, а не цвета. */
+export type SchemeChoice = { id: string; label: string };
+
+/**
+ * Подписывает схемы для выбора. У схемы поставки подпись всегда наша, а у схемы плагина её может не
+ * быть вовсе, поэтому ступеней три: перевод из каталога плагина в его неймспейсе → название вклада →
+ * идентификатор. Идентификатор виден человеку и без каталога, и без названия — это хуже названия, но
+ * лучше пустой строки в списке.
+ */
+export function describeSchemes(
+  schemes: readonly ColorScheme[],
+  contributions: readonly ContributionRegistration[],
+  translator: Translator,
+): SchemeChoice[] {
+  const declared = new Map(
+    colorSchemeContributions(contributions).map((registration) => [registration.id, registration]),
+  );
+
+  return schemes.map((scheme) => {
+    const registration = declared.get(scheme.id);
+
+    if (registration === undefined) {
+      return { id: scheme.id, label: translator.t(`appearance.scheme.${scheme.id}`) };
+    }
+
+    const pluginNamespace =
+      registration.ownership === "plugin" ? registration.pluginId : registration.source;
+    const translated = translator
+      .scope(pluginNamespace)
+      .optional(`appearance.scheme.${registration.declaredId}`);
+
+    return { id: scheme.id, label: translated ?? registration.title ?? registration.id };
+  });
 }
 
 export async function fetchAppearance(): Promise<AppearancePreferences> {

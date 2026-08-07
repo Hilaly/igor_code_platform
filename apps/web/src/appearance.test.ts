@@ -2,16 +2,32 @@ import {
   builtInColorScheme,
   interfaceScales,
   type AppearancePreferences,
+  type ContributionRegistration,
 } from "@sovereign/protocol";
-import { imperiumScheme, rolePropertyName, scaleAttributeName } from "@sovereign/ui-kit";
+import {
+  coreEnglish,
+  coreNamespace,
+  coreRussian,
+  createTranslator,
+  imperiumScheme,
+  oledScheme,
+  rolePropertyName,
+  scaleAttributeName,
+  tokenContractMajor,
+  type CatalogRegistration,
+  type ColorScheme,
+} from "@sovereign/ui-kit";
 import { describe, expect, it } from "vitest";
 
 import {
   applyAppearance,
   cacheAppearance,
   defaultAppearancePreferences,
+  describeSchemes,
+  pluginColorSchemes,
   readCachedAppearance,
   resolveVariant,
+  shippedSchemes,
   type PreferencesCache,
 } from "./appearance.ts";
 
@@ -26,7 +42,11 @@ function cache(initial?: string): PreferencesCache {
   };
 }
 
-function applied(preferences: AppearancePreferences, prefersDark = false) {
+function applied(
+  preferences: AppearancePreferences,
+  prefersDark = false,
+  schemes?: readonly ColorScheme[],
+) {
   const written = new Map<string, string>();
   const attributes = new Map<string, string>();
   const diagnostics: string[] = [];
@@ -34,6 +54,7 @@ function applied(preferences: AppearancePreferences, prefersDark = false) {
   applyAppearance({
     preferences,
     prefersDark,
+    ...(schemes === undefined ? {} : { schemes }),
     target: { setProperty: (property, value) => void written.set(property, value) },
     root: { setAttribute: (name, value) => void attributes.set(name, value) },
     onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
@@ -41,6 +62,35 @@ function applied(preferences: AppearancePreferences, prefersDark = false) {
 
   return { written, attributes, diagnostics };
 }
+
+// Палитра берётся у схемы поставки, а не пишется литералами: цвет в этих файлах запрещён линтером
+// (docs/ui-kit.md), а для проверки важно лишь то, что она не совпадает со встроенной.
+const midnightPalette: Record<string, string> = oledScheme.variants.dark;
+
+const colorScheme = (
+  declaredId: string,
+  scheme: {
+    tokenContract: number;
+    variants: Record<string, Record<string, string>>;
+    roleOverrides?: Record<string, string>;
+  },
+  title?: string,
+): ContributionRegistration => ({
+  ownership: "plugin",
+  kind: "color-scheme",
+  id: `themed.${declaredId}`,
+  declaredId,
+  pluginKey: "data:themed",
+  pluginId: "themed",
+  source: "data",
+  ...(title === undefined ? {} : { title }),
+  scheme,
+});
+
+const midnight = colorScheme("midnight", {
+  tokenContract: tokenContractMajor,
+  variants: { light: midnightPalette, dark: midnightPalette },
+});
 
 describe("resolveVariant", () => {
   it("takes the system variant from what the system asks for", () => {
@@ -112,6 +162,131 @@ describe("applyAppearance", () => {
     });
 
     expect(attributes.get(scaleAttributeName)).toBe("larger");
+  });
+});
+
+describe("colour schemes brought by plugins", () => {
+  const diagnosed = (contributions: ContributionRegistration[]) => {
+    const diagnostics: string[] = [];
+    const schemes = pluginColorSchemes(contributions, (diagnostic) => diagnostics.push(diagnostic));
+
+    return { schemes, diagnostics };
+  };
+
+  it("parses a declared scheme and names it by the contribution identifier", () => {
+    const { schemes, diagnostics } = diagnosed([midnight]);
+
+    expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.midnight"]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("keeps a scheme with an incomplete palette out of the list and says why", () => {
+    const incomplete = Object.fromEntries(
+      Object.entries(midnightPalette).filter(([key]) => key !== "surface"),
+    );
+    const { schemes, diagnostics } = diagnosed([
+      midnight,
+      colorScheme("sparse", {
+        tokenContract: tokenContractMajor,
+        variants: { light: incomplete, dark: midnightPalette },
+      }),
+    ]);
+
+    // Выбрать её нельзя, потому что применить её нечем: неполная палитра дала бы сломанный CSS.
+    expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.midnight"]);
+    expect(diagnostics.join("\n")).toMatch(/themed.sparse has no surface/);
+  });
+
+  it("applies the scheme of a plugin and falls back to Imperium once the plugin is gone", () => {
+    const preferences: AppearancePreferences = {
+      appearance: { colorScheme: "themed.midnight", variant: "light", scale: "default" },
+      locale: "en",
+    };
+    const { schemes } = diagnosed([midnight]);
+
+    const withPlugin = applied(preferences, false, [...shippedSchemes, ...schemes]);
+    const withoutPlugin = applied(preferences, false, shippedSchemes);
+
+    expect(withPlugin.written.get(rolePropertyName("pageSurface"))).toBe(midnightPalette.surface);
+    expect(withPlugin.diagnostics).toEqual([]);
+    expect(withoutPlugin.written.get(rolePropertyName("pageSurface"))).toBe(
+      imperiumScheme.variants.light.surface,
+    );
+    // Настройка при этом не переписывается: включённый обратно плагин обязан вернуть цвета.
+    expect(preferences.appearance.colorScheme).toBe("themed.midnight");
+    expect(withoutPlugin.diagnostics.join("\n")).toMatch(/no colour scheme themed.midnight/);
+  });
+
+  it("refuses a scheme written for another token contract without losing its neighbours", () => {
+    const ancient = colorScheme("ancient", {
+      tokenContract: tokenContractMajor + 1,
+      variants: { light: midnightPalette, dark: midnightPalette },
+    });
+    const { schemes } = diagnosed([ancient]);
+    const { written, diagnostics } = applied(
+      {
+        appearance: { colorScheme: "themed.ancient", variant: "light", scale: "default" },
+        locale: "en",
+      },
+      false,
+      [...shippedSchemes, ...schemes],
+    );
+
+    // Форму демон принял, поэтому схема в списке есть; отвергает её кит, уже при применении.
+    expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.ancient"]);
+    expect(written.get(rolePropertyName("pageSurface"))).toBe(
+      imperiumScheme.variants.light.surface,
+    );
+    expect(diagnostics.join("\n")).toMatch(/token contract/);
+  });
+});
+
+describe("describeSchemes", () => {
+  const translator = (extra: CatalogRegistration[] = []) =>
+    createTranslator({
+      locale: "en",
+      namespace: coreNamespace,
+      catalogs: [coreEnglish, coreRussian, ...extra],
+      onDiagnostic: () => {},
+    });
+
+  it("calls a shipped scheme by our own catalog", () => {
+    expect(describeSchemes([imperiumScheme], [], translator())).toEqual([
+      { id: imperiumScheme.id, label: coreEnglish.messages[`appearance.scheme.imperium`] },
+    ]);
+  });
+
+  it("prefers the catalog of the plugin in its own namespace", () => {
+    const named = translator([
+      {
+        namespace: "themed",
+        locale: "en",
+        messages: { "appearance.scheme.midnight": "Полночь" },
+      },
+    ]);
+    const [scheme] = pluginColorSchemes([midnight], () => {});
+
+    expect(describeSchemes([scheme!], [midnight], named)).toEqual([
+      { id: "themed.midnight", label: "Полночь" },
+    ]);
+  });
+
+  it("falls back to the title of the contribution, and then to its identifier", () => {
+    const titled = colorScheme(
+      "titled",
+      {
+        tokenContract: tokenContractMajor,
+        variants: { light: midnightPalette, dark: midnightPalette },
+      },
+      "Midnight",
+    );
+    const contributions = [midnight, titled];
+    const schemes = pluginColorSchemes(contributions, () => {});
+
+    expect(describeSchemes(schemes, contributions, translator())).toEqual([
+      { id: "themed.midnight", label: "themed.midnight" },
+      { id: "themed.titled", label: "Midnight" },
+    ]);
   });
 });
 

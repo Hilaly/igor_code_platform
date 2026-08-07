@@ -127,6 +127,24 @@ describe("createTranslator", () => {
     expect(kit.t("plugins.count", { count: 11 })).toBe("11 плагинов");
   });
 
+  it("says nothing about an optional key no locale has", () => {
+    const kit = translator("en");
+
+    // Название схемы плагин вправе не переводить (docs/plugins.md): `t` вернул бы сам ключ и написал
+    // ложную диагностику о дырке в переводе.
+    expect(kit.scope("themed").optional("appearance.scheme.midnight")).toBeUndefined();
+    expect(kit.diagnostics).toEqual([]);
+  });
+
+  it("still reports an optional key that one locale has and another does not", () => {
+    const kit = translator("ru", [
+      { namespace: "themed", locale: "en", messages: { "appearance.scheme.midnight": "Midnight" } },
+    ]);
+
+    expect(kit.scope("themed").optional("appearance.scheme.midnight")).toBe("Midnight");
+    expect(kit.diagnostics.join("\n")).toMatch(/themed:ru has no translation/);
+  });
+
   it("formats numbers and dates in the chosen locale", () => {
     const russian = translator("ru");
     const english = translator("en");
