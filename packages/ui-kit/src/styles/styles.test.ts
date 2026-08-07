@@ -49,6 +49,47 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("defines the animated switch track, thumb, sizes, and motion fallback", () => {
+    const toggleCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "toggle.module.css"), "utf8"),
+    );
+
+    expect(toggleCss).toMatch(
+      /\.box\s*\{[^}]*display:\s*inline-flex;[^}]*border-radius:\s*var\(--sovereign-radius-full\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.box::after\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-full\);/s,
+    );
+    expect(toggleCss).toContain('content: "";');
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box\s*\{[^}]*background:\s*var\(--sovereign-accent\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box\s*\{[^}]*border-color:\s*var\(--sovereign-accent-border\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box::after\s*\{[^}]*transform:\s*translateX\(var\(--toggle-thumb-translate\)\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:focus-visible\s*\+\s*\.box\s*\{[^}]*outline:\s*var\(--sovereign-stroke-emphasis\)\s+solid\s+var\(--sovereign-focus-ring\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.toggle:has\(\.input:disabled\)\s*\{[^}]*opacity:[^}]*cursor:\s*not-allowed;/s,
+    );
+    expect(toggleCss).toMatch(
+      /transition:[^;]*(?:background|border-color)[\s\S]*?var\(--sovereign-duration-fast\)[\s\S]*?var\(--sovereign-ease-out\)/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.sm\s*\{[^}]*--toggle-track-width:[^}]*--toggle-track-height:[^}]*--toggle-thumb-size:[^}]*font-size:/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.xs\s*\{[^}]*--toggle-track-width:[^}]*--toggle-track-height:[^}]*--toggle-thumb-size:[^}]*font-size:/s,
+    );
+    expect(toggleCss).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.box[\s\S]*?transition:\s*none;/s,
+    );
+  });
+
   it("ships the approved voice, interface, and machine fonts locally", () => {
     const entry = readFileSync(join(kitRoot, "styles", "index.css"), "utf8");
     const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");

@@ -108,6 +108,12 @@ export const Controls = () => {
     <div style={column}>
       <Toggle checked={enabled} onChange={setEnabled} label="Плагин включён" />
       <Toggle
+        checked={enabled}
+        onChange={setEnabled}
+        label="Плагин включён (подсказка)"
+        labelDisplay="tooltip"
+      />
+      <Toggle
         checked={false}
         onChange={() => {}}
         label="Недоступен: манифест не прочитан"
