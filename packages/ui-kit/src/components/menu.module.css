@@ -79,15 +79,14 @@
 }
 .menu.portal {
   position: fixed;
-  top: var(--menu-top, auto);
-  left: var(--menu-left, auto);
+  top: auto;
+  left: auto;
   width: max-content;
   min-width: 0;
   max-width: calc(100vw - var(--sovereign-space-4));
   margin-top: var(--sovereign-space-1);
 }
 .menu.portal.above {
-  top: var(--menu-top, auto);
   bottom: auto;
   margin-top: calc(var(--sovereign-space-1) * -1);
 }

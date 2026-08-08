@@ -414,6 +414,17 @@ describe("stylesheets of the kit", () => {
     expect(nextTurnCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 
+  it("leaves compact Menu portal coordinates to the inline positioning contract", () => {
+    const menuCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "menu.module.css"), "utf8"),
+    );
+
+    expect(menuCss).toMatch(
+      /\.menu\.portal\s*\{[^}]*position:\s*fixed;[^}]*top:\s*auto;[^}]*left:\s*auto;/s,
+    );
+    expect(menuCss).not.toMatch(/var\(--menu-(?:top|left)/);
+  });
+
   it("keeps shared application states flat and elevates only overlays", () => {
     const dialogCss = withoutComments(
       readFileSync(join(kitRoot, "components", "dialog.module.css"), "utf8"),
