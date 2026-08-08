@@ -161,6 +161,22 @@ it("keeps stale and write-failure notices visible on the detail route", () => {
   expect(screen.getByText("The choice was not written: write failed")).toBeTruthy();
 });
 
+it("shows a stale warning while the first detail snapshot is still loading", () => {
+  render(
+    <PluginDetailView
+      state={{ stale: true }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("What you see may be out of date")).toBeTruthy();
+  expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
+  expect(screen.getByText("Loading…")).toBeTruthy();
+});
+
 it("names the kind of a public route and shows the address it answers at", () => {
   const withRoute: PluginsSnapshot = {
     ...snapshot,

@@ -61,6 +61,11 @@ export function PluginDetailView({
     return (
       <div className="plugin-detail">
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
