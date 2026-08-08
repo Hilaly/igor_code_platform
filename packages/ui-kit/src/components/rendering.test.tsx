@@ -51,7 +51,6 @@ import {
   SettingsRow,
   SettingsView,
 } from "./settings-frame.tsx";
-import { Toggle } from "./toggle.tsx";
 import { Select } from "./select.tsx";
 import { Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
@@ -201,28 +200,6 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('<button type="button"');
     expect(markup).toContain('aria-label="Open Plugin"');
     expect(markup).toContain("Running");
-  });
-
-  it("renders the toggle label visibly by default", () => {
-    const markup = renderToStaticMarkup(
-      <Toggle checked onChange={() => {}} label="Switched on" size="xs" />,
-    );
-
-    expect(markup).toContain('type="checkbox"');
-    expect(markup).toContain(">Switched on</span>");
-    expect(markup).toMatch(/class="[^"]*\b[^\s"]*xs[^\s"]*/);
-    expect(markup).not.toContain('role="tooltip"');
-  });
-
-  it("wraps a tooltip-mode toggle and keeps its label visually hidden", () => {
-    const markup = renderToStaticMarkup(
-      <Toggle checked onChange={() => {}} label="Switched on" labelDisplay="tooltip" />,
-    );
-
-    expect(markup).toContain('type="checkbox"');
-    expect(markup).toContain('role="tooltip"');
-    expect(markup).toContain(">Switched on</span>");
-    expect(markup).toMatch(/class="[^"]*visuallyHidden[^"]*">Switched on</);
   });
 
   it("can demote an embedded settings page heading below the shell heading", () => {

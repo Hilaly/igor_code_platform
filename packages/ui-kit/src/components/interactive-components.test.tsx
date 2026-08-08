@@ -120,7 +120,7 @@ describe("interactive components", () => {
   });
 
   it.each(["visible", "tooltip"] as const)(
-    "names the %s-label toggle with its required label",
+    "names the %s-label toggle and exposes a tooltip only when requested",
     (labelDisplay) => {
       render(
         <Toggle
@@ -132,6 +132,7 @@ describe("interactive components", () => {
       );
 
       expect(screen.getByRole("checkbox", { name: "Enable provider" })).toBeTruthy();
+      expect(document.querySelector('[role="tooltip"]') !== null).toBe(labelDisplay === "tooltip");
     },
   );
 
@@ -223,11 +224,15 @@ describe("interactive components", () => {
     );
   });
 
-  it("names a status dot without exposing its color as meaning", () => {
-    render(<StatusDot tone="positive" label="Демон подключён" />);
+  it.each([
+    ["positive", "Daemon connected"],
+    ["pending", "Daemon reconnecting"],
+    ["danger", "Daemon unavailable"],
+  ] as const)("names the %s status dot without exposing color as meaning", (tone, label) => {
+    render(<StatusDot tone={tone} label={label} />);
 
-    const dot = screen.getByRole("status", { name: "Демон подключён" });
-    expect(dot.getAttribute("title")).toBe("Демон подключён");
+    const dot = screen.getByRole("status", { name: label });
+    expect(dot.getAttribute("title")).toBe(label);
   });
 
   it("keeps Tree actions independent from row selection", () => {
