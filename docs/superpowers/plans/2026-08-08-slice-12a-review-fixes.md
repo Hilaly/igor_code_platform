@@ -25,11 +25,13 @@ Prettier, Make.
 ### Task 1: Сохранить неизвестные поля PUT
 
 **Files:**
+
 - Modify: `apps/daemon/src/settings/config-api.test.ts`
 - Modify: `apps/daemon/src/settings/config-api.ts`
 - Modify: `apps/daemon/src/settings/settings.ts`
 
 **Interfaces:**
+
 - Consumes: `parseConfigUpdate(raw: unknown): SettingsParseResult<Config>`.
 - Produces: `SettingsStore.writeConfig(document: Record<string, unknown>): WriteOutcome`.
 
@@ -59,10 +61,12 @@ Expected: PASS.
 ### Task 2: Именовать ошибку чтения существующего файла
 
 **Files:**
+
 - Modify: `apps/daemon/src/settings/settings.test.ts`
 - Modify: `apps/daemon/src/settings/settings.ts`
 
 **Interfaces:**
+
 - Consumes: `readStoredDocument(path, parse): StoredDocument`.
 - Produces: `patchFile(...): WriteOutcome`, включая `failed` с причиной чтения.
 
@@ -98,12 +102,14 @@ Commit: `fix(settings): preserve compatible config writes`
 ### Task 3: Merge main and preserve both sides
 
 **Files:**
+
 - Merge: `main`
 - Resolve: `apps/web/src/settings/daemon-section.tsx`
 - Resolve: `docs/ui-kit.md`
 - Update if needed: `docs/README.md`
 
 **Interfaces:**
+
 - Consumes: `ConfigForm`, `DurationTimer`, `UseConfigState`, `Translator`.
 - Produces: Daemon section with live uptime and editable config.
 
@@ -130,9 +136,11 @@ Commit: `merge: update slice 12a from main`
 ### Task 4: Full verification
 
 **Files:**
+
 - Verify only; modify only if a real integration regression is exposed.
 
 **Interfaces:**
+
 - Consumes: repository-wide checks.
 - Produces: clean, buildable slice branch.
 
