@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Digits use Manrope through `--sovereign-font-family-body`, `--sovereign-font-weight-bold`, `--sovereign-font-size-lg`, and `font-variant-numeric: tabular-nums`.
+- Digits use Onest through `--sovereign-font-family-body`, `--sovereign-font-weight-bold`, `--sovereign-font-size-lg`, and `font-variant-numeric: tabular-nums`.
 - The timer is flat: no card, background, shadow, border, or ornamental progress graphic.
 - Hours, minutes, and seconds are two digits; days render only when non-zero.
 - The visual value updates every 1,000 milliseconds and is not an ARIA live region.
@@ -166,7 +166,7 @@ Expected: all commands pass without new warnings.
 - [ ] **Step 2: Verify the live Daemon page**
 
 On `http://localhost:5274/settings/daemon`, verify that digits visibly advance each second, retain
-stable width, use compact bold Manrope, show the start date on the left, remain flat without a card,
+stable width, use compact bold Onest, show the start date on the left, remain flat without a card,
 and do not overflow at wide and narrow widths. Confirm loading/unreachable rendering through tests if
 those states cannot be reached safely in the live daemon.
 

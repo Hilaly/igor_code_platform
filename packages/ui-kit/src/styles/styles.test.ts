@@ -137,15 +137,15 @@ describe("stylesheets of the kit", () => {
     const sliderCss = readFileSync(join(kitRoot, "components", "slider.module.css"), "utf8");
 
     expect(entry).toContain("@fontsource-variable/source-serif-4/wght.css");
-    expect(entry).toContain("@fontsource-variable/manrope/wght.css");
+    expect(entry).toContain("@fontsource-variable/onest/wght.css");
     expect(entry).toContain("@fontsource/ibm-plex-mono/400.css");
     expect(entry).toContain("@fontsource/ibm-plex-mono/500.css");
     expect(tokens).toContain('"Source Serif 4 Variable"');
-    expect(tokens).toContain('"Manrope Variable"');
+    expect(tokens).toContain('"Onest Variable"');
     expect(tokens).toContain('"IBM Plex Mono"');
     expect(manifest.dependencies).toMatchObject({
       "@fontsource-variable/source-serif-4": expect.any(String),
-      "@fontsource-variable/manrope": expect.any(String),
+      "@fontsource-variable/onest": expect.any(String),
       "@fontsource/ibm-plex-mono": expect.any(String),
     });
     expect(codeCss.match(/font-weight: 400;/g)).toHaveLength(2);

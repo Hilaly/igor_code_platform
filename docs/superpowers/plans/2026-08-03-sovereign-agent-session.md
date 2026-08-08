@@ -25,7 +25,7 @@ UI Kit отдельным `6bb05ab`. Полная проверка после п
 
 - Start from the completed and reviewed visual-foundation and shell/system-view slices.
 - Preserve session APIs, event ordering, pending/live/persisted deduplication, fork/label actions, archive behavior, queues, statistics, and model/thinking controls.
-- Agent connected text uses Source Serif 4; human messages, controls, headers, reasoning labels, and service rows use Manrope.
+- Agent connected text uses Source Serif 4; human messages, controls, headers, reasoning labels, and service rows use Onest.
 - Tool names, commands, paths, arguments, output, logs, diffs, and build results use IBM Plex Mono.
 - Colour is never the only indication of running/done/failed; status text remains visible while folded.
 - Keep tool details folded by default and keyboard-operable through native `details`/`summary` semantics.
@@ -91,7 +91,7 @@ Expected: FAIL because all message bodies currently use the same body font and w
 
 Constrain the feed content to `--sovereign-reading-width` and centre it while keeping the scroll
 container full width. Agent message body uses display/Source Serif and reading line height; human
-message uses body/Manrope and a compact raised surface; service rows stay body/Manrope. Markdown
+message uses body/Onest and a compact raised surface; service rows stay body/Onest. Markdown
 inherits the agent voice, but its `code`, `pre`, and technical table identifiers continue to use the
 existing `Code`/mono styles.
 
