@@ -407,6 +407,64 @@ describe("createFileResourceWatcher", () => {
     watcher.close();
   });
 
+  it("keeps the same watcher while the watched directory stays the right one", async () => {
+    const directory = join(workspace, `stable-arm-${sequence++}`);
+    const definition = join(directory, "helper");
+    mkdirSync(definition, { recursive: true });
+    const armed: Array<{ directory: string; recursive: boolean }> = [];
+    const startedWatcher = started(
+      [root(directory)],
+      undefined,
+      undefined,
+      undefined,
+      logger,
+      (watchedDirectory, recursive) => armed.push({ directory: watchedDirectory, recursive }),
+    );
+
+    assert.deepEqual(armed, [{ directory, recursive: true }]);
+
+    // Пересоздание рекурсивного наблюдателя на macOS теряет события, случившиеся в момент
+    // перевооружения, а восстановиться нечем: повторное удаление уже удалённого файла событий не
+    // рождает. Поэтому наблюдатель обязан пережить изменение внутри root, а не пересобираться.
+    await repeatUntilChangeCount(startedWatcher, 1, () =>
+      writeFileSync(join(definition, "AGENT.md"), `created ${Date.now()}\n`),
+    );
+    await repeatUntilChangeCount(startedWatcher, 2, () =>
+      writeFileSync(join(definition, "AGENT.md"), `changed ${Date.now()}\n`),
+    );
+
+    assert.deepEqual(armed, [{ directory, recursive: true }]);
+    startedWatcher.watcher.close();
+  });
+
+  it("moves from the parent to the root itself once the root appears", async () => {
+    const parent = join(workspace, `arm-switch-${sequence++}`);
+    mkdirSync(parent);
+    const directory = join(parent, ".sovereign", "agents");
+    const armed: Array<{ directory: string; recursive: boolean }> = [];
+    const startedWatcher = started(
+      [root(directory)],
+      undefined,
+      undefined,
+      undefined,
+      logger,
+      (watchedDirectory, recursive) => armed.push({ directory: watchedDirectory, recursive }),
+    );
+
+    assert.deepEqual(armed, [{ directory: parent, recursive: false }]);
+
+    let attempt = 0;
+    await repeatUntilChangeCount(startedWatcher, 1, () => {
+      attempt += 1;
+      rmSync(join(parent, ".sovereign"), { recursive: true, force: true });
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, `definition-${attempt}.md`), "definition\n");
+    });
+
+    assert.deepEqual(armed.at(-1), { directory, recursive: true });
+    startedWatcher.watcher.close();
+  });
+
   it("reports an old definition tree moved into an existing root", async () => {
     const directory = join(workspace, `moved-root-${sequence++}`);
     mkdirSync(directory);

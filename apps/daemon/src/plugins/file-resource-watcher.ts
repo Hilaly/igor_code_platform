@@ -27,6 +27,14 @@ export type CreateFileResourceWatcherOptions = {
 
 const defaultDebounceMilliseconds = 75;
 
+/**
+ * За каким каталогом сейчас следит один root: за ним самим рекурсивно либо за ближайшим
+ * существующим предком в ожидании появления сегмента `nextSegment`.
+ */
+type ArmPlan =
+  | { kind: "root"; directory: string }
+  | { kind: "ancestor"; directory: string; nextSegment: string };
+
 export function createFileResourceWatcher(
   options: CreateFileResourceWatcherOptions,
 ): FileResourceWatcher {
@@ -35,6 +43,7 @@ export function createFileResourceWatcher(
   let started = false;
   let generation = 0;
   let timer: NodeJS.Timeout | undefined;
+  let armedPlans = "";
   const watchers: FSWatcher[] = [];
   const debounceMilliseconds = options.debounceMilliseconds ?? defaultDebounceMilliseconds;
   const inspectPath =
@@ -58,9 +67,11 @@ export function createFileResourceWatcher(
       timer = undefined;
       if (closed) return;
 
-      // Появившийся ранее отсутствовавший root должен сразу перейти с parent watch на recursive.
-      disarm();
-      arm();
+      // Появившийся ранее отсутствовавший root должен сразу перейти с parent watch на recursive,
+      // но пересоздавать наблюдателя, которому и так нечего менять, нельзя: закрытие и открытие
+      // рекурсивного наблюдателя на macOS открывает окно, в котором FSEvents молча теряет события
+      // (замерено — одно удаление из двадцати под нагрузкой на временный каталог).
+      rearmIfPlanChanged();
       options.onChange();
     }, debounceMilliseconds);
     timer.unref();
@@ -85,14 +96,39 @@ export function createFileResourceWatcher(
     watchers.push(watcher);
   };
 
-  const armRoot = (root: StandaloneResourceRoot): void => {
+  /**
+   * За каким каталогом надо следить ради этого root. Решение отделено от самого слежения, чтобы
+   * его можно было сравнить с уже действующим и не трогать наблюдателя зря.
+   */
+  const planRoot = (root: StandaloneResourceRoot): ArmPlan | undefined => {
+    const rootStat = inspectPath(root.directory);
+    if (rootStat?.isDirectory() === true && !rootStat.isSymbolicLink()) {
+      return { kind: "root", directory: root.directory };
+    }
+
+    let candidate = root.directory;
+    const filesystemRoot = parse(candidate).root;
+    while (candidate !== filesystemRoot) {
+      candidate = dirname(candidate);
+      const stat = inspectPath(candidate);
+      if (stat === undefined) continue;
+      if (stat.isDirectory() && !stat.isSymbolicLink()) {
+        const nextSegment = relative(candidate, root.directory).split(sep)[0];
+        if (nextSegment === undefined || nextSegment === "") return undefined;
+        return { kind: "ancestor", directory: candidate, nextSegment };
+      }
+      return undefined;
+    }
+    return undefined;
+  };
+
+  const armRoot = (root: StandaloneResourceRoot, plan: ArmPlan): void => {
     const rootIsUsableDirectory = (): boolean => {
       const stat = inspectPath(root.directory);
       return stat?.isDirectory() === true && !stat.isSymbolicLink();
     };
 
-    const rootStat = inspectPath(root.directory);
-    if (rootStat?.isDirectory() === true && !rootStat.isSymbolicLink()) {
+    if (plan.kind === "root") {
       watchDirectory(root.directory, true, generation, (_event, name) => {
         if (name === "" || name === ".") return false;
         try {
@@ -115,46 +151,60 @@ export function createFileResourceWatcher(
       return;
     }
 
-    let candidate = root.directory;
-    const filesystemRoot = parse(candidate).root;
-    while (candidate !== filesystemRoot) {
-      candidate = dirname(candidate);
-      const stat = inspectPath(candidate);
-      if (stat === undefined) continue;
-      if (stat.isDirectory() && !stat.isSymbolicLink()) {
-        const nextSegment = relative(candidate, root.directory).split(sep)[0];
-        if (nextSegment === undefined || nextSegment === "") return;
-        watchDirectory(candidate, false, generation, (_event, name) => {
-          if (name !== nextSegment && name !== basename(candidate)) return false;
+    const { directory, nextSegment } = plan;
+    watchDirectory(directory, false, generation, (_event, name) => {
+      if (name !== nextSegment && name !== basename(directory)) return false;
 
-          // macOS can coalesce a nested create and report the watched parent's own basename. In
-          // that case only that exact basename is accepted; unrelated siblings must not rescan.
-          try {
-            return rootIsUsableDirectory();
-          } catch (cause) {
-            options.logger.error("inspecting a standalone file resource root failed", {
-              directory: root.directory,
-              reason: cause instanceof Error ? cause.message : String(cause),
-            });
-            return false;
-          }
+      // macOS can coalesce a nested create and report the watched parent's own basename. In
+      // that case only that exact basename is accepted; unrelated siblings must not rescan.
+      try {
+        return rootIsUsableDirectory();
+      } catch (cause) {
+        options.logger.error("inspecting a standalone file resource root failed", {
+          directory: root.directory,
+          reason: cause instanceof Error ? cause.message : String(cause),
         });
+        return false;
       }
-      return;
-    }
+    });
   };
 
-  const arm = (): void => {
-    for (const root of roots) {
+  const currentPlans = (): Array<ArmPlan | undefined> =>
+    roots.map((root) => {
       try {
-        armRoot(root);
+        return planRoot(root);
+      } catch (cause) {
+        options.logger.error("the standalone file resource root cannot be watched", {
+          directory: root.directory,
+          reason: cause instanceof Error ? cause.message : String(cause),
+        });
+        return undefined;
+      }
+    });
+
+  const armPlans = (plans: Array<ArmPlan | undefined>): void => {
+    armedPlans = JSON.stringify(plans);
+    plans.forEach((plan, index) => {
+      const root = roots[index];
+      if (root === undefined || plan === undefined) return;
+      try {
+        armRoot(root, plan);
       } catch (cause) {
         options.logger.error("the standalone file resource root cannot be watched", {
           directory: root.directory,
           reason: cause instanceof Error ? cause.message : String(cause),
         });
       }
-    }
+    });
+  };
+
+  const arm = (): void => armPlans(currentPlans());
+
+  const rearmIfPlanChanged = (): void => {
+    const plans = currentPlans();
+    if (JSON.stringify(plans) === armedPlans) return;
+    disarm();
+    armPlans(plans);
   };
 
   return {

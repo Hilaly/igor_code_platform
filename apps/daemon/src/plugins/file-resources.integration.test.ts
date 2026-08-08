@@ -472,7 +472,14 @@ describe("file resources end to end", () => {
       );
 
       const missingRevision = registry.revision();
-      await changeAndWait(bus, missingRevision, () => rmSync(agentPath, { force: true }));
+      await changeAndWait(bus, missingRevision, () => {
+        // Файл переписывается перед удалением, чтобы повтор внутри changeAndWait рождал событие и
+        // на второй попытке: удаление уже удалённого файла не рождает ничего, и потерянное первое
+        // событие было бы невосстановимым. Промежуточного состояния никто не увидит — rescan
+        // отложен на debounce, а обе операции синхронны.
+        writeFileSync(agentPath, validAgent());
+        rmSync(agentPath, { force: true });
+      });
       const summary = (await sessions.list(project.id)).find((session) => session.id === sessionId);
       assert.equal(summary?.agentAvailable, false);
       const refusedTurn = await requestJson(port, "POST", sessionTurnsPath(sessionId), {
