@@ -1,136 +1,38 @@
-/*
- * Раскладка страницы настроек. Цвета — только переменные ролей, размеры — только шкалы кита: значения
- * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
- *
- * Своим файлом, а не строками в `shell.css`: под-навигация настроек ничего общего с раскладкой панелей
- * оболочки вокруг неё не имеет — как и `sessions.css` рядом.
- */
+.settings-appearance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.settings-daemon,
+.settings-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+}
 
 .plugins,
 .plugin-detail {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-4);
+  gap: var(--sovereign-space-3);
   min-width: 0;
+  container-type: inline-size;
 }
 
-.plugins-notices {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-}
-
-.plugins-notices:empty {
-  display: none;
-}
-
-.plugins-list,
-.plugin-detail-rows,
-.plugin-detail-contributions {
-  min-width: 0;
-}
-
-.plugins-list > [role="listitem"] {
-  position: relative;
-}
-
-/* Обёртки сохраняют семантику списка, но соседние SettingsRow делят одну линию, как в Appearance. */
-.plugins-list > [role="listitem"] + [role="listitem"] > [role="group"],
-.plugin-detail-contributions > [role="listitem"] + [role="listitem"] > [role="group"] {
-  border-block-start: 0;
-}
-
-.plugins-row-controls {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: var(--sovereign-space-1);
-  min-width: 0;
-}
-
-.plugins-row-meta,
-.plugin-detail-contribution-controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--sovereign-space-2);
-  min-width: 0;
-}
-
-.plugins-row-meta {
-  font-size: var(--sovereign-font-size-xs);
-}
-
-.plugin-detail-back {
-  align-self: flex-start;
-}
-
-.project-detail-surface {
-  padding-block: var(--sovereign-space-3);
-  border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugin-detail-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-  padding-block-start: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugin-detail-section h3 {
-  margin: 0;
-}
-
-.plugin-detail-contribution-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sovereign-space-2);
-  min-width: 0;
-}
-
-@container (width < 40rem) {
-  .plugins-row-controls,
-  .plugin-detail-contribution-controls {
-    align-items: flex-start;
-    justify-content: flex-start;
-  }
-}
-
-.settings-appearance,
-.settings-daemon,
 .settings-config {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Конфиг идёт после фактов о демоне: заголовку нужен воздух, чтобы форма не слиплась со строками. */
-.settings-config {
-  gap: var(--sovereign-space-2);
-  margin-top: var(--sovereign-space-4);
+  margin-block-start: var(--sovereign-space-4);
 }
 
 .settings-config-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--sovereign-space-2);
-}
-
-.settings-appearance-buttons {
-  justify-content: flex-start;
-}
-
-.settings-appearance-buttons {
-  display: flex;
   gap: var(--sovereign-space-2);
-}
-
-.settings-appearance-buttons {
+  min-width: 0;
+  margin-block-start: var(--sovereign-space-2);
   flex-wrap: wrap;
 }
 
@@ -171,4 +73,108 @@
   border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   color: var(--sovereign-text-muted);
   font-size: var(--sovereign-font-size-xs);
+}
+
+.plugins-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+.plugins-notices:empty {
+  display: none;
+}
+
+.plugins-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+  margin: 0;
+  padding-inline-start: var(--sovereign-space-4);
+  overflow-wrap: anywhere;
+}
+
+.plugins-list,
+.plugin-detail-rows,
+.plugin-detail-contributions {
+  min-width: 0;
+}
+
+.plugins-list > [role="listitem"] {
+  position: relative;
+  min-width: 0;
+}
+
+.plugins-row-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.plugins-row-meta,
+.plugin-detail-contribution-meta,
+.plugin-detail-contribution-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+}
+
+.plugins-row-meta {
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.plugin-detail-back {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.plugin-detail-header-card {
+  min-width: 0;
+  padding: var(--sovereign-space-2) var(--sovereign-space-4);
+  background: var(--sovereign-panel-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.plugin-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding-block-start: var(--sovereign-space-2);
+}
+
+.plugin-detail-section h3 {
+  margin: 0;
+}
+
+@container (width < 40rem) {
+  .plugins-row-controls,
+  .plugin-detail-contribution-controls {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .settings-config-actions {
+    justify-content: flex-start;
+  }
+}
+
+@container (width < 28rem) {
+  .settings-diagnostics-stream > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sovereign-space-1);
+  }
 }

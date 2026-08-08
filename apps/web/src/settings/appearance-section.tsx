@@ -10,7 +10,14 @@ import {
   interfaceScales,
   type AppearancePreferences,
 } from "@sovereign/protocol";
-import { Button, Notice, Select, SettingsRow, type ScopedTranslator } from "@sovereign/ui-kit";
+import {
+  AppearancePreview,
+  Notice,
+  SegmentedControl,
+  Select,
+  SettingsRow,
+  type ScopedTranslator,
+} from "@sovereign/ui-kit";
 
 import type { SchemeChoice } from "../appearance.ts";
 
@@ -37,6 +44,11 @@ export function AppearanceSection({
   translator,
 }: AppearanceSectionProps) {
   const { t } = translator;
+  const schemeLabel =
+    schemes.find((scheme) => scheme.id === preferences.appearance.colorScheme)?.label ??
+    preferences.appearance.colorScheme;
+  const variantLabel = t(`appearance.variant.${preferences.appearance.variant}`);
+  const scaleLabel = t(`appearance.scale.${preferences.appearance.scale}`);
 
   return (
     <div className="settings-appearance">
@@ -57,34 +69,30 @@ export function AppearanceSection({
         label={t("appearance.variant")}
         description={t("settings.appearance.variantHint")}
       >
-        <div className="settings-appearance-buttons">
-          {appearanceVariants.map((variant) => (
-            <Button
-              key={variant}
-              pressed={preferences.appearance.variant === variant}
-              onClick={() =>
-                onChange({ ...preferences, appearance: { ...preferences.appearance, variant } })
-              }
-            >
-              {t(`appearance.variant.${variant}`)}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label={t("appearance.variant")}
+          value={preferences.appearance.variant}
+          options={appearanceVariants.map((variant) => ({
+            value: variant,
+            label: t(`appearance.variant.${variant}`),
+          }))}
+          onChange={(variant) =>
+            onChange({ ...preferences, appearance: { ...preferences.appearance, variant } })
+          }
+        />
       </SettingsRow>
       <SettingsRow label={t("appearance.scale")} description={t("settings.appearance.scaleHint")}>
-        <div className="settings-appearance-buttons">
-          {interfaceScales.map((scale) => (
-            <Button
-              key={scale}
-              pressed={preferences.appearance.scale === scale}
-              onClick={() =>
-                onChange({ ...preferences, appearance: { ...preferences.appearance, scale } })
-              }
-            >
-              {t(`appearance.scale.${scale}`)}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label={t("appearance.scale")}
+          value={preferences.appearance.scale}
+          options={interfaceScales.map((scale) => ({
+            value: scale,
+            label: t(`appearance.scale.${scale}`),
+          }))}
+          onChange={(scale) =>
+            onChange({ ...preferences, appearance: { ...preferences.appearance, scale } })
+          }
+        />
       </SettingsRow>
       <SettingsRow label={t("appearance.locale")}>
         <Select
@@ -96,6 +104,23 @@ export function AppearanceSection({
           placeholder={t("common.choose")}
         />
       </SettingsRow>
+      <AppearancePreview
+        title={t("settings.appearance.preview")}
+        label={t("settings.appearance.preview.label", {
+          scheme: schemeLabel,
+          variant: variantLabel,
+          scale: scaleLabel,
+        })}
+        scheme={schemeLabel}
+        variant={variantLabel}
+        scale={scaleLabel}
+        swatches={[
+          { role: "surface", label: t("settings.appearance.preview.surface") },
+          { role: "accent", label: t("settings.appearance.preview.accent") },
+          { role: "secondary", label: t("settings.appearance.preview.secondary") },
+          { role: "text", label: t("settings.appearance.preview.text") },
+        ]}
+      />
     </div>
   );
 }

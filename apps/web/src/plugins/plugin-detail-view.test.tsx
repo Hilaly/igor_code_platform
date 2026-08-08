@@ -2,7 +2,7 @@
 
 import type { PluginsSnapshot } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { PluginDetailView } from "./plugin-detail-view.tsx";
@@ -88,6 +88,10 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
+  const contributions = screen.getByRole("region", { name: "Contributions · 2" });
+  expect(within(contributions).getAllByRole("listitem")).toHaveLength(2);
   expect(container.querySelector(".plugin-detail-surface")).toBeNull();
   for (const [name, checked] of [
     ["Switched on", true],
