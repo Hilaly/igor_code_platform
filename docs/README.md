@@ -140,6 +140,9 @@
   сохранение неизвестных полей PUT, управляемые ошибки чтения настроек и правила слияния с `main`.
 - [План исправлений среза 12a](superpowers/plans/2026-08-08-slice-12a-review-fixes.md) —
   два TDD-цикла, поведенческое разрешение конфликтов с `main` и полная проверка ветки.
+- [Исправления среза 12b-2 и браузерный SDK](superpowers/specs/2026-08-09-slice-12b2-browser-sdk-review-fixes-design.md) —
+  отдельный публичный browser SDK, plugin-owned places, исправления lifecycle, контекста и
+  воспроизводимой живой проверки.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
