@@ -176,11 +176,19 @@ export function pluginColorSchemes(contributions: readonly ContributionRegistrat
       continue;
     }
 
-    const resolved = resolveScheme(parsed.scheme, "light");
+    let rejected = false;
 
-    if (resolved.kind === "rejected") {
-      refusals.push(...resolved.diagnostics);
+    for (const variant of ["light", "dark"] as const) {
+      const resolved = resolveScheme(parsed.scheme, variant);
 
+      if (resolved.kind === "rejected") {
+        refusals.push(...resolved.diagnostics);
+        rejected = true;
+        break;
+      }
+    }
+
+    if (rejected) {
       continue;
     }
 

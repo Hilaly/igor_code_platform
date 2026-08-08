@@ -687,22 +687,53 @@ describe("the colour scheme, a contribution made of nothing but data", () => {
     ]);
   });
 
-  it("takes a scheme whose palette the kit will refuse, because completeness is not its business", () => {
+  it("hands malformed CSS colour strings to the kit unchanged, because CSS semantics are not its business", () => {
     const registry = createContributionRegistry();
 
-    // Мажор контракта токенов и полнота палитры принадлежат киту: демон от кита не зависит, и
-    // проверка здесь сделала бы версию кита частью контракта демона (docs/ui-kit.md).
+    // Мажор контракта токенов, полнота палитры и CSS-семантика принадлежат киту: демон от кита не
+    // зависит, и проверка здесь сделала бы версию кита частью контракта демона (docs/ui-kit.md).
     const outcome = registry.applyPlugin(
       dataHello,
       [
         { ...midnight, id: "ancient", scheme: { tokenContract: 1, variants: { dark: {} } } },
         { ...midnight, id: "sparse", scheme: { tokenContract: 2, variants: { dark: {} } } },
+        {
+          ...midnight,
+          id: "broken-css",
+          scheme: {
+            tokenContract: 2,
+            variants: { light: { surface: "#fff" }, dark: { surface: "" } },
+            roleOverrides: { accent: "not-a-color", futureRole: "still-opaque" },
+          },
+        },
       ],
       nothingDisabled,
     );
 
     assert.deepEqual(outcome.problems, []);
-    assert.deepEqual(ids(outcome.registered), ["hello.ancient", "hello.sparse"]);
+    assert.deepEqual(ids(outcome.registered), [
+      "hello.ancient",
+      "hello.broken-css",
+      "hello.sparse",
+    ]);
+    assert.deepEqual(
+      outcome.registered.find((registration) => registration.id === "hello.broken-css"),
+      {
+        ownership: "plugin",
+        kind: "color-scheme",
+        id: "hello.broken-css",
+        declaredId: "broken-css",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        title: "Midnight",
+        scheme: {
+          tokenContract: 2,
+          variants: { light: { surface: "#fff" }, dark: { surface: "" } },
+          roleOverrides: { accent: "not-a-color", futureRole: "still-opaque" },
+        },
+      },
+    );
   });
 
   it("refuses a document of the wrong shape and keeps its valid siblings", () => {

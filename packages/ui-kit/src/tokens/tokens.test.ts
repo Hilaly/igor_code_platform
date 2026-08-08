@@ -136,6 +136,66 @@ describe("parseColorScheme", () => {
     expect(parsed.kind === "refused" && parsed.reason).toMatch(/no light palette/);
   });
 
+  it.each([
+    ["light", "surface", ""],
+    ["dark", "accent", "not-a-color"],
+  ] as const)("refuses an unresolvable %s palette colour", (variant, role, value) => {
+    const parsed = parseColorScheme("themed.broken", {
+      ...document,
+      variants: {
+        ...document.variants,
+        [variant]: { ...document.variants[variant], [role]: value },
+      },
+    });
+
+    expect(parsed.kind).toBe("refused");
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(
+      new RegExp(`${variant} palette.*${role}`),
+    );
+  });
+
+  it("refuses an unresolvable override of a known role", () => {
+    const parsed = parseColorScheme("themed.broken", {
+      ...document,
+      roleOverrides: { accent: "not-a-color" },
+    });
+
+    expect(parsed.kind).toBe("refused");
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(/role accent/);
+  });
+
+  it("ignores an unresolvable override whose role is unknown", () => {
+    const parsed = parseColorScheme("themed.forward", {
+      ...document,
+      roleOverrides: { neonEdge: "not-a-color" },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(parsed.kind).toBe("parsed");
+    expect(resolved?.kind).toBe("resolved");
+    expect(resolved?.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it.each([
+    ["hex", "#123"],
+    ["modern rgb", "rgb(12 34 56)"],
+    ["legacy rgb", "rgb(12, 34, 56)"],
+    ["hsl", "hsl(120 50% 40%)"],
+    ["oklch", "oklch(60% 0.1 120)"],
+    ["alpha", "rgb(12 34 56 / 0.5)"],
+    ["color-mix", "color-mix(in oklab, red 40%, blue)"],
+  ])("accepts a resolvable %s colour", (_syntax, value) => {
+    const parsed = parseColorScheme("themed.functional", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: { ...document.variants.light, border: value },
+      },
+    });
+
+    expect(parsed.kind).toBe("parsed");
+  });
+
   it("takes a foreign token contract: refusing it is the job of resolveScheme, and only its", () => {
     const parsed = parseColorScheme("themed.ancient", { ...document, tokenContract: 1 });
 
@@ -230,6 +290,35 @@ describe("resolveScheme", () => {
 
     expect(outcome.kind).toBe("resolved");
     expect(outcome.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it("rejects a malformed palette defensively without throwing", () => {
+    const scheme: ColorScheme = {
+      ...imperiumScheme,
+      variants: {
+        ...imperiumScheme.variants,
+        dark: { ...imperiumScheme.variants.dark, surface: "" },
+      },
+    };
+
+    expect(() => resolveScheme(scheme, "dark")).not.toThrow();
+    expect(resolveScheme(scheme, "dark")).toMatchObject({
+      kind: "rejected",
+      diagnostics: [expect.stringMatching(/dark palette.*surface/)],
+    });
+  });
+
+  it("rejects a malformed known role override defensively without throwing", () => {
+    const scheme: ColorScheme = {
+      ...imperiumScheme,
+      roleOverrides: { accent: "not-a-color" },
+    };
+
+    expect(() => resolveScheme(scheme, "light")).not.toThrow();
+    expect(resolveScheme(scheme, "light")).toMatchObject({
+      kind: "rejected",
+      diagnostics: [expect.stringMatching(/role accent/)],
+    });
   });
 
   it("leaves the roles it was not told to override derived from the palette", () => {

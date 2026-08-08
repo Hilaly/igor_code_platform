@@ -7,6 +7,7 @@
 import type { ColorSchemeDocument } from "@sovereign/protocol";
 
 import { readBuiltInRoleOverrides } from "./built-in-role-overrides.ts";
+import { isResolvableColor } from "./color.ts";
 import {
   paletteKeys,
   paletteVariants,
@@ -41,6 +42,41 @@ export type ColorScheme = {
 export type SchemeParse =
   { kind: "parsed"; scheme: ColorScheme } | { kind: "refused"; reason: string };
 
+function paletteRefusal(
+  id: string,
+  variant: PaletteVariant,
+  declared: Partial<Record<(typeof paletteKeys)[number], unknown>> | undefined,
+): string | undefined {
+  if (declared === undefined) {
+    return `the scheme ${id} declares no ${variant} palette`;
+  }
+
+  const missing = paletteKeys.filter((key) => typeof declared[key] !== "string");
+
+  if (missing.length > 0) {
+    return `the ${variant} palette of the scheme ${id} has no ${missing.join(", ")}`;
+  }
+
+  const invalid = paletteKeys.filter((key) => !isResolvableColor(declared[key]));
+
+  return invalid.length === 0
+    ? undefined
+    : `the ${variant} palette of the scheme ${id} has an unresolvable colour for ${invalid.join(", ")}`;
+}
+
+function overrideRefusal(
+  id: string,
+  overrides: Record<string, unknown> | undefined,
+): string | undefined {
+  for (const [role, value] of Object.entries(overrides ?? {})) {
+    if (roleNames.includes(role as RoleName) && !isResolvableColor(value)) {
+      return `the scheme ${id} overrides the role ${role} with an unresolvable colour`;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Разбирает документ схемы, приехавший от плагина (docs/plugins.md). Демон проверил только форму:
  * какие варианты и какие ключи палитры обязательны, знает кит — `paletteKeys` принадлежат ему.
@@ -56,22 +92,22 @@ export function parseColorScheme(id: string, document: ColorSchemeDocument): Sch
   for (const variant of paletteVariants) {
     const declared = document.variants[variant];
 
-    if (declared === undefined) {
-      return { kind: "refused", reason: `the scheme ${id} declares no ${variant} palette` };
+    const refusal = paletteRefusal(id, variant, declared);
+
+    if (refusal !== undefined) {
+      return { kind: "refused", reason: refusal };
     }
 
-    const missing = paletteKeys.filter((key) => typeof declared[key] !== "string");
-
-    if (missing.length > 0) {
-      return {
-        kind: "refused",
-        reason: `the ${variant} palette of the scheme ${id} has no ${missing.join(", ")}`,
-      };
-    }
-
+    const validated = declared as Palette;
     variants[variant] = Object.fromEntries(
-      paletteKeys.map((key) => [key, declared[key]]),
+      paletteKeys.map((key) => [key, validated[key]]),
     ) as Palette;
+  }
+
+  const roleRefusal = overrideRefusal(id, document.roleOverrides);
+
+  if (roleRefusal !== undefined) {
+    return { kind: "refused", reason: roleRefusal };
   }
 
   return {
@@ -102,32 +138,60 @@ export function resolveScheme(scheme: ColorScheme, variant: PaletteVariant): Sch
     };
   }
 
-  const palette: Palette = scheme.variants[variant];
-  const roles = deriveRoles(palette);
-  const diagnostics: string[] = [];
+  try {
+    const palette = scheme.variants[variant] as Palette | undefined;
+    const paletteProblem = paletteRefusal(scheme.id, variant, palette);
 
-  Object.assign(roles, readBuiltInRoleOverrides(scheme, variant));
-
-  for (const [role, value] of Object.entries(scheme.roleOverrides ?? {})) {
-    // Незнакомая роль — диагностика, а не отказ: схему могли написать для более новой версии кита,
-    // и терять из-за одного лишнего имени все остальные цвета незачем.
-    if (!roleNames.includes(role as RoleName)) {
-      diagnostics.push(
-        `the scheme ${scheme.id} overrides an unknown role ${role} and it is ignored`,
-      );
-
-      continue;
+    if (paletteProblem !== undefined) {
+      return { kind: "rejected", diagnostics: [paletteProblem] };
     }
 
-    if (value === undefined) {
-      continue;
-    }
+    const validatedPalette = palette as Palette;
 
-    roles[role as RoleName] = value;
-    diagnostics.push(
-      `the scheme ${scheme.id} overrides the role ${role} by hand: a kit update may not reach it`,
+    const overrideProblem = overrideRefusal(
+      scheme.id,
+      scheme.roleOverrides as Record<string, unknown> | undefined,
     );
-  }
 
-  return { kind: "resolved", roles, diagnostics };
+    if (overrideProblem !== undefined) {
+      return { kind: "rejected", diagnostics: [overrideProblem] };
+    }
+
+    const roles = deriveRoles(validatedPalette);
+    const diagnostics: string[] = [];
+
+    Object.assign(roles, readBuiltInRoleOverrides(scheme, variant));
+
+    for (const [role, value] of Object.entries(scheme.roleOverrides ?? {})) {
+      // Незнакомая роль — диагностика, а не отказ: схему могли написать для более новой версии кита,
+      // и терять из-за одного лишнего имени все остальные цвета незачем.
+      if (!roleNames.includes(role as RoleName)) {
+        diagnostics.push(
+          `the scheme ${scheme.id} overrides an unknown role ${role} and it is ignored`,
+        );
+
+        continue;
+      }
+
+      if (value === undefined) {
+        continue;
+      }
+
+      roles[role as RoleName] = value;
+      diagnostics.push(
+        `the scheme ${scheme.id} overrides the role ${role} by hand: a kit update may not reach it`,
+      );
+    }
+
+    return { kind: "resolved", roles, diagnostics };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+
+    return {
+      kind: "rejected",
+      diagnostics: [
+        `the ${variant} palette of the scheme ${scheme.id} could not be resolved: ${reason}`,
+      ],
+    };
+  }
 }
