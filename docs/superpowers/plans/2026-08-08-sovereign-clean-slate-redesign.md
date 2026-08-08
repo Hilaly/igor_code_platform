@@ -17,13 +17,15 @@ scales, widths, and interaction states.
 **Tech Stack:** React 19, TypeScript 5.8, CSS Modules, plain CSS, Fontsource, Vitest, Testing Library,
 Ladle, Vite, pnpm 11, Node 24.
 
-## Статус на 2026-08-08
+## Статус на 2026-08-09
 
 - Tasks 1–8 выполнены и разбиты на атомарные коммиты.
 - Все 59 исходных CSS-файлов отличаются от baseline `b9146f8`; текущий шестидесятый файл принадлежит
   новому публичному `AppearancePreview`.
 - `make check`, `make build`, production-сборка Ladle и репрезентативная browser QA wide/narrow
-  завершены. Независимое итоговое ревью ветки выполняется последним шагом Task 10.
+  завершены. Независимое итоговое ревью на `5e00d87` нашло 1 Critical, 9 Important и 3 Minor;
+  единая волна исправлений реализована. Scoped re-review и повтор полной controller-owned проверки
+  ещё не завершены, поэтому Step 6 и Step 7 ниже остаются открытыми.
 - Task 9 не начат: маршрут и точные определения аналитики требуют явного решения владельца продукта.
 
 ## Global Constraints
