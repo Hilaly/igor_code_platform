@@ -1,63 +1,41 @@
-/*
- * Раскладка вью провайдеров. Цвета — только переменные ролей, размеры — только шкалы кита: значения
- * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
- *
- * Своим файлом, а не строками в `shell.css`: вью провайдеров — не оболочка.
- */
-
 .providers {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--sovereign-space-2);
-}
-
-/*
- * Строка провайдера в списке: кто он и в каком он состоянии. Пометки держатся правого края распором
- * между ними, а не селектором по классу примитива: имена классов кита хешируются модулями, и
- * цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
- *
- * Отступа здесь нет: строка провайдера выбирается — клик уводит на страницу, — и отступ ей даёт
- * сам `ListRow`. Элементы строчные, потому что содержимое выбираемой строки лежит внутри кнопки.
- */
-.providers-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--sovereign-space-3);
-  flex-wrap: wrap;
-}
-
-.providers-row-facts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-1);
-  align-items: flex-start;
-  /* Длинная подпись способа входа режется, а не растягивает строку. */
   min-width: 0;
-  overflow-wrap: anywhere;
+  min-height: 0;
+  container-type: inline-size;
 }
 
-.providers-row-marks {
-  display: flex;
+.providers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
+  gap: var(--sovereign-space-3);
+  width: 100%;
+  min-width: 0;
 }
 
-/* Содержимое шапки страницы провайдера повторяет содержимое строки списка. */
-.providers-header-facts {
+.providers-row-facts,
+.providers-header-facts,
+.providers-model-facts {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-1);
   align-items: flex-start;
+  gap: var(--sovereign-space-1);
   min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
 }
 
+.providers-row-marks,
 .providers-header-marks {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sovereign-space-2);
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -65,37 +43,45 @@
 .providers-models-control {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-2);
   align-items: flex-end;
+  gap: var(--sovereign-space-2);
   width: 100%;
   min-width: 0;
 }
 
 .providers-models-control > * {
   width: 100%;
+  min-width: 0;
 }
 
-/*
- * Кнопки входа и выхода у раскрытого провайдера: в строку, потому что способов входа у провайдера
- * один-два, и колонка из двух кнопок выглядела бы списком.
- */
-.providers-access {
+.providers-detail-toolbar,
+.provider-form-toolbar,
+.provider-form-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sovereign-space-2);
+  min-width: 0;
   flex-wrap: wrap;
 }
 
-/*
- * Диалог входа: сказанное, вопрос и исход идут сверху вниз в том порядке, в каком приезжали. Это
- * разговор, а не форма, и переставлять его нельзя.
- */
-.providers-login {
+.providers-detail-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
+  min-width: 0;
 }
 
+.providers-access,
+.providers-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.providers-login,
 .providers-login-control {
   display: flex;
   flex-direction: column;
@@ -107,73 +93,51 @@
 .providers-login-actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
-/*
- * Одно сказанное: код устройства, адрес и срок стоят рядом, а не столбиком из четырёх строк.
- * Собрано из примитивов кита на месте — своего примитива у этой компоновки нет намеренно
- * (docs/ui-kit.md, «Блок кода устройства не стал примитивом кита»).
- */
 .providers-login-notice {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
   flex-wrap: wrap;
 }
 
-/* Поле ответа и кнопка: кнопка под полем, потому что поле занимает всю ширину панели. */
 .providers-login-form {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sovereign-space-2);
-}
-
-/*
- * Строка модели не выбирается: по ней ничего не открывается. Поэтому отступ здесь свой — `ListRow`
- * даёт его только выбираемой строке.
- */
-.providers-model {
-  display: flex;
-  padding: var(--sovereign-space-2) var(--sovereign-space-3);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-3);
-  flex-wrap: wrap;
-}
-
-.providers-model-facts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-1);
+  width: 100%;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
-/*
- * Окно и цена — в столбик: у сотен моделей одинаковой формы взгляд идёт вниз по колонке, а не по
- * строке.
- */
+.providers-model {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+}
+
 .providers-model-marks {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-1);
   align-items: flex-end;
-  text-align: right;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+  text-align: end;
 }
 
-.providers-actions {
-  display: flex;
-  gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
-}
-
-.providers-detail-toolbar,
-.provider-form-toolbar,
-.provider-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sovereign-space-2);
+.provider-form-page {
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .provider-form-rows,
@@ -188,13 +152,51 @@
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
-  padding-block: var(--sovereign-space-4) var(--sovereign-space-2);
+  min-width: 0;
+  padding-block: var(--sovereign-space-3) var(--sovereign-space-2);
+  overflow-wrap: anywhere;
 }
 
 .provider-manual-model {
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   padding-block-start: var(--sovereign-space-2);
 }
 
 .provider-form-actions {
-  padding-block: var(--sovereign-space-3);
+  padding-block: var(--sovereign-space-2);
+}
+
+@container (width <= 42rem) {
+  .providers-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .providers-model {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .providers-row,
+  .providers-model {
+    align-items: start;
+    gap: var(--sovereign-space-2);
+  }
+
+  .providers-row-marks,
+  .providers-header-marks,
+  .providers-model-marks,
+  .providers-header-control,
+  .providers-models-control {
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: start;
+  }
+
+  .providers-access,
+  .providers-actions,
+  .providers-login-actions,
+  .providers-detail-toolbar,
+  .provider-form-toolbar,
+  .provider-form-actions {
+    justify-content: flex-start;
+  }
 }
