@@ -1,49 +1,53 @@
 /*
- * Раскладка вью сессий. Цвета — только переменные ролей, размеры — только шкалы кита: значения
- * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
- *
- * Своим файлом, а не строками в `shell.css`: мастер-деталь чата ничего общего с раскладкой панелей
- * оболочки вокруг него не имеет.
+ * Геометрия агентских сессий. UI Kit владеет поверхностями, типографикой и состояниями контролов;
+ * приложение связывает их в contained chat и в компактные страницы управления.
  */
+
+/* Route and page frame --------------------------------------------------- */
 
 .sessions {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
-  /* Вью забирает высоту хоста целиком: лента прокручивается внутри себя, а не вместе со страницей. */
-  min-height: 0;
+  gap: var(--sovereign-space-4);
   min-width: 0;
-  flex: 1;
+  min-height: 0;
   container-type: inline-size;
+}
+
+.session-route-state {
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .sessions-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sovereign-space-2);
+  gap: var(--sovereign-space-3);
   width: 100%;
-  /* Длинный путь режется, а не растягивает строку: папка бывает глубокой. */
   min-width: 0;
-  padding-inline-end: calc(var(--sovereign-space-5) + var(--sovereign-space-3));
 }
 
 .sessions-row-facts {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--sovereign-space-1);
   align-items: flex-start;
+  gap: var(--sovereign-space-1);
   min-width: 0;
   overflow-wrap: anywhere;
   text-align: start;
 }
 
+/* The feed is the only vertical scroll owner. The bottom grid row never overlays it. */
+
 .sessions-chat {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--sovereign-space-3);
-  min-height: 0;
   min-width: 0;
+  min-height: 0;
   border: none;
   background: transparent;
   container-type: inline-size;
@@ -57,26 +61,35 @@
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
+  min-height: 0;
   min-width: 0;
 }
 
-/*
- * У сохранённой реплики одна строка времени и действий. Она занимает место постоянно, чтобы
- * соседние сообщения не прыгали при наведении, но становится видимой только в контексте реплики.
- */
+/* Message register ------------------------------------------------------ */
+
 .sessions-entry-message {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
   width: 100%;
   max-width: var(--sovereign-reading-width);
+  min-width: 0;
   margin-inline: auto;
+}
+
+.sessions-entry-message[data-role="human"] {
+  align-items: flex-end;
+}
+
+.sessions-entry-message[data-role="agent"] {
+  align-items: stretch;
 }
 
 .sessions-entry-meta {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-1);
+  min-width: 0;
   min-height: var(--sovereign-row-height-compact);
   color: var(--sovereign-text-subtle);
   font-size: var(--sovereign-font-size-xs);
@@ -99,19 +112,21 @@
   justify-content: flex-start;
 }
 
-.session-route-state {
-  justify-content: flex-start;
+/* Composer -------------------------------------------------------------- */
+
+.sessions-composer-surface {
+  align-self: end;
+  width: min(100%, var(--sovereign-reading-width));
+  min-width: 0;
+  margin-inline: var(--sovereign-space-3);
 }
 
-/*
- * Ввод прижат к низу панели и не уезжает вместе с лентой: он остаётся на месте, пока история
- * прокручивается над ним.
- */
 .sessions-composer {
   display: grid;
   grid-template-rows: minmax(0, auto) auto;
   gap: var(--sovereign-space-2);
   min-width: 0;
+  min-height: 0;
 }
 
 .sessions-composer > textarea {
@@ -144,11 +159,6 @@
   min-width: 0;
 }
 
-.sessions-composer-surface {
-  min-width: 0;
-  margin-inline: var(--sovereign-space-3);
-}
-
 .sessions-composer-future-slot {
   flex: 1 1 auto;
   min-width: 0;
@@ -156,19 +166,16 @@
 
 .sessions-composer-actions {
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   justify-content: flex-end;
   gap: var(--sovereign-space-1);
-  min-width: 0;
   max-width: 100%;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
-.sessions-composer-actions > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
+.sessions-composer-actions > *,
 .sessions-composer-actions button {
   min-width: 0;
   max-width: 100%;
@@ -185,79 +192,28 @@
   }
 }
 
-/*
- * Экран создания сессии — отдельный маршрут, а не модал: у модала фиксированная ширина, и список
- * моделей в нём не помещался. Форма ограничена по ширине и прижата к началу, чтобы на широком экране
- * контролы не растягивались в строку через всю страницу.
- */
-.new-session {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-  max-width: 40rem;
-}
+/* Queue and usage register --------------------------------------------- */
 
-.new-session-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-1);
-}
-
-.new-session-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-}
-
-.archive-sessions-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-  padding-block-start: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.archive-sessions-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-}
-
-.new-session-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/*
- * Очереди и выбор момента доставки — полоски рядом с лентой и вводом. Они не внутри
- * `.sessions-composer` намеренно: там первый ребёнок растягивается на всю ширину, и это поле ввода.
- */
 .sessions-queues,
 .sessions-modes {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);
-  padding-inline: var(--sovereign-space-3);
+  min-width: 0;
   padding-block: var(--sovereign-space-1);
+  padding-inline: var(--sovereign-space-3);
   flex-wrap: wrap;
-}
-
-.sessions-queues,
-.sessions-modes {
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-/*
- * Контекст — длинная шкала, а токены и деньги — короткие независимые факты. Сетка позволяет шкале
- * забрать доступное место, не заставляя числа переноситься или иметь придуманную фиксированную ширину.
- */
 .sessions-usage {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sovereign-space-2);
-  padding-inline: var(--sovereign-space-3);
+  min-width: 0;
   padding-block: var(--sovereign-space-1);
+  padding-inline: var(--sovereign-space-3);
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
@@ -270,8 +226,8 @@
 }
 
 .sessions-usage-context > :last-child {
-  flex: 1;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .sessions-usage-stat {
@@ -289,15 +245,64 @@
   }
 }
 
-/*
- * Выбранная запись под деревом: описание, переход и правка метки в колонку. Панель выдвижная и
- * узкая, и класть их в строку значит резать подписи.
- */
+/* New and archived session management --------------------------------- */
+
+.new-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-4);
+  width: min(100%, 40rem);
+  min-width: 0;
+}
+
+.new-session-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.new-session-form-region {
+  min-width: 0;
+}
+
+.new-session-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+}
+
+.new-session-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding-block-start: var(--sovereign-space-2);
+}
+
+.archive-sessions-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-4);
+  min-width: 0;
+}
+
+.archive-sessions-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding-block-start: var(--sovereign-space-3);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
 .sessions-tree-entry {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sovereign-space-2);
+  min-width: 0;
   margin-block-start: var(--sovereign-space-3);
   padding-block-start: var(--sovereign-space-3);
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
@@ -307,11 +312,58 @@
   display: flex;
   align-items: flex-end;
   gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
   width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .sessions-tree-label > :first-child {
-  flex: 1;
   min-width: var(--sovereign-space-8);
+  flex: 1 1 12rem;
+}
+
+/* Deterministic interaction and narrow-container fallbacks ------------- */
+
+.sessions-entry-meta button:focus-visible,
+.sessions-composer-actions button:focus-visible,
+.new-session-actions button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-sovereign-input-modality="keyboard"] .sessions-entry-meta:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@container (width <= 28rem) {
+  .sessions-composer-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sessions-composer-future-slot {
+    display: none;
+  }
+
+  .sessions-composer-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sessions-usage {
+    grid-template-columns: 1fr;
+  }
+
+  .sessions-usage-context,
+  .sessions-usage-stat {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sessions-entry-meta {
+    transition: none;
+  }
 }

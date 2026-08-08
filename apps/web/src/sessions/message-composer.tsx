@@ -218,7 +218,7 @@ export function MessageComposer({
                 ) : null}
                 <Tooltip content={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}>
                   <Button
-                    tone="accent"
+                    tone="secondary"
                     iconOnly
                     aria-label={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
                     onClick={send}

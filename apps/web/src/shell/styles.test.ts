@@ -217,6 +217,18 @@ describe("the style sheets of the application", () => {
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
   });
 
+  it("keeps the session bottom zone measurable and the management form shrinkable", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(
+      /\.sessions-chat-bottom\s*\{[^}]*min-height:\s*0;[^}]*min-width:\s*0;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-composer-surface\s*\{[^}]*align-self:\s*end;[^}]*min-width:\s*0;/s,
+    );
+    expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
+  });
+
   it("keeps the central page in a permanent header and body grid", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
