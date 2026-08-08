@@ -170,6 +170,20 @@ describe("stylesheets of the kit", () => {
     expect(effects.match(/--sovereign-elevation-/g)).toHaveLength(3);
   });
 
+  it("rejects a missing Onest fallback", () => {
+    const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");
+
+    expect(tokens).toContain('"Onest Variable", "Onest",');
+  });
+
+  it("rejects a reintroduced decorative effect", () => {
+    const globalStyles = ["index.css", "scale.css", "tokens.css", "effects.css", "reset.css"]
+      .map((name) => withoutComments(readFileSync(join(kitRoot, "styles", name), "utf8")))
+      .join("\n");
+
+    expect(globalStyles).not.toMatch(/gradient|glow|glass|backdrop-blur|hairline/i);
+  });
+
   it("keeps Tree actions in one right-aligned rail across nesting levels", () => {
     const tree = withoutComments(
       readFileSync(join(kitRoot, "components", "tree.module.css"), "utf8"),

@@ -30,15 +30,30 @@ describe("deriveRoles", () => {
     expect(roles.accentHover).toContain(imperiumScheme.variants.light.accent);
     expect(roles.accentHover).toContain(imperiumScheme.variants.light.ink);
   });
+
+  it("rejects an incomplete derived role family for the secondary action", () => {
+    const roles = deriveRoles(imperiumScheme.variants.dark);
+
+    expect(roles).toMatchObject({
+      secondary: imperiumScheme.variants.dark.secondary,
+      secondaryHover: expect.any(String),
+      secondaryStrong: expect.any(String),
+      secondarySurface: expect.any(String),
+      secondaryBorder: expect.any(String),
+      secondaryText: expect.any(String),
+    });
+  });
 });
 
 describe("imperiumScheme", () => {
-  it("separates the Refined Imperium surfaces", () => {
+  it("rejects the wrong dark Refined Imperium palette", () => {
     expect(imperiumScheme.variants.dark).toMatchObject({
-      surface: "#14100b",
-      surfaceRaised: "#201a13",
-      surfaceSunken: "#100d09",
-      border: "#3b2f21",
+      surface: "#100b09",
+      surfaceRaised: "#1f1814",
+      surfaceSunken: "#130e0c",
+      border: "#2a221e",
+      accent: "#8e44ad",
+      secondary: "#c5a059",
     });
     expect(imperiumScheme.variants.light).toMatchObject({
       surface: "#f3ead8",
@@ -262,10 +277,13 @@ describe("contrast", () => {
     ["textOnAccent", "accent"],
     ["textOnAccent", "accentHover"],
     ["textOnAccent", "accentStrong"],
+    ["secondaryText", "pageSurface"],
+    ["secondaryText", "panelSurface"],
+    ["secondaryText", "secondarySurface"],
     ["textOnDanger", "danger"],
   ] as const satisfies readonly (readonly [RoleName, RoleName])[];
 
-  it("includes warning text rendered inside plugin panels", () => {
+  it("rejects unreadable secondary action text", () => {
     expect(rolePairs).toContainEqual(["warningText", "panelSurface"]);
   });
 

@@ -43,8 +43,13 @@ export const roleNames = [
   "controlSurface",
   "controlSurfaceHover",
   "focusRing",
-  /** Второй акцент для редких смысловых меток и надзаголовков, а не действий. */
+  /** Второй акцент для редких ключевых действий и смысловых меток. */
   "secondary",
+  "secondaryHover",
+  "secondaryStrong",
+  "secondarySurface",
+  "secondaryBorder",
+  "secondaryText",
   "danger",
   "dangerSurface",
   "dangerBorder",
@@ -110,7 +115,9 @@ export function deriveRoles(palette: Palette): Roles {
     textOnAccent: palette.accentInk,
     accent: palette.accent,
     accentHover: towardsInk(palette.accent, hoverShift),
-    accentStrong: towardsInk(palette.accent, "18%"),
+    // Палитра гарантирует контраст `accentInk` только на исходном акценте. Сильное состояние
+    // остаётся тем же заполнением, а различие pressed даёт утопленная `accentSurface`.
+    accentStrong: palette.accent,
     // Фон выбранной строки: акцент, разбавленный поверхностью, — иначе выделение перекрикивает текст.
     accentSurface: `color-mix(in oklab, ${palette.accent} 16%, ${palette.surface} 84%)`,
     accentBorder: softBorder(palette.accent),
@@ -120,6 +127,11 @@ export function deriveRoles(palette: Palette): Roles {
     // Кольцо фокуса разбавлено текстом поверх акцента: на тёмной схеме чистый акцент сливается с ней.
     focusRing: `color-mix(in oklab, ${palette.accent} 72%, ${palette.accentInk} 28%)`,
     secondary: palette.secondary,
+    secondaryHover: towardsInk(palette.secondary, hoverShift),
+    secondaryStrong: towardsInk(palette.secondary, "18%"),
+    secondarySurface: softSurface(palette.secondary),
+    secondaryBorder: softBorder(palette.secondary),
+    secondaryText: readableText(palette.secondary),
     danger: palette.danger,
     dangerSurface: softSurface(palette.danger),
     dangerBorder: softBorder(palette.danger),

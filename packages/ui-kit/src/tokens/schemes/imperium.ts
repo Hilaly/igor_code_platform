@@ -1,7 +1,7 @@
 /**
  * Схема «imperium»: пурпур и золото на тёплой бумаге, единственная тема со вторым акцентом в деле.
- * Светлота отдельных значений сдвинута до нашего порога контраста — тон и насыщенность остались
- * исходными (docs/ui-kit.md).
+ * Тёмный вариант повторяет утверждённую Refined Imperium палитру буквально. Производные роли
+ * строятся отдельно, поэтому схема остаётся 15-ключевым публичным контрактом.
  */
 
 import { tokenContractMajor, type ColorScheme } from "../scheme.ts";
@@ -30,21 +30,21 @@ export const imperiumScheme: ColorScheme = {
       shadow: "#2e2a331f",
     },
     dark: {
-      surface: "#14100b",
-      surfaceRaised: "#201a13",
-      surfaceSunken: "#100d09",
-      border: "#3b2f21",
-      ink: "#ece6da",
-      inkMuted: "#b3a893",
-      accent: "#b07fe3",
-      accentInk: "#17130d",
-      secondary: "#d3af6e",
-      danger: "#d0736f",
-      dangerInk: "#17130d",
-      warning: "#d8a75c",
-      success: "#88ac83",
-      overlay: "#0c070299",
-      shadow: "#0c070280",
+      surface: "#100b09",
+      surfaceRaised: "#1f1814",
+      surfaceSunken: "#130e0c",
+      border: "#2a221e",
+      ink: "#f4ede7",
+      inkMuted: "#c8b9ae",
+      accent: "#8e44ad",
+      accentInk: "#fff8f3",
+      secondary: "#c5a059",
+      danger: "#df7b73",
+      dangerInk: "#100b09",
+      warning: "#e0b66c",
+      success: "#91bb8b",
+      overlay: "#100b09cc",
+      shadow: "#100b09a6",
     },
   },
 };
