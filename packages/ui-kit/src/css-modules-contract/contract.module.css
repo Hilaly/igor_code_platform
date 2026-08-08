@@ -1,0 +1,23 @@
+/*
+ * Фикстура контракта CSS Modules (docs/ui-extension-model.md). Тот же синтаксис лежит у демона в
+ * `apps/daemon/src/plugins/fixtures/browsered/src/badge.module.css`: два конвейера, один контракт.
+ * Одну фикстуру на двоих не отдать — кит не может быть зависимостью демона.
+ */
+
+.badge {
+  display: inline-flex;
+}
+
+/* Дефис в имени: camelCase к ключу не добавляется ни у одного из двух конвейеров. */
+.badge-tail {
+  margin-inline-start: 4px;
+}
+
+.loud {
+  composes: badge;
+  font-weight: 700;
+}
+
+:global(.sovereign-plugin-anchor) .badge {
+  outline: none;
+}
