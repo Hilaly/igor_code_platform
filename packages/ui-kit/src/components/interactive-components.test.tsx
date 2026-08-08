@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "./button.tsx";
@@ -14,6 +14,7 @@ import { Popover } from "./popover.tsx";
 import { RadioGroup } from "./radio-group.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
+import { SettingsNavigationItem, SettingsPage, SettingsView } from "./settings-frame.tsx";
 import { Slider } from "./slider.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
@@ -1073,6 +1074,20 @@ describe("interactive components", () => {
 });
 
 describe("tool call", () => {
+  it.each([
+    ["running", "Выполняется"],
+    ["done", "Готово"],
+    ["failed", "Не удалось"],
+  ] as const)("exposes the visible %s machine outcome on its status block", (status, label) => {
+    const { container } = render(
+      <ToolCall toolName="read_file" status={status} statusLabel={label} argumentsText="{}" />,
+    );
+
+    const statusBlock = container.querySelector(`[data-status="${status}"]`);
+    expect(statusBlock).not.toBeNull();
+    expect(within(statusBlock as HTMLElement).getByText(label)).toBeTruthy();
+  });
+
   it("keeps a complete technical summary available when its visible path is truncated", () => {
     const completeSummary =
       "apps/web/src/sessions/a-very-long-technical-directory/session-message-list.tsx";
@@ -1172,6 +1187,31 @@ describe("tool call", () => {
 
     expect(container.querySelectorAll("pre")).toHaveLength(2);
     expect(screen.getByText("Вывод")).not.toBeNull();
+  });
+});
+
+describe("settings frame", () => {
+  it("shows its navigation heading inside the named settings navigation", () => {
+    render(
+      <SettingsView
+        context="Sovereign · Settings"
+        navigationLabel="SETTINGS"
+        navigation={
+          <SettingsNavigationItem selected onSelect={() => {}}>
+            Appearance
+          </SettingsNavigationItem>
+        }
+      >
+        <SettingsPage title="Appearance">Appearance controls</SettingsPage>
+      </SettingsView>,
+    );
+
+    const navigation = screen.getByRole("navigation", { name: "SETTINGS" });
+    expect(within(navigation).getByText("SETTINGS")).toBeTruthy();
+    expect(screen.getAllByRole("heading")).toHaveLength(1);
+    expect(
+      within(navigation).getByRole("button", { name: "Appearance" }).getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
 

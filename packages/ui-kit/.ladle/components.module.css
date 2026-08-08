@@ -1,11 +1,38 @@
+.catalogue {
+  min-width: 0;
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+}
+
+.appearanceControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--sovereign-space-3) var(--sovereign-space-4);
+  margin-block-end: var(--sovereign-space-6);
+  padding-block-end: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.appearanceField {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: min(100%, 10rem);
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+}
+
 .control {
+  min-width: 0;
   min-height: var(--sovereign-control-height-sm);
   padding-inline: var(--sovereign-space-2);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   border-radius: var(--sovereign-radius-sm);
   background: var(--sovereign-control-surface);
   color: var(--sovereign-text);
-  font-family: var(--sovereign-font-family-body);
+  font: inherit;
 }
 
 .control:hover {

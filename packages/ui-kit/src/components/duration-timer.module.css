@@ -1,6 +1,6 @@
 .timer {
   display: inline-flex;
-  max-width: 100%;
+  max-inline-size: 100%;
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
 }
@@ -9,7 +9,7 @@
   display: inline-flex;
   align-items: flex-start;
   gap: var(--sovereign-space-1);
-  max-width: 100%;
+  max-inline-size: 100%;
   white-space: nowrap;
 }
 

@@ -23,6 +23,12 @@ import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
 import { Notice } from "./notice.tsx";
 import { Panel } from "./panel.tsx";
 import { Select } from "./select.tsx";
+import {
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsRow,
+  SettingsView,
+} from "./settings-frame.tsx";
 import { EmptyState, Spinner } from "./state.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { Heading, Text } from "./text.tsx";
@@ -190,7 +196,79 @@ export const ModelPickerStory = () => {
         placeholder="Выберите модель"
         emptyText="Моделей нет"
       />
+      <ModelPicker
+        groups={pickerGroups}
+        value="google/gemini-flash"
+        onChange={() => {}}
+        label="Model above"
+        placeholder="Choose model"
+        emptyText="No models"
+        side="top"
+      />
+      <ModelPicker
+        groups={[
+          { id: "loading", label: "Loading", options: [], loading: true },
+          { id: "failed", label: "Failed", options: [], failureReason: "Catalogue unavailable" },
+          { id: "empty", label: "Empty", options: [] },
+          { id: "disabled", label: "Disabled", options: [], disabled: true },
+        ]}
+        value={undefined}
+        onChange={() => {}}
+        label="Catalogue states"
+        placeholder="Inspect catalogue states"
+        emptyText="No models"
+      />
       <Text tone="muted">Выбрано: {value ?? "—"}</Text>
+    </div>
+  );
+};
+
+export const SettingsFrame = () => {
+  const [section, setSection] = useState("appearance");
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <div style={{ height: "34rem", minWidth: 0 }}>
+      <SettingsView
+        context="◆ Sovereign · Settings · Appearance"
+        navigationLabel="SETTINGS"
+        navigation={["appearance", "projects", "providers", "plugins", "daemon", "diagnostics"].map(
+          (item) => (
+            <SettingsNavigationItem
+              key={item}
+              selected={section === item}
+              onSelect={() => setSection(item)}
+            >
+              {item}
+            </SettingsNavigationItem>
+          ),
+        )}
+      >
+        <SettingsPage title="Appearance" description="Live responsive Settings frame QA.">
+          <SettingsRow label="Colour scheme" description="A non-selectable property row">
+            <Select
+              label="Colour scheme"
+              value="imperium"
+              onChange={() => {}}
+              options={[{ value: "imperium", label: "Imperium" }]}
+              placeholder="Choose scheme"
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Plugin row"
+            description="The full row and nested toggle remain separate targets"
+            onSelect={() => setSection("plugins")}
+            selectLabel="Open plugin"
+          >
+            <Toggle checked={enabled} onChange={setEnabled} label="Enable plugin" />
+          </SettingsRow>
+          <SettingsRow label="Documentation">
+            <Link href="https://example.org" external>
+              Open guide
+            </Link>
+          </SettingsRow>
+        </SettingsPage>
+      </SettingsView>
     </div>
   );
 };

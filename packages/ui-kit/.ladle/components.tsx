@@ -78,16 +78,10 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
   }, [schemeId, variant, scale]);
 
   return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          gap: "var(--sovereign-space-4)",
-          marginBottom: "var(--sovereign-space-6)",
-        }}
-      >
-        <label>
-          scheme{" "}
+    <div className={styles.catalogue}>
+      <div className={styles.appearanceControls} role="group" aria-label="Catalogue appearance">
+        <label className={styles.appearanceField}>
+          <span>scheme</span>
           <select
             className={styles.control}
             value={schemeId}
@@ -100,8 +94,8 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
             ))}
           </select>
         </label>
-        <label>
-          scale{" "}
+        <label className={styles.appearanceField}>
+          <span>scale</span>
           <select
             className={styles.control}
             value={scale}
@@ -116,6 +110,6 @@ export const Provider: GlobalProvider = ({ children, globalState }) => {
         </label>
       </div>
       {children}
-    </>
+    </div>
   );
 };

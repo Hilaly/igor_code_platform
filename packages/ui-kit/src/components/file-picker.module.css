@@ -1,10 +1,3 @@
-/*
- * Проводник в модальном слое. Цвета — только переменные ролей, размеры — только шкала кита: значения
- * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md). Своей
- * модальной геометрии нет — её даёт `Dialog`; здесь только то, что внутри его содержимого.
- */
-
-/* Строка текущего пути и кнопка «наверх»: стоят в ряд, путь уходит в сторону, обрезаясь, а не растягивая слой. */
 .path {
   display: flex;
   align-items: center;
@@ -14,12 +7,17 @@
 
 .path > :last-child {
   min-width: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Запись списка: значок-маркер и имя. Маркер — принадлежность к папке или файлу — декоративен. */
 .entry {
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-2);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

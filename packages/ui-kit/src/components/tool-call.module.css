@@ -1,20 +1,20 @@
-/*
- * Вызов инструмента внутри ленты. Рамка нужна: в потоке ответа он стоит между абзацами текста, и без
- * границы читается как ещё один абзац.
- */
-
 .root {
+  min-width: 0;
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-inline-start-width: var(--sovereign-stroke-emphasis);
   border-radius: var(--sovereign-radius-sm);
-  background: var(--sovereign-panel-surface);
+  background: var(--sovereign-fill-surface);
+  font-family: var(--sovereign-font-family-mono);
 }
 
-/* Идущий вызов заметен не только по переведённой подписи: акцентная кромка остаётся в ленте. */
 .root[data-status="running"] {
   border-inline-start-color: var(--sovereign-accent-border);
 }
 
-/* Провалившийся вызов виден по краю, а не только по значку: цвет один, но опор для глаза две. */
+.root[data-status="done"] {
+  border-inline-start-color: var(--sovereign-success-border);
+}
+
 .root[data-status="failed"] {
   border-color: var(--sovereign-danger-border);
 }
@@ -24,8 +24,8 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sovereign-space-2);
-  min-width: 0;
   width: 100%;
+  min-width: 0;
 }
 
 .icon {
@@ -36,15 +36,15 @@
 
 .identity {
   display: flex;
-  min-width: 0;
   align-items: baseline;
   gap: var(--sovereign-space-2);
+  min-width: 0;
   overflow-x: auto;
   font-family: var(--sovereign-font-family-mono);
 }
 
 .identity > code {
-  flex: 0 0 auto;
+  flex: none;
   white-space: nowrap;
 }
 
@@ -62,7 +62,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-2);
-  /* Переведённое состояние остаётся интерфейсным текстом даже внутри serif-реплики агента. */
+  min-width: 0;
   font-family: var(--sovereign-font-family-body);
 }
 
@@ -71,4 +71,6 @@
   color: var(--sovereign-text-muted);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-semibold);
+  text-transform: uppercase;
 }

@@ -21,6 +21,7 @@ export function SettingsView({
       <header className={styles.context}>{context}</header>
       <div className={styles.body}>
         <nav className={styles.navigation} aria-label={navigationLabel}>
+          <div className={styles.navigationHeader}>{navigationLabel}</div>
           <div className={styles.navigationItems}>{navigation}</div>
         </nav>
         <main className={styles.content}>{children}</main>

@@ -357,6 +357,10 @@ describe("stylesheets of the kit", () => {
       /\.navigationItemSelected\s*\{[^}]*background:\s*var\(--sovereign-accent-surface\)/s,
     );
     expect(settingsFrameCss).toMatch(
+      /\.navigationItemSelected\s*\{[^}]*color:\s*var\(--sovereign-text\);/s,
+    );
+    expect(settingsFrameCss).toMatch(/\.navigationHeader\s*\{/);
+    expect(settingsFrameCss).toMatch(
       /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
     );
     expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
@@ -373,6 +377,18 @@ describe("stylesheets of the kit", () => {
     expect(settingsFrameCss).toMatch(
       /@container\s*\(width\s*<\s*28rem\)[\s\S]*\.row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
     );
+  });
+
+  it("keeps rich picker selectors aligned with their runtime hooks", () => {
+    const comboboxCss = readFileSync(join(kitRoot, "components", "combobox.module.css"), "utf8");
+    const nextTurnCss = readFileSync(
+      join(kitRoot, "components", "next-turn-picker.module.css"),
+      "utf8",
+    );
+
+    expect(comboboxCss).not.toMatch(/\.focused\b/);
+    expect(nextTurnCss).toMatch(/\.modelSubmenu\s*\{/);
+    expect(nextTurnCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 
   it("keeps shared application states flat and elevates only overlays", () => {
