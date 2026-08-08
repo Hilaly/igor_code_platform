@@ -50,7 +50,7 @@ const snapshot: PluginsSnapshot = {
   enablement: { "data:example": { enabled: true, disabledContributions: [] } },
 };
 
-it("presents a compact plugin row and opens the nested detail page", () => {
+it("opens the nested detail from the whole compact row but keeps its toggle independent", () => {
   const onSwitch = vi.fn();
   const onOpen = vi.fn();
   const { container } = render(
@@ -63,24 +63,52 @@ it("presents a compact plugin row and opens the nested detail page", () => {
   );
 
   const row = screen.getByRole("listitem");
+  expect(within(row).getByRole("group", { name: "example" })).toBeTruthy();
   expect(container.querySelectorAll("section")).toHaveLength(0);
   expect(within(row).getByText("example")).toBeTruthy();
   expect(within(row).getByText("Running")).toBeTruthy();
   expect(within(row).getByText("1 contribution")).toBeTruthy();
   expect(within(row).queryByText("Example action")).toBeNull();
+  expect(within(row).queryByText("Open")).toBeNull();
 
   const pluginToggle = within(row).getByRole("checkbox", { name: "Switched on" });
 
   expect(pluginToggle).toHaveProperty("checked", true);
+  expect(within(row).getByRole("tooltip", { name: "Switched on" })).toBeTruthy();
+  expect(
+    pluginToggle.closest("label")?.querySelector('[class*="visuallyHidden"]')?.textContent,
+  ).toBe("Switched on");
 
   fireEvent.click(pluginToggle);
   expect(onSwitch).toHaveBeenNthCalledWith(1, "data:example", {
     enabled: false,
     disabledContributions: [],
   });
+  expect(onOpen).not.toHaveBeenCalled();
 
-  fireEvent.click(within(row).getByRole("button", { name: "Open" }));
+  fireEvent.click(within(row).getByRole("button", { name: "Open example" }));
   expect(onOpen).toHaveBeenCalledWith("data:example");
+});
+
+it("keeps plugin warnings in one flat notice band above the rows", () => {
+  const withWarnings: PluginsSnapshot = {
+    ...snapshot,
+    conflicts: [{ id: "example.action", source: "data", plugins: ["data:example", "data:other"] }],
+  };
+
+  const { container } = render(
+    <PluginsView
+      state={{ snapshot: withWarnings, stale: true, failure: "write failed" }}
+      onSwitch={vi.fn()}
+      onOpen={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const notices = container.querySelector(".plugins-notices");
+  expect(notices).not.toBeNull();
+  expect(notices?.querySelectorAll('[role="alert"]')).toHaveLength(3);
+  expect(notices?.nextElementSibling?.getAttribute("role")).toBe("list");
 });
 
 it("labels every shipped contribution kind without reporting a missing translation", () => {

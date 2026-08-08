@@ -7,14 +7,13 @@ import {
   Badge,
   Code,
   EmptyState,
-  Heading,
   ListRow,
   Notice,
+  SettingsRow,
   Spinner,
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useId } from "react";
 
 import type { FileResourcesState } from "./file-resources-state.ts";
 
@@ -62,19 +61,20 @@ function problemsOf(state: FileResourcesState): Problem[] {
 
 export function FileResourcesPanel({ state, translator }: FileResourcesPanelProps) {
   const { t } = translator;
-  const headingId = useId();
 
   return (
-    <section className="project-resources" aria-labelledby={headingId}>
-      <hgroup id={headingId}>
-        <Heading level={2}>{t("projects.resources.title")}</Heading>
-      </hgroup>
+    <section className="project-resources" aria-label={t("projects.resources.title")}>
       {state.snapshot === undefined ? (
-        state.failure === undefined ? (
-          <Spinner label={t("projects.resources.loading")} />
-        ) : (
-          <Notice tone="danger" title={t("projects.resources.failed", { reason: state.failure })} />
-        )
+        <SettingsRow label={t("projects.resources.title")}>
+          {state.failure === undefined ? (
+            <Spinner label={t("projects.resources.loading")} />
+          ) : (
+            <Notice
+              tone="danger"
+              title={t("projects.resources.failed", { reason: state.failure })}
+            />
+          )}
+        </SettingsRow>
       ) : (
         <ResourcesContent state={state} translator={translator} />
       )}
@@ -90,7 +90,6 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
     ({ state: resourceState }) => resourceState === "active",
   );
   const problems = problemsOf(state);
-  const problemsHeadingId = useId();
 
   return (
     <>
@@ -98,35 +97,39 @@ function ResourcesContent({ state, translator }: FileResourcesPanelProps) {
         <Notice tone="danger" title={t("projects.resources.failed", { reason: state.failure })} />
       )}
       {state.stale ? <Notice tone="warning" title={t("projects.resources.stale")} /> : undefined}
-      <div className="project-resources-counts">
-        <Text>
-          {t("projects.resources.agents.count", {
-            count: active.filter(({ kind }) => kind === "agent").length,
-          })}
-        </Text>
-        <Text>
-          {t("projects.resources.skills.count", {
-            count: active.filter(({ kind }) => kind === "skill").length,
-          })}
-        </Text>
-      </div>
-      <section className="project-resources-problems" aria-labelledby={problemsHeadingId}>
-        <hgroup id={problemsHeadingId}>
-          <Heading level={3}>{t("projects.resources.problems.title")}</Heading>
-        </hgroup>
-        {problems.length === 0 ? (
-          <EmptyState title={t("projects.resources.problems.empty")} />
-        ) : (
-          <ul className="projects-list" aria-label={t("projects.resources.problems.label")}>
-            {problems.map((problem, index) => (
-              <ProblemRow
-                key={`${problem.category}:${pathOf(problem)}:${String(index)}`}
-                problem={problem}
-                translator={translator}
-              />
-            ))}
-          </ul>
-        )}
+      <SettingsRow label={t("projects.resources.title")}>
+        <div className="project-resources-counts">
+          <Text>
+            {t("projects.resources.agents.count", {
+              count: active.filter(({ kind }) => kind === "agent").length,
+            })}
+          </Text>
+          <Text>
+            {t("projects.resources.skills.count", {
+              count: active.filter(({ kind }) => kind === "skill").length,
+            })}
+          </Text>
+        </div>
+      </SettingsRow>
+      <section
+        className="project-resources-problems"
+        aria-label={t("projects.resources.problems.title")}
+      >
+        <SettingsRow label={t("projects.resources.problems.title")}>
+          {problems.length === 0 ? (
+            <EmptyState title={t("projects.resources.problems.empty")} />
+          ) : (
+            <ul className="projects-list" aria-label={t("projects.resources.problems.label")}>
+              {problems.map((problem, index) => (
+                <ProblemRow
+                  key={`${problem.category}:${pathOf(problem)}:${String(index)}`}
+                  problem={problem}
+                  translator={translator}
+                />
+              ))}
+            </ul>
+          )}
+        </SettingsRow>
       </section>
     </>
   );

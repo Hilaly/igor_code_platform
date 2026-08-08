@@ -15,11 +15,9 @@ import type {
 } from "@sovereign/protocol";
 import {
   Badge,
-  Button,
   EmptyState,
-  List,
-  ListRow,
   Notice,
+  SettingsRow,
   Spinner,
   Text,
   Toggle,
@@ -69,54 +67,56 @@ export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsView
 
   return (
     <div className="plugins">
-      {state.stale ? (
-        <Notice tone="warning" title={t("plugins.stale.title")}>
-          {t("plugins.stale.hint")}
-        </Notice>
-      ) : undefined}
+      <div className="plugins-notices">
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
 
-      {state.failure === undefined ? undefined : (
-        <Notice tone="danger" title={t("plugins.write.failed", { reason: state.failure })} />
-      )}
+        {state.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("plugins.write.failed", { reason: state.failure })} />
+        )}
 
-      {snapshot.conflicts.length === 0 ? undefined : (
-        <Notice tone="warning" title={t("plugins.conflicts.title")}>
-          <ul className="plugins-reasons">
-            {snapshot.conflicts.map((conflict) => (
-              <li key={conflict.id}>
-                {t("plugins.conflicts.item", {
-                  id: conflict.id,
-                  plugins: conflict.plugins.join(", "),
-                })}
-              </li>
-            ))}
-          </ul>
-        </Notice>
-      )}
+        {snapshot.conflicts.length === 0 ? undefined : (
+          <Notice tone="warning" title={t("plugins.conflicts.title")}>
+            <ul className="plugins-reasons">
+              {snapshot.conflicts.map((conflict) => (
+                <li key={conflict.id}>
+                  {t("plugins.conflicts.item", {
+                    id: conflict.id,
+                    plugins: conflict.plugins.join(", "),
+                  })}
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        )}
 
-      {snapshot.routeConflicts.length === 0 ? undefined : (
-        <Notice tone="warning" title={t("plugins.routeConflicts.title")}>
-          <ul className="plugins-reasons">
-            {snapshot.routeConflicts.map((conflict) => (
-              <li key={`${conflict.method} ${conflict.path}`}>
-                {t("plugins.routeConflicts.item", {
-                  method: conflict.method,
-                  path: conflict.path,
-                  contributions: conflict.contributions.join(", "),
-                  plugins: conflict.pluginKeys.join(", "),
-                })}
-              </li>
-            ))}
-          </ul>
-        </Notice>
-      )}
+        {snapshot.routeConflicts.length === 0 ? undefined : (
+          <Notice tone="warning" title={t("plugins.routeConflicts.title")}>
+            <ul className="plugins-reasons">
+              {snapshot.routeConflicts.map((conflict) => (
+                <li key={`${conflict.method} ${conflict.path}`}>
+                  {t("plugins.routeConflicts.item", {
+                    method: conflict.method,
+                    path: conflict.path,
+                    contributions: conflict.contributions.join(", "),
+                    plugins: conflict.pluginKeys.join(", "),
+                  })}
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        )}
 
-      <PublicRoutes snapshot={snapshot} translator={translator} />
+        <PublicRoutes snapshot={snapshot} translator={translator} />
+      </div>
 
       {snapshot.plugins.length === 0 ? (
         <EmptyState title={t("plugins.empty")} />
       ) : (
-        <List>
+        <div className="plugins-list" role="list">
           {snapshot.plugins.map((status) => (
             <PluginRow
               key={status.key}
@@ -127,7 +127,7 @@ export function PluginsView({ state, onSwitch, onOpen, translator }: PluginsView
               translator={translator}
             />
           ))}
-        </List>
+        </div>
       )}
     </div>
   );
@@ -214,28 +214,42 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
           : onSwitch(status.key, { ...preferences, enabled: on })
       }
       label={t("plugins.toggle.plugin")}
+      labelDisplay="tooltip"
+      size="xs"
       {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
     />
   );
   const contributions = [...snapshot.contributions, ...snapshot.switchedOffContributions].filter(
     (registration) => registration.ownership === "plugin" && registration.pluginKey === status.key,
   ).length;
-  return (
-    <ListRow>
-      <div className="plugins-row">
-        <div className="plugins-row-main">
-          <Text>{status.id ?? status.key}</Text>
-          <Text tone="muted">{status.key}</Text>
-        </div>
+  const rowContents = (
+    <div className="plugins-row-controls">
+      <div className="plugins-row-meta">
         <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
         <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
-        {pluginToggle}
-        {onOpen === undefined ? undefined : (
-          <Button size="sm" onClick={() => onOpen(status.key)}>
-            {t("plugins.detail.open")}
-          </Button>
-        )}
       </div>
-    </ListRow>
+      {pluginToggle}
+    </div>
+  );
+  return (
+    <div role="listitem">
+      {onOpen === undefined ? (
+        <SettingsRow
+          label={status.id ?? status.key}
+          description={<Text tone="muted">{status.key}</Text>}
+        >
+          {rowContents}
+        </SettingsRow>
+      ) : (
+        <SettingsRow
+          label={status.id ?? status.key}
+          description={<Text tone="muted">{status.key}</Text>}
+          onSelect={() => onOpen(status.key)}
+          selectLabel={`${t("plugins.detail.open")} ${status.id ?? status.key}`}
+        >
+          {rowContents}
+        </SettingsRow>
+      )}
+    </div>
   );
 }

@@ -27,15 +27,15 @@ import {
   CodeBlock,
   ConfirmDialog,
   EmptyState,
-  Heading,
   List,
   ListRow,
   Notice,
+  SettingsRow,
   Spinner,
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
@@ -152,19 +152,25 @@ export function ProvidersView({
 
     return (
       <div className="providers">
-        <Button onClick={onBack}>{t("providers.back")}</Button>
-        <Text>{provider.name}</Text>
+        <div className="providers-detail-toolbar">
+          <Button onClick={onBack}>{t("providers.back")}</Button>
+        </div>
         {logins}
-        <ProviderHeader provider={provider} translator={translator} />
-        {provider.origin === "user" ? (
-          <UserProviderActions
-            provider={provider}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onRefresh={onRefresh}
-            translator={translator}
-          />
-        ) : undefined}
+        <ProviderHeader
+          provider={provider}
+          translator={translator}
+          actions={
+            provider.origin === "user" ? (
+              <UserProviderActions
+                provider={provider}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onRefresh={onRefresh}
+                translator={translator}
+              />
+            ) : undefined
+          }
+        />
         <ProviderAccess
           provider={provider}
           stubborn={state.logins.stubborn[provider.id]}
@@ -352,34 +358,42 @@ function UserProviderActions({
 type ProviderHeaderProps = {
   provider: ProviderSummary;
   translator: ScopedTranslator;
+  actions?: ReactNode;
 };
 
 /** Шапка страницы провайдера: имя, идентификатор, состояние авторизации. */
-function ProviderHeader({ provider, translator }: ProviderHeaderProps) {
+function ProviderHeader({ provider, translator, actions }: ProviderHeaderProps) {
   const { t } = translator;
 
   return (
-    <div className="providers-header">
-      <div className="providers-header-facts">
-        <Code>{provider.id}</Code>
-        <Text tone="muted">
-          {provider.logins.length === 0
-            ? t("providers.logins.none")
-            : t("providers.logins", {
-                methods: provider.logins.map((login) => login.label).join(", "),
-              })}
-        </Text>
+    <SettingsRow
+      label={provider.name}
+      description={
+        <span className="providers-header-facts">
+          <Code>{provider.id}</Code>
+          <Text tone="muted">
+            {provider.logins.length === 0
+              ? t("providers.logins.none")
+              : t("providers.logins", {
+                  methods: provider.logins.map((login) => login.label).join(", "),
+                })}
+          </Text>
+        </span>
+      }
+    >
+      <div className="providers-header-control">
+        <div className="providers-header-marks">
+          <AuthMark auth={provider.auth} translator={translator} />
+          <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
+          {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
+          {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
+          {provider.origin === "user" ? (
+            <Badge tone="neutral">{t("providers.user.badge")}</Badge>
+          ) : undefined}
+        </div>
+        {actions}
       </div>
-      <div className="providers-header-marks">
-        <AuthMark auth={provider.auth} translator={translator} />
-        <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
-        {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
-        {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
-        {provider.origin === "user" ? (
-          <Badge tone="neutral">{t("providers.user.badge")}</Badge>
-        ) : undefined}
-      </div>
-    </div>
+    </SettingsRow>
   );
 }
 
@@ -409,30 +423,31 @@ function ProviderAccess({
   const { t } = translator;
 
   return (
-    <section className="providers-section">
-      <Heading level={3}>{t("providers.access.title", { name: provider.name })}</Heading>
-      <div className="providers-access">
-        {provider.logins.length === 0 ? (
-          <Text tone="muted">{t("providers.logins.none")}</Text>
-        ) : (
-          provider.logins.map((login) => (
-            <Button
-              key={login.type}
-              tone="accent"
-              disabled={busy}
-              onClick={() => onLogIn(provider.id, login.type)}
-            >
-              {login.label}
-            </Button>
-          ))
-        )}
+    <section className="providers-detail-rows">
+      <SettingsRow label={t("providers.access.title", { name: provider.name })}>
+        <div className="providers-access">
+          {provider.logins.length === 0 ? (
+            <Text tone="muted">{t("providers.logins.none")}</Text>
+          ) : (
+            provider.logins.map((login) => (
+              <Button
+                key={login.type}
+                tone="accent"
+                disabled={busy}
+                onClick={() => onLogIn(provider.id, login.type)}
+              >
+                {login.label}
+              </Button>
+            ))
+          )}
 
-        {provider.auth.kind === "configured" ? (
-          <Button tone="danger" onClick={() => onLogOut(provider.id)}>
-            {t("providers.logout")}
-          </Button>
-        ) : undefined}
-      </div>
+          {provider.auth.kind === "configured" ? (
+            <Button tone="danger" onClick={() => onLogOut(provider.id)}>
+              {t("providers.logout")}
+            </Button>
+          ) : undefined}
+        </div>
+      </SettingsRow>
 
       {stubborn === undefined ? undefined : (
         // Ловушка «нажал выход, ничего не изменилось»: кред из окружения платформе не принадлежит, и
@@ -528,21 +543,24 @@ function ProviderModels({ provider, entry, translator }: ProviderModelsProps) {
   const { t } = translator;
 
   return (
-    <section className="providers-section">
-      <Heading level={3}>{t("providers.models.title", { name: provider.name })}</Heading>
-      {entry === undefined || entry.kind === "loading" ? (
-        <Spinner label={t("state.loading")} />
-      ) : entry.kind === "failed" ? (
-        <Notice tone="danger" title={t("providers.models.failed", { reason: entry.reason })} />
-      ) : entry.models.length === 0 ? (
-        <EmptyState title={t("providers.models.empty")} />
-      ) : (
-        <List>
-          {entry.models.map((model) => (
-            <ModelRow key={model.id} model={model} translator={translator} />
-          ))}
-        </List>
-      )}
+    <section className="providers-detail-rows">
+      <SettingsRow label={t("providers.models.title", { name: provider.name })}>
+        <div className="providers-models-control">
+          {entry === undefined || entry.kind === "loading" ? (
+            <Spinner label={t("state.loading")} />
+          ) : entry.kind === "failed" ? (
+            <Notice tone="danger" title={t("providers.models.failed", { reason: entry.reason })} />
+          ) : entry.models.length === 0 ? (
+            <EmptyState title={t("providers.models.empty")} />
+          ) : (
+            <List>
+              {entry.models.map((model) => (
+                <ModelRow key={model.id} model={model} translator={translator} />
+              ))}
+            </List>
+          )}
+        </div>
+      </SettingsRow>
     </section>
   );
 }

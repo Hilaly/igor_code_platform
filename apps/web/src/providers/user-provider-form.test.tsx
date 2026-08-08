@@ -21,6 +21,45 @@ const translator = createTranslator({
 });
 
 describe("UserProviderForm", () => {
+  it("uses settings rows instead of nested panels for every provider property", () => {
+    render(
+      <UserProviderForm
+        mode="create"
+        onBack={vi.fn()}
+        onSubmit={vi.fn(async () => undefined)}
+        translator={translator}
+      />,
+    );
+
+    for (const name of ["Идентификатор", "Название", "Базовый URL API"]) {
+      expect(screen.getByRole("textbox", { name }).closest('[role="group"]')).not.toBeNull();
+    }
+    expect(
+      screen.getByRole("combobox", { name: "Формат запросов" }).closest('[role="group"]'),
+    ).not.toBeNull();
+    const expectTooltipToggles = (name: string, count: number) => {
+      const toggles = screen.getAllByRole("checkbox", { name });
+      expect(toggles).toHaveLength(count);
+      expect(screen.getAllByRole("tooltip", { name })).toHaveLength(count);
+      for (const toggle of toggles) {
+        expect(
+          toggle.closest("label")?.querySelector('[class*="visuallyHidden"]')?.textContent,
+        ).toBe(name);
+      }
+    };
+    for (const name of [
+      "Загружать модели автоматически",
+      "Модели поддерживают reasoning",
+      "Модели принимают изображения",
+    ]) {
+      expectTooltipToggles(name, 1);
+    }
+    fireEvent.click(screen.getByRole("button", { name: /Добавить ручную модель/ }));
+    expectTooltipToggles("Модели поддерживают reasoning", 2);
+    expectTooltipToggles("Модели принимают изображения", 2);
+    expect(document.querySelector("[class*='panel']")).toBeNull();
+  });
+
   it("creates a persistent provider with protocol defaults and manual models", async () => {
     const onSubmit = vi.fn(async () => undefined);
 

@@ -106,6 +106,7 @@
 }
 
 .row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(10rem, 0.75fr) minmax(16rem, 1.25fr);
   align-items: center;
@@ -115,13 +116,46 @@
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+.rowSelectable:hover {
+  background: var(--sovereign-control-surface-hover);
+}
+
+.rowSelect {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 0;
+  border-radius: var(--sovereign-radius-xs);
+  background: transparent;
+  cursor: pointer;
+}
+
+.rowSelect:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: calc(-1 * var(--sovereign-stroke-emphasis));
+}
+
 .row:last-child {
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .rowCopy,
 .rowControl {
+  position: relative;
   min-width: 0;
+}
+
+.rowSelectable .rowCopy,
+.rowSelectable .rowControl {
+  pointer-events: none;
+}
+
+.rowControl {
+  z-index: 1;
+}
+
+.rowSelectable .rowControl :is(a, button, input, select, textarea, label, [role="button"]) {
+  pointer-events: auto;
 }
 
 .rowCopy {
