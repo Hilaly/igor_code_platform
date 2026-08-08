@@ -286,6 +286,18 @@ describe("ProjectsView", () => {
     expect(folder.value).toBe("  ~/code/platform  ");
   });
 
+  it("lays out every new-project property as a settings row", () => {
+    show(withProjects([]));
+    openNewProject();
+
+    const folderRow = screen.getByRole("textbox", { name: "Папка" }).closest('[role="group"]');
+    const nameRow = screen.getByRole("textbox", { name: "Имя" }).closest('[role="group"]');
+
+    expect(folderRow).not.toBeNull();
+    expect(nameRow).not.toBeNull();
+    expect(within(folderRow as HTMLElement).getByRole("button", { name: "Обзор…" })).toBeDefined();
+  });
+
   it("clears the form once the project is created", async () => {
     const { onCreate } = show(withProjects([]));
     openNewProject();

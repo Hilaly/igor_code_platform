@@ -176,7 +176,7 @@ describe("the style sheets of the application", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
     expect(projects).toMatch(
-      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*opacity:\s*1;/s,
+      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
     );
   });
 
@@ -274,13 +274,26 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps plugin list and detail rows compact and divided", () => {
+  it("leaves plugin list and detail row geometry to SettingsRow", () => {
+    const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
+
+    expect(settings).not.toMatch(/\.plugins-row\s*\{/s);
+    expect(settings).not.toMatch(/\.plugin-detail-(?:surface|hero|facts)\s*\{/s);
+    expect(settings).toMatch(/\.plugin-detail-rows[\s,]*\.plugin-detail-contributions\s*\{/s);
+    expect(settings).toMatch(/\.plugin-detail-contribution-controls\s*\{[^}]*min-width:\s*0;/s);
+  });
+
+  it("keeps the plugin list row target full-size and its metadata in two compact lines", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
     expect(settings).toMatch(
-      /\.plugins-row\s*\{[^}]*min-height:\s*var\(--sovereign-row-height-compact\);/s,
+      /\.plugins-list\s*>\s*\[role="listitem"\]\s*\{[^}]*position:\s*relative;/s,
     );
-    expect(settings).toMatch(/\.plugin-detail-facts\s*\{[^}]*border-block-start:/s);
-    expect(settings).toMatch(/\.plugin-detail-contribution\s*\{[^}]*min-width:\s*0;/s);
+    expect(settings).toMatch(
+      /\.plugins-row-controls\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
+    );
+    expect(settings).toMatch(
+      /\.plugins-row-meta\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-xs\);/s,
+    );
   });
 });

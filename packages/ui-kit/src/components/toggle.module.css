@@ -1,10 +1,7 @@
 /*
- * Стиль переключателя. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем
- * держится дисциплина цвета»).
- *
  * Настоящий `input` остаётся в дереве и только уводится с глаз: он даёт фокус, клавиатуру и роль
- * для скринридера. Видимый бокс рисует соседний элемент, а галочку — его `::after` по состоянию
- * `:checked`, поэтому второго источника истины о том, включено ли, не появляется.
+ * скринридеру. Соседний трек рисует состояние, а его `::after` — круглый бегунок: обе части читают
+ * один и тот же `:checked`, поэтому второго источника истины о значении не появляется.
  */
 
 .toggle {
@@ -12,16 +9,32 @@
   align-items: center;
   gap: var(--sovereign-space-2);
   color: var(--sovereign-text);
-  font-size: var(--sovereign-font-size-sm);
   cursor: pointer;
+}
+
+.sm {
+  --toggle-track-width: 2.5rem;
+  --toggle-track-height: 1.4rem;
+  --toggle-thumb-size: 1rem;
+  --toggle-thumb-offset: 0.15rem;
+  --toggle-thumb-translate: 1.1rem;
+
+  font-size: var(--sovereign-font-size-sm);
+}
+
+.xs {
+  --toggle-track-width: 2rem;
+  --toggle-track-height: 1.125rem;
+  --toggle-thumb-size: 0.75rem;
+  --toggle-thumb-offset: 0.1875rem;
+  --toggle-thumb-translate: 0.875rem;
+
+  font-size: var(--sovereign-font-size-xs);
 }
 
 .input {
   position: absolute;
-  /*
-   * Не ноль: элемент нулевого размера часть браузеров исключает из порядка обхода с клавиатуры.
-   * Величина не из шкалы, потому что это не размер в раскладке, а минимум, оставляющий контрол живым.
-   */
+  /* Не ноль: элемент нулевого размера часть браузеров исключает из порядка клавиатурного обхода. */
   width: 1px;
   height: 1px;
   padding: var(--sovereign-space-0);
@@ -34,16 +47,27 @@
   position: relative;
   display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--sovereign-space-4);
-  height: var(--sovereign-space-4);
+  width: var(--toggle-track-width);
+  height: var(--toggle-track-height);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
-  border-radius: var(--sovereign-radius-2xs);
+  border-radius: var(--sovereign-radius-full);
   background: var(--sovereign-sunken-surface);
   transition:
     background var(--sovereign-duration-fast) var(--sovereign-ease-out),
     border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+
+.box::after {
+  position: absolute;
+  top: var(--toggle-thumb-offset);
+  left: var(--toggle-thumb-offset);
+  width: var(--toggle-thumb-size);
+  height: var(--toggle-thumb-size);
+  border-radius: var(--sovereign-radius-full);
+  background: var(--sovereign-control-surface);
+  content: "";
+  transform: translateX(0);
+  transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .toggle:hover .box {
@@ -51,24 +75,15 @@
 }
 
 .input:checked + .box {
-  border-color: transparent;
+  border-color: var(--sovereign-accent-border);
   background: var(--sovereign-accent);
 }
 
 .input:checked + .box::after {
-  content: "";
-  /*
-   * Галочка — две стороны квадрата, повёрнутые на 45°. Размеры в `em` от кегля подписи: шкала
-   * отступов дала бы галочку, не связанную с текстом, и при смене масштаба они разъехались бы.
-   */
-  width: 0.3em;
-  height: 0.55em;
-  border-right: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-on-accent);
-  border-bottom: var(--sovereign-stroke-emphasis) solid var(--sovereign-text-on-accent);
-  transform: rotate(45deg) translate(-0.05em, -0.05em);
+  transform: translateX(var(--toggle-thumb-translate));
 }
 
-/* Кольцо фокуса переносится на видимый бокс: у самого контрола показывать его негде. */
+/* Кольцо фокуса переносится на видимый трек: у настоящего контрола показывать его негде. */
 .input:focus-visible + .box {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
   outline-offset: var(--sovereign-space-1);
@@ -81,4 +96,20 @@
 
 .label {
   line-height: var(--sovereign-line-height-snug);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box,
+  .box::after {
+    transition: none;
+  }
 }

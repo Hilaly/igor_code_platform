@@ -27,18 +27,6 @@
   flex-wrap: wrap;
 }
 
-/*
- * Шапка страницы одного провайдера: те же двое, что в строке списка, но на отдельной странице.
- * Раскладка повторяет строку, чтобы взгляд узнавал блок — разница только в отступах страницы.
- */
-.providers-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sovereign-space-3);
-  flex-wrap: wrap;
-}
-
 .providers-row-facts {
   display: flex;
   flex-direction: column;
@@ -73,16 +61,18 @@
   flex-wrap: wrap;
 }
 
-/*
- * На странице одного провайдера вход и модели — разделы одного объекта, а не самостоятельные
- * карточки. Заголовок и тонкий разделитель сохраняют иерархию без вложенных поднятых поверхностей.
- */
-.providers-section {
+.providers-header-control,
+.providers-models-control {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
-  padding-block-start: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  align-items: flex-end;
+  width: 100%;
+  min-width: 0;
+}
+
+.providers-models-control > * {
+  width: 100%;
 }
 
 /*
@@ -104,6 +94,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-3);
+}
+
+.providers-login-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.providers-login-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /*
@@ -165,8 +168,33 @@
   flex-wrap: wrap;
 }
 
-.provider-form-page form {
-  display: grid;
-  gap: var(--sovereign-space-4);
-  max-width: 48rem;
+.providers-detail-toolbar,
+.provider-form-toolbar,
+.provider-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+}
+
+.provider-form-rows,
+.provider-manual-models,
+.provider-manual-model {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.provider-form-section-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  padding-block: var(--sovereign-space-4) var(--sovereign-space-2);
+}
+
+.provider-manual-model {
+  padding-block-start: var(--sovereign-space-2);
+}
+
+.provider-form-actions {
+  padding-block: var(--sovereign-space-3);
 }

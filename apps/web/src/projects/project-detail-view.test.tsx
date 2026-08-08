@@ -65,6 +65,21 @@ describe("ProjectDetailView", () => {
     expect(screen.getByText("Файловые ресурсы проекта")).toBeDefined();
   });
 
+  it("presents the project facts as flat settings rows", () => {
+    render(
+      <ProjectDetailView
+        project={project}
+        loaded
+        onBack={vi.fn()}
+        onNewSession={vi.fn()}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "Alpha" })).toBeDefined();
+    expect(screen.getByRole("group", { name: "Сессий: 3" })).toBeDefined();
+  });
+
   it("keeps one page heading and a named action toolbar outside the detail object", () => {
     render(
       <ProjectDetailView

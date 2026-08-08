@@ -291,6 +291,13 @@ describe("ProvidersView", () => {
     expect(remove.closest("li")).toBeNull();
   });
 
+  it("presents provider identity and access as flat settings rows", () => {
+    show(withProviders([provider("anthropic")]), "anthropic");
+
+    expect(screen.getByRole("group", { name: "Anthropic" })).toBeDefined();
+    expect(screen.getByRole("group", { name: "Вход в Anthropic" })).toBeDefined();
+  });
+
   it("shows the models of the open provider with the window and the price", () => {
     const state = applyModels(
       markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),
@@ -407,6 +414,15 @@ describe("the way into a provider", () => {
 });
 
 describe("a login that is already running", () => {
+  it("keeps the login flow in a flat settings row", () => {
+    const state = withProviders([provider("anthropic")]);
+
+    show(withLogin(state, applyStarted(state.logins, attempt())));
+
+    expect(screen.getByRole("group", { name: "Вход в Anthropic" })).toBeDefined();
+    expect(document.querySelector("[class*='panel']")).toBeNull();
+  });
+
   it("shows who took the provider and that a plugin answers its questions", () => {
     const state = withProviders([provider("anthropic")]);
 

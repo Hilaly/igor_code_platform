@@ -149,6 +149,18 @@ describe("FileResourcesPanel", () => {
     expect(within(problems).queryByRole("button")).toBeNull();
   });
 
+  it("uses flat settings rows for the resource summary and problems", () => {
+    render(
+      <FileResourcesPanel
+        state={applyFileResourcesSnapshot(initialFileResourcesState, snapshot)}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "Файловые ресурсы" })).toBeDefined();
+    expect(screen.getByRole("group", { name: "Проблемы и неактивные ресурсы" })).toBeDefined();
+  });
+
   it("shows zero active counts and a no-problems state for an empty snapshot", () => {
     render(
       <FileResourcesPanel

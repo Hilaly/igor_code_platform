@@ -96,20 +96,42 @@ export function SettingsPage({
   );
 }
 
+type SettingsRowSelection =
+  | { onSelect?: undefined; selectLabel?: never }
+  | {
+      onSelect: () => void;
+      /** Accessible name of the full-row selection target. */
+      selectLabel: string;
+    };
+
 export type SettingsRowProps = {
   label: ReactNode;
   description?: ReactNode;
   children: ReactNode;
-};
+} & SettingsRowSelection;
 
 /** A mockup-aligned property row: explanation on the left, control or value on the right. */
-export function SettingsRow({ label, description, children }: SettingsRowProps) {
+export function SettingsRow({
+  label,
+  description,
+  children,
+  onSelect,
+  selectLabel,
+}: SettingsRowProps) {
   return (
     <div
-      className={styles.row}
+      className={`${styles.row}${onSelect === undefined ? "" : ` ${styles.rowSelectable}`}`}
       role="group"
       aria-label={typeof label === "string" ? label : undefined}
     >
+      {onSelect === undefined ? undefined : (
+        <button
+          type="button"
+          className={styles.rowSelect}
+          onClick={onSelect}
+          aria-label={selectLabel}
+        />
+      )}
       <div className={styles.rowCopy}>
         <div className={styles.rowLabel}>{label}</div>
         {description === undefined ? undefined : (

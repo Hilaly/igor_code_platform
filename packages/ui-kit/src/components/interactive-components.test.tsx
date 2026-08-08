@@ -14,6 +14,7 @@ import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
+import { Toggle } from "./toggle.tsx";
 import { Tooltip } from "./tooltip.tsx";
 import { Tree, type TreeNode } from "./tree.tsx";
 
@@ -45,6 +46,31 @@ function rect(values: Partial<DOMRect> = {}): DOMRect {
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it.each(["visible", "tooltip"] as const)(
+    "names the %s-label toggle with its required label",
+    (labelDisplay) => {
+      render(
+        <Toggle
+          checked={false}
+          onChange={() => {}}
+          label="Enable provider"
+          labelDisplay={labelDisplay}
+        />,
+      );
+
+      expect(screen.getByRole("checkbox", { name: "Enable provider" })).toBeTruthy();
+    },
+  );
+
+  it("reports the newly checked value when its switch is clicked", () => {
+    const onChange = vi.fn();
+    render(<Toggle checked={false} onChange={onChange} label="Enable provider" />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable provider" }));
+
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
   it("connects a selectable list row to an explicitly identified tooltip", () => {
     render(
       <List>

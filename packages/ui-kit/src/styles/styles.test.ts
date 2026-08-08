@@ -49,6 +49,87 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("styles DurationTimer as flat compact bold tabular body text", () => {
+    const timerCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "duration-timer.module.css"), "utf8"),
+    );
+
+    expect(timerCss).toMatch(
+      /\.timer\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-body\);/s,
+    );
+    expect(timerCss).toMatch(/\.digits\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-lg\);/s);
+    expect(timerCss).toMatch(
+      /\.digits\s*\{[^}]*font-weight:\s*var\(--sovereign-font-weight-bold\);/s,
+    );
+    expect(timerCss).toMatch(/\.digits\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/s);
+    expect(timerCss).not.toMatch(/(?:background|border|box-shadow)\s*:/);
+  });
+
+  it("defines the animated switch track, thumb, sizes, and motion fallback", () => {
+    const toggleCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "toggle.module.css"), "utf8"),
+    );
+
+    expect(toggleCss).toMatch(
+      /\.box\s*\{[^}]*display:\s*inline-flex;[^}]*border-radius:\s*var\(--sovereign-radius-full\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.box::after\s*\{[^}]*border-radius:\s*var\(--sovereign-radius-full\);/s,
+    );
+    expect(toggleCss).toContain('content: "";');
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box\s*\{[^}]*background:\s*var\(--sovereign-accent\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box\s*\{[^}]*border-color:\s*var\(--sovereign-accent-border\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:checked\s*\+\s*\.box::after\s*\{[^}]*transform:\s*translateX\(var\(--toggle-thumb-translate\)\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.input:focus-visible\s*\+\s*\.box\s*\{[^}]*outline:\s*var\(--sovereign-stroke-emphasis\)\s+solid\s+var\(--sovereign-focus-ring\);/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.toggle:has\(\.input:disabled\)\s*\{[^}]*opacity:[^}]*cursor:\s*not-allowed;/s,
+    );
+    expect(toggleCss).toMatch(
+      /transition:[^;]*(?:background|border-color)[\s\S]*?var\(--sovereign-duration-fast\)[\s\S]*?var\(--sovereign-ease-out\)/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.sm\s*\{[^}]*--toggle-track-width:[^}]*--toggle-track-height:[^}]*--toggle-thumb-size:[^}]*font-size:/s,
+    );
+    expect(toggleCss).toMatch(
+      /\.xs\s*\{[^}]*--toggle-track-width:[^}]*--toggle-track-height:[^}]*--toggle-thumb-size:[^}]*font-size:/s,
+    );
+    expect(toggleCss).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.box[\s\S]*?transition:\s*none;/s,
+    );
+  });
+
+  it("keeps an idle tooltip out of scroll overflow until interaction reveals it", () => {
+    const tooltipCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),
+    );
+
+    expect(tooltipCss).toMatch(/\.tip\s*\{[^}]*display:\s*none;/s);
+    expect(tooltipCss).toMatch(
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+    );
+  });
+
+  it("shows compact Toggle labels only on hover without removing focus tooltips elsewhere", () => {
+    const tooltipCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),
+    );
+    const toggle = readFileSync(join(kitRoot, "components", "toggle.tsx"), "utf8");
+
+    expect(tooltipCss).toMatch(
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+    );
+    expect(tooltipCss).not.toMatch(/\.hoverOnly:focus-within\s*>\s*\.tip/);
+    expect(toggle).toMatch(/<Tooltip\s+content=\{label\}\s+hoverOnly>[\s\S]*\{toggle\}/);
+  });
+
   it("ships the approved voice, interface, and machine fonts locally", () => {
     const entry = readFileSync(join(kitRoot, "styles", "index.css"), "utf8");
     const tokens = readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8");
@@ -185,6 +266,13 @@ describe("stylesheets of the kit", () => {
       /\.pageTitle\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\)/s,
     );
     expect(settingsFrameCss).toMatch(/\.row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
+    expect(settingsFrameCss).toMatch(/\.rowSelect\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/s);
+    expect(settingsFrameCss).toMatch(
+      /\.rowSelectable \.rowCopy,[\s\S]*?\.rowSelectable \.rowControl\s*\{[^}]*pointer-events:\s*none;/s,
+    );
+    expect(settingsFrameCss).toMatch(
+      /\.rowSelectable \.rowControl :is\([^}]+\)\s*\{[^}]*pointer-events:\s*auto;/s,
+    );
     expect(settingsFrameCss).toMatch(
       /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.navigation\s*\{[^}]*overflow-x:\s*auto;/s,
     );

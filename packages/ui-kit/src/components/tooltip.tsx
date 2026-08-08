@@ -1,11 +1,13 @@
 /**
  * Подсказка при наведении и при фокусе. Целиком на CSS: ни состояния, ни портала, ни измерений — обёртка
- * позиционирует пузырь собой, а показывает его `:hover` и `:focus-within`. Состояние в React означало бы
+ * позиционирует пузырь собой, а показывает его `:hover` и, по умолчанию, `:focus-within`. Состояние в React означало бы
  * перерисовку на каждое движение мыши, портал — расчёт координат вручную; за это платят те, кому нужно
  * вырваться из обрезающего предка, а подсказка живёт вплотную к своему элементу.
  *
  * Пузырь в разметке всегда, поэтому скринридер читает его вместе с элементом-триггером. Показ по фокусу
  * работает только если триггер сам умеет принимать фокус: у нарисованной картинки подсказки не будет.
+ * `hoverOnly` нужен для компактных контролов, которые после клика сохраняют фокус, но не должны оставлять
+ * служебную подпись на экране.
  */
 
 import { cloneElement, isValidElement, useId, type ReactNode } from "react";
@@ -21,11 +23,13 @@ export type TooltipProps = {
   /** Явный id нужен, когда описание связано с фокусируемым предком триггера. */
   id?: string;
   side?: TooltipSide;
+  /** Показывать подсказку только при наведении, не удерживая её после click/focus триггера. */
+  hoverOnly?: boolean;
   /** Элемент, к которому подсказка привязана. */
   children: ReactNode;
 };
 
-export function Tooltip({ content, id, side = "top", children }: TooltipProps) {
+export function Tooltip({ content, id, side = "top", hoverOnly = false, children }: TooltipProps) {
   const generatedId = useId();
   const tooltipId = id ?? generatedId;
   const trigger = isValidElement(children)
@@ -37,7 +41,7 @@ export function Tooltip({ content, id, side = "top", children }: TooltipProps) {
     : children;
 
   return (
-    <span className={styles.wrap}>
+    <span className={`${styles.wrap} ${hoverOnly ? styles.hoverOnly : ""}`}>
       {trigger}
       <span className={`${styles.tip} ${styles[side]}`} id={tooltipId} role="tooltip">
         {content}

@@ -8,13 +8,11 @@ import {
 } from "@sovereign/protocol";
 import {
   Button,
-  Field,
   Form,
-  Heading,
   Input,
   Notice,
-  Panel,
   Select,
+  SettingsRow,
   Text,
   Textarea,
   Toggle,
@@ -155,48 +153,62 @@ export function UserProviderForm(props: UserProviderFormProps) {
 
   return (
     <div className="providers provider-form-page">
-      <Button onClick={props.onBack}>{props.translator.t("providers.back")}</Button>
+      <div className="provider-form-toolbar">
+        <Button onClick={props.onBack}>{props.translator.t("providers.back")}</Button>
+      </div>
       {props.failure ? <Notice tone="danger" title={props.failure} /> : undefined}
       {diagnostics.length > 0 ? <Notice tone="danger" title={diagnostics.join("; ")} /> : undefined}
-      <Panel>
-        <Form onSubmit={submit} disabled={busy}>
-          <Field label={t("providers.user.id")} hint={t("providers.user.id.hint")}>
-            {(control) => (
-              <Input {...control} value={id} onChange={setId} disabled={props.mode === "edit"} />
-            )}
-          </Field>
-          <Field label={t("providers.user.name")}>
-            {(control) => <Input {...control} value={name} onChange={setName} />}
-          </Field>
-          <Field label={t("providers.user.baseUrl")}>
-            {(control) => <Input {...control} value={baseUrl} onChange={setBaseUrl} />}
-          </Field>
-          <Select
-            value={api}
-            options={apis}
-            onChange={(value) => setApi(value as CustomProviderApi)}
-            label={t("providers.user.api")}
-            placeholder={t("providers.user.api.choose")}
-          />
-          <Toggle
-            checked={automatic}
-            onChange={setAutomatic}
-            label={t("providers.user.models.automatic")}
-          />
+      <Form onSubmit={submit} disabled={busy}>
+        <div className="provider-form-rows">
+          <SettingsRow
+            label={<span>{t("providers.user.id")}</span>}
+            description={t("providers.user.id.hint")}
+          >
+            <Input
+              aria-label={t("providers.user.id")}
+              value={id}
+              onChange={setId}
+              disabled={props.mode === "edit"}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.name")}</span>}>
+            <Input aria-label={t("providers.user.name")} value={name} onChange={setName} />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.baseUrl")}</span>}>
+            <Input aria-label={t("providers.user.baseUrl")} value={baseUrl} onChange={setBaseUrl} />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.api")}</span>}>
+            <Select
+              value={api}
+              options={apis}
+              onChange={(value) => setApi(value as CustomProviderApi)}
+              label=""
+              ariaLabel={t("providers.user.api")}
+              placeholder={t("providers.user.api.choose")}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.models.automatic")}</span>}>
+            <Toggle
+              checked={automatic}
+              onChange={setAutomatic}
+              label={t("providers.user.models.automatic")}
+              labelDisplay="tooltip"
+            />
+          </SettingsRow>
           {automatic ? (
-            <Field
-              label={t("providers.user.models.url")}
-              hint={suggestedModelsUrl === "" ? undefined : `По умолчанию: ${suggestedModelsUrl}`}
+            <SettingsRow
+              label={<span>{t("providers.user.models.url")}</span>}
+              description={
+                suggestedModelsUrl === "" ? undefined : `По умолчанию: ${suggestedModelsUrl}`
+              }
             >
-              {(control) => (
-                <Input
-                  {...control}
-                  value={customModelsUrl}
-                  onChange={setCustomModelsUrl}
-                  placeholder={t("providers.user.models.url.placeholder")}
-                />
-              )}
-            </Field>
+              <Input
+                aria-label={t("providers.user.models.url")}
+                value={customModelsUrl}
+                onChange={setCustomModelsUrl}
+                placeholder={t("providers.user.models.url.placeholder")}
+              />
+            </SettingsRow>
           ) : undefined}
           <ManualModelsEditor
             models={manualModels}
@@ -204,47 +216,82 @@ export function UserProviderForm(props: UserProviderFormProps) {
             onChange={setManualModels}
             translator={props.translator}
           />
-          <Heading level={2}>{t("providers.user.defaults")}</Heading>
-          <Field label={t("providers.user.context")}>
-            {(control) => <Input {...control} value={contextWindow} onChange={setContextWindow} />}
-          </Field>
-          <Field label={t("providers.user.maxTokens")}>
-            {(control) => <Input {...control} value={maxTokens} onChange={setMaxTokens} />}
-          </Field>
-          <Toggle
-            checked={reasoning}
-            onChange={setReasoning}
-            label={t("providers.user.reasoning")}
-          />
-          <Toggle
-            checked={imageInput}
-            onChange={setImageInput}
-            label={t("providers.user.images")}
-          />
-          <Field label={t("providers.user.cost.input")}>
-            {(control) => <Input {...control} value={inputCost} onChange={setInputCost} />}
-          </Field>
-          <Field label={t("providers.user.cost.output")}>
-            {(control) => <Input {...control} value={outputCost} onChange={setOutputCost} />}
-          </Field>
-          <Field
-            label={t("providers.user.models.disabled")}
-            hint={t("providers.user.models.disabled.hint")}
+          <div className="provider-form-section-label">
+            <Text>{t("providers.user.defaults")}</Text>
+          </div>
+          <SettingsRow label={<span>{t("providers.user.context")}</span>}>
+            <Input
+              aria-label={t("providers.user.context")}
+              value={contextWindow}
+              onChange={setContextWindow}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.maxTokens")}</span>}>
+            <Input
+              aria-label={t("providers.user.maxTokens")}
+              value={maxTokens}
+              onChange={setMaxTokens}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.reasoning")}</span>}>
+            <Toggle
+              checked={reasoning}
+              onChange={setReasoning}
+              label={t("providers.user.reasoning")}
+              labelDisplay="tooltip"
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.images")}</span>}>
+            <Toggle
+              checked={imageInput}
+              onChange={setImageInput}
+              label={t("providers.user.images")}
+              labelDisplay="tooltip"
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.cost.input")}</span>}>
+            <Input
+              aria-label={t("providers.user.cost.input")}
+              value={inputCost}
+              onChange={setInputCost}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.cost.output")}</span>}>
+            <Input
+              aria-label={t("providers.user.cost.output")}
+              value={outputCost}
+              onChange={setOutputCost}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={<span>{t("providers.user.models.disabled")}</span>}
+            description={t("providers.user.models.disabled.hint")}
           >
-            {(control) => (
-              <Textarea {...control} value={disabledModels} onChange={setDisabledModels} rows={4} />
-            )}
-          </Field>
-          <Field label={t("providers.user.overrides")} hint={t("providers.user.overrides.hint")}>
-            {(control) => (
-              <Textarea {...control} value={modelOverrides} onChange={setModelOverrides} rows={8} />
-            )}
-          </Field>
-          <Button tone="accent" type="submit" disabled={busy}>
-            {busy ? t("providers.user.saving") : t("providers.user.save")}
-          </Button>
-        </Form>
-      </Panel>
+            <Textarea
+              aria-label={t("providers.user.models.disabled")}
+              value={disabledModels}
+              onChange={setDisabledModels}
+              rows={4}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={<span>{t("providers.user.overrides")}</span>}
+            description={t("providers.user.overrides.hint")}
+          >
+            <Textarea
+              aria-label={t("providers.user.overrides")}
+              value={modelOverrides}
+              onChange={setModelOverrides}
+              rows={8}
+            />
+          </SettingsRow>
+          <div className="provider-form-actions">
+            <Button tone="accent" type="submit" disabled={busy}>
+              {busy ? t("providers.user.saving") : t("providers.user.save")}
+            </Button>
+          </div>
+        </div>
+      </Form>
     </div>
   );
 }
@@ -273,97 +320,108 @@ function ManualModelsEditor({
     );
 
   return (
-    <section>
-      <Heading level={2}>{t("providers.user.models.manual")}</Heading>
-      <Text tone="muted">{t("providers.user.models.manual.hint")}</Text>
+    <section className="provider-manual-models">
+      <div className="provider-form-section-label">
+        <Text>{t("providers.user.models.manual")}</Text>
+        <Text tone="muted">{t("providers.user.models.manual.hint")}</Text>
+      </div>
       {models.map((model, index) => (
-        <Panel key={index} title={model.name || model.id || t("providers.user.models.unnamed")}>
-          <Field label={t("providers.user.model.id")}>
-            {(control) => (
-              <Input {...control} value={model.id} onChange={(id) => update(index, { id })} />
-            )}
-          </Field>
-          <Field label={t("providers.user.model.name")}>
-            {(control) => (
-              <Input {...control} value={model.name} onChange={(name) => update(index, { name })} />
-            )}
-          </Field>
-          <Field label={t("providers.user.context")}>
-            {(control) => (
-              <Input
-                {...control}
-                value={String(model.contextWindow)}
-                onChange={(value) => update(index, { contextWindow: Number(value) })}
-              />
-            )}
-          </Field>
-          <Field label={t("providers.user.maxTokens")}>
-            {(control) => (
-              <Input
-                {...control}
-                value={String(model.maxTokens)}
-                onChange={(value) => update(index, { maxTokens: Number(value) })}
-              />
-            )}
-          </Field>
-          <Toggle
-            checked={model.reasoning ?? false}
-            onChange={(reasoning) => update(index, { reasoning })}
-            label={t("providers.user.reasoning")}
-          />
-          <Toggle
-            checked={(model.input ?? ["text"]).includes("image")}
-            onChange={(image) => update(index, { input: image ? ["text", "image"] : ["text"] })}
-            label={t("providers.user.images")}
-          />
-          <Field label={t("providers.user.cost.input")}>
-            {(control) => (
-              <Input
-                {...control}
-                value={String(model.cost?.input ?? 0)}
-                onChange={(value) =>
-                  update(index, { cost: { input: Number(value), output: model.cost?.output ?? 0 } })
-                }
-              />
-            )}
-          </Field>
-          <Field label={t("providers.user.cost.output")}>
-            {(control) => (
-              <Input
-                {...control}
-                value={String(model.cost?.output ?? 0)}
-                onChange={(value) =>
-                  update(index, { cost: { input: model.cost?.input ?? 0, output: Number(value) } })
-                }
-              />
-            )}
-          </Field>
-          <Button
-            tone="danger"
-            onClick={() => onChange(models.filter((_, position) => position !== index))}
-          >
-            {t("providers.user.model.remove")}
-          </Button>
-        </Panel>
+        <div className="provider-manual-model" key={index}>
+          <div className="provider-form-section-label">
+            <Text>{model.name || model.id || t("providers.user.models.unnamed")}</Text>
+          </div>
+          <SettingsRow label={<span>{t("providers.user.model.id")}</span>}>
+            <Input
+              aria-label={t("providers.user.model.id")}
+              value={model.id}
+              onChange={(id) => update(index, { id })}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.model.name")}</span>}>
+            <Input
+              aria-label={t("providers.user.model.name")}
+              value={model.name}
+              onChange={(name) => update(index, { name })}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.context")}</span>}>
+            <Input
+              aria-label={t("providers.user.context")}
+              value={String(model.contextWindow)}
+              onChange={(value) => update(index, { contextWindow: Number(value) })}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.maxTokens")}</span>}>
+            <Input
+              aria-label={t("providers.user.maxTokens")}
+              value={String(model.maxTokens)}
+              onChange={(value) => update(index, { maxTokens: Number(value) })}
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.reasoning")}</span>}>
+            <Toggle
+              checked={model.reasoning ?? false}
+              onChange={(reasoning) => update(index, { reasoning })}
+              label={t("providers.user.reasoning")}
+              labelDisplay="tooltip"
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.images")}</span>}>
+            <Toggle
+              checked={(model.input ?? ["text"]).includes("image")}
+              onChange={(image) => update(index, { input: image ? ["text", "image"] : ["text"] })}
+              label={t("providers.user.images")}
+              labelDisplay="tooltip"
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.cost.input")}</span>}>
+            <Input
+              aria-label={t("providers.user.cost.input")}
+              value={String(model.cost?.input ?? 0)}
+              onChange={(value) =>
+                update(index, { cost: { input: Number(value), output: model.cost?.output ?? 0 } })
+              }
+            />
+          </SettingsRow>
+          <SettingsRow label={<span>{t("providers.user.cost.output")}</span>}>
+            <Input
+              aria-label={t("providers.user.cost.output")}
+              value={String(model.cost?.output ?? 0)}
+              onChange={(value) =>
+                update(index, { cost: { input: model.cost?.input ?? 0, output: Number(value) } })
+              }
+            />
+          </SettingsRow>
+          <div className="provider-form-actions">
+            <Button
+              tone="danger"
+              onClick={() => onChange(models.filter((_, position) => position !== index))}
+            >
+              {t("providers.user.model.remove")}
+            </Button>
+          </div>
+        </div>
       ))}
-      <Button
-        onClick={() =>
-          onChange([
-            ...models,
-            {
-              id: "",
-              name: "",
-              contextWindow: defaults.contextWindow,
-              maxTokens: defaults.maxTokens,
-              reasoning: defaults.reasoning,
-              input: [...defaults.input],
-              cost: { ...defaults.cost },
-            },
-          ])
-        }
-      >
-        + {t("providers.user.model.add")}
-      </Button>
+      <div className="provider-form-actions">
+        <Button
+          onClick={() =>
+            onChange([
+              ...models,
+              {
+                id: "",
+                name: "",
+                contextWindow: defaults.contextWindow,
+                maxTokens: defaults.maxTokens,
+                reasoning: defaults.reasoning,
+                input: [...defaults.input],
+                cost: { ...defaults.cost },
+              },
+            ])
+          }
+        >
+          + {t("providers.user.model.add")}
+        </Button>
+      </div>
     </section>
   );
 }
