@@ -174,8 +174,8 @@
 
 .shell-resizer {
   flex: 0 0 auto;
-  width: var(--sovereign-space-2);
-  min-width: var(--sovereign-space-2);
+  width: 5px;
+  min-width: 5px;
   border: 0;
   background: var(--sovereign-border);
   cursor: col-resize;
