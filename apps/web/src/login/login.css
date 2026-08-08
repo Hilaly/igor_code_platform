@@ -1,35 +1,36 @@
-/*
- * Раскладка вью входа. Та же дисциплина, что у оболочки: цвета — только переменные ролей, размеры —
- * только шкалы кита (docs/ui-kit.md), проверяется тестом styles.test.ts.
- *
- * Вид самой карточки и полей живёт в ките — здесь только то, как эта карточка стоит на пустом экране.
- */
-
 .login {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   padding: var(--sovereign-space-5);
+  overflow: auto;
   background: var(--sovereign-page-surface);
 }
 
-/* Узкий экран — требование вижна, а не среза: форма входа обязана работать с телефона. */
 .login-form {
   width: 100%;
-  max-width: 24rem;
+  max-width: var(--sovereign-reading-width);
+  min-width: 0;
 }
 
 .login-body {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--sovereign-space-2);
 }
 
-/*
- * Бренд-блок над заголовком формы. Вид знака и типографика названия — из китового `BrandLockup`;
- * здесь только отступ до следующего поля, чтобы блок не прилипал к заголовку.
- */
 .login-brand {
+  min-width: 0;
   margin-block-end: var(--sovereign-space-2);
+}
+
+@media (width <= 40rem) {
+  .login {
+    align-items: flex-start;
+    padding: var(--sovereign-space-3);
+  }
 }

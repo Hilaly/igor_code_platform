@@ -134,11 +134,9 @@ describe("the style sheets of the application", () => {
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
 
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*min-width:\s*0;/s);
-    expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-y:\s*auto;/s);
-    expect(shell).toMatch(/\.shell-projects\s*\{[^}]*overflow-x:\s*hidden;/s);
     expect(shell).toMatch(/\.shell-left-projects\s*\{[^}]*overflow-x:\s*hidden;/s);
-    expect(shell).toMatch(/\.shell-left\s*\{[^}]*overflow:\s*hidden;/s);
-    expect(shell).toMatch(/\.shell-nav\s*\{[^}]*min-width:\s*0;/s);
+    expect(shell).toMatch(/\.shell-left-projects\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-left,\s*\.shell-right\s*\{[^}]*overflow:\s*hidden;/s);
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*min-width:\s*0;/s);
     expect(sessions).toMatch(
       /\.sessions-composer\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0,\s*auto\)\s+auto;/s,
@@ -211,8 +209,9 @@ describe("the style sheets of the application", () => {
       /\.sessions-chat[^}]*(?:position:\s*(?:sticky|absolute)|100vh|100dvh)/s,
     );
     expect(shell).toMatch(/\.shell-body\s*\{[^}]*overflow:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*hidden;/s);
     expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s,
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*\{[^}]*overflow:\s*hidden;/s,
     );
     expect(sessions).not.toMatch(/\.sessions-split/);
     expect(sessions).not.toMatch(/@media\s*\(width\s*<\s*60rem\)/);
@@ -225,15 +224,14 @@ describe("the style sheets of the application", () => {
       /\.shell-page\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\);/s,
     );
     expect(shell).toMatch(
-      /\.shell-header[\s,]*\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
+      /\.shell-header,\s*\.shell-body,\s*\.shell-header\s*>\s*\*\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
     );
-    expect(shell).toMatch(/\.shell-body\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s);
     expect(shell).toMatch(/\.shell-page\s*\{[^}]*overflow:\s*hidden;/s);
     expect(shell).toMatch(/\.shell-body\s*\{[^}]*overflow:\s*auto;/s);
     expect(shell).not.toMatch(/\.shell-header[^}]*position:\s*(?:sticky|absolute)/s);
     expect(shell).not.toMatch(/\.shell-header[^}]*(?:100vh|100dvh)/s);
     expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s*\{[^}]*overflow:\s*hidden;/s,
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*\{[^}]*overflow:\s*hidden;/s,
     );
   });
 
@@ -243,6 +241,15 @@ describe("the style sheets of the application", () => {
     expect(shell).toMatch(
       /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;/s,
     );
+  });
+
+  it("keeps clean-slate shell ownership free of dead plugin and historical selectors", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).not.toMatch(
+      /(?:^|[,{])\s*\.shell-(?:status|account-status|nav|projects)\s*(?:[,{]|\{)/m,
+    );
+    expect(shell).not.toMatch(/\.plugins(?:-plugin|-contribution|-contributions|-reasons)?\b/);
   });
 
   it("does not retain a composer option collapse container", () => {

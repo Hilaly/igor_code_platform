@@ -7,6 +7,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { BrandLockup } from "@sovereign/ui-kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 
@@ -61,6 +62,15 @@ function show(overrides: Partial<ShellProps> = {}) {
 }
 
 describe("global shell header", () => {
+  it("keeps the product brand in the navigation header without inventing an account name", () => {
+    show({ navigationHeader: <BrandLockup name="Sovereign" /> });
+
+    expect(screen.getByText("Sovereign")).toBeDefined();
+    expect(screen.getByRole("navigation", { name: labels.left })).toBeDefined();
+    expect(screen.queryByText("Plan")).toBeNull();
+    expect(screen.queryByText("Tools")).toBeNull();
+  });
+
   it("renders the route header before page content and updates it with the route", () => {
     const view = show({
       header: {

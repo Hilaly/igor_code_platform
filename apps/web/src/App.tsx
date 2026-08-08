@@ -15,7 +15,7 @@ import {
   type LoginStepFrame,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
-import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
+import { BrandLockup, Button, coreNamespace, createTranslator, Spinner } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -515,7 +515,7 @@ export function App() {
       }
       navigationHeader={
         <div className="shell-nav-header">
-          <Heading level={3}>Sovereign</Heading>
+          <BrandLockup name={translator.t("product.name")} />
           <Button
             onClick={() => {
               setDraftProjectId(undefined);
