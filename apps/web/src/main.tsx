@@ -10,6 +10,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App.tsx";
+import { registerHostModules } from "./plugins/host-modules.ts";
+
+// До рендера, а значит и до любого `import()` бандла плагина: заглушка внутри бандла читает реестр
+// в момент загрузки модуля и без него бросает ошибку (docs/ui-extension-model.md).
+registerHostModules();
 
 const container = document.getElementById("root");
 if (!container) {
