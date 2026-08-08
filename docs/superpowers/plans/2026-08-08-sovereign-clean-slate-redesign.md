@@ -17,6 +17,15 @@ scales, widths, and interaction states.
 **Tech Stack:** React 19, TypeScript 5.8, CSS Modules, plain CSS, Fontsource, Vitest, Testing Library,
 Ladle, Vite, pnpm 11, Node 24.
 
+## Статус на 2026-08-08
+
+- Tasks 1–8 выполнены и разбиты на атомарные коммиты.
+- Все 59 исходных CSS-файлов отличаются от baseline `b9146f8`; текущий шестидесятый файл принадлежит
+  новому публичному `AppearancePreview`.
+- `make check`, `make build`, production-сборка Ladle и репрезентативная browser QA wide/narrow
+  завершены. Независимое итоговое ревью ветки выполняется последним шагом Task 10.
+- Task 9 не начат: маршрут и точные определения аналитики требуют явного решения владельца продукта.
+
 ## Global Constraints
 
 - Work on branch `feature/frontend_redesign_antigravity`; preserve the pre-existing WIP instead of
@@ -110,14 +119,14 @@ Ladle, Vite, pnpm 11, Node 24.
   action family usable by UI Kit without component color literals.
 - Consumed by: all later CSS tasks.
 
-- [ ] **Step 1: Write failing role, palette, and global-style behavior tests**
+- [x] **Step 1: Write failing role, palette, and global-style behavior tests**
 
   Add literal expected dark Imperium values to `tokens.test.ts`, extend the role-pair contrast matrix
   for any new secondary action roles, and update `styles.test.ts` to exercise the new token consumers
   rather than grep obsolete geometry. Name the mutations: wrong dark palette, incomplete derived role,
   unreadable action text, missing Onest fallback, and reintroduced decorative effect.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Run:
 
@@ -128,18 +137,18 @@ Ladle, Vite, pnpm 11, Node 24.
 
   Expected: FAIL on the old palette/roles/global style contract for the exact named mutations.
 
-- [ ] **Step 3: Replace the five global CSS files and implement roles**
+- [x] **Step 3: Replace the five global CSS files and implement roles**
 
   Recreate each file from an empty body. Preserve imports and public custom-property names, declare
   only used geometry/motion/elevation tokens, add `"Onest"` fallback, and keep reduced-motion and
   global focus/selection/scrollbar behavior. Put exact colors only in `imperium.ts`.
 
-- [ ] **Step 4: Verify GREEN and contrast**
+- [x] **Step 4: Verify GREEN and contrast**
 
   Run the focused tests plus UI Kit typecheck. Expected: all pass with every derived text/surface pair
   at or above the repository contrast threshold.
 
-- [ ] **Step 5: Commit the foundation**
+- [x] **Step 5: Commit the foundation**
 
   ```bash
   git add packages/ui-kit/src/tokens packages/ui-kit/src/styles
@@ -162,28 +171,28 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: optional semantic secondary/gold `Button` tone for the real send action.
 - Consumed by: every screen and rich component.
 
-- [ ] **Step 1: Add failing interaction tests for the new action tone and state matrix**
+- [x] **Step 1: Add failing interaction tests for the new action tone and state matrix**
 
   Render the real `Button`, Toggle, inputs, selections, segmented and radio controls. Assert native
   role/state/disabled behavior and that the new tone is addressable through the public component
   API. Do not assert CSS hashes.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Run interactive/rendering/style tests. Expected: the secondary action tone is absent and the new
   visual-state contract rejects the old modules.
 
-- [ ] **Step 3: Recreate all 17 modules from empty files**
+- [x] **Step 3: Recreate all 17 modules from empty files**
 
   Cover hover, focus-visible, active, disabled, pressed/checked, invalid, sizes, icon-only and reduced
   motion. Preserve `--toggle-*`, segmented index/count, slider thumb and textarea runtime contracts.
 
-- [ ] **Step 4: Verify controls**
+- [x] **Step 4: Verify controls**
 
   Run UI Kit tests/typecheck and build Ladle. Expected: all control behavior remains green and the
   catalogue builds.
 
-- [ ] **Step 5: Commit core controls**
+- [x] **Step 5: Commit core controls**
 
   ```bash
   git add packages/ui-kit/src/components packages/ui-kit/src/styles/styles.test.ts
@@ -206,27 +215,27 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: flat system surfaces, purple selected rows, restrained overlay elevation, thin context
   header and consistent feedback states.
 
-- [ ] **Step 1: Add failing behavior contracts for stateful surfaces**
+- [x] **Step 1: Add failing behavior contracts for stateful surfaces**
 
   Exercise real Dialog, Menu, Tooltip, Tree, Disclosure, Tabs, Notice and Toast interactions. Each
   test names a break that would matter after a rewrite: trapped focus lost, pointer-focus leaks a
   tooltip, expanded state hidden, selected row loses semantics, or alert/live region disappears.
 
-- [ ] **Step 2: Verify RED against the intended clean-slate visual contract**
+- [x] **Step 2: Verify RED against the intended clean-slate visual contract**
 
   Run focused component and stylesheet tests. Expected: new surface/state requirements fail while
   unchanged behavior tests establish the baseline.
 
-- [ ] **Step 3: Recreate all 21 modules from empty files**
+- [x] **Step 3: Recreate all 21 modules from empty files**
 
   Preserve CSS variable positions and state selectors; rebuild appearance using only roles and scale.
   Keep elevation only for actual raised/overlay surfaces and make reduced motion deterministic.
 
-- [ ] **Step 4: Verify surfaces and overlays**
+- [x] **Step 4: Verify surfaces and overlays**
 
   Run all UI Kit tests, typecheck and Ladle build. Expected: 0 failures and no console/build warnings.
 
-- [ ] **Step 5: Commit surface/navigation modules**
+- [x] **Step 5: Commit surface/navigation modules**
 
   ```bash
   git add packages/ui-kit/src/components packages/ui-kit/src/styles/styles.test.ts
@@ -253,28 +262,28 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: editorial agent voice, coffee human bubble, machine execution blocks, `SETTINGS` label,
   Refined Imperium component catalogue and live scheme/variant/scale QA harness.
 
-- [ ] **Step 1: Add failing rich-component behavior tests**
+- [x] **Step 1: Add failing rich-component behavior tests**
 
   Render real chat/tool/pickers/settings components. Protect all existing behaviors and add semantic
   assertions for visible Settings navigation heading and the machine block's running/done/failed
   text—not source-string or CSS-hash assertions.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Expected: the intended Settings/context structure or visual-state contract is missing while legacy
   behavior tests remain green.
 
-- [ ] **Step 3: Recreate the 11 modules and Ladle style from empty files**
+- [x] **Step 3: Recreate the 11 modules and Ladle style from empty files**
 
   Implement all picker/open/selected/loading/failure states, editorial typography, human/service
   roles, technical blocks, Settings responsive master-detail, long-id overflow and catalogue layout.
   Correct the WIP Settings selected-text contrast: soft `accentSurface` uses normal readable text.
 
-- [ ] **Step 4: Verify rich UI Kit and catalogue**
+- [x] **Step 4: Verify rich UI Kit and catalogue**
 
   Run the complete UI Kit suite, typecheck and Ladle production build. Expected: all pass.
 
-- [ ] **Step 5: Commit rich components**
+- [x] **Step 5: Commit rich components**
 
   ```bash
   git add packages/ui-kit
@@ -299,26 +308,26 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: `◆ Sovereign` brand, new-session primary action, dense purple sidebar selection, thin
   contextual header, centered login surface.
 
-- [ ] **Step 1: Add failing shell composition tests**
+- [x] **Step 1: Add failing shell composition tests**
 
   Require the real sidebar to render BrandLockup/brand semantics and retain named navigation,
   resizers, account menu and header. Update CSS behavior tests to assert shrink/scroll/responsive
   outcomes of the new contract instead of exact old rule order.
 
-- [ ] **Step 2: Run shell/login tests and verify RED**
+- [x] **Step 2: Run shell/login tests and verify RED**
 
   Expected: missing new brand/context structure; existing behavior tests remain the regression net.
 
-- [ ] **Step 3: Recreate `shell.css` and `login.css` from empty files**
+- [x] **Step 3: Recreate `shell.css` and `login.css` from empty files**
 
   Remove dead plugin/shell selectors, move plugin reasons to Settings ownership, and implement all
   hidden/visible/contained/page/resizer/focus/narrow states. Make only minimal TSX structure changes.
 
-- [ ] **Step 4: Verify shell and login**
+- [x] **Step 4: Verify shell and login**
 
   Run shell, layout, page, account, router, Login and web style tests plus web typecheck.
 
-- [ ] **Step 5: Commit shell/login**
+- [x] **Step 5: Commit shell/login**
 
   ```bash
   git add apps/web/src/App.tsx apps/web/src/shell apps/web/src/login
@@ -341,28 +350,28 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: editorial chat, clean machine register, gold send action, bottom composer, compact
   management pages and narrow-container behavior.
 
-- [ ] **Step 1: Add failing composer/session visual-contract tests**
+- [x] **Step 1: Add failing composer/session visual-contract tests**
 
   Protect the real action set and assign only send the new secondary action tone. Assert all actions
   still invoke their existing callbacks and retain accessible names; protect contained layout and
   textarea-only overflow through observable rendered structure plus browser checks.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Expected: Send lacks secondary action tone or new structural hook. Existing 235 session tests remain
   green except the intentional new assertion.
 
-- [ ] **Step 3: Recreate `sessions.css` from an empty file**
+- [x] **Step 3: Recreate `sessions.css` from an empty file**
 
   Cover every inventoried selector and state, including previously unstyled form/archive wrappers.
   Preserve contained Shell, feed scroll, composer bottom position, 2–12 row textarea, container
   queries, message action modality and usage warning/danger states.
 
-- [ ] **Step 4: Verify all session behavior**
+- [x] **Step 4: Verify all session behavior**
 
   Run every session test, router tests, web styles and typecheck. Expected: all pass.
 
-- [ ] **Step 5: Commit sessions**
+- [x] **Step 5: Commit sessions**
 
   ```bash
   git add apps/web/src/sessions apps/web/src/shell/styles.test.ts
@@ -387,26 +396,26 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: Refined master-detail, context chain, live Imperium preview/swatches, plugin hero/facts/
   warning/contributions layout.
 
-- [ ] **Step 1: Add failing semantic tests for Appearance preview and Plugin Detail**
+- [x] **Step 1: Add failing semantic tests for Appearance preview and Plugin Detail**
 
   Require a named live preview that reflects the selected scheme label and exposes semantic swatches
   accessibly; require Plugin Detail's header/facts/contribution sections without changing switch
   payloads. Protect the one-heading contract.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Expected: preview is absent and the new detail grouping assertion fails.
 
-- [ ] **Step 3: Implement minimal structure and recreate `settings.css` from empty**
+- [x] **Step 3: Implement minimal structure and recreate `settings.css` from empty**
 
   Preserve the previous agent's useful WIP intent but rewrite the final file wholly. Own plugin
   selectors here, cover every section and narrow layout, and remove dead project selectors.
 
-- [ ] **Step 4: Verify Settings and plugins**
+- [x] **Step 4: Verify Settings and plugins**
 
   Run all Settings, plugins, appearance, router and style tests plus typecheck.
 
-- [ ] **Step 5: Commit Settings and plugins**
+- [x] **Step 5: Commit Settings and plugins**
 
   ```bash
   git add apps/web/src/settings apps/web/src/plugins packages/ui-kit/src/i18n
@@ -429,26 +438,26 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: consistent Settings rows, dense facts/marks, readable forms, resource diagnostics and
   responsive detail layouts.
 
-- [ ] **Step 1: Add failing semantic/responsive contracts**
+- [x] **Step 1: Add failing semantic/responsive contracts**
 
   Protect real named lists/sections/toolbars, full-row selection with independent actions, form
   labels/errors and long-path accessible values. Add structure only where current generic wrappers do
   not expose a real region.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   Expected: only intentional new semantic assertions fail.
 
-- [ ] **Step 3: Recreate both CSS files from empty**
+- [x] **Step 3: Recreate both CSS files from empty**
 
   Cover every inventoried class/state and keyboard-only tooltip reveal. Keep application CSS limited
   to geometry and role/scale consumers.
 
-- [ ] **Step 4: Verify projects/providers**
+- [x] **Step 4: Verify projects/providers**
 
   Run all project/provider tests, web styles and typecheck.
 
-- [ ] **Step 5: Commit projects/providers**
+- [x] **Step 5: Commit projects/providers**
 
   ```bash
   git add apps/web/src/projects apps/web/src/providers apps/web/src/shell/styles.test.ts
@@ -497,13 +506,13 @@ Ladle, Vite, pnpm 11, Node 24.
 - Produces: documented current visual system, fresh verification evidence, clean independent review,
   and an atomic committed branch.
 
-- [ ] **Step 1: Prove every CSS file was wholly replaced**
+- [x] **Step 1: Prove every CSS file was wholly replaced**
 
   Compare all 59 source CSS blobs with the starting commit and review each final file for historical
   selector/comment residue. Confirm every current TSX CSS class is styled or intentionally layout-free,
   and every final selector has a current consumer or documented pseudo/state purpose.
 
-- [ ] **Step 2: Run full automated verification on Node 24**
+- [x] **Step 2: Run full automated verification on Node 24**
 
   ```bash
   PATH=/Users/user/.nvm/versions/node/v24.18.0/bin:$PATH make check
@@ -515,19 +524,19 @@ Ladle, Vite, pnpm 11, Node 24.
 
   Expected: all commands exit 0, no failures and no new warnings.
 
-- [ ] **Step 3: Run browser QA matrix**
+- [x] **Step 3: Run browser QA matrix**
 
   Start web and Ladle. Inspect every available route and canonical component story in Imperium dark/
   light, all three scales, wide/narrow containers; smoke Nord/OLED/Sage light/dark. Exercise hover,
   keyboard focus, menus, dialogs, disclosures, selected/pressed/disabled, loading/empty/warning/danger,
   long strings and textarea growth. Save representative screenshots as ignored review artifacts.
 
-- [ ] **Step 4: Fix every reproduced defect and repeat the affected matrix**
+- [x] **Step 4: Fix every reproduced defect and repeat the affected matrix**
 
   Behavioral defects receive a red/green regression test. CSS-only defects receive a focused
   visual-contract test when behavior can be expressed reliably, plus fresh browser evidence.
 
-- [ ] **Step 5: Update durable documentation and commit it**
+- [x] **Step 5: Update durable documentation and commit it**
 
   Rewrite obsolete visual descriptions in `docs/ui-kit.md`, update the spec/plan status and index,
   and record only real deliberate deferrals in `docs/backlog.md`.
