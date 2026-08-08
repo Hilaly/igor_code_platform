@@ -23,6 +23,8 @@ import type { SchemeChoice } from "../appearance.ts";
 
 export type AppearanceSectionProps = {
   preferences: AppearancePreferences;
+  /** Scheme whose roles are actually on the document; persisted preference may name a missing plugin. */
+  effectiveScheme: string;
   /**
    * Уже подписанные схемы: подпись схемы плагина берётся из его каталога и названия вклада
    * (docs/plugins.md), и второй способ её вычислить разошёлся бы с первым.
@@ -37,6 +39,7 @@ export type AppearanceSectionProps = {
 
 export function AppearanceSection({
   preferences,
+  effectiveScheme,
   schemes,
   locales,
   onChange,
@@ -45,8 +48,7 @@ export function AppearanceSection({
 }: AppearanceSectionProps) {
   const { t } = translator;
   const schemeLabel =
-    schemes.find((scheme) => scheme.id === preferences.appearance.colorScheme)?.label ??
-    preferences.appearance.colorScheme;
+    schemes.find((scheme) => scheme.id === effectiveScheme)?.label ?? effectiveScheme;
   const variantLabel = t(`appearance.variant.${preferences.appearance.variant}`);
   const scaleLabel = t(`appearance.scale.${preferences.appearance.scale}`);
 

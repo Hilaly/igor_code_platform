@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAppearancePreferences } from "./appearance.ts";
+import {
+  appearanceCacheKey,
+  cacheAppearance,
+  defaultAppearancePreferences,
+  fetchAppearance,
+} from "./appearance.ts";
 import { App } from "./App.tsx";
 
 vi.mock("./session.ts", () => ({
@@ -47,6 +52,7 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
     })),
   );
+  vi.mocked(fetchAppearance).mockResolvedValue(defaultAppearancePreferences);
 });
 
 describe("App shell composition", () => {
@@ -59,5 +65,33 @@ describe("App shell composition", () => {
 
     expect(productName.parentElement?.querySelector("svg")).not.toBeNull();
     expect(within(navigation).getByRole("button", { name: "+ New session" })).toBeDefined();
+  });
+
+  it("previews Imperium while preserving a disappeared saved plugin scheme", async () => {
+    const missing = {
+      ...defaultAppearancePreferences,
+      appearance: {
+        ...defaultAppearancePreferences.appearance,
+        colorScheme: "themed.missing",
+        variant: "dark" as const,
+      },
+    };
+    cacheAppearance(localStorage, missing);
+    vi.mocked(fetchAppearance).mockResolvedValue(missing);
+    history.replaceState(null, "", "/settings/appearance");
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("region", {
+        name: "Preview: Imperium (purple and gold), Dark, Normal",
+      }),
+    ).toBeTruthy();
+    await waitFor(() => {
+      const cached = JSON.parse(localStorage.getItem(appearanceCacheKey) ?? "{}") as {
+        appearance?: { colorScheme?: string };
+      };
+      expect(cached.appearance?.colorScheme).toBe("themed.missing");
+    });
   });
 });

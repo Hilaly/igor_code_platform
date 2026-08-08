@@ -27,6 +27,7 @@ describe("AppearanceSection", () => {
     render(
       <AppearanceSection
         preferences={preferences}
+        effectiveScheme="imperium"
         schemes={[
           { id: "imperium", label: "Imperium (purple and gold)" },
           { id: "nord", label: "Nord (arctic)" },
@@ -54,6 +55,7 @@ describe("AppearanceSection", () => {
     render(
       <AppearanceSection
         preferences={preferences}
+        effectiveScheme="imperium"
         schemes={[
           { id: "imperium", label: "Imperium (purple and gold)" },
           { id: "nord", label: "Nord (arctic)" },
@@ -87,5 +89,40 @@ describe("AppearanceSection", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Language" }));
     fireEvent.click(screen.getByRole("option", { name: /русский/i }));
     expect(onChange).toHaveBeenLastCalledWith({ ...preferences, locale: "ru" });
+  });
+
+  it("previews the effective fallback without rewriting a disappeared persisted scheme", () => {
+    const missing = {
+      ...preferences,
+      appearance: { ...preferences.appearance, colorScheme: "themed.missing" },
+    };
+    const onChange = vi.fn();
+
+    render(
+      <AppearanceSection
+        preferences={missing}
+        effectiveScheme="imperium"
+        schemes={[
+          { id: "imperium", label: "Imperium (purple and gold)" },
+          { id: "nord", label: "Nord (arctic)" },
+        ]}
+        locales={["en", "ru"]}
+        onChange={onChange}
+        refusal={undefined}
+        translator={translator}
+      />,
+    );
+
+    expect(
+      screen.getByRole("region", { name: "Preview: Imperium (purple and gold), Dark, Normal" }),
+    ).toBeTruthy();
+    expect(missing.appearance.colorScheme).toBe("themed.missing");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Colour scheme" }));
+    fireEvent.click(screen.getByRole("option", { name: "Nord (arctic)" }));
+    expect(onChange).toHaveBeenCalledWith({
+      ...missing,
+      appearance: { ...missing.appearance, colorScheme: "nord" },
+    });
   });
 });
