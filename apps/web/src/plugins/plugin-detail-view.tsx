@@ -101,6 +101,17 @@ export function PluginDetailView({
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
       </div>
 
+      <div className="plugins-notices">
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
+        {state.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("plugins.write.failed", { reason: state.failure })} />
+        )}
+      </div>
+
       <section className="plugin-detail-header-card" aria-label={status.id ?? status.key}>
         <SettingsRow label={status.id ?? status.key} description={<Code>{status.key}</Code>}>
           <Toggle

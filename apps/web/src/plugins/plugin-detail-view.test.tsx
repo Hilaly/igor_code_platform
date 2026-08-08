@@ -145,6 +145,22 @@ it("shows a not-found state for an unknown plugin key", () => {
   expect(screen.getByText(/not found/i)).toBeTruthy();
 });
 
+it("keeps stale and write-failure notices visible on the detail route", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: true, failure: "write failed" }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("What you see may be out of date")).toBeTruthy();
+  expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
+  expect(screen.getByText("The choice was not written: write failed")).toBeTruthy();
+});
+
 it("names the kind of a public route and shows the address it answers at", () => {
   const withRoute: PluginsSnapshot = {
     ...snapshot,
