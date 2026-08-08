@@ -204,9 +204,13 @@ async function isReadableFile(path: string): Promise<boolean> {
   }
 }
 
-/** Ключ плагина содержит двоеточия (`project:<проект>:<id>`), а имя класса CSS их не допускает. */
+/**
+ * Ключ плагина содержит двоеточия (`project:<проект>:<id>`), а имя класса CSS их не допускает.
+ * Base64url кодирует ключ целиком: он обратим, не содержит небезопасных символов и не позволяет
+ * разным ключам схлопнуться в один префикс.
+ */
 function cssSafeKey(pluginKey: string): string {
-  return pluginKey.replaceAll(/[^A-Za-z0-9_-]/g, "-");
+  return Buffer.from(pluginKey).toString("base64url");
 }
 
 function escapeForRegExp(value: string): string {

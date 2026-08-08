@@ -1154,6 +1154,50 @@ describe("createPluginSupervisor", () => {
     );
   });
 
+  it("removes the old contributions when the replacement browser bundle fails to build", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    const worker = join(fixtures, "browsered", "src", "worker.ts");
+    const browser = join(fixtures, "browsered", "src", "browser.tsx");
+    const originalWorker = readFileSync(worker, "utf8");
+    const originalBrowser = readFileSync(browser, "utf8");
+
+    try {
+      writeFileSync(
+        worker,
+        'import { contribute, type PluginModule } from "@sovereign/sdk";\n\nexport const activate: PluginModule["activate"] = async () => {\n  await contribute.custom({ id: "panel", title: "Panel" });\n};\n',
+      );
+      await supervisor.apply(only("browsered"), enabled("data:browsered"));
+      await recorded.waitFor(reachedState("data:browsered", "running"), "browsered running");
+      assert.deepEqual(
+        registry.resolved().map((registration) => registration.id),
+        ["browsered.panel"],
+      );
+
+      writeFileSync(browser, "export const broken = ;\n");
+      await supervisor.reload([
+        { directory: join(fixtures, "browsered"), fileResourcesChanged: false },
+      ]);
+      await recorded.waitFor(
+        reachedState("data:browsered", "failed"),
+        "the replacement build failure",
+      );
+
+      assert.deepEqual(registry.resolved(), []);
+    } finally {
+      writeFileSync(worker, originalWorker);
+      writeFileSync(browser, originalBrowser);
+    }
+  });
+
   it("keeps the previous revision readable after a reload and forgets both when switched off", async () => {
     const recorded = journal();
     const registry = createContributionRegistry();

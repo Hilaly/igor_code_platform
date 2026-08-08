@@ -590,6 +590,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     if (outcome.kind === "failed") {
       // Как и провал установки (docs/plugins.md): повтор раз в минуту не починит опечатку в TSX.
       // Повтор происходит по правке файла или по повторному включению.
+      // При reload старый снимок временно сохранён, пока новый воркер поднимается. Новый бандл не
+      // собрался — воркера уже нет, и оставлять его вклады рабочими означало бы мёртвые маршруты,
+      // инструменты и хуки до следующей правки.
+      dropContributions(entry);
       entry.attempt = 0;
       entry.nextAttemptAt = undefined;
       transition(entry, "failed", outcome.reason);

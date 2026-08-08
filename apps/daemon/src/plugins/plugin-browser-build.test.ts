@@ -169,24 +169,25 @@ describe("buildPluginBrowser", () => {
     it("keeps local names readable and passes :global and composes through", async () => {
       const styles = textOf(await buildBrowsered(), pluginBrowserFileNames.styles);
 
-      assert.match(styles, /\.data_browsered_badge_badge\{display:inline-flex\}/);
-      assert.match(styles, /\.sovereign-plugin-anchor \.data_browsered_badge_badge/);
-      assert.match(styles, /\.data_browsered_badge_loud/);
+      assert.match(styles, /\.ZGF0YTpicm93c2VyZWQ_badge_badge\{display:inline-flex\}/);
+      assert.match(styles, /\.sovereign-plugin-anchor \.ZGF0YTpicm93c2VyZWQ_badge_badge/);
+      assert.match(styles, /\.ZGF0YTpicm93c2VyZWQ_badge_loud/);
     });
 
     /**
      * У esbuild в имени класса нет хеша вовсе: без ключа плагина в имени два плагина с одинаковым
      * `badge.module.css` молча перекрыли бы стили друг друга.
      */
-    it("gives two plugins different class names for the same stylesheet", async () => {
-      const mine = textOf(await buildBrowsered("data:browsered"), pluginBrowserFileNames.styles);
+    it("gives two colliding-safe plugin keys different class names for the same stylesheet", async () => {
+      const mine = textOf(
+        await buildBrowsered("project:foo-bar:browsered"),
+        pluginBrowserFileNames.styles,
+      );
       const theirs = textOf(
-        await buildBrowsered("project:p1:browsered"),
+        await buildBrowsered("project:foo:bar-browsered"),
         pluginBrowserFileNames.styles,
       );
 
-      assert.match(mine, /\.data_browsered_badge_badge\b/);
-      assert.match(theirs, /\.project_p1_browsered_badge_badge\b/);
       assert.notEqual(mine, theirs);
     });
   });
