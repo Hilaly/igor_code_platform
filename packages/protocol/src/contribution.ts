@@ -8,7 +8,7 @@
  */
 
 import type { HookCriticality } from "./hook.ts";
-import type { PluginSource } from "./plugin.ts";
+import { projectOfPluginSource, type PluginSource } from "./plugin.ts";
 import type { ThinkingLevel } from "./session.ts";
 import type { AgentSkillSelection, AgentToolSelection } from "./tool-pattern.ts";
 
@@ -33,6 +33,21 @@ export type ContributionOwnership =
       scope: "user" | "project";
       projectId?: string;
     };
+
+/**
+ * Какому проекту принадлежит вклад; у вклада всего узла — никакому. Владения два, и признак проекта
+ * у них записан по-разному (источник плагина против явной области standalone-корня), поэтому вопрос
+ * задаётся функцией: иначе каждый спрашивающий воспроизводил бы обе ветки, а забыть одну легко.
+ *
+ * Снимок `/api/plugins` — каталог **объявлений**, а не решение одного контекста: в нём лежат и
+ * проектные вклады, иначе их нечем было бы показать и включить. Значит спрашивать обязан всякий, кто
+ * применяет вклад не в контексте проекта.
+ */
+export function projectOfContribution(ownership: ContributionOwnership): string | undefined {
+  return ownership.ownership === "plugin"
+    ? projectOfPluginSource(ownership.source)
+    : ownership.projectId;
+}
 
 export type RegistrationCommon = ContributionOwnership & {
   /** С неймспейсом: `<pluginId>.<объявленный>` (docs/ui-extension-model.md, docs/event-bus.md). */
@@ -130,9 +145,33 @@ export function isPluginRouteMethod(value: unknown): value is PluginRouteMethod 
 }
 
 /**
- * HTTP-маршрут плагина (docs/web-api.md). Адрес — `/p/<id плагина>/<path>`; идентификатор плагина, а
- * не его ключ: адрес попадает во внешние системы, и `project%3Ab7Kq%3Ahello` в вебхуке не наберёт
- * руками никто. Перекрытие при этом уже разрешено реестром — вклад один, победитель один.
+ * Префикс адреса маршрутов плагина. Под `/api`, потому что `/p/<id плагина>/...` целиком отдан
+ * браузерным страницам плагина (docs/ui-extension-model.md): когда демон начнёт отдавать интерфейс
+ * сам, `GET /p/hello/board` стало бы неразрешимым — один адрес просят и таблица маршрутов, и
+ * страница, а различить их по форме нельзя.
+ *
+ * Затенения маршрутами ядра нет и быть не может: `p` не второй сегмент ни у одного из них, что
+ * стережёт тест, а диспетчер сравнивает сегменты буквально и требует равного их числа
+ * (docs/web-api.md).
+ */
+export const pluginRoutePrefix = "/api/p";
+
+/**
+ * Адрес маршрута плагина. Считается в одном месте на всю платформу: демон строит по нему таблицу, а
+ * интерфейс показывает человеку — разойдясь, они заставили бы искать настоящий адрес глазами.
+ *
+ * Пустой путь — сам плагин, и это законный адрес.
+ */
+export function pluginRouteAddress(pluginId: string, path: string): string {
+  return path === ""
+    ? `${pluginRoutePrefix}/${pluginId}`
+    : `${pluginRoutePrefix}/${pluginId}/${path}`;
+}
+
+/**
+ * HTTP-маршрут плагина (docs/web-api.md). Адрес — `/api/p/<id плагина>/<path>`; идентификатор
+ * плагина, а не его ключ: адрес попадает во внешние системы, и `project%3Ab7Kq%3Ahello` в вебхуке не
+ * наберёт руками никто. Перекрытие при этом уже разрешено реестром — вклад один, победитель один.
  *
  * **`path` — не идентификатор вклада.** Идентификатором вклад переключается человеком и живёт в
  * `preferences.json`, а путь — часть внешнего адреса: связать их значило бы менять адрес при
@@ -154,6 +193,57 @@ export type PublicRouteContributionRegistration = RouteRegistrationCommon & {
   kind: "public-route";
 };
 
+/**
+ * Цветовая схема, приехавшая от плагина (docs/ui-kit.md). Схема — **данные**: ни одной функции она
+ * не предоставляет, поэтому браузерного кода плагину для неё не нужно вовсе.
+ *
+ * Форма нарочно структурная, без знания о палитре. Какие ключи в палитре обязательны и какой мажор
+ * контракта токенов действует, знает кит, а он зависит от протокола — обратный импорт был бы циклом.
+ * Отсюда разделение: **демон проверяет форму, кит проверяет контракт.** Схема с верной формой, но
+ * чужим мажором или неполной палитрой доезжает до браузера и отвергается там, с диагностикой.
+ */
+export type ColorSchemeDocument = {
+  /** Мажор контракта токенов кита, на который схема рассчитана. */
+  tokenContract: number;
+  /** Палитры по имени варианта; какие варианты и ключи обязательны — знает кит. */
+  variants: Record<string, Record<string, string>>;
+  /** Точечные переопределения ролей: имена ролей тоже принадлежат киту. */
+  roleOverrides?: Record<string, string>;
+};
+
+/**
+ * Своего имени у схемы нет: имя, которым её выбирают, — это `id` вклада с неймспейсом
+ * (`themed.midnight`), он же стоит в `preferences.json`. Второе имя рядом с идентификатором было бы
+ * вторым способом сказать то же — тот же довод, которым у инструмента отвергнуто отдельное поле
+ * имени, — и переключение вклада и выбор схемы работают одним ключом.
+ */
+export type ColorSchemeContributionRegistration = RegistrationCommon & {
+  kind: "color-scheme";
+  scheme: ColorSchemeDocument;
+};
+
+/**
+ * Неймспейс каталога сообщений, принадлежащий ядру (docs/ui-kit.md). Живёт в протоколе, а не в ките,
+ * потому что по нему принимает решение демон: занять этот неймспейс своим вкладом плагин не может, но
+ * **прислать для него каталог** может — так на платформе появляется новый язык интерфейса.
+ */
+export const coreCatalogNamespace = "core";
+
+/**
+ * Каталог сообщений, приехавший от плагина (docs/ui-kit.md). Как и цветовая схема, это **данные**:
+ * браузерного кода плагину для него не нужно вовсе.
+ *
+ * Неймспейс — либо `core`, либо идентификатор самого плагина. Чужой запрещён: разрешить его потом
+ * можно, никого не сломав, а запретить потом — нельзя.
+ */
+export type LocaleCatalogContributionRegistration = RegistrationCommon & {
+  kind: "locale-catalog";
+  namespace: string;
+  /** Канонический тег локали: годность тега знает `Intl`, а не наш шаблон. */
+  locale: string;
+  messages: Record<string, string>;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -162,9 +252,34 @@ export type ContributionRegistration =
   | ToolContributionRegistration
   | HookSubscriptionContributionRegistration
   | RouteContributionRegistration
-  | PublicRouteContributionRegistration;
+  | PublicRouteContributionRegistration
+  | ColorSchemeContributionRegistration
+  | LocaleCatalogContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
+
+/**
+ * Все виды, перечисленные явно. `Record<ContributionKind, true>` требует каждого ключа и не терпит
+ * лишнего, поэтому вид, добавленный в union и забытый здесь, ломает сборку, а не находится глазами.
+ */
+const everyKind = {
+  custom: true,
+  event: true,
+  agent: true,
+  skill: true,
+  tool: true,
+  hook: true,
+  route: true,
+  "public-route": true,
+  "color-scheme": true,
+  "locale-catalog": true,
+} satisfies Record<ContributionKind, true>;
+
+/**
+ * Виды списком: типа в рантайме нет, а перебрать виды нужно — например, чтобы проверить, что у
+ * каждого есть подпись в каталоге интерфейса.
+ */
+export const contributionKinds = Object.keys(everyKind) as readonly ContributionKind[];
 
 /**
  * Спор между вкладами с одинаковым идентификатором и одинаковым рангом источника: не применяется ни

@@ -42,6 +42,7 @@
 | `core.plugin.contributions`  | действующий набор вкладов изменился                 | `GET /api/plugins`     |
 | `core.contributions.changed` | контекстные наборы вкладов изменились               | подресурсы проекта     |
 | `core.preferences.changed`   | изменились цветовая схема, вариант или локаль       | `GET /api/preferences` |
+| `core.config.changed`        | изменился конфиг демона                             | `GET /api/config`      |
 | `core.projects.changed`      | список проектов или доступность папки изменились    | `GET /api/projects`    |
 | `core.sessions.changed`      | список сессий или состояние одной из них изменились | `GET /api/sessions`    |
 | `core.sessions.degraded`     | сессия лишилась инструмента или модели              | — (факт, не состояние) |

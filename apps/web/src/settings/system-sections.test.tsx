@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { defaultConfig } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
@@ -18,6 +19,9 @@ const translator = createTranslator({
   },
 });
 
+const config = { config: defaultConfig, failure: undefined, refusal: undefined };
+const onSaveConfig = () => {};
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-08-07T12:30:00.000Z"));
@@ -35,6 +39,8 @@ it("lays daemon facts out as compact Appearance-style property rows and ticks up
       health={{ status: "ok", startedAt: "2026-08-07T12:00:00.000Z", uptimeSeconds: 1_800 }}
       failure={undefined}
       locale="en-GB"
+      config={config}
+      onSaveConfig={onSaveConfig}
       translator={translator}
     />,
   );
@@ -52,6 +58,7 @@ it("lays daemon facts out as compact Appearance-style property rows and ticks up
   expect(within(timer).getAllByText("00")).toHaveLength(2);
   expect(within(timer).getByText("30")).toBeTruthy();
   expect(within(timer).getAllByText(":")).toHaveLength(2);
+  expect(screen.getByRole("heading", { name: "Configuration" })).toBeTruthy();
 
   act(() => vi.advanceTimersByTime(1_000));
 
@@ -70,6 +77,8 @@ it("keeps daemon loading and failure states in the uptime value column", () => {
       health={undefined}
       failure={undefined}
       locale="en-GB"
+      config={config}
+      onSaveConfig={onSaveConfig}
       translator={translator}
     />,
   );
@@ -84,6 +93,8 @@ it("keeps daemon loading and failure states in the uptime value column", () => {
       health={undefined}
       failure="connection refused"
       locale="en-GB"
+      config={config}
+      onSaveConfig={onSaveConfig}
       translator={translator}
     />,
   );
@@ -99,6 +110,8 @@ it("keeps every visible uptime unit in the accessible timer name after an hour",
       health={{ status: "ok", startedAt: "2026-08-07T11:29:59.000Z", uptimeSeconds: 3_601 }}
       failure={undefined}
       locale="en-GB"
+      config={config}
+      onSaveConfig={onSaveConfig}
       translator={translator}
     />,
   );

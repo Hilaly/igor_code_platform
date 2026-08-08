@@ -87,7 +87,7 @@ export type PluginTestHost = {
     declaredId: string,
     toolArguments: unknown,
   ) => Promise<{ content: string; isError: boolean }>;
-  /** Позвать маршрут — то же, что делает диспетчер, получив запрос на `/p/<id плагина>/…`. */
+  /** Позвать маршрут — то же, что делает диспетчер, получив запрос на `/api/p/<id плагина>/…`. */
   callRoute: (declaredId: string, request: PluginRouteRequest) => Promise<PluginRouteResponse>;
   /**
    * Хранилище плагина в памяти: настоящее, а не заглушка с ответами. Плагин, который что-то записал

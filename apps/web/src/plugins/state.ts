@@ -11,6 +11,7 @@
 import {
   coreEventTypes,
   isPluginStreamEvent,
+  pluginRouteAddress,
   streamGapType,
   type ContributionRegistration,
   type PluginPreferences,
@@ -19,9 +20,9 @@ import {
 } from "@sovereign/protocol";
 
 /**
- * Адрес маршрута плагина — `/p/<id плагина>/<путь>` (docs/web-api.md). Считается в одном месте на
- * оба вью: список открытых наружу маршрутов и подробности вклада обязаны называть один и тот же
- * адрес, иначе человек искал бы его глазами по двум экранам.
+ * Адрес маршрута плагина по его записи в реестре (docs/web-api.md). Сам адрес строит протокол — тот
+ * же вызов делает демон, собирая таблицу: разойдясь, вью показывал бы адрес, по которому никто не
+ * отвечает.
  */
 export function routeAddress(
   registration: Extract<ContributionRegistration, { kind: "route" | "public-route" }>,
@@ -30,7 +31,7 @@ export function routeAddress(
   const pluginId =
     registration.ownership === "plugin" ? registration.pluginId : registration.source;
 
-  return registration.path === "" ? `/p/${pluginId}` : `/p/${pluginId}/${registration.path}`;
+  return pluginRouteAddress(pluginId, registration.path);
 }
 
 export type PluginsState = {

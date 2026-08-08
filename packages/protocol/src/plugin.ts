@@ -83,7 +83,10 @@ export function pluginEnabledByDefault(source: PluginSource): boolean {
   return source === "builtin";
 }
 
-/** Идентификатор попадает в маршрут `/p/<pluginId>/...`, поэтому годятся не любые символы. */
+/**
+ * Идентификатор попадает и в маршрут `/api/p/<pluginId>/...`, и в адрес страницы
+ * `/p/<pluginId>/...`, поэтому годятся не любые символы.
+ */
 export const pluginIdPattern = /^[a-z0-9][a-z0-9-]*$/;
 
 export type PluginManifest = {

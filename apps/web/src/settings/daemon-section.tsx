@@ -2,9 +2,12 @@
  * Раздел «Демон» страницы настроек. Внизу левой панели те же факты лежат одной строкой — связь видна
  * без перехода на страницу; здесь они развёрнуты: состояние потока, время работы, момент старта и
  * причина, если демон недоступен.
+ *
+ * Конфиг демона живёт здесь же, а не отдельным разделом: это настройки того самого демона, о котором
+ * раздел и рассказывает, и разводить их по двум страницам значило бы прятать половину предмета.
  */
 
-import type { Health } from "@sovereign/protocol";
+import type { Config, Health } from "@sovereign/protocol";
 import {
   Badge,
   DurationTimer,
@@ -16,6 +19,8 @@ import {
 
 import type { StreamStatus } from "../events/stream.ts";
 import { formatFullUptime, useUptimeSeconds } from "../uptime.ts";
+import { ConfigForm } from "./config-form.tsx";
+import type { ConfigState } from "./use-config.ts";
 
 const tones: Record<StreamStatus, BadgeTone> = {
   connecting: "neutral",
@@ -29,10 +34,20 @@ export type DaemonSectionProps = {
   failure: string | undefined;
   /** Локаль интерфейса: момент старта показывается локализованной датой, а не сырой ISO-строкой. */
   locale: string;
+  config: ConfigState;
+  onSaveConfig: (config: Config) => void;
   translator: ScopedTranslator;
 };
 
-export function DaemonSection({ stream, health, failure, locale, translator }: DaemonSectionProps) {
+export function DaemonSection({
+  stream,
+  health,
+  failure,
+  locale,
+  config,
+  onSaveConfig,
+  translator,
+}: DaemonSectionProps) {
   const { t } = translator;
   const uptimeSeconds = useUptimeSeconds(health);
   const timerLabels: DurationTimerProps["labels"] = {
@@ -81,6 +96,7 @@ export function DaemonSection({ stream, health, failure, locale, translator }: D
           <span>{t("daemon.unreachable", { reason: failure })}</span>
         )}
       </SettingsRow>
+      <ConfigForm state={config} onSave={onSaveConfig} translator={translator} />
     </div>
   );
 }

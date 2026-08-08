@@ -24,7 +24,7 @@ export type PluginRouteBody = string | Uint8Array;
 
 export type PluginRouteRequest = {
   method: PluginRouteMethod;
-  /** Путь, каким его объявил вклад, а не адрес: префикс `/p/<id плагина>/` ставит платформа. */
+  /** Путь, каким его объявил вклад, а не адрес: префикс `/api/p/<id плагина>/` ставит платформа. */
   path: string;
   /** Значения сегментов вида `:имя` из объявленного пути. */
   parameters: Record<string, string>;

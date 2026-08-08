@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
 import { paletteKeys, paletteVariants, type Palette } from "./palette.ts";
 import { deriveRoles, roleNames, rolePropertyName, type RoleName } from "./roles.ts";
-import { resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
+import { parseColorScheme, resolveScheme, tokenContractMajor, type ColorScheme } from "./scheme.ts";
 import { imperiumScheme } from "./schemes/imperium.ts";
 import { shippedSchemes } from "./schemes/shipped.ts";
 
@@ -58,6 +58,65 @@ describe("rolePropertyName", () => {
     const names = new Set(roleNames.map(rolePropertyName));
 
     expect(names.size).toBe(roleNames.length);
+  });
+});
+
+describe("parseColorScheme", () => {
+  const document = {
+    tokenContract: tokenContractMajor,
+    variants: { light: imperiumScheme.variants.light, dark: imperiumScheme.variants.dark },
+  };
+
+  it("names the scheme by the identifier it is given: the document carries no name of its own", () => {
+    const parsed = parseColorScheme("themed.midnight", document);
+
+    expect(parsed.kind === "parsed" && parsed.scheme.id).toBe("themed.midnight");
+    expect(parsed.kind === "parsed" && parsed.scheme.variants.dark.surface).toBe(
+      imperiumScheme.variants.dark.surface,
+    );
+  });
+
+  it("refuses an incomplete palette whole and names what is missing", () => {
+    const withoutTwoKeys = Object.fromEntries(
+      Object.entries(imperiumScheme.variants.light).filter(
+        ([key]) => key !== "secondary" && key !== "shadow",
+      ),
+    );
+    const parsed = parseColorScheme("themed.midnight", {
+      ...document,
+      variants: { ...document.variants, light: withoutTwoKeys },
+    });
+
+    // Пропущенный ключ дал бы `color-mix(… undefined …)`, то есть сломанный CSS вместо отказа.
+    expect(parsed.kind).toBe("refused");
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(/secondary, shadow/);
+  });
+
+  it("refuses a scheme that brought only one variant", () => {
+    const parsed = parseColorScheme("themed.midnight", {
+      ...document,
+      variants: { dark: imperiumScheme.variants.dark },
+    });
+
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(/no light palette/);
+  });
+
+  it("takes a foreign token contract: refusing it is the job of resolveScheme, and only its", () => {
+    const parsed = parseColorScheme("themed.ancient", { ...document, tokenContract: 1 });
+
+    expect(parsed.kind).toBe("parsed");
+    expect(parsed.kind === "parsed" && resolveScheme(parsed.scheme, "light").kind).toBe("rejected");
+  });
+
+  it("keeps the declared role overrides, unknown names included", () => {
+    const parsed = parseColorScheme("themed.midnight", {
+      ...document,
+      roleOverrides: { accent: "#123456", neonEdge: "#654321" },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind === "resolved" && resolved.roles.accent).toBe("#123456");
+    expect(resolved?.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
   });
 });
 

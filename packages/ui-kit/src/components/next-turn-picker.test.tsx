@@ -66,7 +66,7 @@ function Harness({
       triggerLabel="Параметры следующего турна"
       placeholder="Выберите модель"
       emptyText="Моделей нет"
-      translator={{ t: (key) => translations[key] ?? key }}
+      translator={{ t: (key) => translations[key] ?? key, optional: (key) => translations[key] }}
       {...overrides}
     />
   );

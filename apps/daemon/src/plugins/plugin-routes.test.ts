@@ -136,7 +136,7 @@ describe("the routes of a plugin", () => {
       },
     );
 
-    const answer = await call("GET", "/p/tasks/board/7?full=yes", undefined, { accept: "*/*" });
+    const answer = await call("GET", "/api/p/tasks/board/7?full=yes", undefined, { accept: "*/*" });
 
     assert.equal(answer.status, 201);
     assert.equal(answer.headers["content-type"], "application/json");
@@ -159,7 +159,7 @@ describe("the routes of a plugin", () => {
       { kind: "public-route", id: "hook", method: "POST", path: "webhooks/github" },
     ]);
 
-    await call("POST", "/p/tasks/webhooks/github", "не json вовсе", {
+    await call("POST", "/api/p/tasks/webhooks/github", "не json вовсе", {
       "content-type": "text/plain",
     });
 
@@ -174,7 +174,7 @@ describe("the routes of a plugin", () => {
       { kind: "public-route", id: "hook", method: "GET", path: "hook" },
     ]);
 
-    await call("GET", "/p/tasks/hook", undefined, { cookie: "sovereign_session=secret" });
+    await call("GET", "/api/p/tasks/hook", undefined, { cookie: "sovereign_session=secret" });
 
     const request = (calls[0] as { request: PluginRouteRequest }).request;
 
@@ -196,10 +196,10 @@ describe("the routes of a plugin", () => {
       },
     );
 
-    assert.equal((await call("GET", "/p/tasks/one")).status, 200);
-    assert.equal((await call("GET", "/p/tasks/two")).status, 200);
-    assert.equal((await call("GET", "/p/tasks/one")).status, 429);
-    assert.equal((await call("GET", "/p/tasks/two")).status, 429);
+    assert.equal((await call("GET", "/api/p/tasks/one")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/two")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/one")).status, 429);
+    assert.equal((await call("GET", "/api/p/tasks/two")).status, 429);
   });
 
   it("needs a session on an ordinary route and none on a public one", async () => {
@@ -209,8 +209,8 @@ describe("the routes of a plugin", () => {
     ];
     const { call } = await serve(routes, { session: false });
 
-    assert.equal((await call("GET", "/p/tasks/board")).status, 401);
-    assert.equal((await call("GET", "/p/tasks/hook")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/board")).status, 401);
+    assert.equal((await call("GET", "/api/p/tasks/hook")).status, 200);
   });
 
   it("refuses a public route called too often, and keeps counting per contribution", async () => {
@@ -222,17 +222,17 @@ describe("the routes of a plugin", () => {
       { requestsPerMinute: 2 },
     );
 
-    assert.equal((await call("GET", "/p/tasks/hook")).status, 200);
-    assert.equal((await call("GET", "/p/tasks/hook")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/hook")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/hook")).status, 200);
 
-    const refused = await call("GET", "/p/tasks/hook");
+    const refused = await call("GET", "/api/p/tasks/hook");
 
     assert.equal(refused.status, 429);
     assert.deepEqual(JSON.parse(refused.body.toString("utf8")), {
       error: "too many requests to this route",
     });
     // Сосед считается отдельно: чужой вебхук не имеет права закрыть доступ соседнему.
-    assert.equal((await call("GET", "/p/tasks/other")).status, 200);
+    assert.equal((await call("GET", "/api/p/tasks/other")).status, 200);
     assert.ok(records.some((record) => record.message.includes("called too often")));
   });
 
@@ -242,8 +242,8 @@ describe("the routes of a plugin", () => {
       { kind: "public-route", id: "hook", method: "GET", path: "hook" },
     ]);
 
-    await call("GET", "/p/tasks/board");
-    await call("GET", "/p/tasks/hook");
+    await call("GET", "/api/p/tasks/board");
+    await call("GET", "/api/p/tasks/hook");
 
     const calls = records.filter((record) => record.message === "a route of a plugin was called");
 
@@ -270,8 +270,8 @@ describe("the routes of a plugin", () => {
       },
     );
 
-    const late = await call("GET", "/p/tasks/slow");
-    const broken = await call("GET", "/p/tasks/broken");
+    const late = await call("GET", "/api/p/tasks/slow");
+    const broken = await call("GET", "/api/p/tasks/broken");
 
     assert.equal(late.status, 504);
     assert.equal(broken.status, 500);
@@ -296,8 +296,8 @@ describe("the routes of a plugin", () => {
       },
     );
 
-    const greedy = await call("GET", "/p/tasks/greedy");
-    const odd = await call("GET", "/p/tasks/odd");
+    const greedy = await call("GET", "/api/p/tasks/greedy");
+    const odd = await call("GET", "/api/p/tasks/odd");
 
     assert.equal(greedy.status, 200);
     assert.equal(greedy.headers["x-mine"], "yes");
@@ -316,7 +316,7 @@ describe("the routes of a plugin", () => {
     ]);
 
     // Спор за адрес разрешается как спор за идентификатор вклада: не применяется ни один.
-    assert.equal((await call("GET", "/p/tasks/board")).status, 404);
+    assert.equal((await call("GET", "/api/p/tasks/board")).status, 404);
     assert.ok(
       records.some((record) => record.message.includes("claimed by several contributions")),
     );
@@ -328,7 +328,7 @@ describe("the routes of a plugin", () => {
       { kind: "route", id: "second", method: "GET", path: "items/:name" },
     ]);
 
-    assert.equal((await call("GET", "/p/tasks/items/new")).status, 404);
+    assert.equal((await call("GET", "/api/p/tasks/items/new")).status, 404);
   });
 
   it("drops the route of a contribution the human switched off", async () => {
@@ -349,7 +349,7 @@ describe("the routes of a plugin", () => {
     registry.apply(plugin, declared, new Set());
     assert.deepEqual(
       routes.routes().map((route) => route.path),
-      ["/p/tasks/board"],
+      ["/api/p/tasks/board"],
     );
 
     // Таблица пересобирается по ревизии реестра: выключенный вклад уносит свой адрес с собой.
@@ -399,7 +399,7 @@ describe("the routes of a plugin", () => {
           host: "127.0.0.1",
           port,
           method: "POST",
-          path: "/p/tasks/hook",
+          path: "/api/p/tasks/hook",
           headers: { "content-type": "text/plain", "content-length": "11" },
         },
         (incoming) => {

@@ -47,14 +47,15 @@ export function appearancePreferencesRoutes(options: AppearancePreferencesRouteO
 
         const written = options.settings.writeAppearancePreferences(parsed.value);
 
-        if (written.kind === "refused") {
+        if (written.kind !== "written") {
           options.logger.error("the appearance preferences were not written", {
             reason: written.reason,
           });
 
           // Отказ файла — не ошибка запроса и не поломка демона: настройки на диске правил кто-то
-          // ещё, и разобраться с этим может только человек.
-          respondWithError(response, 409, written.reason);
+          // ещё, и разобраться с этим может только человек. Отказ файловой системы (`500`) — тоже
+          // его дело, поэтому причина уходит в ответ, а не остаётся в журнале.
+          respondWithError(response, written.kind === "refused" ? 409 : 500, written.reason);
 
           return;
         }

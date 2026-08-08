@@ -15,26 +15,21 @@ import {
   type LoginStepFrame,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
-import {
-  Button,
-  coreEnglish,
-  coreNamespace,
-  coreRussian,
-  createTranslator,
-  Heading,
-  Spinner,
-} from "@sovereign/ui-kit";
+import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyAppearance,
   cacheAppearance,
   defaultAppearancePreferences,
+  describeSchemes,
   fetchAppearance,
+  pluginColorSchemes,
   readCachedAppearance,
   shippedSchemes,
   writeAppearance,
 } from "./appearance.ts";
+import { availableLocales, pluginCatalogs, shippedCatalogs } from "./catalogs.ts";
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
@@ -42,6 +37,7 @@ import { LoginView } from "./login/login-view.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
+import { windowWideContributions } from "./plugins/window-wide.ts";
 import { ProjectsView } from "./projects/projects-view.tsx";
 import { ProjectDetailView } from "./projects/project-detail-view.tsx";
 import { FileResourcesPanel } from "./projects/file-resources-panel.tsx";
@@ -68,14 +64,12 @@ import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearanceSection } from "./settings/appearance-section.tsx";
 import { DaemonSection } from "./settings/daemon-section.tsx";
 import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
+import { useConfig } from "./settings/use-config.ts";
 import { SettingsView } from "./settings/settings-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { describePage, PageView } from "./shell/page.tsx";
 import { Shell } from "./shell/shell.tsx";
-
-const catalogs = [coreEnglish, coreRussian];
-const shippedLocales = catalogs.map((catalog) => catalog.locale);
 
 /** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
 type Access = AuthenticationState | "asking";
@@ -146,19 +140,6 @@ export function App() {
   useEffect(() => {
     writeLayout(localStorage, layout);
   }, [layout]);
-
-  // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
-  // дерева, поэтому переключение стоит одинаково на пустой странице и на полной (docs/ui-kit.md).
-  useEffect(() => {
-    applyAppearance({
-      preferences,
-      prefersDark,
-      target: document.documentElement.style,
-      root: document.documentElement,
-      onDiagnostic: diagnostics.record,
-    });
-    cacheAppearance(localStorage, preferences);
-  }, [preferences, prefersDark, diagnostics]);
 
   useEffect(() => {
     const query = matchMedia("(prefers-color-scheme: dark)");
@@ -276,6 +257,47 @@ export function App() {
   }, [stream]);
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
+  const contributions = plugins.state.snapshot?.contributions;
+  // Схема и каталог применяются ко всему окну, а снимок несёт объявления всех контекстов сразу:
+  // копия плагина в папке проекта пришла бы вторым `themed.midnight` в тот же список.
+  const windowWide = useMemo(() => windowWideContributions(contributions ?? []), [contributions]);
+  const declaredSchemes = useMemo(() => pluginColorSchemes(windowWide), [windowWide]);
+  const schemes = useMemo(() => [...shippedSchemes, ...declaredSchemes.schemes], [declaredSchemes]);
+  // Отвергнутая схема называется один раз, а не на каждый снимок плагинов: снимок приезжает на любое
+  // изменение любого плагина, а сломанная схема остаётся той же самой.
+  const namedRefusals = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const refusal of declaredSchemes.refusals) {
+      if (namedRefusals.current.has(refusal)) {
+        continue;
+      }
+
+      namedRefusals.current.add(refusal);
+      diagnostics.record(refusal);
+    }
+  }, [declaredSchemes, diagnostics]);
+  // Каталоги плагинов идут после наших: побеждает последний объявивший сообщение (docs/ui-kit.md).
+  const catalogs = useMemo(() => [...shippedCatalogs, ...pluginCatalogs(windowWide)], [windowWide]);
+  const locales = useMemo(() => availableLocales(catalogs), [catalogs]);
+
+  // Тема применяется записью CSS-переменных в корень документа: перерисовка не требует ре-рендера
+  // дерева, поэтому переключение стоит одинаково на пустой странице и на полной (docs/ui-kit.md).
+  useEffect(() => {
+    applyAppearance({
+      preferences,
+      prefersDark,
+      schemes,
+      target: document.documentElement.style,
+      root: document.documentElement,
+      // Пока снимок плагинов не приехал, схемы плагина ещё нет ни в одном списке, и жалоба на её
+      // отсутствие была бы ложной — на каждой загрузке страницы, у каждого, кто её выбрал.
+      onDiagnostic: contributions === undefined ? () => {} : diagnostics.record,
+    });
+    cacheAppearance(localStorage, preferences);
+  }, [preferences, prefersDark, diagnostics, schemes, contributions]);
+
+  const config = useConfig({ bus, stream, onDiagnostic: diagnostics.record });
   const projects = useProjects({ bus, stream, onDiagnostic: diagnostics.record });
   const fileResources = useFileResources(
     page.kind === "settings-project" ? page.projectId : undefined,
@@ -346,7 +368,7 @@ export function App() {
         catalogs,
         onDiagnostic: diagnostics.record,
       }),
-    [preferences.locale, diagnostics],
+    [preferences.locale, catalogs, diagnostics],
   );
 
   const pageHeader = describePage(page, translator, {
@@ -732,8 +754,8 @@ export function App() {
             appearance={
               <AppearanceSection
                 preferences={preferences}
-                schemes={shippedSchemes}
-                locales={shippedLocales}
+                schemes={describeSchemes(schemes, windowWide, translator)}
+                locales={locales}
                 onChange={change}
                 refusal={refusal}
                 translator={translator}
@@ -806,6 +828,8 @@ export function App() {
                 health={health}
                 failure={failure}
                 locale={preferences.locale}
+                config={config.state}
+                onSaveConfig={config.save}
                 translator={translator}
               />
             }

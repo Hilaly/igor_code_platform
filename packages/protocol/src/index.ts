@@ -4,6 +4,7 @@
  */
 
 export * from "./authentication.ts";
+export * from "./config-api.ts";
 export * from "./contribution.ts";
 export * from "./event-stream.ts";
 export * from "./events.ts";

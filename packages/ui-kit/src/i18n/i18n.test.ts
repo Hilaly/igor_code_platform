@@ -1,3 +1,4 @@
+import { configKeys, contributionKinds } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { shippedSchemes } from "../tokens/schemes/shipped.ts";
@@ -126,6 +127,24 @@ describe("createTranslator", () => {
     expect(kit.t("plugins.count", { count: 11 })).toBe("11 плагинов");
   });
 
+  it("says nothing about an optional key no locale has", () => {
+    const kit = translator("en");
+
+    // Название схемы плагин вправе не переводить (docs/plugins.md): `t` вернул бы сам ключ и написал
+    // ложную диагностику о дырке в переводе.
+    expect(kit.scope("themed").optional("appearance.scheme.midnight")).toBeUndefined();
+    expect(kit.diagnostics).toEqual([]);
+  });
+
+  it("still reports an optional key that one locale has and another does not", () => {
+    const kit = translator("ru", [
+      { namespace: "themed", locale: "en", messages: { "appearance.scheme.midnight": "Midnight" } },
+    ]);
+
+    expect(kit.scope("themed").optional("appearance.scheme.midnight")).toBe("Midnight");
+    expect(kit.diagnostics.join("\n")).toMatch(/themed:ru has no translation/);
+  });
+
   it("formats numbers and dates in the chosen locale", () => {
     const russian = translator("ru");
     const english = translator("en");
@@ -168,6 +187,30 @@ describe("the shipped catalogs", () => {
     for (const catalog of [coreEnglish, coreRussian]) {
       const missing = shippedSchemes
         .map((scheme) => `appearance.scheme.${scheme.id}`)
+        .filter((key) => catalog.messages[key] === undefined);
+
+      expect(missing, catalog.locale).toEqual([]);
+    }
+  });
+
+  it("name every kind of contribution the platform knows", () => {
+    // Новый вид вклада добавляется в четырёх местах, и подпись во вью — последнее из них: без неё
+    // человек видит в карточке плагина `plugins.kind.color-scheme` вместо слова.
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const missing = contributionKinds
+        .map((kind) => `plugins.kind.${kind}`)
+        .filter((key) => catalog.messages[key] === undefined);
+
+      expect(missing, catalog.locale).toEqual([]);
+    }
+  });
+
+  it("name and explain every key of the daemon config", () => {
+    // Форма конфига строится по `configKeys`: ключ без подписи доезжает до строки настроек своим
+    // именем из файла, а подсказки у него нет вовсе — и понять, что означает число, негде.
+    for (const catalog of [coreEnglish, coreRussian]) {
+      const missing = configKeys
+        .flatMap((key) => [`settings.config.key.${key}`, `settings.config.hint.${key}`])
         .filter((key) => catalog.messages[key] === undefined);
 
       expect(missing, catalog.locale).toEqual([]);

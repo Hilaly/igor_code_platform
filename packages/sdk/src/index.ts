@@ -11,8 +11,10 @@ import { subscribeToEvent } from "./events.ts";
 import {
   currentPluginHost,
   type AgentContribution,
+  type ColorSchemeContribution,
   type CustomContribution,
   type HookCriticality,
+  type LocaleCatalogContribution,
   type PluginLogLevel,
   type RouteContribution,
 } from "./host.ts";
@@ -28,10 +30,13 @@ export type {
   AgentContribution,
   AgentSkillSelection,
   AgentToolSelection,
+  ColorSchemeContribution,
+  ColorSchemeDocument,
   CustomContribution,
   EventContribution,
   HookContribution,
   HookCriticality,
+  LocaleCatalogContribution,
   PayloadSchema,
   PluginContribution,
   PluginHost,
@@ -286,7 +291,7 @@ export const contribute = {
   },
 
   /**
-   * Объявить HTTP-маршрут (docs/web-api.md). Адрес — `/p/<id плагина>/<path>`; проверку сессии
+   * Объявить HTTP-маршрут (docs/web-api.md). Адрес — `/api/p/<id плагина>/<path>`; проверку сессии
    * ставит диспетчер, а не обработчик, поэтому обычный маршрут защищён по построению.
    */
   route: async (route: RouteDeclaration): Promise<void> => declareRoute("route", route),
@@ -298,6 +303,24 @@ export const contribute = {
    */
   publicRoute: async (route: RouteDeclaration): Promise<void> =>
     declareRoute("public-route", route),
+
+  /**
+   * Объявить цветовую схему (docs/ui-kit.md). Браузерного кода не требует: схема — данные, и
+   * поэтому плагин с одной темой не собирается сборщиком вовсе.
+   *
+   * Имя, которым человек выбирает схему, — это `id` вклада с неймспейсом плагина. Полноту палитры и
+   * мажор контракта токенов проверяет кит, уже в браузере: SDK о палитре не знает.
+   */
+  colorScheme: async (contribution: ColorSchemeContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "color-scheme", ...contribution }),
+
+  /**
+   * Объявить каталог сообщений (docs/ui-kit.md). Каталог для неймспейса `core` заменяет строки
+   * платформы — и добавляет платформе язык, если такого ещё нет; каталог для своего неймспейса
+   * называет строки самого плагина. Чужой неймспейс платформа не примет.
+   */
+  localeCatalog: async (contribution: LocaleCatalogContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "locale-catalog", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {
