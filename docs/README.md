@@ -133,6 +133,8 @@
 - [План исправлений среза 11b по ревью](superpowers/plans/2026-08-06-slice-11b-review-fixes.md) —
   закрытые регрессии идентичности обработчиков, диспетчеризации маршрутов, JSON-хранилища и
   отображения действующих публичных маршрутов.
+- [Исправления среза 12a по ревью](superpowers/specs/2026-08-08-slice-12a-review-fixes-design.md) —
+  сохранение неизвестных полей PUT, управляемые ошибки чтения настроек и правила слияния с `main`.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
