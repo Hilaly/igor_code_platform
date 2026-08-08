@@ -49,6 +49,117 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("defines the complete Button tone and interaction-state contract", () => {
+    const source = withoutComments(
+      readFileSync(join(kitRoot, "components", "button.module.css"), "utf8"),
+    );
+
+    expect(source).toMatch(
+      /\.secondary\s*\{[^}]*background:\s*var\(--sovereign-secondary\);[^}]*color:\s*var\(--sovereign-text-on-secondary\);/s,
+    );
+    expect(source).toMatch(/\.secondary:hover:not\(:disabled,\s*\[aria-pressed="true"\]\)/);
+    expect(source).toMatch(/\.button:active:not\(:disabled\)/);
+    expect(source).toMatch(/\.button:disabled/);
+    expect(source).toMatch(/\.button\[aria-pressed="true"\]/);
+    expect(source).toMatch(/\.sm::before\s*\{[^}]*inset-block:/s);
+    expect(source.indexOf(".danger {")).toBeLessThan(
+      source.indexOf('.button[aria-pressed="true"]'),
+    );
+  });
+
+  it("keeps input and custom Select states aligned with keyboard modality", () => {
+    const input = withoutComments(
+      readFileSync(join(kitRoot, "components", "input.module.css"), "utf8"),
+    );
+    const select = withoutComments(
+      readFileSync(join(kitRoot, "components", "select.module.css"), "utf8"),
+    );
+
+    expect(input).toMatch(/\.control::placeholder/);
+    expect(input).toMatch(/\.control:hover:not\(:disabled\):not\(:focus\)/);
+    expect(input).toMatch(/\.control:focus-visible/);
+    expect(input).not.toMatch(/\.control:focus\s*\{/);
+    expect(input).toMatch(/\.control\[aria-invalid="true"\]:focus-visible/);
+    expect(input).toMatch(/\.control:disabled/);
+    expect(input).toMatch(
+      /\.textarea\s*\{[^}]*max-height:\s*calc\(var\(--textarea-max-rows,[^}]*overflow-y:\s*auto;/s,
+    );
+    expect(select).not.toMatch(/\.control\.invalid/);
+    expect(select).toMatch(/\.control:hover:not\(\.disabled\)/);
+    expect(select).toMatch(/\.control:focus-visible/);
+    expect(select).toMatch(/\.control\.disabled/);
+    expect(select).toMatch(
+      /\.dropdown\s*\{[^}]*position:\s*absolute;[^}]*z-index:[^}]*max-height:[^}]*overflow-y:\s*auto;/s,
+    );
+  });
+
+  it("preserves native selection controls and both browser slider engines", () => {
+    const radio = withoutComments(
+      readFileSync(join(kitRoot, "components", "radio-group.module.css"), "utf8"),
+    );
+    const segmented = withoutComments(
+      readFileSync(join(kitRoot, "components", "segmented-control.module.css"), "utf8"),
+    );
+    const slider = withoutComments(
+      readFileSync(join(kitRoot, "components", "slider.module.css"), "utf8"),
+    );
+
+    expect(radio).toMatch(/\.radio:checked/);
+    expect(radio).toMatch(/\.radio:focus-visible/);
+    expect(radio).toMatch(/\.radio:disabled/);
+    expect(segmented).toMatch(
+      /\.indicator\s*\{[^}]*var\(--segmented-count\)[^}]*var\(--segmented-index\)[^}]*pointer-events:\s*none;/s,
+    );
+    expect(segmented).toMatch(/\.option:hover:not\(:disabled\)/);
+    expect(segmented).toMatch(/\.option:focus-visible/);
+    expect(segmented).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+    expect(slider).toMatch(/\.input::-webkit-slider-thumb/);
+    expect(slider).toMatch(/\.input::-moz-range-thumb/);
+    expect(slider).toMatch(/\.input:focus-visible::-webkit-slider-thumb/);
+    expect(slider).toMatch(/\.input:focus-visible::-moz-range-thumb/);
+    expect(slider).toMatch(/\.input:disabled/);
+  });
+
+  it("keeps compact primitives semantic, typographic, and layout-safe", () => {
+    const link = withoutComments(
+      readFileSync(join(kitRoot, "components", "link.module.css"), "utf8"),
+    );
+    const icon = withoutComments(
+      readFileSync(join(kitRoot, "components", "icon.module.css"), "utf8"),
+    );
+    const icons = withoutComments(
+      readFileSync(join(kitRoot, "components", "icons.module.css"), "utf8"),
+    );
+    const text = withoutComments(
+      readFileSync(join(kitRoot, "components", "text.module.css"), "utf8"),
+    );
+    const code = withoutComments(
+      readFileSync(join(kitRoot, "components", "code.module.css"), "utf8"),
+    );
+    const badge = withoutComments(
+      readFileSync(join(kitRoot, "components", "badge.module.css"), "utf8"),
+    );
+    const statusDot = withoutComments(
+      readFileSync(join(kitRoot, "components", "status-dot.module.css"), "utf8"),
+    );
+
+    expect(link).toMatch(/text-decoration:\s*underline/);
+    expect(link).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(link).toMatch(/\.link:focus-visible/);
+    expect(icon).toMatch(/fill:\s*currentColor/);
+    expect(icon).toMatch(/\.xs[\s\S]*\.sm[\s\S]*\.md[\s\S]*\.lg[\s\S]*\.xl/);
+    expect(icons).toMatch(/\.symbol\s*>\s*svg\s*\{[^}]*display:\s*block;/s);
+    expect(text).toMatch(
+      /\.heading\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\);/s,
+    );
+    expect(text).not.toMatch(/\.secondary\s*\{/);
+    expect(code.match(/font-weight:\s*400;/g)).toHaveLength(2);
+    expect(code).toMatch(/\.block\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*overflow-x:\s*auto;/s);
+    expect(code).toMatch(/\.inline\s*\{[^}]*font-size:\s*0\.9em;[^}]*overflow-wrap:\s*anywhere;/s);
+    expect(badge).toMatch(/\.badge\s*\{[^}]*text-wrap:\s*nowrap;/s);
+    expect(statusDot).toMatch(/\.dot\s*\{[^}]*background:\s*currentColor;/s);
+  });
+
   it("styles DurationTimer as flat compact bold tabular body text", () => {
     const timerCss = withoutComments(
       readFileSync(join(kitRoot, "components", "duration-timer.module.css"), "utf8"),

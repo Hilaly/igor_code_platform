@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import styles from "./button.module.css";
 
-export type ButtonTone = "normal" | "accent" | "danger";
+export type ButtonTone = "normal" | "secondary" | "accent" | "danger";
 
 export type ButtonSize = "md" | "sm";
 
