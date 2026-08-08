@@ -143,6 +143,9 @@
 - [Исправления среза 12b-2 и браузерный SDK](superpowers/specs/2026-08-09-slice-12b2-browser-sdk-review-fixes-design.md) —
   отдельный публичный browser SDK, plugin-owned places, исправления lifecycle, контекста и
   воспроизводимой живой проверки.
+- [План исправлений среза 12b-2 и browser SDK](superpowers/plans/2026-08-09-slice-12b2-browser-sdk-review-fixes.md) —
+  десять TDD-задач от identity resolver и CSS lifecycle до tracked fixtures, живой проверки и
+  переписывания локальной истории.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
