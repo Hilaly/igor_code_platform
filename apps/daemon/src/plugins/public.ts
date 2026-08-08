@@ -7,6 +7,7 @@ export {
 } from "./contribution-registry.ts";
 export { standaloneResourceRoots, type StandaloneResourceRoot } from "./file-resource-roots.ts";
 export { createFileResourceWatcher, type FileResourceWatcher } from "./file-resource-watcher.ts";
+export { pluginAssetsRoute } from "./plugin-assets-route.ts";
 export { pluginPreferencesRoute } from "./plugin-preferences.ts";
 export { createPluginProviders } from "./plugin-providers.ts";
 export { createPluginRoutes, type PluginRoutes } from "./plugin-routes.ts";

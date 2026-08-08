@@ -35,6 +35,9 @@ export type HostModuleSpecifier = (typeof hostModuleSpecifiers)[number];
 /** Общий префикс адресов собранного браузерного кода плагина. */
 export const pluginAssetPrefix = "/plugin-assets";
 
+/** Строка таблицы маршрутов демона под эти адреса. Рядом с адресом, чтобы они не разъехались. */
+export const pluginAssetPathPattern = `${pluginAssetPrefix}/:pluginKey/:revision/:file`;
+
 /**
  * Имена файлов, на которые ссылается статус плагина. Рядом с ними сборка кладёт карты кода
  * (`browser.js.map`, `browser.css.map`), но по имени их никто не спрашивает: браузер приходит за

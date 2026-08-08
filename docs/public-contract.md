@@ -40,6 +40,7 @@
 | Виды вкладов и состав каждого                  | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
 | Имена мест и правила разрешения провайдеров    | [ui-extension-model.md](ui-extension-model.md)       |
 | Реестр модулей хоста: ключ и состав            | [ui-extension-model.md](ui-extension-model.md)       |
+| Адрес браузерных ассетов плагина и заголовки   | [web-api.md](web-api.md)                             |
 | Контракт CSS Modules браузерной части плагина  | [ui-extension-model.md](ui-extension-model.md)       |
 | UI-кит: компоненты и их свойства               | [ui-kit.md](ui-kit.md)                               |
 | Семантические токены и политика устаревания    | [ui-kit.md](ui-kit.md)                               |
