@@ -1075,18 +1075,26 @@ describe("interactive components", () => {
 
 describe("tool call", () => {
   it.each([
-    ["running", "Выполняется"],
-    ["done", "Готово"],
-    ["failed", "Не удалось"],
-  ] as const)("exposes the visible %s machine outcome on its status block", (status, label) => {
-    const { container } = render(
-      <ToolCall toolName="read_file" status={status} statusLabel={label} argumentsText="{}" />,
-    );
+    ["running", "Выполняется", "●"],
+    ["done", "Готово", "✓"],
+    ["failed", "Не удалось", "×"],
+  ] as const)(
+    "exposes the visible %s machine outcome with a decorative status sign",
+    (status, label, signText) => {
+      const { container } = render(
+        <ToolCall toolName="read_file" status={status} statusLabel={label} argumentsText="{}" />,
+      );
 
-    const statusBlock = container.querySelector(`[data-status="${status}"]`);
-    expect(statusBlock).not.toBeNull();
-    expect(within(statusBlock as HTMLElement).getByText(label)).toBeTruthy();
-  });
+      const statusBlock = container.querySelector(`[data-status="${status}"]`);
+      expect(statusBlock).not.toBeNull();
+      expect(within(statusBlock as HTMLElement).getByText(label)).toBeTruthy();
+
+      const sign = within(statusBlock as HTMLElement).getByText(signText);
+      expect(sign.getAttribute("aria-hidden")).toBe("true");
+      expect(sign.hasAttribute("aria-label")).toBe(false);
+      expect(sign.hasAttribute("role")).toBe(false);
+    },
+  );
 
   it("keeps a complete technical summary available when its visible path is truncated", () => {
     const completeSummary =

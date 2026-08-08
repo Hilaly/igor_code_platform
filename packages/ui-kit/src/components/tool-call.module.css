@@ -66,6 +66,29 @@
   font-family: var(--sovereign-font-family-body);
 }
 
+.statusSign {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1em;
+  font-family: var(--sovereign-font-family-mono);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-bold);
+  line-height: var(--sovereign-line-height-none);
+}
+
+.root[data-status="running"] .statusSign {
+  color: var(--sovereign-accent-text);
+}
+
+.root[data-status="done"] .statusSign {
+  color: var(--sovereign-success-text);
+}
+
+.root[data-status="failed"] .statusSign {
+  color: var(--sovereign-danger-text);
+}
+
 .outputLabel {
   margin-block-start: var(--sovereign-space-2);
   color: var(--sovereign-text-muted);

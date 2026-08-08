@@ -20,6 +20,12 @@ const tones: Record<ToolCallStatus, BadgeTone> = {
   failed: "danger",
 };
 
+const statusSigns: Record<ToolCallStatus, string> = {
+  running: "●",
+  done: "✓",
+  failed: "×",
+};
+
 export type ToolCallProps = {
   /** Необязательный знак типа инструмента; его форму выбирает вызывающий. */
   icon?: ReactNode;
@@ -69,6 +75,9 @@ export function ToolCall({
             </span>
             <span className={styles.outcome}>
               {duration === undefined ? undefined : <Code>{duration}</Code>}
+              <span className={styles.statusSign} aria-hidden="true">
+                {statusSigns[status]}
+              </span>
               <Badge tone={tones[status]}>{statusLabel}</Badge>
             </span>
           </span>
