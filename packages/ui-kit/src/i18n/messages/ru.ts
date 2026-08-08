@@ -414,6 +414,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.state.disabled": "Выключен",
     "plugins.state.refused": "Отказано",
     "plugins.state.installing": "Ставит зависимости",
+    "plugins.state.building": "Собирает интерфейс",
     "plugins.state.starting": "Запускается",
     "plugins.state.running": "Работает",
     "plugins.state.stopping": "Останавливается",

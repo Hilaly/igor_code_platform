@@ -58,3 +58,16 @@ export const pluginBrowserFileNames = {
 export function pluginAssetAddress(pluginKey: string, revision: string, file: string): string {
   return `${pluginAssetPrefix}/${encodeURIComponent(pluginKey)}/${encodeURIComponent(revision)}/${encodeURIComponent(file)}`;
 }
+
+/**
+ * Где лежит собранный браузерный код работающего плагина. Адреса готовые, а не части, из которых
+ * их надо собрать: собирает их тот, кто знает ревизию, — иначе браузер повторял бы правило
+ * составления адреса и расходился бы с демоном при первой же его правке.
+ */
+export type PluginBrowserAssets = {
+  revision: string;
+  /** Адрес модуля-точки входа. */
+  entry: string;
+  /** Адрес таблицы стилей; её нет у плагина, не написавшего ни одного CSS-файла. */
+  styles?: string;
+};

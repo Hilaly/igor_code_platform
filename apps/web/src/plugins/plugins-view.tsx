@@ -42,6 +42,7 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
   disabled: "neutral",
   refused: "danger",
   installing: "accent",
+  building: "accent",
   starting: "accent",
   running: "success",
   stopping: "neutral",

@@ -415,6 +415,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.state.disabled": "Switched off",
     "plugins.state.refused": "Refused",
     "plugins.state.installing": "Installing",
+    "plugins.state.building": "Building the interface",
     "plugins.state.starting": "Starting",
     "plugins.state.running": "Running",
     "plugins.state.stopping": "Stopping",

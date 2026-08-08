@@ -5,6 +5,7 @@
  * обоим.
  */
 
+import type { PluginBrowserAssets } from "./plugin-browser.ts";
 import type { PluginSource } from "./plugin.ts";
 
 /** Порядок перечисления смысловой нагрузки не несёт: переходы между состояниями задаёт docs/plugins.md. */
@@ -13,6 +14,7 @@ export const pluginLifecycleStates = [
   "disabled",
   "refused",
   "installing",
+  "building",
   "starting",
   "running",
   "stopping",
@@ -40,4 +42,10 @@ export type PluginStatus = {
    * пользователя это единственный признак, что вклада нет.
    */
   contributionProblems?: string[];
+  /**
+   * Адреса собранного браузерного кода (docs/ui-extension-model.md). Есть только у работающего
+   * плагина, объявившего `sovereign.browser`: сборка идёт до подъёма воркера, и её результат живёт
+   * ровно столько же, сколько сам плагин.
+   */
+  browser?: PluginBrowserAssets;
 };
