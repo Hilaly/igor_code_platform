@@ -223,6 +223,29 @@ describe("buildPluginBrowser", () => {
       assert.match(outcome.reason, /src\/browser\.tsx:3:/);
     });
 
+    it("reports a missing stylesheet the same way as any other missing import", async () => {
+      // Найдено живым прогоном: пока подмена пути шла без проверки существования, отсутствующий
+      // `*.module.css` доезжал до `onLoad` и превращался в ENOENT со стеком по нашим модулям и по
+      // внутренностям esbuild — вместо места импорта в исходнике плагина.
+      const directory = copyOfBrowsered();
+      writeFileSync(
+        join(directory, "src", "browser.tsx"),
+        'import styles from "./nowhere.module.css";\n\nexport const classNames = styles;\n',
+      );
+
+      const outcome = await buildPluginBrowser({
+        pluginKey: "data:browsered",
+        directory,
+        browserEntry: "src/browser.tsx",
+      });
+
+      assert.equal(outcome.kind, "failed");
+      assert.ok(outcome.kind === "failed");
+      assert.match(outcome.reason, /Could not resolve "\.\/nowhere\.module\.css"/);
+      assert.match(outcome.reason, /src\/browser\.tsx:1:/);
+      assert.doesNotMatch(outcome.reason, /node_modules|plugin-browser-build/);
+    });
+
     it("does not reach for a missing entry point outside the plugin folder", async () => {
       const outcome = await buildPluginBrowser({
         pluginKey: "data:browsered",

@@ -8,7 +8,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { build, formatMessages, stop, type Plugin } from "esbuild";
@@ -160,8 +160,15 @@ function scopedCssModulesPlugin(pluginKey: string): Plugin {
   return {
     name: "sovereign-scoped-css-modules",
     setup(build) {
-      build.onResolve({ filter: /\.module\.css$/ }, (args) => {
+      build.onResolve({ filter: /\.module\.css$/ }, async (args) => {
         const source = resolve(args.resolveDir, args.path);
+
+        // Несуществующий файл отдаётся обратно esbuild: он напишет обычное «Could not resolve» с
+        // местом импорта, тогда как ошибка из `onLoad` приехала бы автору плагина вместе со стеком
+        // по нашим модулям и по внутренностям esbuild.
+        if (!(await isReadableFile(source))) {
+          return undefined;
+        }
 
         return {
           path: join(dirname(source), `${prefix}--${basename(source)}`),
@@ -182,6 +189,19 @@ function scopedCssModulesPlugin(pluginKey: string): Plugin {
       });
     },
   };
+}
+
+/** Существование файла проверяется до подмены пути, а не ловится исключением при чтении. */
+async function isReadableFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+
+    throw cause;
+  }
 }
 
 /** Ключ плагина содержит двоеточия (`project:<проект>:<id>`), а имя класса CSS их не допускает. */
