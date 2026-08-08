@@ -224,7 +224,7 @@ describe("the style sheets of the application", () => {
       /\.sessions-chat-bottom\s*\{[^}]*min-height:\s*0;[^}]*min-width:\s*0;/s,
     );
     expect(sessions).toMatch(
-      /\.sessions-composer-surface\s*\{[^}]*align-self:\s*end;[^}]*min-width:\s*0;/s,
+      /\.sessions-composer-surface\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
     );
     expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
   });
@@ -275,9 +275,6 @@ describe("the style sheets of the application", () => {
 
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*background:\s*transparent;/s);
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*border:\s*none;/s);
-    expect(sessions).toMatch(
-      /\.sessions-composer-surface\s*\{[^}]*margin-inline:\s*var\(--sovereign-space-3\);/s,
-    );
     expect(sessions).not.toMatch(
       /\.sessions-composer(?:-surface)?\s*\{[^}]*(?:background|border(?:-radius)?|box-shadow)\s*:/s,
     );

@@ -115,10 +115,9 @@
 /* Composer -------------------------------------------------------------- */
 
 .sessions-composer-surface {
-  align-self: end;
-  width: min(100%, var(--sovereign-reading-width));
+  align-self: center;
+  width: min(calc(100% - 2 * var(--sovereign-space-3)), var(--sovereign-reading-width));
   min-width: 0;
-  margin-inline: var(--sovereign-space-3);
 }
 
 .sessions-composer {
@@ -145,7 +144,7 @@
 }
 
 .sessions-composer > textarea::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--sovereign-stroke-emphasis) solid transparent;
   border-radius: var(--sovereign-radius-full);
   background: var(--sovereign-border-strong);
   background-clip: padding-box;
