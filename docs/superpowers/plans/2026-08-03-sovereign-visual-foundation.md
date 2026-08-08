@@ -21,7 +21,7 @@ typecheck, ESLint, Prettier и production-build Ladle и web.
 - Work in an isolated feature worktree branched from the commit containing `36a1b97` and all subsequently approved plan documents.
 - Preserve the existing palette shape, `ColorScheme` contract, `roleNames`, `applyRoles`, `applyScale`, and all four shipped scheme identifiers.
 - Keep `imperium` as the default scheme and preserve all three interface scale settings.
-- Use Source Serif 4 for `--sovereign-font-family-display`, Manrope for `--sovereign-font-family-body`, and IBM Plex Mono for `--sovereign-font-family-mono`.
+- Use Source Serif 4 for `--sovereign-font-family-display`, Onest for `--sovereign-font-family-body`, and IBM Plex Mono for `--sovereign-font-family-mono`.
 - Load fonts from UI Kit dependencies; do not add a CDN or runtime font request.
 - Themes change colour only; no scheme-specific component geometry or markup.
 - Add no application feature and no new server or protocol contract.
@@ -33,7 +33,7 @@ typecheck, ESLint, Prettier и production-build Ladle и web.
 
 - `packages/ui-kit/package.json`: replace the three current Fontsource dependencies with the approved families.
 - `pnpm-lock.yaml`: lock the approved local font packages.
-- `packages/ui-kit/src/styles/index.css`: load Source Serif 4 variable, Manrope variable, and IBM Plex Mono weights 400/500.
+- `packages/ui-kit/src/styles/index.css`: load Source Serif 4 variable, Onest variable, and IBM Plex Mono weights 400/500.
 - `packages/ui-kit/src/styles/tokens.css`: map the existing display/body/mono public tokens to the approved voice/interface/machine families and add compact/readable geometry tokens.
 - `packages/ui-kit/src/styles/effects.css`: keep only restrained elevation and neutral surface effects; remove gradients, glow, glass, and backdrop blur.
 - `packages/ui-kit/src/styles/styles.test.ts`: protect font imports, token consumers, flat effects, and the absence of decorative effects.
@@ -59,7 +59,7 @@ typecheck, ESLint, Prettier и production-build Ladle и web.
 **Interfaces:**
 
 - Preserves: `--sovereign-font-family-display`, `--sovereign-font-family-body`, and `--sovereign-font-family-mono` as the public CSS token names.
-- Produces: display = Source Serif 4, body = Manrope, mono = IBM Plex Mono.
+- Produces: display = Source Serif 4, body = Onest, mono = IBM Plex Mono.
 - Consumed later: agent messages use display, all controls use body, and machine blocks use mono.
 
 - [x] **Step 1: Write the failing font contract test**
@@ -73,15 +73,15 @@ it("ships the approved voice, interface, and machine fonts locally", () => {
   const manifest = JSON.parse(readFileSync(join(kitRoot, "..", "package.json"), "utf8"));
 
   expect(entry).toContain("@fontsource-variable/source-serif-4/wght.css");
-  expect(entry).toContain("@fontsource-variable/manrope/wght.css");
+  expect(entry).toContain("@fontsource-variable/onest/wght.css");
   expect(entry).toContain("@fontsource/ibm-plex-mono/400.css");
   expect(entry).toContain("@fontsource/ibm-plex-mono/500.css");
   expect(tokens).toContain('"Source Serif 4 Variable"');
-  expect(tokens).toContain('"Manrope Variable"');
+  expect(tokens).toContain('"Onest Variable"');
   expect(tokens).toContain('"IBM Plex Mono"');
   expect(manifest.dependencies).toMatchObject({
     "@fontsource-variable/source-serif-4": expect.any(String),
-    "@fontsource-variable/manrope": expect.any(String),
+    "@fontsource-variable/onest": expect.any(String),
     "@fontsource/ibm-plex-mono": expect.any(String),
   });
 });
@@ -99,14 +99,14 @@ Run:
 
 ```bash
 pnpm --filter @sovereign/ui-kit remove @fontsource-variable/ibm-plex-sans @fontsource-variable/unbounded @fontsource-variable/jetbrains-mono
-pnpm --filter @sovereign/ui-kit add @fontsource-variable/source-serif-4@^5.3.0 @fontsource-variable/manrope@^5.3.0 @fontsource/ibm-plex-mono@^5.3.0
+pnpm --filter @sovereign/ui-kit add @fontsource-variable/source-serif-4@^5.3.0 @fontsource-variable/onest@^5.3.0 @fontsource/ibm-plex-mono@^5.3.0
 ```
 
 Import the exact four CSS entries asserted above. Set the family tokens to:
 
 ```css
 --sovereign-font-family-display: "Source Serif 4 Variable", Georgia, serif;
---sovereign-font-family-body: "Manrope Variable", -apple-system, "Segoe UI", sans-serif;
+--sovereign-font-family-body: "Onest Variable", -apple-system, "Segoe UI", sans-serif;
 --sovereign-font-family-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
 ```
 
@@ -314,7 +314,7 @@ Expected: FAIL because primitives still use the old control heights, broad radii
 Use `--sovereign-row-height-compact` for list/tree rows and small navigation controls. Reduce default
 panel radius to `--sovereign-radius-sm`, use one subtle border and `--sovereign-elevation-1`, and
 remove backdrop filtering. Keep button/input APIs and focus/disabled semantics unchanged. Use
-display/Source Serif only for `Heading`; controls and rows stay body/Manrope.
+display/Source Serif only for `Heading`; controls and rows stay body/Onest.
 
 - [x] **Step 4: Add the dense foundation Ladle scenario**
 
