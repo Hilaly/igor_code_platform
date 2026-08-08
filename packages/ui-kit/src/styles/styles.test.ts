@@ -231,6 +231,16 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  it("lets a tooltip-wrapped trigger shrink inside a narrow flex container", () => {
+    const tooltipCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),
+    );
+
+    expect(tooltipCss).toMatch(
+      /\.wrap\s*\{[^}]*display:\s*inline-flex;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+    );
+  });
+
   it("shows compact Toggle labels only on hover without removing focus tooltips elsewhere", () => {
     const tooltipCss = withoutComments(
       readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),

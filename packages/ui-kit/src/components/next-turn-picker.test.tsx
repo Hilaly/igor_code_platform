@@ -82,6 +82,30 @@ describe("the NextTurnPicker", () => {
     expect(screen.getAllByRole("menuitem")).toHaveLength(2);
   });
 
+  it("keeps a long model identifier readable through the ellipsized tooltip-wrapped trigger", () => {
+    const longModel = "provider/" + "reasoning-capable-model-".repeat(12);
+
+    render(
+      <Harness
+        model={longModel}
+        modelGroups={[
+          {
+            id: "provider",
+            label: "Provider",
+            options: [{ value: longModel, label: longModel }],
+          },
+        ]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: new RegExp(longModel) });
+
+    expect(trigger.textContent).toContain(longModel);
+    expect(trigger.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe(
+      "Параметры следующего турна",
+    );
+  });
+
   it("transfers focus into the model submenu, changes the controlled model, and restores trigger focus", () => {
     const onModelChange = vi.fn();
     render(<Harness model="" onModelChange={onModelChange} />);
