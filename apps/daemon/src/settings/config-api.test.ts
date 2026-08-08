@@ -182,6 +182,25 @@ describe("configRoutes", () => {
     assert.deepEqual(stored(), { ...defaultConfig, maxConcurrentTurns: 8, futureKey: "keep me" });
   });
 
+  it("keeps a key the schema does not know when the body brings it", async () => {
+    // Клиент более новой версии может прислать ключ, которого этот демон ещё не применяет. Запись
+    // обязана сохранить его в документе, но ответ описывает только известный применяемый снимок.
+    const { put, stored } = await serve();
+    const answer = await put({
+      ...defaultConfig,
+      maxConcurrentTurns: 8,
+      futureKey: "keep me",
+    });
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(JSON.parse(answer.body), { ...defaultConfig, maxConcurrentTurns: 8 });
+    assert.deepEqual(stored(), {
+      ...defaultConfig,
+      maxConcurrentTurns: 8,
+      futureKey: "keep me",
+    });
+  });
+
   it("refuses a body that leaves a key out and writes nothing", async () => {
     const { directory, put } = await serve();
     const answer = await put({ logLevel: "debug" });

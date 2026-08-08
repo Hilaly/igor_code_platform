@@ -321,6 +321,35 @@ test(
   },
 );
 
+// Права проверяются ядром, а root их не спрашивает: под ним чтение прошло бы и проверка стала бы
+// ложно зелёной.
+test(
+  "an existing file that refuses the read is reported, not thrown",
+  { skip: process.getuid?.() === 0 },
+  () => {
+    const directory = freshDirectory();
+
+    write(directory, configFileName, JSON.stringify(defaultConfig));
+
+    const { store } = startedStore(directory);
+    const path = join(directory, configFileName);
+
+    chmodSync(path, 0o000);
+
+    try {
+      const outcome = store.writeConfig({ ...defaultConfig, maxConcurrentTurns: 8 });
+
+      assert.equal(outcome.kind, "failed");
+      assert.match(
+        outcome.kind === "failed" ? outcome.reason : "",
+        /^config\.json was not written: /,
+      );
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  },
+);
+
 test("the write leaves no temporary file behind", () => {
   const directory = freshDirectory();
   const { store } = startedStore(directory);

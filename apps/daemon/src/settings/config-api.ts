@@ -39,7 +39,10 @@ export function configRoutes(options: ConfigRouteOptions): Route[] {
           return;
         }
 
-        const written = options.settings.writeConfig(parsed.value);
+        // Успешный разбор гарантирует объект верхнего уровня. Хранилищу нужен исходный документ,
+        // чтобы не потерять ключи более новой версии; ответ остаётся известным текущему демону
+        // применяемым `Config` (docs/data-directory.md).
+        const written = options.settings.writeConfig(body as Record<string, unknown>);
 
         if (written.kind !== "written") {
           options.logger.error("the daemon config was not written", { reason: written.reason });

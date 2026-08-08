@@ -55,7 +55,7 @@ export type SettingsStore = {
    * другой файл: конфиг пишет человек, и запись поверх негодного файла стёрла бы его правку
    * (docs/data-directory.md).
    */
-  writeConfig: (config: Config) => WriteOutcome;
+  writeConfig: (document: Record<string, unknown>) => WriteOutcome;
   close: () => void;
 };
 
@@ -206,15 +206,15 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
     parse: (raw: unknown) => SettingsParseResult<Value>,
     patch: (document: Record<string, unknown>) => Record<string, unknown>,
   ): WriteOutcome => {
-    // Основа для записи — файл, а не снимок в памяти: между перечитываниями его мог поправить
-    // человек, и переключение одного плагина не должно откатывать соседнюю строку.
-    const stored = readStoredDocument(join(directory, fileName), parse);
-
-    if (stored.kind === "refused") {
-      return stored;
-    }
-
     try {
+      // Основа для записи — файл, а не снимок в памяти: между перечитываниями его мог поправить
+      // человек, и переключение одного плагина не должно откатывать соседнюю строку.
+      const stored = readStoredDocument(join(directory, fileName), parse);
+
+      if (stored.kind === "refused") {
+        return stored;
+      }
+
       writeFileAtomically(
         join(directory, fileName),
         `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
@@ -258,8 +258,8 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
       patchPreferences((document) => ({ ...document, appearance, locale })),
     // Разложение поверх документа, а не замена им: ключ, которого схема не знает, написан более
     // новой платформой или руками, и запись из интерфейса не имеет права его унести.
-    writeConfig: (config) =>
-      patchFile(configFileName, parseConfig, (document) => ({ ...document, ...config })),
+    writeConfig: (update) =>
+      patchFile(configFileName, parseConfig, (document) => ({ ...document, ...update })),
     close: () => {
       if (debounceTimer !== undefined) {
         clearTimeout(debounceTimer);
