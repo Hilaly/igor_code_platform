@@ -197,7 +197,7 @@ describe("the style sheets of the application", () => {
 
     expect(sessions).toMatch(/\.sessions\s*\{[^}]*container-type:\s*inline-size;/s);
     expect(sessions).toMatch(
-      /\.sessions-chat\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;/s,
+      /\.sessions-chat\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0, 1fr\) auto;/s,
     );
     expect(sessions).toMatch(/\.sessions-chat\s*\{[^}]*container-type:\s*inline-size;/s);
     expect(sessions).toMatch(/\.sessions-chat-scroll\s*\{[^}]*min-height:\s*0;/s);
