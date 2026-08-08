@@ -71,7 +71,14 @@ export function NextTurnPicker({
     if (modelOpen) modelMenuRef.current?.focus();
   }, [modelOpen]);
   useEffect(() => {
-    if (reasoningOpen) reasoningMenuRef.current?.focus();
+    if (!reasoningOpen) return;
+
+    const menu = reasoningMenuRef.current;
+    const initialOption =
+      menu?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]') ??
+      menu?.querySelector<HTMLElement>('[role="option"]');
+
+    initialOption?.focus();
   }, [reasoningOpen]);
 
   const handleReasoningKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {

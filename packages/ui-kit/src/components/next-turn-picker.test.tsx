@@ -125,27 +125,34 @@ describe("the NextTurnPicker", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("navigates reasoning options with arrows and restores focus after Escape", () => {
+  it("focuses the selected reasoning option and preserves keyboard cascade behavior", () => {
     const onThinkingLevelChange = vi.fn();
     render(<Harness onThinkingLevelChange={onThinkingLevelChange} />);
     const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
-    const listbox = screen.getByRole("listbox", { name: "Уровень рассуждений" });
+    const selected = screen.getByRole("option", { name: /Средний/, selected: true });
 
-    expect(document.activeElement).toBe(listbox);
-    fireEvent.keyDown(listbox, { key: "ArrowDown" });
-    fireEvent.keyDown(listbox, { key: "ArrowDown" });
-    fireEvent.keyDown(listbox, { key: "Enter" });
+    expect(document.activeElement).toBe(selected);
+    fireEvent.keyDown(selected, { key: "End" });
+    const last = screen.getByRole("option", { name: "Максимальный" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Home" });
+    const first = screen.getByRole("option", { name: "Выкл" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    const next = screen.getByRole("option", { name: "Минимальный" });
+    expect(document.activeElement).toBe(next);
+    fireEvent.keyDown(next, { key: "Enter" });
     expect(onThinkingLevelChange).toHaveBeenCalledWith("minimal");
     expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
     expect(document.activeElement).toBe(trigger);
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
-    fireEvent.keyDown(screen.getByRole("listbox", { name: "Уровень рассуждений" }), {
-      key: "Escape",
-    });
+    const reopened = screen.getByRole("option", { name: /Минимальный/, selected: true });
+    expect(document.activeElement).toBe(reopened);
+    fireEvent.keyDown(reopened, { key: "Escape" });
     expect(document.activeElement).toBe(trigger);
   });
 
