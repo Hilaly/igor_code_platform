@@ -40,8 +40,8 @@ it("shows one selected settings section and only its content", () => {
   );
 
   expect(screen.getByRole("navigation", { name: "Разделы настроек" })).toBeTruthy();
-  expect(screen.getByText("Настройки")).toBeTruthy();
-  expect(screen.queryByText("Sovereign")).toBeNull();
+  expect(screen.getByText("SETTINGS")).toBeTruthy();
+  expect(screen.getByText("◆ Sovereign · Настройки · Провайдеры")).toBeTruthy();
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(screen.getByRole("heading", { level: 1, name: "Провайдеры" })).toBeTruthy();
   expect(screen.getAllByRole("region", { name: "Провайдеры" })).toHaveLength(1);
@@ -60,26 +60,33 @@ it("shows one selected settings section and only its content", () => {
   expect(onSectionChange).toHaveBeenLastCalledWith("projects");
 });
 
-it("demotes its embedded page heading when the shell owns the page heading", () => {
-  render(
-    <ShellHeaderProvider description={{ title: "Настройки" }}>
-      <SettingsView
-        section="providers"
-        onSectionChange={vi.fn()}
-        projects={<div>project content</div>}
-        appearance={<div>appearance content</div>}
-        providers={<div>provider content</div>}
-        plugins={<div>plugin content</div>}
-        daemon={<div>daemon</div>}
-        diagnostics={<div>diagnostics</div>}
-        translator={translator}
-      />
-    </ShellHeaderProvider>,
-  );
+it.each(["64rem", "24rem"])(
+  "keeps the approved hierarchy without an embedded duplicate heading at %s",
+  (width) => {
+    render(
+      <div style={{ width }}>
+        <ShellHeaderProvider description={{ title: "Провайдеры" }}>
+          <SettingsView
+            section="providers"
+            onSectionChange={vi.fn()}
+            projects={<div>project content</div>}
+            appearance={<div>appearance content</div>}
+            providers={<div>provider content</div>}
+            plugins={<div>plugin content</div>}
+            daemon={<div>daemon</div>}
+            diagnostics={<div>diagnostics</div>}
+            translator={translator}
+          />
+        </ShellHeaderProvider>
+      </div>,
+    );
 
-  expect(screen.getByRole("heading", { level: 2, name: "Провайдеры" })).toBeTruthy();
-  expect(screen.queryByRole("heading", { level: 1, name: "Провайдеры" })).toBeNull();
-});
+    expect(screen.getByText("SETTINGS")).toBeTruthy();
+    expect(screen.getByText("◆ Sovereign · Настройки · Провайдеры")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Провайдеры" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Провайдеры" })).toBeNull();
+  },
+);
 
 it.each([
   {
@@ -140,30 +147,32 @@ it.each([
   },
 );
 
-it("moves the plugin name into the page heading without inventing breadcrumbs", () => {
+it("puts a plugin object into the full Settings context chain", () => {
   render(
-    <SettingsView
-      section="plugins"
-      detailTitle="Usage insights"
-      onSectionChange={vi.fn()}
-      projects={<div>project content</div>}
-      appearance={<div>appearance content</div>}
-      providers={<div>provider content</div>}
-      plugins={
-        <>
-          <h2>Usage insights summary</h2>
-          <div>plugin detail content</div>
-        </>
-      }
-      daemon={<div>daemon</div>}
-      diagnostics={<div>diagnostics</div>}
-      translator={translator}
-    />,
+    <ShellHeaderProvider description={{ title: "Usage insights" }}>
+      <SettingsView
+        section="plugins"
+        detailTitle="Usage insights"
+        onSectionChange={vi.fn()}
+        projects={<div>project content</div>}
+        appearance={<div>appearance content</div>}
+        providers={<div>provider content</div>}
+        plugins={
+          <>
+            <h2>Usage insights summary</h2>
+            <div>plugin detail content</div>
+          </>
+        }
+        daemon={<div>daemon</div>}
+        diagnostics={<div>diagnostics</div>}
+        translator={translator}
+      />
+    </ShellHeaderProvider>,
   );
 
-  expect(screen.getByRole("heading", { level: 1, name: "Usage insights" })).toBeTruthy();
+  expect(screen.getByText("◆ Sovereign · Настройки · Usage insights")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Usage insights" })).toBeNull();
   expect(screen.getByRole("heading", { level: 2, name: "Usage insights summary" })).toBeTruthy();
-  expect(screen.queryByText("Sovereign")).toBeNull();
   expect(screen.getByText("plugin detail content")).toBeTruthy();
 });
 
@@ -208,6 +217,7 @@ it("keeps projects selected for both the list and a project detail", () => {
 
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(screen.getByRole("heading", { level: 1, name: "Alpha" })).toBeTruthy();
+  expect(screen.getByText("◆ Sovereign · Настройки · Alpha")).toBeTruthy();
   expect(screen.getByRole("heading", { level: 2, name: "Alpha summary" })).toBeTruthy();
   expect(screen.getByText("project detail content")).toBeTruthy();
 });
