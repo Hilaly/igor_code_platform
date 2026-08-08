@@ -77,10 +77,24 @@ export function PluginDetailView({
 
   const status = snapshot.plugins.find((plugin) => plugin.key === pluginKey);
   if (status === undefined) {
+    const authoritative = !state.stale && state.failure === undefined;
+
     return (
       <div className="plugin-detail">
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
-        <EmptyState title={t("plugins.detail.notfound", { key: pluginKey })} />
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
+        {state.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("plugins.failed", { reason: state.failure })} />
+        )}
+        {authoritative ? (
+          <EmptyState title={t("plugins.detail.notfound", { key: pluginKey })} />
+        ) : state.failure === undefined ? (
+          <Spinner label={t("state.loading")} />
+        ) : undefined}
       </div>
     );
   }
