@@ -86,7 +86,7 @@
 }
 
 .sessions-entry-message:hover > .sessions-entry-meta,
-.sessions-entry-meta:focus-within {
+:root[data-sovereign-input-modality="keyboard"] .sessions-entry-meta:focus-within {
   opacity: 1;
   pointer-events: auto;
 }

@@ -6,6 +6,7 @@ import "./providers/providers.css";
 import "./sessions/sessions.css";
 import "./settings/settings.css";
 
+import { trackInputModality } from "@sovereign/ui-kit";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -19,6 +20,11 @@ registerHostModules();
 const container = document.getElementById("root");
 if (!container) {
   throw new Error("root container is missing in index.html");
+}
+
+const stopTrackingInputModality = trackInputModality(document);
+if (import.meta.hot) {
+  import.meta.hot.dispose(stopTrackingInputModality);
 }
 
 createRoot(container).render(

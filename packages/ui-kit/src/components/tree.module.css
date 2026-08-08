@@ -150,7 +150,10 @@
 }
 
 .root[data-actions-visibility="interaction"] .item:hover > .actions,
-.root[data-actions-visibility="interaction"] .item:focus-within > .actions,
+:root[data-sovereign-input-modality="keyboard"]
+  .root[data-actions-visibility="interaction"]
+  .item:focus-within
+  > .actions,
 .root[data-actions-visibility="interaction"] .actions:has([aria-expanded="true"]) {
   opacity: 1;
   pointer-events: auto;

@@ -26,11 +26,12 @@
 }
 
 /*
- * Наведение показывает любую подсказку. По фокусу остаются открыты обычные подсказки, но не компактные
- * подписи Toggle: после клика checkbox сохраняет фокус, и такая подпись не должна оставаться на экране.
+ * Наведение показывает любую подсказку. Фокус открывает обычные подсказки только после keyboard-input,
+ * но не компактные подписи Toggle. После указательного клика корень остаётся в pointer-modality,
+ * поэтому hover-out закрывает пузырь при сохранённом focus.
  */
 .wrap:hover > .tip,
-.wrap:not(.hoverOnly):focus-within > .tip {
+:root[data-sovereign-input-modality="keyboard"] .wrap:not(.hoverOnly):focus-within > .tip {
   display: block;
 }
 

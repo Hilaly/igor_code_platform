@@ -113,7 +113,7 @@ describe("stylesheets of the kit", () => {
 
     expect(tooltipCss).toMatch(/\.tip\s*\{[^}]*display:\s*none;/s);
     expect(tooltipCss).toMatch(
-      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?:root\[data-sovereign-input-modality="keyboard"\]\s+\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
     );
   });
 
@@ -124,9 +124,8 @@ describe("stylesheets of the kit", () => {
     const toggle = readFileSync(join(kitRoot, "components", "toggle.tsx"), "utf8");
 
     expect(tooltipCss).toMatch(
-      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
+      /\.wrap:hover\s*>\s*\.tip,[\s\S]*?:root\[data-sovereign-input-modality="keyboard"\]\s+\.wrap:not\(\.hoverOnly\):focus-within\s*>\s*\.tip\s*\{[^}]*display:\s*block;/s,
     );
-    expect(tooltipCss).not.toMatch(/\.hoverOnly:focus-within\s*>\s*\.tip/);
     expect(toggle).toMatch(/<Tooltip\s+content=\{label\}\s+hoverOnly>[\s\S]*\{toggle\}/);
   });
 
@@ -188,6 +187,9 @@ describe("stylesheets of the kit", () => {
       /\.root\[data-disclosure-alignment="label"\] \.togglePlaceholder\s*\{[^}]*width:\s*0;/s,
     );
     expect(tree).not.toMatch(/\.root\[data-disclosure-alignment="label"\] \.toggle\s*,/s);
+    expect(tree).toMatch(
+      /\.item:hover\s*>\s*\.actions,[\s\S]*?:root\[data-sovereign-input-modality="keyboard"\][\s\S]*?\.item:focus-within\s*>\s*\.actions,[\s\S]*?\.actions:has\(\[aria-expanded="true"\]\)/s,
+    );
   });
 
   it("describes public accents and elevation without obsolete decorative effects", () => {

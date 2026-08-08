@@ -84,6 +84,12 @@ describe("the style sheets of the application", () => {
     expect(loaded).toEqual(sheets.map((sheet) => sheet.name).sort());
   });
 
+  it("starts input modality tracking before rendering the application", () => {
+    expect(entrypoint).toMatch(
+      /trackInputModality\(document\);[\s\S]*createRoot\(container\)\.render/,
+    );
+  });
+
   it.each(sheets)("$name takes every colour from a role variable", ({ styles }) => {
     const literals = [
       ...(styles.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []),
@@ -176,7 +182,7 @@ describe("the style sheets of the application", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
     expect(projects).toMatch(
-      /\.projects-list\s*>\s*li\s*>\s*button:focus-visible\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
+      /:root\[data-sovereign-input-modality="keyboard"\]\s+\.projects-list\s*>\s*li\s*>\s*button:focus\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
     );
   });
 
