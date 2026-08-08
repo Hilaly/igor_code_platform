@@ -16,6 +16,11 @@ import {
   type PaletteVariant,
 } from "./palette.ts";
 import { deriveRoles, roleNames, type RoleName, type Roles } from "./roles.ts";
+import {
+  chooseSecondaryActionForeground,
+  minimumSecondaryActionContrast,
+  secondaryActionContrastRatio,
+} from "./secondary-contrast.ts";
 
 /**
  * Мажор контракта токенов. Растёт, когда меняется палитра: роли добавляются и переименовываются без
@@ -159,8 +164,10 @@ export function resolveScheme(scheme: ColorScheme, variant: PaletteVariant): Sch
 
     const roles = deriveRoles(validatedPalette);
     const diagnostics: string[] = [];
+    const builtInOverrides = readBuiltInRoleOverrides(scheme, variant);
+    let secondaryForegroundOverridden = builtInOverrides?.textOnSecondary !== undefined;
 
-    Object.assign(roles, readBuiltInRoleOverrides(scheme, variant));
+    Object.assign(roles, builtInOverrides);
 
     for (const [role, value] of Object.entries(scheme.roleOverrides ?? {})) {
       // Незнакомая роль — диагностика, а не отказ: схему могли написать для более новой версии кита,
@@ -178,9 +185,26 @@ export function resolveScheme(scheme: ColorScheme, variant: PaletteVariant): Sch
       }
 
       roles[role as RoleName] = value;
+      secondaryForegroundOverridden ||= role === "textOnSecondary";
       diagnostics.push(
         `the scheme ${scheme.id} overrides the role ${role} by hand: a kit update may not reach it`,
       );
+    }
+
+    if (!secondaryForegroundOverridden) {
+      roles.textOnSecondary = chooseSecondaryActionForeground(roles).foreground;
+    }
+
+    const secondaryContrast = secondaryActionContrastRatio(roles);
+
+    if (secondaryContrast < minimumSecondaryActionContrast) {
+      return {
+        kind: "rejected",
+        diagnostics: [
+          ...diagnostics,
+          `the ${variant} palette of the scheme ${scheme.id} gives its secondary action only ${secondaryContrast.toFixed(2)}:1 contrast across base, hover and strong states on the panel surface; ${minimumSecondaryActionContrast}:1 is required`,
+        ],
+      };
     }
 
     return { kind: "resolved", roles, diagnostics };

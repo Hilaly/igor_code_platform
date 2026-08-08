@@ -259,6 +259,98 @@ describe("parseColorScheme", () => {
       ).toBeGreaterThanOrEqual(4.5);
     }
   });
+
+  it("chooses one foreground that survives every opaque secondary action state", () => {
+    const boundaryPalette = {
+      ...document.variants.light,
+      surface: "#ffffff",
+      surfaceRaised: "#ffffff",
+      surfaceSunken: "#f5f5f5",
+      ink: "#000000",
+      inkMuted: "#555555",
+      accentInk: "#ffffff",
+      dangerInk: "#ffffff",
+      secondary: "#767676",
+    };
+    const parsed = parseColorScheme("themed.secondary-boundary", {
+      ...document,
+      variants: { ...document.variants, light: boundaryPalette },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("resolved");
+    if (resolved?.kind !== "resolved") return;
+
+    expect(resolved.roles.textOnSecondary).toBe("#ffffff");
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatioOnSurface(
+          resolved.roles.textOnSecondary,
+          resolved.roles[background],
+          resolved.roles.panelSurface,
+        ),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("rejects a translucent secondary when no foreground survives every rendered state", () => {
+    const parsed = parseColorScheme("themed.secondary-alpha-boundary", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: {
+          ...document.variants.light,
+          surface: "#ffffff",
+          surfaceRaised: "#ffffff",
+          surfaceSunken: "#f5f5f5",
+          ink: "#000000",
+          inkMuted: "#555555",
+          accentInk: "#ffffff",
+          dangerInk: "#ffffff",
+          secondary: "rgb(0 0 0 / 0.5)",
+        },
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("rejected");
+    expect(resolved?.diagnostics.join("\n")).toMatch(/secondary action.*contrast/i);
+  });
+
+  it("composites a translucent secondary before choosing its foreground", () => {
+    const parsed = parseColorScheme("themed.secondary-alpha-valid", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: {
+          ...document.variants.light,
+          surface: "#ffffff",
+          surfaceRaised: "#ffffff",
+          surfaceSunken: "#f5f5f5",
+          ink: "#000000",
+          inkMuted: "#555555",
+          accentInk: "#ffffff",
+          dangerInk: "#ffffff",
+          secondary: "rgb(0 0 0 / 0.3)",
+        },
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("resolved");
+    if (resolved?.kind !== "resolved") return;
+
+    expect(resolved.roles.textOnSecondary).toBe("#000000");
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatioOnSurface(
+          resolved.roles.textOnSecondary,
+          resolved.roles[background],
+          resolved.roles.panelSurface,
+        ),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
 
 describe("resolveScheme", () => {
@@ -540,6 +632,17 @@ function contrastRatio(first: string, second: string): number {
   const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
     (left, right) => right - left,
   );
+
+  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
+}
+
+function contrastRatioOnSurface(foreground: string, background: string, surface: string): number {
+  const renderedBackground = composite(rgbChannels(background), rgbChannels(surface));
+  const renderedForeground = composite(rgbChannels(foreground), renderedBackground);
+  const [lighter, darker] = [
+    relativeLuminance(renderedForeground),
+    relativeLuminance(renderedBackground),
+  ].sort((left, right) => right - left);
 
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }

@@ -11,9 +11,8 @@
  * основному тексту, чтобы цветная надпись оставалась читаемой на светлой поверхности.
  */
 
-import { convert, resolve } from "@asamuzakjp/css-color";
-
 import type { Palette } from "./palette.ts";
+import { chooseLegibleForeground } from "./secondary-contrast.ts";
 
 export const roleNames = [
   "pageSurface",
@@ -100,10 +99,14 @@ export function deriveRoles(palette: Palette): Roles {
   /** Второстепенный текст чуть сдвинут к основному ради утопленной поверхности полей. */
   const readableMuted = `color-mix(in oklab, ${palette.inkMuted} 96%, ${palette.ink} 4%)`;
 
+  const secondary = palette.secondary;
+  const secondaryHover = towardsInk(secondary, hoverShift);
+  const secondaryStrong = towardsInk(secondary, "18%");
+
   /**
-   * Второй акцент — самостоятельный цвет, поэтому `accentInk` не обещает контраст на нём. Среди
-   * уже объявленных нейтральных foreground выбирается самый контрастный; новый ключ палитры ради
-   * текста не нужен, а все состояния secondary остаются на той же стороне шкалы яркости.
+   * Второй акцент — самостоятельный цвет, поэтому `accentInk` не обещает контраст на нём. Один
+   * нейтральный foreground выбирается по худшему из трёх заполненных состояний после композиции
+   * поверх реальной поднятой поверхности кнопки.
    */
   const secondaryForegroundCandidates = [
     palette.ink,
@@ -113,11 +116,11 @@ export function deriveRoles(palette: Palette): Roles {
     palette.accentInk,
     palette.dangerInk,
   ];
-  const textOnSecondary = secondaryForegroundCandidates.reduce((mostLegible, candidate) =>
-    contrastRatio(candidate, palette.secondary) > contrastRatio(mostLegible, palette.secondary)
-      ? candidate
-      : mostLegible,
-  );
+  const textOnSecondary = chooseLegibleForeground(
+    secondaryForegroundCandidates,
+    [secondary, secondaryHover, secondaryStrong],
+    [palette.surface, palette.surfaceRaised],
+  ).foreground;
 
   // Своего значения у «к сведению» в палитре нет: акцент, сведённый к второстепенному тексту.
   const info = `color-mix(in oklab, ${palette.accent} 55%, ${palette.inkMuted} 45%)`;
@@ -149,12 +152,12 @@ export function deriveRoles(palette: Palette): Roles {
     controlSurfaceHover: towardsInk(palette.surfaceRaised, hoverShift),
     // Кольцо фокуса разбавлено текстом поверх акцента: на тёмной схеме чистый акцент сливается с ней.
     focusRing: `color-mix(in oklab, ${palette.accent} 72%, ${palette.accentInk} 28%)`,
-    secondary: palette.secondary,
-    secondaryHover: towardsInk(palette.secondary, hoverShift),
-    secondaryStrong: towardsInk(palette.secondary, "18%"),
-    secondarySurface: softSurface(palette.secondary),
-    secondaryBorder: softBorder(palette.secondary),
-    secondaryText: readableText(palette.secondary),
+    secondary,
+    secondaryHover,
+    secondaryStrong,
+    secondarySurface: softSurface(secondary),
+    secondaryBorder: softBorder(secondary),
+    secondaryText: readableText(secondary),
     danger: palette.danger,
     dangerSurface: softSurface(palette.danger),
     dangerBorder: softBorder(palette.danger),
@@ -183,25 +186,4 @@ export function deriveRoles(palette: Palette): Roles {
  */
 export function rolePropertyName(role: RoleName): string {
   return `--sovereign-${role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
-}
-
-function relativeLuminance(color: string): number {
-  const resolved = resolve(color);
-  const [red = 0, green = 0, blue = 0] =
-    resolved === null ? [] : convert.colorToRgb(resolved).slice(0, 3);
-  const channels = [red, green, blue].map((channel) => {
-    const value = channel / 255;
-
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-
-  return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
-}
-
-function contrastRatio(first: string, second: string): number {
-  const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort(
-    (left, right) => right - left,
-  );
-
-  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
