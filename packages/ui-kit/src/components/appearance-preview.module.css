@@ -1,0 +1,117 @@
+.preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--sovereign-panel-surface);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-sm);
+  box-shadow: var(--sovereign-elevation-1);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  container-type: inline-size;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+  padding: var(--sovereign-space-3) var(--sovereign-space-4);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.eyebrow,
+.meta,
+.swatchLabel {
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.eyebrow {
+  font-weight: var(--sovereign-font-weight-semibold);
+  letter-spacing: var(--sovereign-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--sovereign-font-family-display);
+  font-size: var(--sovereign-font-size-lg);
+  font-weight: var(--sovereign-font-weight-semibold);
+  line-height: var(--sovereign-line-height-tight);
+}
+
+.meta {
+  flex: none;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--sovereign-space-4);
+  list-style: none;
+}
+
+.swatchItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.swatch {
+  display: block;
+  min-height: var(--sovereign-space-6);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  border-radius: var(--sovereign-radius-xs);
+}
+
+.surface {
+  background: var(--sovereign-page-surface);
+}
+
+.accent {
+  background: var(--sovereign-accent);
+}
+
+.secondary {
+  background: var(--sovereign-secondary);
+}
+
+.text {
+  background: var(--sovereign-text);
+}
+
+.swatchLabel {
+  overflow-wrap: anywhere;
+}
+
+@container (width < 28rem) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .meta {
+    text-align: start;
+  }
+
+  .swatches {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { AppearancePreview } from "./appearance-preview.tsx";
 import { Badge } from "./badge.tsx";
 import { BrandLockup } from "./brand-lockup.tsx";
 import { Button } from "./button.tsx";
@@ -382,6 +383,39 @@ export const VisualFoundation = () => {
     </Panel>
   );
 };
+
+export const AppearancePreviews = () => (
+  <div style={column}>
+    <AppearancePreview
+      title="Превью"
+      label="Превью: Империум, тёмная, обычная"
+      scheme="Империум"
+      variant="Тёмная"
+      scale="Обычная"
+      swatches={[
+        { role: "surface", label: "Поверхность" },
+        { role: "accent", label: "Акцент" },
+        { role: "secondary", label: "Вторичный акцент" },
+        { role: "text", label: "Текст" },
+      ]}
+    />
+    <div style={{ maxWidth: "22rem" }}>
+      <AppearancePreview
+        title="Preview"
+        label="Preview: Imperium, dark, smaller"
+        scheme="Imperium"
+        variant="Dark"
+        scale="Smaller"
+        swatches={[
+          { role: "surface", label: "Surface" },
+          { role: "accent", label: "Accent" },
+          { role: "secondary", label: "Secondary" },
+          { role: "text", label: "Text" },
+        ]}
+      />
+    </div>
+  </div>
+);
 
 export const Links = () => (
   <div style={column}>
