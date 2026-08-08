@@ -157,7 +157,10 @@ describe("stylesheets of the kit", () => {
     expect(code).toMatch(/\.block\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*overflow-x:\s*auto;/s);
     expect(code).toMatch(/\.inline\s*\{[^}]*font-size:\s*0\.9em;[^}]*overflow-wrap:\s*anywhere;/s);
     expect(badge).toMatch(/\.badge\s*\{[^}]*text-wrap:\s*nowrap;/s);
-    expect(statusDot).toMatch(/\.dot\s*\{[^}]*background:\s*currentColor;/s);
+    expect(statusDot).toMatch(
+      /\.dot\s*\{[^}]*inline-size:\s*var\(--sovereign-space-2\);[^}]*block-size:\s*var\(--sovereign-space-2\);[^}]*background:\s*currentColor;/s,
+    );
+    expect(statusDot).not.toMatch(/(?:^|[;{])\s*(?:width|height)\s*:/m);
   });
 
   it("styles DurationTimer as flat compact bold tabular body text", () => {
