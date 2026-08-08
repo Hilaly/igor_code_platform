@@ -399,6 +399,10 @@ describe("contrast", () => {
     }
   });
 
+  const selectedTabPair = ["accentText", "accentSurface"] as const satisfies readonly [
+    RoleName,
+    RoleName,
+  ];
   const rolePairs = [
     ["text", "pageSurface"],
     ["textMuted", "pageSurface"],
@@ -424,7 +428,7 @@ describe("contrast", () => {
     ["text", "fillSurface"],
     ["textMuted", "fillSurface"],
     ["text", "accentSurface"],
-    ["accentText", "accentSurface"],
+    selectedTabPair,
     ["dangerText", "dangerSurface"],
     ["warningText", "warningSurface"],
     ["successText", "successSurface"],

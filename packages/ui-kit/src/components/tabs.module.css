@@ -42,7 +42,7 @@
   border-color: var(--sovereign-border-strong);
 }
 .tab[aria-selected="true"] {
-  color: var(--sovereign-text-on-accent);
+  color: var(--sovereign-accent-text);
   background: var(--sovereign-accent-surface);
   border-color: var(--sovereign-accent);
 }

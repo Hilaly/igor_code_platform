@@ -93,6 +93,16 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  it("uses readable accent text on the selected Tabs soft surface", () => {
+    const tabs = withoutComments(
+      readFileSync(join(kitRoot, "components", "tabs.module.css"), "utf8"),
+    );
+
+    expect(tabs).toMatch(
+      /\.tab\[aria-selected="true"\]\s*\{[^}]*color:\s*var\(--sovereign-accent-text\);[^}]*background:\s*var\(--sovereign-accent-surface\);/s,
+    );
+  });
+
   it("preserves native selection controls and both browser slider engines", () => {
     const radio = withoutComments(
       readFileSync(join(kitRoot, "components", "radio-group.module.css"), "utf8"),
