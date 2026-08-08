@@ -572,6 +572,46 @@ describe("contrast", () => {
     expect(failures).toEqual([]);
   });
 
+  const focusAdjacentSurfaces = [
+    "pageSurface",
+    "panelSurface",
+    "sunkenSurface",
+    "fillSurface",
+    "fillSurfaceStrong",
+    "controlSurface",
+    "controlSurfaceHover",
+    "accentSurface",
+    "secondarySurface",
+    "dangerSurface",
+    "warningSurface",
+    "successSurface",
+    "infoSurface",
+  ] as const satisfies readonly RoleName[];
+
+  it("keeps the shared keyboard focus ring distinct from every adjacent surface", () => {
+    const failures: string[] = [];
+
+    for (const scheme of shippedSchemes) {
+      for (const variant of paletteVariants) {
+        const resolved = resolveScheme(scheme, variant);
+        expect(resolved.kind, `${scheme.id} ${variant}`).toBe("resolved");
+        if (resolved.kind !== "resolved") continue;
+
+        for (const background of focusAdjacentSurfaces) {
+          const ratio = contrastRatio(resolved.roles.focusRing, resolved.roles[background]);
+
+          if (ratio < 3) {
+            failures.push(
+              `${scheme.id} ${variant}: focusRing against ${background} is ${ratio.toFixed(2)}:1`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
   it("keeps the translucent Notice body legible after alpha composition", () => {
     const noticePairs = [
       ["infoText", "infoSurface"],

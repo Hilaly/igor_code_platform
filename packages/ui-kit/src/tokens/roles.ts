@@ -150,8 +150,8 @@ export function deriveRoles(palette: Palette): Roles {
     accentText: readableText(palette.accent),
     controlSurface: palette.surfaceRaised,
     controlSurfaceHover: towardsInk(palette.surfaceRaised, hoverShift),
-    // Кольцо фокуса разбавлено текстом поверх акцента: на тёмной схеме чистый акцент сливается с ней.
-    focusRing: `color-mix(in oklab, ${palette.accent} 72%, ${palette.accentInk} 28%)`,
+    // Кольцо сохраняет оттенок акцента, а основной текст даёт ему 3:1 на нейтральных и мягких фонах.
+    focusRing: `color-mix(in oklab, ${palette.accent} 35%, ${palette.ink} 65%)`,
     secondary,
     secondaryHover,
     secondaryStrong,
