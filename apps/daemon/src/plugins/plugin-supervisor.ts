@@ -13,8 +13,11 @@ import { Worker } from "node:worker_threads";
 import type { LoginStep, PluginContribution } from "@sovereign/sdk";
 import {
   coreEventTypes,
+  pluginAssetAddress,
+  pluginBrowserFileNames,
   type ContributionRegistration,
   type LogSource,
+  type PluginBrowserAssets,
   type PluginLifecycleState,
   type PluginStatus,
   type Preferences,
@@ -27,6 +30,13 @@ import type {
 } from "./contribution-registry.ts";
 import type { EventBus } from "../platform/public.ts";
 import type { Logger } from "../platform/public.ts";
+import { createPluginAssetStore } from "./plugin-assets.ts";
+import {
+  buildPluginBrowser,
+  stopPluginBrowserBuilds,
+  type BrowserBuildOutcome,
+  type PluginBrowserBundle,
+} from "./plugin-browser-build.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";
@@ -54,6 +64,11 @@ export type PluginSupervisor = {
   routeGeneration: () => number;
   /** Есть ли сейчас воркер, которому можно передать HTTP-вызов. */
   isRunning: (pluginKey: string) => boolean;
+  /**
+   * Файл собранного браузерного бандла. Владеет им супервизор, потому что живёт бандл ровно столько
+   * же, сколько плагин: выключили — забыли.
+   */
+  browserAsset: (pluginKey: string, revision: string, file: string) => Uint8Array | undefined;
   /** Привести живое к желаемому: поднять включённые, погасить выключенные, забыть исчезнувшие. */
   apply: (discovery: PluginDiscovery, preferences: Preferences) => Promise<void>;
   /** Поднять заново включённые плагины из перечисленных папок: их исходники изменились. */
@@ -119,6 +134,11 @@ export type CreatePluginSupervisorOptions = {
     onInstallStart: () => void,
   ) => Promise<DependencyOutcome>;
   /**
+   * Сборка браузерной части (docs/ui-extension-model.md). Внедряется по той же причине, что и
+   * установка: тесту жизненного цикла нужен управляемый провал, а не настоящий esbuild.
+   */
+  buildBrowser?: (plugin: DiscoveredPlugin) => Promise<BrowserBuildOutcome>;
+  /**
    * Ответить на запрос плагина о провайдерах (`plugin-providers.ts`). Необязателен: супервизор
    * поднимает плагины и без каталога — тесты жизненного цикла о провайдерах не знают вовсе.
    *
@@ -179,6 +199,8 @@ type Supervised = {
   cancelRetry?: CancelScheduled;
   /** Метка текущей попытки старта: установка асинхронна, и её результат мог устареть. */
   startToken?: object;
+  /** Адреса собранного браузерного кода этой попытки: у плагина без интерфейса их нет. */
+  browser?: PluginBrowserAssets;
 };
 
 export function createPluginSupervisor(options: CreatePluginSupervisorOptions): PluginSupervisor {
@@ -198,6 +220,15 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     options.ensureDependencies ??
     ((plugin: DiscoveredPlugin, onInstallStart: () => void) =>
       ensurePluginDependencies({ directory: plugin.directory, logger, onInstallStart }));
+  const buildBrowser =
+    options.buildBrowser ??
+    ((plugin: DiscoveredPlugin) =>
+      buildPluginBrowser({
+        pluginKey: plugin.key,
+        directory: plugin.directory,
+        ...(plugin.manifest.browser === undefined ? {} : { browserEntry: plugin.manifest.browser }),
+      }));
+  const assets = createPluginAssetStore();
 
   const supervised = new Map<string, Supervised>();
   const refused = new Map<string, PluginStatus>();
@@ -227,6 +258,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     ...(entry.contributionProblems.length === 0
       ? {}
       : { contributionProblems: entry.contributionProblems }),
+    ...(entry.browser === undefined ? {} : { browser: entry.browser }),
   });
 
   const transition = (entry: Supervised, state: PluginLifecycleState, reason?: string): void => {
@@ -357,6 +389,10 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.worker = undefined;
     void worker?.terminate();
     dropContributions(entry);
+
+    // Ассеты остаются в памяти, а статус про них молчит: страница, открытая до падения, ещё вправе
+    // дозапросить карту кода своей ревизии, но обещать браузерную часть упавшего плагина нельзя.
+    entry.browser = undefined;
 
     // Плагин, продержавшийся достаточно долго, падает как в первый раз: иначе редкая ошибка раз в
     // сутки навсегда оставит его на потолке задержки.
@@ -530,6 +566,50 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     return true;
   };
 
+  /**
+   * Сборка браузерной части — тоже этап жизненного цикла, а не скрытая подготовка: провалившаяся
+   * сборка обязана быть видна человеку там же, где остальные причины «плагин не работает».
+   *
+   * Сборка идёт **до** подъёма воркера: вклады, которые воркер объявит в `activate`, ссылаются на
+   * экспорты бандла, и без бандла реестр наполнился бы мёртвыми ссылками.
+   */
+  const build = async (entry: Supervised, token: object): Promise<boolean> => {
+    if (entry.plugin.manifest.browser === undefined) {
+      return true;
+    }
+
+    transition(entry, "building");
+
+    const outcome = await buildBrowser(entry.plugin);
+
+    // Пока шла сборка, плагин могли выключить, перезагрузить или снять с диска.
+    if (entry.startToken !== token) {
+      return false;
+    }
+
+    if (outcome.kind === "failed") {
+      // Как и провал установки (docs/plugins.md): повтор раз в минуту не починит опечатку в TSX.
+      // Повтор происходит по правке файла или по повторному включению.
+      entry.attempt = 0;
+      entry.nextAttemptAt = undefined;
+      transition(entry, "failed", outcome.reason);
+
+      return false;
+    }
+
+    if (outcome.kind === "built") {
+      assets.put(entry.plugin.key, outcome.bundle);
+      entry.browser = browserAssetsOf(entry.plugin.key, outcome.bundle);
+
+      logger.debug("the plugin browser bundle is built", {
+        plugin: entry.plugin.key,
+        revision: outcome.bundle.revision,
+      });
+    }
+
+    return true;
+  };
+
   const start = (entry: Supervised): void => {
     const token = {};
     entry.startToken = token;
@@ -538,7 +618,11 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       const ready = await install(entry);
 
       // Пока ставились зависимости, плагин могли выключить или снять с диска.
-      if (ready && entry.startToken === token) {
+      if (!ready || entry.startToken !== token) {
+        return;
+      }
+
+      if (await build(entry, token)) {
         launch(entry);
       }
     })();
@@ -586,6 +670,13 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     entry.startToken = undefined;
 
     const worker = entry.worker;
+
+    // Перезагрузка ассеты не забывает: прежняя ревизия нужна странице, открытой до неё. Выключение
+    // и остановка забывают — плагина больше нет, и держать его код в памяти незачем.
+    if (!preserveSnapshot) {
+      assets.forget(entry.plugin.key);
+    }
+    entry.browser = undefined;
 
     // Даже без воркера переход пишется в журнал: «выключен» — такое же наблюдаемое состояние, как
     // «запущен», и человек, выключивший плагин, должен увидеть подтверждение (docs/plugins.md).
@@ -801,6 +892,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       const alive =
         entry.state === "installing" ||
+        entry.state === "building" ||
         entry.state === "starting" ||
         entry.state === "running" ||
         entry.state === "failed";
@@ -832,6 +924,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
       return entry?.worker !== undefined && entry.state === "running";
     },
+    browserAsset: (pluginKey, revision, file) => assets.read(pluginKey, revision, file),
     apply,
     call,
     reload: async (directories) => {
@@ -862,6 +955,8 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
           const revision = registry.revision();
           registry.removePlugin(entry.plugin.key);
           publishContributions(revision);
+          // Перезагрузка ассеты сохранила, но плагина не стало вовсе — держать их больше не для кого.
+          assets.forget(entry.plugin.key);
           supervised.delete(entry.plugin.key);
           continue;
         }
@@ -882,7 +977,26 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
       // Снимает подписку на шину, чтобы пересоздание супервизора (тест, будущий рантайм) не
       // оставляло старую доставлять события в дохлые хэндлы воркеров.
       events.close();
+
+      // esbuild держит дочерний процесс-сервис: без этого демон не завершается (docs/toolchain.md).
+      stopPluginBrowserBuilds();
     },
+  };
+}
+
+/**
+ * Адреса собранного бандла. Составляются здесь, а не в браузере: правило составления знает тот, кто
+ * знает ревизию, и повторённое на другой стороне оно разъехалось бы при первой же правке.
+ */
+function browserAssetsOf(pluginKey: string, bundle: PluginBrowserBundle): PluginBrowserAssets {
+  const styles = bundle.files.has(pluginBrowserFileNames.styles)
+    ? pluginAssetAddress(pluginKey, bundle.revision, pluginBrowserFileNames.styles)
+    : undefined;
+
+  return {
+    revision: bundle.revision,
+    entry: pluginAssetAddress(pluginKey, bundle.revision, pluginBrowserFileNames.script),
+    ...(styles === undefined ? {} : { styles }),
   };
 }
 

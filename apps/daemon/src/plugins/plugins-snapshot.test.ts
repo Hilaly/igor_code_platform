@@ -80,6 +80,17 @@ describe("buildPluginsSnapshot", () => {
     });
   });
 
+  it("carries the browser asset addresses of a status through untouched", () => {
+    // Снимок не пересобирает статус по полям, и адреса ассетов доезжают до страницы сами.
+    const browser = {
+      revision: "abcdefghijkl",
+      entry: "/plugin-assets/data%3Ahello/abcdefghijkl/browser.js",
+    };
+    const built: PluginStatus = { ...running, browser };
+
+    assert.deepEqual(buildPluginsSnapshot(sources([built, refused])).plugins, [built, refused]);
+  });
+
   it("tells the recorded enablement apart from the one derived from the source", () => {
     const state = sources([running], {
       "data:hello": { enabled: true, disabledContributions: ["hello.panel"] },

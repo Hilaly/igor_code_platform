@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { setTimeout as wait } from "node:timers/promises";
@@ -243,6 +243,14 @@ afterEach(async () => {
   await running?.stopAll();
   running = undefined;
 });
+
+function revisionOf(supervisor: PluginSupervisor, key: string): string {
+  const revision = supervisor.statuses().find((status) => status.key === key)?.browser?.revision;
+
+  assert.ok(revision !== undefined, `${key} reports no browser revision`);
+
+  return revision;
+}
 
 const lifecycleEvents = (events: BusEvent[], key: string): PluginStatus[] =>
   events
@@ -1058,6 +1066,138 @@ describe("createPluginSupervisor", () => {
     await recorded.waitFor(reachedState("builtin:hello", "running"), "the built-in plugin running");
 
     assert.equal(asked, false);
+  });
+
+  it("builds the browser bundle before it launches the worker", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("browsered"), enabled("data:browsered"));
+    await recorded.waitFor(reachedState("data:browsered", "running"), "browsered running");
+
+    const states = lifecycleEvents(recorded.events, "data:browsered").map((status) => status.state);
+
+    assert.deepEqual(states, ["discovered", "building", "starting", "running"]);
+
+    const [status] = supervisor.statuses().filter((entry) => entry.key === "data:browsered");
+    const browser = status?.browser;
+
+    assert.ok(browser !== undefined, "the running plugin reports its browser assets");
+    assert.equal(browser.entry, `/plugin-assets/data%3Abrowsered/${browser.revision}/browser.js`);
+    assert.equal(browser.styles, `/plugin-assets/data%3Abrowsered/${browser.revision}/browser.css`);
+
+    // Сборка попала не только в статус: по адресу лежат байты, и это тот же модуль.
+    const script = supervisor.browserAsset("data:browsered", browser.revision, "browser.js");
+
+    assert.ok(script !== undefined);
+    assert.match(Buffer.from(script).toString("utf8"), /__sovereignHostModules__/);
+  });
+
+  it("says nothing about building for a plugin without a browser entry point", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("hello"), enabled("data:hello"));
+    await recorded.waitFor(reachedState("data:hello", "running"), "hello running");
+
+    const states = lifecycleEvents(recorded.events, "data:hello").map((status) => status.state);
+
+    assert.equal(states.includes("building"), false);
+    assert.equal(
+      supervisor.statuses().some((entry) => entry.browser !== undefined),
+      false,
+    );
+  });
+
+  it("leaves a plugin whose browser sources do not build failed, without retrying", async () => {
+    const recorded = journal();
+    const clock = manualClock();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+      now: clock.now,
+      schedule: clock.schedule,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("browser-broken"), enabled("data:browser-broken"));
+    const failure = await recorded.waitFor(
+      reachedState("data:browser-broken", "failed"),
+      "the build failure",
+    );
+
+    assert.match(String(failure["reason"]), /Could not resolve "\.\/missing-panel\.tsx"/);
+    assert.match(String(failure["reason"]), /src\/browser\.tsx:7:22/);
+    // Повтор раз в минуту не починит опечатку в TSX: попытки не назначаются вовсе.
+    assert.deepEqual(clock.delays(), []);
+    // Воркер не поднимался: сборка идёт до него.
+    assert.equal(
+      recorded.records.some((record) => record.message === "browser-broken is up"),
+      false,
+    );
+  });
+
+  it("keeps the previous revision readable after a reload and forgets both when switched off", async () => {
+    const recorded = journal();
+    const registry = createContributionRegistry();
+    const supervisor = createPluginSupervisor({
+      logger: recorded.logger,
+      bus: recorded.bus,
+      createPluginLogger: recorded.pluginLogger,
+      registry,
+    });
+    running = supervisor;
+
+    await supervisor.apply(only("browsered"), enabled("data:browsered"));
+    await recorded.waitFor(reachedState("data:browsered", "running"), "browsered running");
+
+    const first = revisionOf(supervisor, "data:browsered");
+    const styles = join(fixtures, "browsered", "src", "badge.module.css");
+    const original = readFileSync(styles, "utf8");
+
+    try {
+      writeFileSync(styles, `${original}\n.reloaded {\n  opacity: 1;\n}\n`);
+      await supervisor.reload([
+        { directory: join(fixtures, "browsered"), fileResourcesChanged: false },
+      ]);
+      await recorded.waitFor(
+        (record) =>
+          recorded.records.filter(reachedState("data:browsered", "running")).length === 2 &&
+          record.message === "plugin lifecycle",
+        "browsered running again",
+      );
+    } finally {
+      writeFileSync(styles, original);
+    }
+
+    const second = revisionOf(supervisor, "data:browsered");
+
+    assert.notEqual(first, second);
+    // Страница, открытая до перезагрузки, ещё живёт на прежней ревизии.
+    assert.notEqual(supervisor.browserAsset("data:browsered", first, "browser.js"), undefined);
+    assert.notEqual(supervisor.browserAsset("data:browsered", second, "browser.js"), undefined);
+
+    await supervisor.apply(only("browsered"), disabled("data:browsered"));
+
+    assert.equal(supervisor.browserAsset("data:browsered", first, "browser.js"), undefined);
+    assert.equal(supervisor.browserAsset("data:browsered", second, "browser.js"), undefined);
   });
 
   it("fails a plugin that throws in activate and retries with a growing delay", async () => {
