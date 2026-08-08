@@ -163,6 +163,42 @@ describe("parseColorScheme", () => {
 
     expect(resolved?.kind === "resolved" && resolved.roles.controlSurface).not.toBe("#261c18");
   });
+
+  it.each([
+    ["rgb()", "rgb(20 20 20)", "rgb(230 230 230)", "rgb(190 135 30)"],
+    ["hsl()", "hsl(0 0% 8%)", "hsl(0 0% 92%)", "hsl(40 73% 43%)"],
+    ["oklch()", "oklch(20% 0 0)", "oklch(92% 0 0)", "oklch(65% 0.14 75)"],
+  ])("keeps secondary action text legible for plugin %s colors", (_, dark, light, secondary) => {
+    const parsed = parseColorScheme("themed.functional", {
+      ...document,
+      variants: {
+        light: {
+          ...document.variants.light,
+          surface: dark,
+          surfaceRaised: light,
+          surfaceSunken: dark,
+          ink: light,
+          inkMuted: light,
+          accentInk: dark,
+          dangerInk: dark,
+          secondary,
+        },
+        dark: document.variants.dark,
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(parsed.kind).toBe("parsed");
+    expect(resolved?.kind).toBe("resolved");
+
+    if (resolved?.kind !== "resolved") return;
+
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatio(resolved.roles.textOnSecondary, resolved.roles[background]),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
 
 describe("resolveScheme", () => {

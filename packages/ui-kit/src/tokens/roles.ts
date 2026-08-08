@@ -11,6 +11,8 @@
  * основному тексту, чтобы цветная надпись оставалась читаемой на светлой поверхности.
  */
 
+import { convert, resolve } from "@asamuzakjp/css-color";
+
 import type { Palette } from "./palette.ts";
 
 export const roleNames = [
@@ -184,14 +186,16 @@ export function rolePropertyName(role: RoleName): string {
 }
 
 function relativeLuminance(color: string): number {
-  const channels = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(color)?.slice(1, 4) ?? [];
-  const [red = 0, green = 0, blue = 0] = channels.map((channel) => {
-    const value = Number.parseInt(channel, 16) / 255;
+  const resolved = resolve(color);
+  const [red = 0, green = 0, blue = 0] =
+    resolved === null ? [] : convert.colorToRgb(resolved).slice(0, 3);
+  const channels = [red, green, blue].map((channel) => {
+    const value = channel / 255;
 
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   });
 
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
 }
 
 function contrastRatio(first: string, second: string): number {
