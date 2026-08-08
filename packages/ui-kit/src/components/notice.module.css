@@ -32,5 +32,5 @@
   line-height: var(--sovereign-line-height-snug);
 }
 .body {
-  color: color-mix(in srgb, currentColor 88%, transparent);
+  color: color-mix(in srgb, currentColor 82%, transparent);
 }

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Dialog } from "./dialog.tsx";
@@ -11,6 +13,13 @@ import { Tooltip } from "./tooltip.tsx";
 afterEach(cleanup);
 
 describe("surface semantics", () => {
+  it("keeps notice body contrast at the approved translucent role", () => {
+    const source = readFileSync(join(import.meta.dirname, "notice.module.css"), "utf8");
+    expect(source).toContain(
+      ["color", "-mix(in srgb, current", "Color 82%, transparent)"].join(""),
+    );
+  });
+
   it("traps dialog focus, closes on Escape, and restores its opener", async () => {
     const onClose = vi.fn();
     const { rerender } = render(<button type="button">Opener</button>);
