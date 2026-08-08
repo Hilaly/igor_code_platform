@@ -180,6 +180,9 @@
   TDD-срезы системных вкладок, объектных списков и вложенных страниц с полной визуальной проверкой.
 - [План анимированного тумблера](superpowers/plans/2026-08-07-animated-toggle.md) — TDD-срезы
   switch-примитива, tooltip-подписей в Settings и полной визуальной проверки.
+- [Полный clean-slate редизайн Sovereign](superpowers/specs/2026-08-08-sovereign-clean-slate-redesign-design.md) —
+  утверждённая полная замена всех CSS приложения и UI Kit в визуальном языке Refined Imperium с
+  сохранением поведения и доступности; размещение нового экрана аналитики пока обсуждается.
 - [Живой таймер времени работы демона](superpowers/specs/2026-08-07-daemon-uptime-timer-design.md) —
   компактный жирный цифровой таймер UI Kit и ежесекундное обновление на странице Daemon.
 - [План живого таймера демона](superpowers/plans/2026-08-07-daemon-uptime-timer.md) — TDD-срезы
