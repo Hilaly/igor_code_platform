@@ -1,37 +1,24 @@
-/*
- * Стиль списка. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
- * дисциплина цвета»).
- *
- * Строка скруглена и подсвечивается целиком: выбор и наведение — это состояния строки, а не рамки
- * вокруг текста внутри неё. Разделитель взят самой слабой линией, потому что в плотном списке
- * обычная граница превращает его в таблицу.
- */
-
 .list {
   display: flex;
   flex-direction: column;
   padding: var(--sovereign-space-0);
   list-style: none;
 }
-
 .row {
   position: relative;
   display: flex;
-  min-height: var(--sovereign-row-height-compact);
   align-items: center;
+  min-height: var(--sovereign-row-height-compact);
+  color: var(--sovereign-text);
   border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-xs);
-  color: var(--sovereign-text);
 }
-
 .row:last-child {
-  border-bottom: none;
+  border-bottom: 0;
 }
-
 .selected {
   background: var(--sovereign-accent-surface);
 }
-
 .select {
   display: block;
   width: 100%;
@@ -40,32 +27,26 @@
   padding-inline: var(--sovereign-space-3);
   padding-block: var(--sovereign-space-1);
   box-sizing: content-box;
-  border: none;
-  /* Скругление наследуется от строки: иначе подсветка при наведении вылезает за её углы. */
-  border-radius: inherit;
-  background: none;
+  overflow: hidden;
   color: inherit;
   font: inherit;
-  overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--sovereign-duration-fast) var(--sovereign-ease-out);
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
 }
-
-/* Составная строка сохраняет естественную высоту: компактная ступень для неё только минимум. */
 .select:has(> *) {
   height: auto;
   min-height: var(--sovereign-row-height-compact);
   overflow: visible;
   white-space: normal;
 }
-
 .select:hover {
   background: var(--sovereign-control-surface-hover);
 }
-
 .actions {
   position: absolute;
   inset-inline-end: var(--sovereign-space-3);

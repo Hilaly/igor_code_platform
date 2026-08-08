@@ -1,39 +1,32 @@
-/*
- * Стиль панели. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
- * дисциплина цвета»).
- *
- * Поверхность и возвышение заданы ролями: самостоятельная панель отделена от страницы одной
- * границей и первым, сдержанным уровнем тени (styles/effects.css).
- */
-
 .panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sovereign-text);
+  background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-sm);
-  background: var(--sovereign-panel-surface);
   box-shadow: var(--sovereign-elevation-1);
-  color: var(--sovereign-text);
-  /* Скругление обрезает содержимое: иначе шапка вылезает углами за край панели. */
-  overflow: hidden;
 }
-
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sovereign-space-3);
+  min-width: 0;
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
   border-bottom: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
-
 .actions {
   display: flex;
   flex: none;
   align-items: center;
   gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
 }
-
 .body {
+  min-width: 0;
   padding: var(--sovereign-space-4);
 }

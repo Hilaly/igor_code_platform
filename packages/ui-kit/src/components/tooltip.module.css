@@ -2,63 +2,46 @@
   position: relative;
   display: inline-flex;
 }
-
-/*
- * Пузырь вывернут: заливка цветом текста, надпись цветом страницы. Своей роли у выворотки нет, а эта
- * пара уже проверена тестом контраста — в обратную сторону контраст тот же.
- */
 .tip {
   position: absolute;
   z-index: var(--sovereign-z-overlay);
   display: none;
   width: max-content;
-  /* Предел строки подсказки, а не шаг отступа: дальше текст перестаёт читаться одним взглядом. */
   max-width: 16rem;
   padding: var(--sovereign-space-1) var(--sovereign-space-2);
-  border-radius: var(--sovereign-radius-sm);
-  background: var(--sovereign-text);
   color: var(--sovereign-page-surface);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
   line-height: var(--sovereign-line-height-normal);
-  /* Пузырь не перехватывает мышь: иначе он загораживает то, к чему относится. */
   pointer-events: none;
+  background: var(--sovereign-text);
+  border-radius: var(--sovereign-radius-sm);
 }
-
-/*
- * Наведение показывает любую подсказку. Фокус открывает обычные подсказки только после keyboard-input,
- * но не компактные подписи Toggle. После указательного клика корень остаётся в pointer-modality,
- * поэтому hover-out закрывает пузырь при сохранённом focus.
- */
 .wrap:hover > .tip,
 :root[data-sovereign-input-modality="keyboard"] .wrap:not(.hoverOnly):focus-within > .tip {
   display: block;
 }
-
 .top {
   bottom: 100%;
   left: 50%;
-  transform: translateX(-50%);
   margin-bottom: var(--sovereign-space-2);
+  transform: translateX(-50%);
 }
-
 .bottom {
   top: 100%;
   left: 50%;
-  transform: translateX(-50%);
   margin-top: var(--sovereign-space-2);
+  transform: translateX(-50%);
 }
-
 .left {
   top: 50%;
   right: 100%;
-  transform: translateY(-50%);
   margin-right: var(--sovereign-space-2);
+  transform: translateY(-50%);
 }
-
 .right {
   top: 50%;
   left: 100%;
-  transform: translateY(-50%);
   margin-left: var(--sovereign-space-2);
+  transform: translateY(-50%);
 }

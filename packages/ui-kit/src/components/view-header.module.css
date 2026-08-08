@@ -4,39 +4,36 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sovereign-space-3);
+  min-width: 0;
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
-
 .headingGroup {
   display: flex;
   flex: 1 1 auto;
-  min-width: 0;
   align-items: baseline;
   gap: var(--sovereign-space-2);
+  min-width: 0;
 }
-
 .title {
   min-width: 0;
   flex: 0 1 auto;
 }
-
 .context {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  flex: 1 1 auto;
+  color: var(--sovereign-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--sovereign-text-muted);
 }
-
 .actions {
   display: flex;
   flex: 1 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--sovereign-space-2);
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
 }

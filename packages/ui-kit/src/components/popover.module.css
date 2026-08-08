@@ -2,47 +2,42 @@
   position: relative;
   display: inline-block;
 }
-
 .trigger {
   display: inline-flex;
-  background: transparent;
-  border: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   cursor: pointer;
 }
-
 .content {
   position: absolute;
   z-index: var(--sovereign-z-overlay);
+  min-width: 12rem;
+  padding: var(--sovereign-space-3);
+  color: var(--sovereign-text);
   background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-md);
   box-shadow: var(--sovereign-elevation-2);
-  padding: var(--sovereign-space-3);
-  min-width: 12rem;
 }
-
 .top {
   bottom: calc(100% + var(--sovereign-space-2));
   left: 50%;
   transform: translateX(-50%);
 }
-
 .bottom {
   top: calc(100% + var(--sovereign-space-2));
   left: 50%;
   transform: translateX(-50%);
 }
-
 .left {
-  right: calc(100% + var(--sovereign-space-2));
   top: 50%;
+  right: calc(100% + var(--sovereign-space-2));
   transform: translateY(-50%);
 }
-
 .right {
-  left: calc(100% + var(--sovereign-space-2));
   top: 50%;
+  left: calc(100% + var(--sovereign-space-2));
   transform: translateY(-50%);
 }

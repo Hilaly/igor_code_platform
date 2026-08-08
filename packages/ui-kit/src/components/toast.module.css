@@ -1,65 +1,63 @@
 .container {
   position: fixed;
-  bottom: var(--sovereign-space-5);
   right: var(--sovereign-space-5);
+  bottom: var(--sovereign-space-5);
   z-index: var(--sovereign-z-modal);
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
-  pointer-events: none;
-  max-width: 24rem;
   width: 100%;
+  max-width: 24rem;
+  pointer-events: none;
 }
-
 .toast {
-  pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sovereign-space-3);
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
   background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
   border-radius: var(--sovereign-radius-sm);
   box-shadow: var(--sovereign-elevation-2);
-  color: var(--sovereign-text);
-  font-family: var(--sovereign-font-family-body);
-  font-size: var(--sovereign-font-size-sm);
+  pointer-events: auto;
   animation: slideIn var(--sovereign-duration-normal) var(--sovereign-ease-out);
 }
-
 .normal {
   border-color: var(--sovereign-accent-border);
 }
-
 .success {
   border-color: var(--sovereign-success-border);
 }
-
 .warning {
   border-color: var(--sovereign-warning-border);
 }
-
 .danger {
   border-color: var(--sovereign-danger-border);
 }
-
 .close {
-  background: transparent;
-  border: none;
-  color: var(--sovereign-text-muted);
-  cursor: pointer;
   padding: 0;
-  font-size: 1.1rem;
+  color: var(--sovereign-text-muted);
+  font-size: var(--sovereign-font-size-lg);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
-
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateY(1rem) scale(0.95);
+    transform: translateY(var(--sovereign-space-3));
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
   }
 }

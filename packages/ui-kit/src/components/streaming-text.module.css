@@ -1,8 +1,3 @@
-/*
- * Идущий ответ. Переводы строк сохраняются самим стилем: разметки у этого текста нет, и они —
- * единственное, чем он структурирован.
- */
-
 .root {
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-display);
@@ -11,11 +6,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-/*
- * Каретка стоит в потоке текста, поэтому она `inline-block` с нулевой шириной содержимого: иначе
- * последняя строка сдвигалась бы каждый раз, когда мигание её прячет.
- */
 .caret {
   display: inline-block;
   width: var(--sovereign-space-2);
@@ -26,17 +16,11 @@
   vertical-align: text-bottom;
   animation: caret-blink var(--sovereign-duration-slow) steps(2, jump-none) infinite;
 }
-
 @keyframes caret-blink {
   50% {
     opacity: 0.2;
   }
 }
-
-/*
- * Мигание — движение без смысла: тому, кому оно мешает, каретка остаётся видимой неподвижной.
- * Убирать её вовсе нельзя — тогда пропадает единственный признак того, что ответ ещё идёт.
- */
 @media (prefers-reduced-motion: reduce) {
   .caret {
     animation: none;

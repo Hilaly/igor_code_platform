@@ -1,7 +1,9 @@
 .surface {
+  min-width: 0;
   padding: var(--sovereign-space-3);
+  color: var(--sovereign-text);
+  background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
   border-radius: var(--sovereign-radius-md);
-  background: var(--sovereign-panel-surface);
   box-shadow: var(--sovereign-elevation-1);
 }
