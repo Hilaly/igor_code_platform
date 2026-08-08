@@ -458,6 +458,17 @@ describe("stylesheets of the kit", () => {
     expect(noticeCss + stateCss).not.toMatch(/--sovereign-elevation-/);
   });
 
+  it("reserves both viewport gutters for the narrow Toast stack", () => {
+    const toastCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "toast.module.css"), "utf8"),
+    );
+
+    expect(toastCss).toMatch(
+      /\.container\s*\{[^}]*inset-inline-end:\s*var\(--sovereign-space-5\);[^}]*inset-block-end:\s*var\(--sovereign-space-5\);[^}]*inline-size:\s*min\(24rem,\s*calc\(100vw\s*-\s*2\s*\*\s*var\(--sovereign-space-5\)\)\);/s,
+    );
+    expect(toastCss).not.toMatch(/\.container\s*\{[^}]*width:\s*100%;/s);
+  });
+
   it("catalogues the canonical shared system states on the page surface", () => {
     const catalogue = readFileSync(join(kitRoot, "components", "primitives.stories.tsx"), "utf8");
     const systemStates = catalogue.slice(catalogue.indexOf("export const SystemStates"));

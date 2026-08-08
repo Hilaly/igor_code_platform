@@ -1,13 +1,12 @@
 .container {
   position: fixed;
-  right: var(--sovereign-space-5);
-  bottom: var(--sovereign-space-5);
+  inset-inline-end: var(--sovereign-space-5);
+  inset-block-end: var(--sovereign-space-5);
   z-index: var(--sovereign-z-modal);
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-2);
-  width: 100%;
-  max-width: 24rem;
+  inline-size: min(24rem, calc(100vw - 2 * var(--sovereign-space-5)));
   pointer-events: none;
 }
 .toast {
