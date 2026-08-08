@@ -6,6 +6,7 @@
 
 import type { ColorSchemeDocument } from "@sovereign/protocol";
 
+import { readBuiltInRoleOverrides } from "./built-in-role-overrides.ts";
 import {
   paletteKeys,
   paletteVariants,
@@ -104,6 +105,8 @@ export function resolveScheme(scheme: ColorScheme, variant: PaletteVariant): Sch
   const palette: Palette = scheme.variants[variant];
   const roles = deriveRoles(palette);
   const diagnostics: string[] = [];
+
+  Object.assign(roles, readBuiltInRoleOverrides(scheme, variant));
 
   for (const [role, value] of Object.entries(scheme.roleOverrides ?? {})) {
     // Незнакомая роль — диагностика, а не отказ: схему могли написать для более новой версии кита,

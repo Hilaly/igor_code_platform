@@ -1,5 +1,5 @@
 import { convert, resolve } from "@asamuzakjp/css-color";
-import { interfaceScales } from "@sovereign/protocol";
+import { interfaceScales, type ColorSchemeDocument } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
@@ -41,6 +41,7 @@ describe("deriveRoles", () => {
       secondarySurface: expect.any(String),
       secondaryBorder: expect.any(String),
       secondaryText: expect.any(String),
+      textOnSecondary: expect.any(String),
     });
   });
 });
@@ -55,11 +56,30 @@ describe("imperiumScheme", () => {
       accent: "#8e44ad",
       secondary: "#c5a059",
     });
+    expect(resolveScheme(imperiumScheme, "dark")).toMatchObject({
+      kind: "resolved",
+      roles: {
+        controlSurface: "#261c18",
+        accentSurface: "#3b2256",
+        accentStrong: "#482b68",
+        borderStrong: "#362c27",
+      },
+    });
     expect(imperiumScheme.variants.light).toMatchObject({
       surface: "#f3ead8",
       surfaceRaised: "#fffaf0",
       surfaceSunken: "#e7dcc5",
       border: "#d1bea0",
+    });
+  });
+
+  it("keeps built-in role overrides out of the serialized scheme contract", () => {
+    const serialized = JSON.parse(JSON.stringify(imperiumScheme)) as Record<string, unknown>;
+
+    expect(Object.keys(serialized).sort()).toEqual(["id", "tokenContract", "variants"]);
+    expect(resolveScheme({ ...imperiumScheme }, "dark")).toMatchObject({
+      kind: "resolved",
+      roles: { controlSurface: "#261c18" },
     });
   });
 });
@@ -132,6 +152,16 @@ describe("parseColorScheme", () => {
 
     expect(resolved?.kind === "resolved" && resolved.roles.accent).toBe("#123456");
     expect(resolved?.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it("does not accept built-in role overrides from a plugin scheme document", () => {
+    const parsed = parseColorScheme("themed.midnight", {
+      ...document,
+      builtInRoleOverrides: { dark: { controlSurface: "#261c18" } },
+    } as ColorSchemeDocument);
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "dark") : undefined;
+
+    expect(resolved?.kind === "resolved" && resolved.roles.controlSurface).not.toBe("#261c18");
   });
 });
 
@@ -280,11 +310,20 @@ describe("contrast", () => {
     ["secondaryText", "pageSurface"],
     ["secondaryText", "panelSurface"],
     ["secondaryText", "secondarySurface"],
+    ["textOnSecondary", "secondary"],
+    ["textOnSecondary", "secondaryHover"],
+    ["textOnSecondary", "secondaryStrong"],
     ["textOnDanger", "danger"],
   ] as const satisfies readonly (readonly [RoleName, RoleName])[];
 
-  it("rejects unreadable secondary action text", () => {
-    expect(rolePairs).toContainEqual(["warningText", "panelSurface"]);
+  it("checks secondary action text on every filled secondary state", () => {
+    expect(rolePairs).toEqual(
+      expect.arrayContaining([
+        ["textOnSecondary", "secondary"],
+        ["textOnSecondary", "secondaryHover"],
+        ["textOnSecondary", "secondaryStrong"],
+      ]),
+    );
   });
 
   it("keeps every consumed text role legible on its actual surface", () => {
@@ -292,7 +331,10 @@ describe("contrast", () => {
 
     for (const scheme of shippedSchemes) {
       for (const variant of paletteVariants) {
-        const roles = deriveRoles(scheme.variants[variant]);
+        const resolved = resolveScheme(scheme, variant);
+        expect(resolved.kind, `${scheme.id} ${variant}`).toBe("resolved");
+        const roles =
+          resolved.kind === "resolved" ? resolved.roles : deriveRoles(scheme.variants[variant]);
 
         for (const [text, background] of rolePairs) {
           const ratio = contrastRatio(roles[text], roles[background]);
@@ -339,8 +381,8 @@ describe("contrast", () => {
   });
 
   it("covers the whole palette between the pairs and what is not text", () => {
-    // Второй акцент здесь не проверяется намеренно: он служит смысловым меткам и надзаголовкам, а не
-    // тексту на фоне, поэтому к нему неприменима эта проверка контраста текстовых пар.
+    // Второй акцент проверяется через производные ролевые пары выше: сама палитра не знает, какой
+    // foreground выберет кит для заполненного secondary-действия.
     const checked = new Set<string>([
       ...textPairs.flat(),
       "border",

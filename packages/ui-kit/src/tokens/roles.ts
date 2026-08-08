@@ -31,6 +31,7 @@ export const roleNames = [
   /** Третья ступень текста: подсказка в поле ввода, единицы измерения. */
   "textSubtle",
   "textOnAccent",
+  "textOnSecondary",
   "accent",
   "accentHover",
   /** Акцент на шаг глубже: нажатое состояние и особо заметная смысловая метка. */
@@ -97,6 +98,25 @@ export function deriveRoles(palette: Palette): Roles {
   /** Второстепенный текст чуть сдвинут к основному ради утопленной поверхности полей. */
   const readableMuted = `color-mix(in oklab, ${palette.inkMuted} 96%, ${palette.ink} 4%)`;
 
+  /**
+   * Второй акцент — самостоятельный цвет, поэтому `accentInk` не обещает контраст на нём. Среди
+   * уже объявленных нейтральных foreground выбирается самый контрастный; новый ключ палитры ради
+   * текста не нужен, а все состояния secondary остаются на той же стороне шкалы яркости.
+   */
+  const secondaryForegroundCandidates = [
+    palette.ink,
+    palette.surface,
+    palette.surfaceRaised,
+    palette.surfaceSunken,
+    palette.accentInk,
+    palette.dangerInk,
+  ];
+  const textOnSecondary = secondaryForegroundCandidates.reduce((mostLegible, candidate) =>
+    contrastRatio(candidate, palette.secondary) > contrastRatio(mostLegible, palette.secondary)
+      ? candidate
+      : mostLegible,
+  );
+
   // Своего значения у «к сведению» в палитре нет: акцент, сведённый к второстепенному тексту.
   const info = `color-mix(in oklab, ${palette.accent} 55%, ${palette.inkMuted} 45%)`;
 
@@ -113,6 +133,7 @@ export function deriveRoles(palette: Palette): Roles {
     textMuted: readableMuted,
     textSubtle: readableMuted,
     textOnAccent: palette.accentInk,
+    textOnSecondary,
     accent: palette.accent,
     accentHover: towardsInk(palette.accent, hoverShift),
     // Палитра гарантирует контраст `accentInk` только на исходном акценте. Сильное состояние
@@ -160,4 +181,23 @@ export function deriveRoles(palette: Palette): Roles {
  */
 export function rolePropertyName(role: RoleName): string {
   return `--sovereign-${role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+}
+
+function relativeLuminance(color: string): number {
+  const channels = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(color)?.slice(1, 4) ?? [];
+  const [red = 0, green = 0, blue = 0] = channels.map((channel) => {
+    const value = Number.parseInt(channel, 16) / 255;
+
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(first: string, second: string): number {
+  const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort(
+    (left, right) => right - left,
+  );
+
+  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
