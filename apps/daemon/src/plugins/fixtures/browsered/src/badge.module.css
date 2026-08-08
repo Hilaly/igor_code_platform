@@ -1,0 +1,19 @@
+/* Локальные имена, на которых проверяется контракт CSS Modules (docs/ui-extension-model.md). */
+
+.badge {
+  display: inline-flex;
+}
+
+/* Дефис в имени: camelCase к ключу не добавляется ни у одного из двух конвейеров. */
+.badge-tail {
+  margin-inline-start: 4px;
+}
+
+.loud {
+  composes: badge;
+  font-weight: 700;
+}
+
+:global(.sovereign-plugin-anchor) .badge {
+  outline: none;
+}
