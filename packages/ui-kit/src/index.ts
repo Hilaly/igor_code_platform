@@ -70,6 +70,7 @@ export * from "./i18n/catalog.ts";
 export * from "./i18n/messages/en.ts";
 export * from "./i18n/messages/ru.ts";
 export * from "./i18n/translator.ts";
+export * from "./input-modality.ts";
 export * from "./tokens/apply.ts";
 export * from "./tokens/palette.ts";
 export * from "./tokens/roles.ts";
