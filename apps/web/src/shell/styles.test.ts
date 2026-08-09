@@ -166,11 +166,13 @@ describe("the style sheets of the application", () => {
     const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
 
     expect(sessions).toMatch(
-      /\.sessions-composer-actions\s*\{[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/s,
+      /\.sessions-composer-actions\s*\{[^}]*justify-content:\s*flex-end;[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*nowrap;/s,
     );
     expect(sessions).toMatch(
-      /@container\s*\(width\s*<=\s*40rem\)\s*\{[\s\S]*\.sessions-composer-actions\s*\{[^}]*flex:\s*0\s+1\s+auto;/s,
+      /\.sessions-composer-future-slot\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;/s,
     );
+    expect(sessions).not.toMatch(/\.sessions-modes/);
+    expect(sessions).not.toMatch(/\.sessions-composer-toolbar\s*\{[^}]*flex-direction:\s*column;/s);
     expect(sessions).not.toMatch(
       /\.sessions-composer-actions\s*\{[^}]*overflow(?:-x|-y)?\s*:\s*(?:auto|scroll|hidden)/s,
     );

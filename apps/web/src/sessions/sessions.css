@@ -171,7 +171,7 @@
   gap: var(--sovereign-space-1);
   max-width: 100%;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .sessions-composer-actions > *,
@@ -180,21 +180,9 @@
   max-width: 100%;
 }
 
-@container (width <= 40rem) {
-  .sessions-composer-toolbar {
-    align-items: flex-start;
-  }
-
-  .sessions-composer-actions {
-    flex: 0 1 auto;
-    justify-content: flex-start;
-  }
-}
-
 /* Queue register and usage tooltip ------------------------------------- */
 
-.sessions-queues,
-.sessions-modes {
+.sessions-queues {
   display: flex;
   align-items: center;
   gap: var(--sovereign-space-2);
@@ -317,22 +305,6 @@
 :root[data-sovereign-input-modality="keyboard"] .sessions-entry-meta:focus-within {
   opacity: 1;
   pointer-events: auto;
-}
-
-@container (width <= 28rem) {
-  .sessions-composer-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .sessions-composer-future-slot {
-    display: none;
-  }
-
-  .sessions-composer-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -201,7 +201,7 @@ describe("the session message composer", () => {
     expect(composer?.querySelector("textarea")).not.toBeNull();
     expect(composer?.querySelector(".sessions-composer-toolbar")).not.toBeNull();
     expect(composer?.querySelectorAll(".sessions-composer-options")).toHaveLength(0);
-    expect(composer?.querySelectorAll("button")).toHaveLength(3);
+    expect(composer?.querySelectorAll("button")).toHaveLength(4);
   });
 
   it("keeps the circular context indicator inside the composer action row", () => {
@@ -213,11 +213,25 @@ describe("the session message composer", () => {
     expect(progress.tagName).toBe("svg");
   });
 
+  it("orders context, next-turn settings, stop, and send options from left to right", () => {
+    render(<ComposerHarness />);
+
+    const progress = screen.getByRole("progressbar", { name: "Заполнение контекста" });
+    const model = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });
+    const stop = screen.getByRole("button", { name: "Остановить" });
+    const send = screen.getByRole("button", { name: "Отправить" });
+
+    expect(progress.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(model.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(stop.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
   it("keeps the idle action set named and leaves planning controls out of the composer", () => {
     render(<ComposerHarness />);
 
-    expect(screen.getByRole("button", { name: "Дописать без запуска" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Отправить" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Варианты отправки" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Остановить" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
     expect(screen.queryByRole("button", { name: /plan|tools/i })).toBeNull();
   });
@@ -226,10 +240,35 @@ describe("the session message composer", () => {
     render(<ComposerHarness busy />);
 
     expect(screen.getByRole("button", { name: "Вклинить" })).not.toBeNull();
-    expect(screen.getByRole("radio", { name: "К следующему турну" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Варианты отправки" })).not.toBeNull();
     expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Остановить" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Остановить" }).hasAttribute("disabled")).toBe(false);
     expect(screen.queryByRole("button", { name: /plan|tools/i })).toBeNull();
+  });
+
+  it("offers only append while idle and adds queued delivery options while busy", () => {
+    const view = render(<ComposerHarness />);
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.change(field, { target: { value: "вариант" } });
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Дописать без запуска",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+
+    view.rerender(<ComposerHarness busy />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "вариант" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Дописать без запуска",
+      "Отправить после турна",
+      "Оставить к следующему турну",
+    ]);
+    expect(screen.queryByRole("radiogroup")).toBeNull();
   });
 
   it("shows the compact combined trigger instead of two visible comboboxes", () => {
@@ -298,11 +337,11 @@ describe("the session message composer", () => {
 
     render(<ComposerHarness busy onSendMessage={onSendMessage} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "После турна" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "продолжай" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Отправить после турна" }));
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Отправить после турна" }));
 
     expect(onSendMessage).toHaveBeenCalledWith({ text: "продолжай", mode: "follow-up" });
     await waitFor(() =>
@@ -312,6 +351,23 @@ describe("the session message composer", () => {
     );
   });
 
+  it("does not persist a queued alternative as the next Enter action", async () => {
+    const onSendMessage = vi.fn(() => Promise.resolve(undefined));
+    render(<ComposerHarness busy onSendMessage={onSendMessage} />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "после турна" } });
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Отправить после турна" }));
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
+
+    fireEvent.change(field, { target: { value: "сейчас" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    expect(onSendMessage).toHaveBeenLastCalledWith({ text: "сейчас", mode: "steer" });
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
+  });
+
   it("keeps next-turn overrides out of append messages", async () => {
     const onSendMessage = vi.fn(() => Promise.resolve(undefined));
     render(<ComposerHarness onSendMessage={onSendMessage} />);
@@ -319,7 +375,8 @@ describe("the session message composer", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "добавь" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Дописать без запуска" }));
+    fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Дописать без запуска" }));
     expect(onSendMessage).toHaveBeenCalledWith({ text: "добавь", mode: "append" });
     await waitFor(() =>
       expect(
@@ -328,15 +385,16 @@ describe("the session message composer", () => {
     );
   });
 
-  it("offers append only while idle and interrupt only while busy", () => {
+  it("keeps append in the menu and keeps stop stable across turn status", () => {
     const onSendMessage = vi.fn(() => Promise.resolve(undefined));
     const onInterrupt = vi.fn();
     const view = render(<ComposerHarness onInterrupt={onInterrupt} />);
 
-    expect(screen.queryByRole("button", { name: "Остановить" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Варианты отправки" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Остановить" }).hasAttribute("disabled")).toBe(true);
     view.rerender(<ComposerHarness busy onSendMessage={onSendMessage} onInterrupt={onInterrupt} />);
 
-    expect(screen.queryByRole("button", { name: "Дописать без запуска" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Варианты отправки" })).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Остановить" }));
     expect(onInterrupt).toHaveBeenCalledTimes(1);
   });
@@ -461,7 +519,8 @@ describe("the session message composer", () => {
       if (busy) {
         fireEvent.click(screen.getByRole("button", { name: buttonName }));
       } else {
-        fireEvent.click(screen.getByRole("button", { name: buttonName }));
+        fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: buttonName }));
       }
       expect(onSendMessage).toHaveBeenCalledWith({ text: "сообщение A", mode });
 
@@ -479,9 +538,11 @@ describe("the session message composer", () => {
       acceptance.resolve(undefined);
 
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: buttonName }).hasAttribute("disabled")).toBe(
-          false,
-        ),
+        expect(
+          screen
+            .getByRole("button", { name: busy ? buttonName : "Отправить" })
+            .hasAttribute("disabled"),
+        ).toBe(false),
       );
       expect(
         (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
