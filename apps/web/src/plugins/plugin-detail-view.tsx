@@ -431,12 +431,19 @@ function TechnicalData({
                             group: registration.group,
                             order: registration.order,
                           }
-                        : {
-                            model: registration.model,
-                            thinkingLevel: registration.thinkingLevel,
-                            tools: registration.tools,
-                            skills: registration.skills,
-                          };
+                        : registration.kind === "command"
+                          ? {
+                              export: registration.export,
+                              placeId: registration.placeId,
+                              group: registration.group,
+                              order: registration.order,
+                            }
+                          : {
+                              model: registration.model,
+                              thinkingLevel: registration.thinkingLevel,
+                              tools: registration.tools,
+                              skills: registration.skills,
+                            };
   if (data === undefined) return undefined;
   return (
     <Disclosure

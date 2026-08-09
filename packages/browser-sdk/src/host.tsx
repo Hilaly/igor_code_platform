@@ -246,7 +246,8 @@ function CollectionPlace({
   return (
     <>
       {orderPlaceContributions(id, runtime.contributions, context).map((registration) => {
-        const reference = referenceOf(registration);
+        // Кнопку команды рисует отдельная ветка; здесь — только вклады с содержимым.
+        const reference = registration.kind === "component" ? referenceOf(registration) : undefined;
 
         return reference === undefined ? null : (
           <PlaceInstance

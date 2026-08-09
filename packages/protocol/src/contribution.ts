@@ -303,6 +303,29 @@ export type ComponentContributionRegistration = RegistrationCommon & {
   order?: number;
 };
 
+/**
+ * Вклад-команда: именованное действие плагина (docs/ui-extension-model.md). От компонента отличается
+ * тем, что у него нет содержимого — есть только исполнение, поэтому одну команду зовут и кнопкой, и
+ * палитрой, и чужой плагин по идентификатору.
+ *
+ * Заголовок обязателен, в отличие от общего `title`: команда представлена в интерфейсе только им, и
+ * рисуется она **до** загрузки бандла — иначе полоса действий прыгала бы по мере загрузки плагинов.
+ *
+ * Поля `handler` нет намеренно: наличие `export` уже означает «обработчик в браузерном бандле», ровно
+ * как `builtIn` у места. Появится воркерный обработчик — `export` станет необязательным, и это
+ * дополняющее изменение, а не второй способ сказать то же.
+ */
+export type CommandContributionRegistration = RegistrationCommon & {
+  kind: "command";
+  title: string;
+  /** Имя экспорта в браузерном бандле плагина: дескриптор команды. */
+  export: string;
+  /** Место кардинальности «действие», куда хост поставит кнопку. Не сказано — кнопки нет. */
+  placeId?: string;
+  group?: string;
+  order?: number;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -315,9 +338,18 @@ export type ContributionRegistration =
   | ColorSchemeContributionRegistration
   | LocaleCatalogContributionRegistration
   | PlaceContributionRegistration
-  | ComponentContributionRegistration;
+  | ComponentContributionRegistration
+  | CommandContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
+
+/**
+ * Вклады, которые хост расставляет по местам. Порядок у них общий: кнопка команды стоит в той же
+ * полосе, что и компонент, и два ряда, сложенные по разным правилам, прыгали бы друг относительно
+ * друга.
+ */
+export type PlacedContributionRegistration =
+  ComponentContributionRegistration | CommandContributionRegistration;
 
 /**
  * Все виды, перечисленные явно. `Record<ContributionKind, true>` требует каждого ключа и не терпит
@@ -336,6 +368,7 @@ const everyKind = {
   "locale-catalog": true,
   place: true,
   component: true,
+  command: true,
 } satisfies Record<ContributionKind, true>;
 
 /**

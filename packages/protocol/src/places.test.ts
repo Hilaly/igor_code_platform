@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type {
+  CommandContributionRegistration,
   ComponentContributionRegistration,
   PlaceContributionRegistration,
 } from "./contribution.ts";
 import { isPlaceCardinality } from "./contribution.ts";
 import {
+  componentsForPlace,
+  contributionsForPlace,
   corePlace,
   corePlaces,
   orderPlaceContributions,
@@ -30,6 +33,24 @@ const component = (
   kind: "component",
   placeId: "core.settings.plugins",
   export: "Panel",
+  ...extra,
+});
+
+const command = (
+  declaredId: string,
+  source: PluginSource,
+  extra: { placeId?: string; group?: string; order?: number } = {},
+): CommandContributionRegistration => ({
+  ownership: "plugin",
+  pluginKey: `${source}:${declaredId}`,
+  pluginId: declaredId,
+  source,
+  id: `${declaredId}.run`,
+  declaredId: "run",
+  kind: "command",
+  title: "Run",
+  placeId: "core.view.header.actions",
+  export: "RunCommand",
   ...extra,
 });
 
@@ -249,6 +270,45 @@ describe("orderPlaceContributions", () => {
       [project],
     );
     assert.deepEqual(orderPlaceContributions("core.settings.plugins", [data, project], {}), [data]);
+  });
+
+  /**
+   * Кнопка команды стоит в той же полосе, что и компоненты, значит и порядок у них общий: два ряда,
+   * сложенные по разным правилам, прыгали бы друг относительно друга.
+   */
+  it("puts commands and components into one order", () => {
+    const contributions = [
+      command("z", "data", { group: "a", order: 1 }),
+      component("a", "data", { placeId: "core.view.header.actions", group: "a", order: 2 }),
+      command("a", "data", { group: "a", order: 1 }),
+    ];
+
+    assert.deepEqual(
+      orderPlaceContributions("core.view.header.actions", contributions, windowWide).map(
+        (registration) => registration.id,
+      ),
+      ["a.run", "z.run", "a.panel"],
+    );
+  });
+
+  it("keeps commands of another project out of the context", () => {
+    const elsewhere = command("themed", "project:spare");
+
+    assert.deepEqual(contributionsForPlace("core.view.header.actions", [elsewhere], inProject), []);
+    assert.deepEqual(
+      contributionsForPlace("core.view.header.actions", [elsewhere], windowWide),
+      [],
+    );
+  });
+
+  /** Команда одиночное место занять не может, поэтому в спор за провайдера она не входит. */
+  it("hides commands from the component lookup that resolves a provider", () => {
+    const claimant = command("themed", "data", { placeId: "core.settings.plugins" });
+
+    assert.deepEqual(componentsForPlace("core.settings.plugins", [claimant], windowWide), []);
+    assert.deepEqual(resolvePlaceProvider("core.settings.plugins", [claimant], windowWide), {
+      kind: "built-in",
+    });
   });
 
   it("resolves place declaration identity in the current context", () => {

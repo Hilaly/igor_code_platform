@@ -390,6 +390,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.forgotten.hint": "The choice is kept: the contribution may come back with the plugin.",
     "plugins.kind.agent": "agent",
     "plugins.kind.color-scheme": "colour scheme",
+    "plugins.kind.command": "command",
     "plugins.kind.component": "component",
     "plugins.kind.custom": "contribution",
     "plugins.kind.event": "event",

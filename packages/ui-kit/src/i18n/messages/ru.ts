@@ -389,6 +389,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.forgotten.hint": "Решение сохраняется: вклад может вернуться вместе с плагином.",
     "plugins.kind.agent": "агент",
     "plugins.kind.color-scheme": "цветовая схема",
+    "plugins.kind.command": "команда",
     "plugins.kind.component": "компонент",
     "plugins.kind.custom": "вклад",
     "plugins.kind.event": "событие",
