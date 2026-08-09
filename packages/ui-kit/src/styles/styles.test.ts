@@ -74,6 +74,9 @@ describe("stylesheets of the kit", () => {
     const select = withoutComments(
       readFileSync(join(kitRoot, "components", "select.module.css"), "utf8"),
     );
+    const floatingLayer = withoutComments(
+      readFileSync(join(kitRoot, "components", "floating-layer.module.css"), "utf8"),
+    );
 
     expect(input).toMatch(/\.control::placeholder/);
     expect(input).toMatch(/\.control:hover:not\(:disabled\):not\(:focus\)/);
@@ -88,8 +91,10 @@ describe("stylesheets of the kit", () => {
     expect(select).toMatch(/\.control:hover:not\(\.disabled\)/);
     expect(select).toMatch(/\.control:focus-visible/);
     expect(select).toMatch(/\.control\.disabled/);
-    expect(select).toMatch(
-      /\.dropdown\s*\{[^}]*position:\s*absolute;[^}]*z-index:[^}]*max-height:[^}]*overflow-y:\s*auto;/s,
+    expect(select).toMatch(/\.dropdown\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto;/s);
+    expect(select).not.toMatch(/\.dropdown\s*\{[^}]*position:\s*absolute;/s);
+    expect(floatingLayer).toMatch(
+      /\.layer\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*var\(--sovereign-z-overlay\);/s,
     );
   });
 
@@ -414,14 +419,12 @@ describe("stylesheets of the kit", () => {
     expect(nextTurnCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 
-  it("leaves compact Menu portal coordinates to the inline positioning contract", () => {
+  it("leaves Menu portal coordinates to the shared floating layer", () => {
     const menuCss = withoutComments(
       readFileSync(join(kitRoot, "components", "menu.module.css"), "utf8"),
     );
 
-    expect(menuCss).toMatch(
-      /\.menu\.portal\s*\{[^}]*position:\s*fixed;[^}]*top:\s*auto;[^}]*left:\s*auto;/s,
-    );
+    expect(menuCss).not.toMatch(/\.menu\s*\{[^}]*position:\s*(?:absolute|fixed);/s);
     expect(menuCss).not.toMatch(/var\(--menu-(?:top|left)/);
   });
 

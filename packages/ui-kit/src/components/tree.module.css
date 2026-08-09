@@ -133,8 +133,7 @@
   pointer-events: auto;
 }
 .context {
-  position: fixed;
-  z-index: var(--sovereign-z-overlay);
+  width: min(24rem, calc(100vw - var(--sovereign-space-4)));
 }
 .children {
   display: flex;

@@ -6,9 +6,9 @@
  * перевода фокуса, а его поверхность не принимает ни того, ни другого.
  */
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
+import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./menu.module.css";
 import { nextEnabledIndex } from "./roving-focus.ts";
 
@@ -68,7 +68,6 @@ export function Menu({
   const itemElements = useRef<(HTMLButtonElement | null)[]>([]);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const openedByPointer = useRef(false);
-  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | undefined>();
   // Ссылка на свежий набор: массив пунктов приходит новым на каждой перерисовке вызывающего, и в
   // зависимостях эффекта он снимал бы слушатели и заново забирал фокус на первый пункт.
   const latestItems = useRef(items);
@@ -153,49 +152,17 @@ export function Menu({
     [],
   );
 
-  useLayoutEffect(() => {
-    if (!open || !compact || typeof window === "undefined") {
-      return;
-    }
-
-    const updatePosition = (): void => {
-      const triggerElement = triggerRef.current;
-
-      if (triggerElement === null) {
-        return;
-      }
-
-      const rect = triggerElement.getBoundingClientRect();
-      const popupHeight = popupRef.current?.getBoundingClientRect().height ?? 0;
-      const popupWidth = popupRef.current?.getBoundingClientRect().width ?? 0;
-      const viewportPadding = 8;
-      const maxLeft = Math.max(viewportPadding, window.innerWidth - popupWidth - viewportPadding);
-      const preferredTop = placement === "above" ? rect.top - popupHeight : rect.bottom;
-      const maxTop = Math.max(viewportPadding, window.innerHeight - popupHeight - viewportPadding);
-
-      setPopupPosition({
-        left: Math.min(Math.max(rect.left, viewportPadding), maxLeft),
-        top: Math.min(Math.max(preferredTop, viewportPadding), maxTop),
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [compact, open, placement]);
-
-  const popup = open ? (
-    <div
-      className={`${styles.menu}${placement === "above" ? ` ${styles.above}` : ""}${compact ? ` ${styles.portal}` : ""}`}
+  const popup = (
+    <FloatingLayer
+      open={open}
+      anchorRef={triggerRef}
+      layerRef={popupRef}
+      side={placement === "above" ? "top" : "bottom"}
+      matchAnchorWidth={!compact}
+      className={`${styles.menu}${compact ? ` ${styles.compactMenu}` : ""}`}
       id={menuId}
       role="menu"
-      aria-label={label}
-      ref={popupRef}
+      ariaLabel={label}
       onPointerEnter={() => {
         if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current);
       }}
@@ -203,11 +170,6 @@ export function Menu({
         if (!openOnHover) return;
         hoverCloseTimer.current = setTimeout(() => setOpen(false), hoverCloseDelayMilliseconds);
       }}
-      style={
-        compact && popupPosition !== undefined
-          ? { ...popupPosition, maxWidth: "calc(100vw - 16px)" }
-          : undefined
-      }
     >
       {items.map((item, index) => (
         <button
@@ -228,8 +190,8 @@ export function Menu({
           {item.label}
         </button>
       ))}
-    </div>
-  ) : undefined;
+    </FloatingLayer>
+  );
 
   return (
     <div
@@ -261,9 +223,7 @@ export function Menu({
       >
         {trigger}
       </button>
-      {compact && popup !== undefined && typeof document !== "undefined"
-        ? createPortal(popup, document.body)
-        : popup}
+      {popup}
     </div>
   );
 }

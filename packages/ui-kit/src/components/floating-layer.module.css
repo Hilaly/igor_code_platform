@@ -1,0 +1,5 @@
+.layer {
+  position: fixed;
+  z-index: var(--sovereign-z-overlay);
+  box-sizing: border-box;
+}

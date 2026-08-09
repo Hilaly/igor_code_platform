@@ -22,7 +22,6 @@
 import {
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,10 +29,9 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
-
 import { Badge, type BadgeTone } from "./badge.tsx";
 import { ChevronRightIcon } from "./icons.tsx";
+import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./tree.module.css";
 
 const contextCloseDelayMilliseconds = 120;
@@ -151,14 +149,9 @@ export function Tree({
   const treeId = useId();
   const itemElements = useRef(new Map<string, HTMLDivElement>());
   const contextElement = useRef<HTMLDivElement | null>(null);
-  const contextNaturalWidth = useRef<number | undefined>(undefined);
+  const contextAnchor = useRef<HTMLElement | null>(null);
   const contextCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [activeContext, setActiveContext] = useState<
-    { node: TreeNode; anchor: HTMLElement } | undefined
-  >();
-  const [contextPosition, setContextPosition] = useState<
-    { top: number; left: number; width: number } | undefined
-  >();
+  const [activeContext, setActiveContext] = useState<{ node: TreeNode } | undefined>();
 
   const cancelContextClose = (): void => {
     if (contextCloseTimer.current !== undefined) clearTimeout(contextCloseTimer.current);
@@ -168,12 +161,8 @@ export function Tree({
     if (node.context === undefined) return;
     cancelContextClose();
     const visibleRow = anchor.firstElementChild;
-    contextNaturalWidth.current = undefined;
-    setContextPosition(undefined);
-    setActiveContext({
-      node,
-      anchor: visibleRow instanceof HTMLElement ? visibleRow : anchor,
-    });
+    contextAnchor.current = visibleRow instanceof HTMLElement ? visibleRow : anchor;
+    setActiveContext({ node });
   };
 
   const scheduleContextClose = (): void => {
@@ -185,41 +174,6 @@ export function Tree({
   };
 
   useEffect(() => () => cancelContextClose(), []);
-
-  useLayoutEffect(() => {
-    if (activeContext === undefined || typeof window === "undefined") return;
-
-    const updatePosition = (): void => {
-      const anchor = activeContext.anchor.getBoundingClientRect();
-      const context = contextElement.current?.getBoundingClientRect();
-      const measuredWidth = context?.width ?? 0;
-      if (
-        contextNaturalWidth.current === undefined ||
-        (contextNaturalWidth.current === 0 && measuredWidth > 0)
-      ) {
-        contextNaturalWidth.current = measuredWidth;
-      }
-      const naturalWidth = contextNaturalWidth.current;
-      const height = context?.height ?? 0;
-      const viewportPadding = 8;
-      const gap = 8;
-      const left = anchor.right + gap;
-      const availableWidth = Math.max(0, window.innerWidth - viewportPadding - left);
-      const top = Math.min(
-        Math.max(anchor.top, viewportPadding),
-        Math.max(viewportPadding, window.innerHeight - height - viewportPadding),
-      );
-      setContextPosition({ top, left, width: Math.min(naturalWidth, availableWidth) });
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [activeContext]);
 
   /** Владелец раскрытия определяется наличием пропа, и второго источника у набора нет. */
   const isExpansionControlled = expandedIds !== undefined;
@@ -444,22 +398,20 @@ export function Tree({
       >
         {renderNodes(nodes)}
       </div>
-      {activeContext !== undefined && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              ref={contextElement}
-              className={styles.context}
-              role="tooltip"
-              aria-label={activeContext.node.label}
-              style={contextPosition}
-              onPointerEnter={cancelContextClose}
-              onPointerLeave={scheduleContextClose}
-            >
-              {activeContext.node.context}
-            </div>,
-            document.body,
-          )
-        : null}
+      <FloatingLayer
+        open={activeContext !== undefined}
+        anchorRef={contextAnchor}
+        layerRef={contextElement}
+        side="right"
+        offset={8}
+        className={styles.context}
+        role="tooltip"
+        ariaLabel={activeContext?.node.label}
+        onPointerEnter={cancelContextClose}
+        onPointerLeave={scheduleContextClose}
+      >
+        {activeContext?.node.context}
+      </FloatingLayer>
     </>
   );
 }
