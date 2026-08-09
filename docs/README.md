@@ -193,6 +193,9 @@
   TDD-исправление якоря строки, правой геометрии и строгого сокращения пути.
 - [Выравнивание содержимого Settings](superpowers/specs/2026-08-07-settings-content-alignment-design.md) —
   утверждённый единый плоский визуальный контракт Appearance для всех разделов и detail-страниц.
+- [Немедленное применение настроек Daemon](superpowers/specs/2026-08-09-settings-immediate-apply-design.md) —
+  утверждённый partial-контракт конфига, независимая запись одного параметра и поведение полей
+  без общей кнопки Save.
 - [Анимированный тумблер UI Kit](superpowers/specs/2026-08-07-animated-toggle-design.md) — единый
   switch-контрол, режимы видимой подписи и tooltip для плотных строк Settings.
 - [План выравнивания содержимого Settings](superpowers/plans/2026-08-07-settings-content-alignment.md) —
