@@ -5,14 +5,16 @@
   "type": "module",
   "exports": {
     ".": "./src/index.tsx",
-    "./host": "./src/host.tsx"
+    "./host": "./src/host.tsx",
+    "./tabs": "./src/tabs.tsx"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "@sovereign/protocol": "workspace:*"
+    "@sovereign/protocol": "workspace:*",
+    "@sovereign/ui-kit": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"
