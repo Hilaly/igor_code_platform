@@ -180,7 +180,7 @@ describe("the style sheets of the application", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
     expect(projects).toMatch(
-      /:root\[data-sovereign-input-modality="keyboard"\]\s+\.projects-list\s*>\s*li\s*>\s*button:focus\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
+      /:root\[data-sovereign-input-modality="keyboard"\]\s+\.projects-list\s*>\s*li\s*>\s*\[role="group"\]:has\(>\s*button:focus\)\s+\.projects-row-folder\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
     );
   });
 
@@ -296,24 +296,20 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("leaves plugin list and detail row geometry to SettingsRow", () => {
+  it("leaves plugin list and detail row geometry to the UI kit", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
     expect(settings).not.toMatch(/\.plugins-row\s*\{/s);
+    expect(settings).not.toMatch(/\.plugins-row-controls\s*\{/s);
     expect(settings).not.toMatch(/\.plugin-detail-(?:surface|hero|facts)\s*\{/s);
     expect(settings).toMatch(/\.plugin-detail-rows[\s,]*\.plugin-detail-contributions\s*\{/s);
     expect(settings).toMatch(/\.plugin-detail-contribution-controls\s*\{[^}]*min-width:\s*0;/s);
   });
 
-  it("keeps the plugin list row target full-size and its metadata in two compact lines", () => {
+  it("keeps only fallback plugin metadata grouping in application CSS", () => {
     const settings = sheets.find((sheet) => sheet.name === "settings.css")?.styles ?? "";
 
-    expect(settings).toMatch(
-      /\.plugins-list\s*>\s*\[role="listitem"\]\s*\{[^}]*position:\s*relative;/s,
-    );
-    expect(settings).toMatch(
-      /\.plugins-row-controls\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
-    );
+    expect(settings).not.toMatch(/\.plugins-list\s*>\s*\[role="listitem"\]\s*\{/s);
     expect(settings).toMatch(
       /\.plugins-row-meta\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-xs\);/s,
     );
