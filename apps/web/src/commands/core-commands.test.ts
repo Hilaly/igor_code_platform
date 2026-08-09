@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { defaultLayout } from "../shell/layout.ts";
 import { coreCommands, type CoreCommandHost } from "./core-commands.ts";
 
-function host(layout = defaultLayout, rightUnavailable = false): CoreCommandHost & {
+function host(
+  layout = defaultLayout,
+  rightUnavailable = false,
+): CoreCommandHost & {
   navigate: ReturnType<typeof vi.fn>;
   onLayoutChange: ReturnType<typeof vi.fn>;
   rightUnavailable: boolean;

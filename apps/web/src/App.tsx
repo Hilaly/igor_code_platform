@@ -131,9 +131,7 @@ export function App() {
 
   const authenticated = access === "authenticated";
   const rightUnavailable =
-    page.kind === "settings" ||
-    page.kind === "settings-project" ||
-    page.kind === "settings-plugin";
+    page.kind === "settings" || page.kind === "settings-project" || page.kind === "settings-plugin";
 
   // Аккорд слушается всегда, но палитра сама себя не покажет неаутентифицированному: до входа
   // оболочки на экране нет вовсе.
@@ -1015,7 +1013,12 @@ export function App() {
         <CommandPalette
           open={commandsOpen}
           onClose={() => setCommandsOpen(false)}
-          host={{ navigate: navigation.navigate, layout, onLayoutChange: setLayout, rightUnavailable }}
+          host={{
+            navigate: navigation.navigate,
+            layout,
+            onLayoutChange: setLayout,
+            rightUnavailable,
+          }}
           context={pageContext}
           translator={translator}
         />
