@@ -465,14 +465,14 @@ Task Runner не является человеческим backlog: личные
 
 Один установленный Sovereign не обязан содержать весь каталог. Плагины складываются в готовые наборы:
 
-| Сборка               | Основной состав                                                               |
-| -------------------- | ----------------------------------------------------------------------------- |
-| **Personal**         | Assistant, Notes and Tasks, Calendar, Mail, Contacts, Notifications           |
-| **Knowledge Worker** | Documents, Knowledge, Memory, Research, Meetings, Presentations               |
+| Сборка               | Основной состав                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Personal**         | Assistant, Notes and Tasks, Calendar, Mail, Contacts, Notifications                                                                |
+| **Knowledge Worker** | Documents, Knowledge, Memory, Research, Meetings, Presentations                                                                    |
 | **Developer**        | Task Runner, Spec Builder, Code Review, Issue Radar, Dev Fleet, File Explorer, Terminal, Browser Workshop, Computer Use, Sandboxes |
-| **Automation**       | Scheduler, Jobs, Workflows, Hooks and Webhooks, Deliveries                    |
-| **Operations**       | Operations, Usage & Cost, Notifications, Messaging Channels, External Connections |
-| **Local AI**         | Local Models, Model Compare, Knowledge, Gallery                               |
+| **Automation**       | Scheduler, Jobs, Workflows, Hooks and Webhooks, Deliveries                                                                         |
+| **Operations**       | Operations, Usage & Cost, Notifications, Messaging Channels, External Connections                                                  |
+| **Local AI**         | Local Models, Model Compare, Knowledge, Gallery                                                                                    |
 
 Набор — способ установки и первого включения, а не новый тип плагина. Пользователь может удалить
 ненужный компонент, заменить его альтернативой или собрать собственную комбинацию.
