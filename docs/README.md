@@ -186,6 +186,8 @@
   TDD-циклы для путей, подсказки, бренд-блока, shell-probe и переписывания истории ветки.
 - [Глобальная шапка shell для всех рабочих вью](superpowers/specs/2026-08-06-shell-global-header-design.md) —
   согласованный постоянный header центральной колонки с необязательными слотами view.
+- [Центрированный контент и стартовый экран новой сессии](superpowers/specs/2026-08-09-centered-content-and-new-session-design.md) —
+  согласованный общий content frame shell и новая центрированная композиция `/sessions/new`.
 - [План глобальной шапки shell](superpowers/plans/2026-08-06-shell-global-header.md) —
   TDD-задачи для примитива UI kit, постоянной раскладки shell и миграции текущих вью.
 - [Компактный композер агентской сессии](superpowers/specs/2026-08-06-compact-session-composer-design.md) —
