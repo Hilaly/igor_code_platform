@@ -1,11 +1,10 @@
 /**
  * Связь формы конфига с демоном: снимок на подъёме соединения, перезапрос по `core.config.changed`
- * и по разрыву потока, запись документа целиком. Своего потока форма не открывает — соединение одно
+ * и по разрыву потока, запись одного ключа. Своего потока форма не открывает — соединение одно
  * на вкладку (docs/web-api.md).
  *
- * Оптимистичного применения здесь нет, в отличие от внешнего вида: показанные значения — это черновик
- * формы, а не снимок, и «применить сразу» было бы применением черновика к самому себе. Снимок держит
- * ровно то, что сказал демон, и по расхождению с ним видно, что файл изменился под открытой формой
+ * Оптимистичного применения здесь нет: показанные значения берутся из последнего ответа демона. Так
+ * после каждого независимого изменения форма показывает ровно авторитетный снимок файла
  * (docs/data-directory.md).
  */
 
@@ -41,7 +40,7 @@ export const initialConfigState: ConfigState = {
 
 export type ConfigController = {
   state: ConfigState;
-  save: (config: Config) => void;
+  update: (key: keyof Config, value: Config[keyof Config]) => void;
 };
 
 export type UseConfigOptions = {
@@ -116,16 +115,16 @@ export function useConfig(options: UseConfigOptions): ConfigController {
 
   useEffect(() => () => pending.current?.abort(), []);
 
-  const save = useCallback(
-    (config: Config) => {
+  const update = useCallback(
+    (key: keyof Config, value: Config[keyof Config]) => {
       apply((current) => ({ ...current, refusal: undefined }));
 
       const seq = writeSeq.current + 1;
       writeSeq.current = seq;
 
-      void writeConfig(config)
+      void writeConfig({ [key]: value } as Partial<Config>)
         .then((written) => {
-          // Протухший ответ: после этой записи человек сохранил ещё раз, и снимок обязан
+          // Протухший ответ: после этой записи человек изменил другой контрол, и снимок обязан
           // остаться за последней записью. Своё событие вернёт её и так.
           if (writeSeq.current !== seq) {
             return;
@@ -150,5 +149,5 @@ export function useConfig(options: UseConfigOptions): ConfigController {
     [apply, onDiagnostic, reload],
   );
 
-  return { state, save };
+  return { state, update };
 }

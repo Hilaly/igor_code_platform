@@ -61,7 +61,7 @@ beforeEach(() => {
       return answer(refusal.body, refusal.status);
     }
 
-    stored = JSON.parse(init?.body as string) as typeof defaultConfig;
+    stored = { ...stored, ...(JSON.parse(init?.body as string) as Partial<typeof defaultConfig>) };
 
     return answer(stored);
   });
@@ -156,19 +156,16 @@ describe("useConfig", () => {
     expect(asked()).toHaveLength(1);
   });
 
-  it("writes the whole document and keeps what the daemon answered", async () => {
+  it("writes one changed key and keeps the complete daemon answer", async () => {
     const view = connect();
 
     await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
 
-    act(() => view.result.current.save({ ...defaultConfig, publicRouteRequestsPerMinute: 3 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
 
-    await waitFor(() =>
-      expect(view.result.current.state.config?.publicRouteRequestsPerMinute).toBe(3),
-    );
+    await waitFor(() => expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8));
     expect(JSON.parse(asked("PUT")[0]?.body ?? "{}")).toEqual({
-      ...defaultConfig,
-      publicRouteRequestsPerMinute: 3,
+      maxConcurrentTurns: 8,
     });
   });
 
@@ -178,7 +175,7 @@ describe("useConfig", () => {
     await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
 
     refusal = { status: 409, body: { error: "config.json: EACCES" } };
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 8 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
 
     await waitFor(() => expect(view.result.current.state.refusal).toBe("config.json: EACCES"));
     // Снимок перезапрашивается: отказ как раз о том, что файл живёт своей жизнью.
@@ -206,8 +203,8 @@ describe("useConfig", () => {
       });
     });
 
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 8 }));
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 2 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
+    act(() => view.result.current.update("maxConcurrentTurns", 2));
 
     await waitFor(() => expect(answers).toHaveLength(2));
 

@@ -35,7 +35,7 @@ export type DaemonSectionProps = {
   /** Локаль интерфейса: момент старта показывается локализованной датой, а не сырой ISO-строкой. */
   locale: string;
   config: ConfigState;
-  onSaveConfig: (config: Config) => void;
+  onChangeConfig: (key: keyof Config, value: Config[keyof Config]) => void;
   translator: ScopedTranslator;
 };
 
@@ -45,7 +45,7 @@ export function DaemonSection({
   failure,
   locale,
   config,
-  onSaveConfig,
+  onChangeConfig,
   translator,
 }: DaemonSectionProps) {
   const { t } = translator;
@@ -96,7 +96,7 @@ export function DaemonSection({
           <span>{t("daemon.unreachable", { reason: failure })}</span>
         )}
       </SettingsRow>
-      <ConfigForm state={config} onSave={onSaveConfig} translator={translator} />
+      <ConfigForm state={config} onChange={onChangeConfig} translator={translator} />
     </div>
   );
 }
