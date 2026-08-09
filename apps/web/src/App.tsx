@@ -13,6 +13,7 @@ import {
   type AuthenticationState,
   type Health,
   type LoginStepFrame,
+  type PlaceContext,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
 import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
@@ -34,6 +35,7 @@ import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
+import { BrowserRuntimeProvider, HostPlace } from "./places/place-host.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
@@ -73,6 +75,15 @@ import { Shell } from "./shell/shell.tsx";
 
 /** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
 type Access = AuthenticationState | "asking";
+
+/**
+ * Предмет оконного места настроек: вид страницы и, когда открыта карточка, идентификатор того, что
+ * на ней. Проекта в контексте нет намеренно — оконное вью плагину из папки проекта не отдаётся.
+ */
+const settingsSubject = (name: string, identifier: string | undefined): PlaceContext =>
+  identifier === undefined
+    ? { subject: { view: "list" } }
+    : { subject: { view: "detail", [name]: identifier } };
 
 export function App() {
   const diagnostics = useMemo(createDiagnosticsStore, []);
@@ -258,6 +269,13 @@ export function App() {
 
   const plugins = usePlugins({ bus, stream, onDiagnostic: diagnostics.record });
   const contributions = plugins.state.snapshot?.contributions;
+  // Местам достаётся снимок целиком, включая вклады из папок проектов: контекст, в котором место
+  // рисуется, знает только само место, и отбор по проекту делает разрешение провайдера.
+  const placeContributions = useMemo(() => contributions ?? [], [contributions]);
+  const pluginStatuses = useMemo(
+    () => plugins.state.snapshot?.plugins ?? [],
+    [plugins.state.snapshot],
+  );
   // Схема и каталог применяются ко всему окну, а снимок несёт объявления всех контекстов сразу:
   // копия плагина в папке проекта пришла бы вторым `themed.midnight` в тот же список.
   const windowWide = useMemo(() => windowWideContributions(contributions ?? []), [contributions]);
@@ -349,6 +367,42 @@ export function App() {
     onDiagnostic: diagnostics.record,
     archived: true,
   });
+
+  // Контекст места считается один раз на изменение: новый объект на каждой отрисовке перерисовывал
+  // бы экземпляр плагина вместе с любым событием оболочки.
+  //
+  // У пяти мест базовой поставки `project` стоит только там, где место и правда принадлежит проекту.
+  // Оконным вью настроек его не дают намеренно: иначе плагин из папки открытого проекта заменил бы
+  // общий для окна список — решение владельца продукта (docs/ui-extension-model.md).
+  const chatContext = useMemo<PlaceContext>(
+    () => ({
+      ...(sessions.state.open?.summary === undefined
+        ? {}
+        : { project: sessions.state.open.summary.projectId }),
+      ...(sessions.state.open === undefined
+        ? {}
+        : { subject: { sessionId: sessions.state.open.id } }),
+    }),
+    [sessions.state.open],
+  );
+  const newSessionContext = useMemo<PlaceContext>(
+    () => (draftProjectId === undefined ? {} : { project: draftProjectId }),
+    [draftProjectId],
+  );
+  const settingsProjectsContext = useMemo(
+    () =>
+      settingsSubject("projectId", page.kind === "settings-project" ? page.projectId : undefined),
+    [page],
+  );
+  const settingsProvidersContext = useMemo(
+    () => settingsSubject("providerId", page.kind === "settings" ? page.providerId : undefined),
+    [page],
+  );
+  const settingsPluginsContext = useMemo(
+    () =>
+      settingsSubject("pluginKey", page.kind === "settings-plugin" ? page.pluginKey : undefined),
+    [page],
+  );
 
   // Обработчик кадра берётся у вью провайдеров, а соединение живёт своей жизнью: связывает их
   // ссылка, и переустановка её не трогает поток.
@@ -473,372 +527,422 @@ export function App() {
   }
 
   return (
-    <Shell
-      layout={layout}
-      onLayoutChange={setLayout}
-      contentMode={page.kind === "session" ? "contained" : "page"}
-      header={pageHeader}
-      labels={{
-        left: translator.t("panel.left"),
-        right: translator.t("panel.right"),
-        emptyTabs: translator.t("panel.tabs.empty"),
-        hideLeft: translator.t("panel.left.hide"),
-        hideRight: translator.t("panel.right.hide"),
-        showLeft: translator.t("panel.left.show"),
-        showRight: translator.t("panel.right.show"),
-      }}
-      navigation={
-        <SidebarProjects
-          projects={projects.state.snapshot?.projects}
-          sessions={sessions.state.sessions}
-          projectsLoading={
-            projects.state.snapshot === undefined && projects.state.failure === undefined
-          }
-          projectsFailure={projects.state.failure}
-          sessionsLoading={
-            sessions.state.sessions === undefined && sessions.state.failure === undefined
-          }
-          sessionsFailure={sessions.state.failure}
-          selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
-          storage={localStorage}
-          onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-          onNewSession={(projectId) => {
-            setDraftProjectId(projectId);
-            navigation.navigate({ kind: "new-session" });
-          }}
-          onUpdateProject={projects.update}
-          onRemoveProject={projects.remove}
-          onUpdateSession={sessions.updateSession}
-          onRemoveSession={sessions.removeSession}
-          translator={translator}
-        />
-      }
-      navigationHeader={
-        <div className="shell-nav-header">
-          <Heading level={3}>Sovereign</Heading>
-          <Button
-            onClick={() => {
-              setDraftProjectId(undefined);
+    <BrowserRuntimeProvider
+      contributions={placeContributions}
+      plugins={pluginStatuses}
+      onDiagnostic={diagnostics.record}
+    >
+      <Shell
+        layout={layout}
+        onLayoutChange={setLayout}
+        contentMode={page.kind === "session" ? "contained" : "page"}
+        header={pageHeader}
+        labels={{
+          left: translator.t("panel.left"),
+          right: translator.t("panel.right"),
+          emptyTabs: translator.t("panel.tabs.empty"),
+          hideLeft: translator.t("panel.left.hide"),
+          hideRight: translator.t("panel.right.hide"),
+          showLeft: translator.t("panel.left.show"),
+          showRight: translator.t("panel.right.show"),
+        }}
+        navigation={
+          <SidebarProjects
+            projects={projects.state.snapshot?.projects}
+            sessions={sessions.state.sessions}
+            projectsLoading={
+              projects.state.snapshot === undefined && projects.state.failure === undefined
+            }
+            projectsFailure={projects.state.failure}
+            sessionsLoading={
+              sessions.state.sessions === undefined && sessions.state.failure === undefined
+            }
+            sessionsFailure={sessions.state.failure}
+            selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
+            storage={localStorage}
+            onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+            onNewSession={(projectId) => {
+              setDraftProjectId(projectId);
               navigation.navigate({ kind: "new-session" });
             }}
-          >
-            + {translator.t("sessions.new")}
-          </Button>
-        </div>
-      }
-      status={
-        <AccountControl
-          stream={stream}
-          failure={failure}
-          onOpenArchive={() => navigation.navigate({ kind: "session-archive" })}
-          onOpenSettings={() => navigation.navigate({ kind: "settings", section: "appearance" })}
-          onLogOut={() => {
-            void logOut().then(() => {
-              setExpired(false);
-              setLoginRefusal(undefined);
-              setAccess("unauthenticated");
-            });
-          }}
-          translator={translator}
-        />
-      }
-      tabs={[]}
-      rightUnavailable={
-        page.kind === "settings" ||
-        page.kind === "settings-project" ||
-        page.kind === "settings-plugin"
-      }
-    >
-      <PageView
-        page={page}
-        session={
-          <SessionRouteView
-            sessionId={page.kind === "session" ? page.sessionId : ""}
-            open={sessions.state.open}
+            onUpdateProject={projects.update}
+            onRemoveProject={projects.remove}
+            onUpdateSession={sessions.updateSession}
+            onRemoveSession={sessions.removeSession}
             translator={translator}
-          >
-            {sessions.state.open === undefined ? null : (
-              <ChatView
-                open={sessions.state.open}
-                providers={sessions.state.providers}
-                models={sessions.state.models}
-                onPrepareModels={sessions.prepareModels}
-                onLoadModels={sessions.loadModels}
-                onSubmit={sessions.submitTurn}
-                onSendMessage={sessions.sendMessage}
-                onDiagnostic={diagnostics.record}
-                onInterrupt={sessions.interrupt}
-                onFork={async (request) => {
-                  const outcome = await sessions.forkSession(request);
-                  if (outcome.kind === "done") {
-                    navigation.navigate({ kind: "session", sessionId: outcome.session.id });
-                  }
-                }}
-                onCompact={sessions.compact}
-                onSetLabel={sessions.setEntryLabel}
-                onNavigate={sessions.navigate}
-                translator={translator}
-              />
-            )}
-          </SessionRouteView>
+          />
         }
-        sessionArchive={
-          <ArchiveSessionsView
-            sessions={archivedSessions.state.sessions}
-            projects={
-              projects.state.snapshot === undefined
-                ? undefined
-                : [...projects.state.snapshot.projects, ...projects.state.snapshot.archived]
-            }
-            loaded={archivedSessions.state.sessions !== undefined}
-            failure={archivedSessions.state.failure}
-            onOpen={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-            onRestore={async (session) => {
-              return archivedSessions.updateSession(session.id, {
-                ...(session.title === undefined ? {} : { title: session.title }),
-                archived: false,
+        navigationHeader={
+          <div className="shell-nav-header">
+            <Heading level={3}>Sovereign</Heading>
+            <Button
+              onClick={() => {
+                setDraftProjectId(undefined);
+                navigation.navigate({ kind: "new-session" });
+              }}
+            >
+              + {translator.t("sessions.new")}
+            </Button>
+          </div>
+        }
+        status={
+          <AccountControl
+            stream={stream}
+            failure={failure}
+            onOpenArchive={() => navigation.navigate({ kind: "session-archive" })}
+            onOpenSettings={() => navigation.navigate({ kind: "settings", section: "appearance" })}
+            onLogOut={() => {
+              void logOut().then(() => {
+                setExpired(false);
+                setLoginRefusal(undefined);
+                setAccess("unauthenticated");
               });
             }}
-            onRemove={async (sessionId) => {
-              return archivedSessions.removeSession(sessionId);
-            }}
             translator={translator}
           />
         }
-        newSession={
-          <NewSessionView
-            {...(draftProjectId === undefined ? {} : { initialProjectId: draftProjectId })}
-            {...(sessions.state.projects === undefined
-              ? {}
-              : { projects: sessions.state.projects })}
-            projectAgents={sessions.projectAgents}
-            {...(sessions.state.providers === undefined
-              ? {}
-              : { providers: sessions.state.providers })}
-            models={sessions.state.models}
-            onPrepareDraft={sessions.prepareDraft}
-            onSelectProject={sessions.selectProject}
-            onPickProvider={sessions.loadModels}
-            onCreate={async (draft) => {
-              const outcome = await sessions.createSession(draft);
-
-              if (outcome.kind === "refused") {
-                return { reason: outcome.reason };
+        tabs={[]}
+        rightUnavailable={
+          page.kind === "settings" ||
+          page.kind === "settings-project" ||
+          page.kind === "settings-plugin"
+        }
+      >
+        <PageView
+          page={page}
+          session={
+            <SessionRouteView
+              sessionId={page.kind === "session" ? page.sessionId : ""}
+              open={sessions.state.open}
+              translator={translator}
+            >
+              {sessions.state.open === undefined ? null : (
+                <HostPlace
+                  id="core.session.chat"
+                  context={chatContext}
+                  builtIn={
+                    <ChatView
+                      open={sessions.state.open}
+                      providers={sessions.state.providers}
+                      models={sessions.state.models}
+                      onPrepareModels={sessions.prepareModels}
+                      onLoadModels={sessions.loadModels}
+                      onSubmit={sessions.submitTurn}
+                      onSendMessage={sessions.sendMessage}
+                      onDiagnostic={diagnostics.record}
+                      onInterrupt={sessions.interrupt}
+                      onFork={async (request) => {
+                        const outcome = await sessions.forkSession(request);
+                        if (outcome.kind === "done") {
+                          navigation.navigate({ kind: "session", sessionId: outcome.session.id });
+                        }
+                      }}
+                      onCompact={sessions.compact}
+                      onSetLabel={sessions.setEntryLabel}
+                      onNavigate={sessions.navigate}
+                      translator={translator}
+                    />
+                  }
+                />
+              )}
+            </SessionRouteView>
+          }
+          sessionArchive={
+            <ArchiveSessionsView
+              sessions={archivedSessions.state.sessions}
+              projects={
+                projects.state.snapshot === undefined
+                  ? undefined
+                  : [...projects.state.snapshot.projects, ...projects.state.snapshot.archived]
               }
+              loaded={archivedSessions.state.sessions !== undefined}
+              failure={archivedSessions.state.failure}
+              onOpen={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+              onRestore={async (session) => {
+                return archivedSessions.updateSession(session.id, {
+                  ...(session.title === undefined ? {} : { title: session.title }),
+                  archived: false,
+                });
+              }}
+              onRemove={async (sessionId) => {
+                return archivedSessions.removeSession(sessionId);
+              }}
+              translator={translator}
+            />
+          }
+          newSession={
+            <HostPlace
+              id="core.session.new"
+              context={newSessionContext}
+              builtIn={
+                <NewSessionView
+                  {...(draftProjectId === undefined ? {} : { initialProjectId: draftProjectId })}
+                  {...(sessions.state.projects === undefined
+                    ? {}
+                    : { projects: sessions.state.projects })}
+                  projectAgents={sessions.projectAgents}
+                  {...(sessions.state.providers === undefined
+                    ? {}
+                    : { providers: sessions.state.providers })}
+                  models={sessions.state.models}
+                  onPrepareDraft={sessions.prepareDraft}
+                  onSelectProject={sessions.selectProject}
+                  onPickProvider={sessions.loadModels}
+                  onCreate={async (draft) => {
+                    const outcome = await sessions.createSession(draft);
 
-              return { sessionId: outcome.session.id };
-            }}
-            onSubmit={sessions.submitTurnToSession}
-            onNavigate={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-            translator={translator}
-          />
-        }
-        newProvider={
-          <UserProviderForm
-            mode="create"
-            onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
-            failure={providerFormFailure}
-            onSubmit={async (definition) => {
-              try {
-                await createUserProvider(definition);
-                setProviderFormFailure(undefined);
+                    if (outcome.kind === "refused") {
+                      return { reason: outcome.reason };
+                    }
+
+                    return { sessionId: outcome.session.id };
+                  }}
+                  onSubmit={sessions.submitTurnToSession}
+                  onNavigate={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+                  translator={translator}
+                />
+              }
+            />
+          }
+          newProvider={
+            <UserProviderForm
+              mode="create"
+              onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
+              failure={providerFormFailure}
+              onSubmit={async (definition) => {
+                try {
+                  await createUserProvider(definition);
+                  setProviderFormFailure(undefined);
+                  navigation.navigate({
+                    kind: "settings",
+                    section: "providers",
+                    providerId: definition.id,
+                  });
+                } catch (cause) {
+                  setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+                }
+              }}
+              translator={translator}
+            />
+          }
+          editProvider={
+            <UserProviderForm
+              mode="edit"
+              initial={editingProvider}
+              loading={
+                page.kind === "edit-provider" &&
+                editingProvider === undefined &&
+                providerFormFailure === undefined
+              }
+              failure={providerFormFailure}
+              onBack={() =>
                 navigation.navigate({
                   kind: "settings",
                   section: "providers",
-                  providerId: definition.id,
-                });
-              } catch (cause) {
-                setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+                  providerId: page.kind === "edit-provider" ? page.providerId : undefined,
+                })
               }
-            }}
-            translator={translator}
-          />
-        }
-        editProvider={
-          <UserProviderForm
-            mode="edit"
-            initial={editingProvider}
-            loading={
-              page.kind === "edit-provider" &&
-              editingProvider === undefined &&
-              providerFormFailure === undefined
-            }
-            failure={providerFormFailure}
-            onBack={() =>
-              navigation.navigate({
-                kind: "settings",
-                section: "providers",
-                providerId: page.kind === "edit-provider" ? page.providerId : undefined,
-              })
-            }
-            onSubmit={async (definition) => {
-              try {
-                await updateUserProvider(definition.id, definition);
-                setProviderFormFailure(undefined);
-                navigation.navigate({
-                  kind: "settings",
-                  section: "providers",
-                  providerId: definition.id,
-                });
-              } catch (cause) {
-                setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+              onSubmit={async (definition) => {
+                try {
+                  await updateUserProvider(definition.id, definition);
+                  setProviderFormFailure(undefined);
+                  navigation.navigate({
+                    kind: "settings",
+                    section: "providers",
+                    providerId: definition.id,
+                  });
+                } catch (cause) {
+                  setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
+                }
+              }}
+              translator={translator}
+            />
+          }
+          settings={
+            <SettingsView
+              section={
+                page.kind === "settings-plugin"
+                  ? "plugins"
+                  : page.kind === "settings-project"
+                    ? "projects"
+                    : page.kind === "settings"
+                      ? page.section
+                      : "appearance"
               }
-            }}
-            translator={translator}
-          />
-        }
-        settings={
-          <SettingsView
-            section={
-              page.kind === "settings-plugin"
-                ? "plugins"
-                : page.kind === "settings-project"
-                  ? "projects"
-                  : page.kind === "settings"
-                    ? page.section
-                    : "appearance"
-            }
-            detailTitle={
-              page.kind === "settings-plugin"
-                ? plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
-                    ?.id
-                : page.kind === "settings-project"
-                  ? projects.state.snapshot === undefined
-                    ? undefined
-                    : [
-                        ...projects.state.snapshot.projects,
-                        ...projects.state.snapshot.archived,
-                      ].find(({ id }) => id === page.projectId)?.name
-                  : undefined
-            }
-            onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
-            projects={
-              page.kind === "settings-project" ? (
-                <ProjectDetailView
-                  project={
-                    projects.state.snapshot === undefined
+              detailTitle={
+                page.kind === "settings-plugin"
+                  ? plugins.state.snapshot?.plugins.find((plugin) => plugin.key === page.pluginKey)
+                      ?.id
+                  : page.kind === "settings-project"
+                    ? projects.state.snapshot === undefined
                       ? undefined
                       : [
                           ...projects.state.snapshot.projects,
                           ...projects.state.snapshot.archived,
-                        ].find(({ id }) => id === page.projectId)
+                        ].find(({ id }) => id === page.projectId)?.name
+                    : undefined
+              }
+              onSectionChange={(section) => navigation.navigate({ kind: "settings", section })}
+              projects={
+                <HostPlace
+                  id="core.settings.projects"
+                  context={settingsProjectsContext}
+                  builtIn={
+                    <>
+                      {page.kind === "settings-project" ? (
+                        <ProjectDetailView
+                          project={
+                            projects.state.snapshot === undefined
+                              ? undefined
+                              : [
+                                  ...projects.state.snapshot.projects,
+                                  ...projects.state.snapshot.archived,
+                                ].find(({ id }) => id === page.projectId)
+                          }
+                          loaded={projects.state.snapshot !== undefined}
+                          headingLevel={2}
+                          failure={projects.state.failure}
+                          fileResources={
+                            <FileResourcesPanel state={fileResources} translator={translator} />
+                          }
+                          onBack={() =>
+                            navigation.navigate({ kind: "settings", section: "projects" })
+                          }
+                          onNewSession={() => {
+                            setDraftProjectId(page.projectId);
+                            navigation.navigate({ kind: "new-session" });
+                          }}
+                          translator={translator}
+                        />
+                      ) : (
+                        <ProjectsView
+                          headingLevel={2}
+                          state={projects.state}
+                          onCreate={projects.create}
+                          onUpdate={projects.update}
+                          onRemove={projects.remove}
+                          onDismissComplaints={projects.dismissComplaints}
+                          onOpen={(projectId) =>
+                            navigation.navigate({ kind: "settings-project", projectId })
+                          }
+                          translator={translator}
+                        />
+                      )}
+                    </>
                   }
-                  loaded={projects.state.snapshot !== undefined}
-                  headingLevel={2}
-                  failure={projects.state.failure}
-                  fileResources={
-                    <FileResourcesPanel state={fileResources} translator={translator} />
-                  }
-                  onBack={() => navigation.navigate({ kind: "settings", section: "projects" })}
-                  onNewSession={() => {
-                    setDraftProjectId(page.projectId);
-                    navigation.navigate({ kind: "new-session" });
-                  }}
+                />
+              }
+              appearance={
+                <AppearanceSection
+                  preferences={preferences}
+                  schemes={describeSchemes(schemes, windowWide, translator)}
+                  locales={locales}
+                  onChange={change}
+                  refusal={refusal}
                   translator={translator}
                 />
-              ) : (
-                <ProjectsView
-                  headingLevel={2}
-                  state={projects.state}
-                  onCreate={projects.create}
-                  onUpdate={projects.update}
-                  onRemove={projects.remove}
-                  onDismissComplaints={projects.dismissComplaints}
-                  onOpen={(projectId) =>
-                    navigation.navigate({ kind: "settings-project", projectId })
+              }
+              providers={
+                <HostPlace
+                  id="core.settings.providers"
+                  context={settingsProvidersContext}
+                  builtIn={
+                    <ProvidersView
+                      headingLevel={2}
+                      state={providers.state}
+                      providerId={page.kind === "settings" ? page.providerId : undefined}
+                      onOpen={(providerId) =>
+                        navigation.navigate({ kind: "settings", section: "providers", providerId })
+                      }
+                      onCreate={() => navigation.navigate({ kind: "new-provider" })}
+                      onEdit={(providerId) =>
+                        navigation.navigate({ kind: "edit-provider", providerId })
+                      }
+                      onDelete={async (providerId) => {
+                        try {
+                          await deleteUserProvider(providerId);
+                          setProviderFormFailure(undefined);
+                          navigation.navigate({ kind: "settings", section: "providers" });
+                        } catch (cause) {
+                          setProviderFormFailure(
+                            cause instanceof Error ? cause.message : String(cause),
+                          );
+                          throw cause;
+                        }
+                      }}
+                      onRefresh={async (providerId) => {
+                        try {
+                          await refreshUserProvider(providerId);
+                          setProviderFormFailure(undefined);
+                        } catch (cause) {
+                          setProviderFormFailure(
+                            cause instanceof Error ? cause.message : String(cause),
+                          );
+                          throw cause;
+                        }
+                      }}
+                      actionFailure={providerFormFailure}
+                      onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
+                      onLogIn={providers.logIn}
+                      onAnswer={providers.answer}
+                      onCancelLogin={providers.cancelLogin}
+                      onCloseLogin={providers.closeLogin}
+                      onLogOut={providers.logOut}
+                      translator={translator}
+                    />
                   }
+                />
+              }
+              plugins={
+                <HostPlace
+                  id="core.settings.plugins"
+                  context={settingsPluginsContext}
+                  builtIn={
+                    <>
+                      {page.kind === "settings-plugin" ? (
+                        <PluginDetailView
+                          headingLevel={2}
+                          state={plugins.state}
+                          pluginKey={page.pluginKey}
+                          onBack={() =>
+                            navigation.navigate({ kind: "settings", section: "plugins" })
+                          }
+                          onSwitch={plugins.switchPlugin}
+                          translator={translator}
+                        />
+                      ) : (
+                        <PluginsView
+                          headingLevel={2}
+                          state={plugins.state}
+                          onSwitch={plugins.switchPlugin}
+                          onOpen={(pluginKey) =>
+                            navigation.navigate({ kind: "settings-plugin", pluginKey })
+                          }
+                          translator={translator}
+                        />
+                      )}
+                    </>
+                  }
+                />
+              }
+              daemon={
+                <DaemonSection
+                  stream={stream}
+                  health={health}
+                  failure={failure}
+                  locale={preferences.locale}
+                  config={config.state}
+                  onSaveConfig={config.save}
                   translator={translator}
                 />
-              )
-            }
-            appearance={
-              <AppearanceSection
-                preferences={preferences}
-                schemes={describeSchemes(schemes, windowWide, translator)}
-                locales={locales}
-                onChange={change}
-                refusal={refusal}
-                translator={translator}
-              />
-            }
-            providers={
-              <ProvidersView
-                headingLevel={2}
-                state={providers.state}
-                providerId={page.kind === "settings" ? page.providerId : undefined}
-                onOpen={(providerId) =>
-                  navigation.navigate({ kind: "settings", section: "providers", providerId })
-                }
-                onCreate={() => navigation.navigate({ kind: "new-provider" })}
-                onEdit={(providerId) => navigation.navigate({ kind: "edit-provider", providerId })}
-                onDelete={async (providerId) => {
-                  try {
-                    await deleteUserProvider(providerId);
-                    setProviderFormFailure(undefined);
-                    navigation.navigate({ kind: "settings", section: "providers" });
-                  } catch (cause) {
-                    setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
-                    throw cause;
-                  }
-                }}
-                onRefresh={async (providerId) => {
-                  try {
-                    await refreshUserProvider(providerId);
-                    setProviderFormFailure(undefined);
-                  } catch (cause) {
-                    setProviderFormFailure(cause instanceof Error ? cause.message : String(cause));
-                    throw cause;
-                  }
-                }}
-                actionFailure={providerFormFailure}
-                onBack={() => navigation.navigate({ kind: "settings", section: "providers" })}
-                onLogIn={providers.logIn}
-                onAnswer={providers.answer}
-                onCancelLogin={providers.cancelLogin}
-                onCloseLogin={providers.closeLogin}
-                onLogOut={providers.logOut}
-                translator={translator}
-              />
-            }
-            plugins={
-              page.kind === "settings-plugin" ? (
-                <PluginDetailView
-                  headingLevel={2}
-                  state={plugins.state}
-                  pluginKey={page.pluginKey}
-                  onBack={() => navigation.navigate({ kind: "settings", section: "plugins" })}
-                  onSwitch={plugins.switchPlugin}
-                  translator={translator}
-                />
-              ) : (
-                <PluginsView
-                  headingLevel={2}
-                  state={plugins.state}
-                  onSwitch={plugins.switchPlugin}
-                  onOpen={(pluginKey) =>
-                    navigation.navigate({ kind: "settings-plugin", pluginKey })
-                  }
-                  translator={translator}
-                />
-              )
-            }
-            daemon={
-              <DaemonSection
-                stream={stream}
-                health={health}
-                failure={failure}
-                locale={preferences.locale}
-                config={config.state}
-                onSaveConfig={config.save}
-                translator={translator}
-              />
-            }
-            diagnostics={<DiagnosticsSection diagnostics={reported} translator={translator} />}
-            translator={translator}
-          />
-        }
-        translator={translator}
-      />
-    </Shell>
+              }
+              diagnostics={<DiagnosticsSection diagnostics={reported} translator={translator} />}
+              translator={translator}
+            />
+          }
+          translator={translator}
+        />
+      </Shell>
+    </BrowserRuntimeProvider>
   );
 }

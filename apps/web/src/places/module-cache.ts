@@ -10,31 +10,17 @@
  */
 
 import type { PluginStatus } from "@sovereign/protocol";
+import type {
+  LoadedPluginModule,
+  PluginModuleCache,
+  PluginModuleLoad,
+} from "@sovereign/browser-sdk/host";
 
-export type LoadedPluginModule = Record<string, unknown>;
-
-export type PluginModuleLoad =
-  | { kind: "loading" }
-  | { kind: "loaded"; module: LoadedPluginModule }
-  /** Отказ кешируется вместе с успехами: иначе провал сети повторялся бы на каждой отрисовке. */
-  | { kind: "failed"; reason: string };
-
-export type PluginModuleCache = {
-  /**
-   * Что известно про бандл прямо сейчас. Синхронно, потому что зовётся из отрисовки; загрузка, если
-   * она нужна, начинается тут же, а о её конце сообщает подписка. Тот же приём, что у `React.lazy`:
-   * ответ обязан быть доступен без ожидания, иначе место не нарисовать.
-   */
-  moduleOf: (status: PluginStatus) => PluginModuleLoad;
-  /**
-   * Забыть бандлы плагинов, которых в снимке больше нет или которые перестали быть работающими.
-   * Отдельным вызовом из эффекта, а не из `moduleOf`: убирать чужие таблицы стилей из документа по
-   * ходу отрисовки значило бы менять документ там, где React этого не ждёт.
-   */
-  retain: (statuses: readonly PluginStatus[]) => void;
-  subscribe: (listener: () => void) => () => void;
-  dispose: () => void;
-};
+export type {
+  LoadedPluginModule,
+  PluginModuleCache,
+  PluginModuleLoad,
+} from "@sovereign/browser-sdk/host";
 
 type Entry = { revision: string; load: PluginModuleLoad };
 
