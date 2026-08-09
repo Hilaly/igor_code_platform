@@ -40,16 +40,16 @@
 - Produces: `renderAgentData(directory?: string): string`.
 - `renderSkillCatalogue` продолжает выдавать байт-в-байт тот же XML.
 
-- [ ] **Step 1: Написать красные тесты renderer-а.**
+- [x] **Step 1: Написать красные тесты renderer-а.**
       Проверить отсутствие wrapper без directory и экранирование всех пяти XML-метасимволов.
-- [ ] **Step 2: Запустить**
+- [x] **Step 2: Запустить**
       `pnpm --filter @sovereign/agent-runtime-pi exec node --test src/agent-data.test.ts`
       и увидеть ожидаемое падение из-за отсутствующего модуля.
-- [ ] **Step 3: Реализовать `xml.ts` и `agent-data.ts`, перевести `skills.ts` на общий helper.**
-- [ ] **Step 4: Запустить**
+- [x] **Step 3: Реализовать `xml.ts` и `agent-data.ts`, перевести `skills.ts` на общий helper.**
+- [x] **Step 4: Запустить**
       `pnpm --filter @sovereign/agent-runtime-pi exec node --test src/agent-data.test.ts src/skills.test.ts`
       и получить PASS.
-- [ ] **Step 5: Закоммитить renderer отдельным коммитом.**
+- [x] **Step 5: Закоммитить renderer отдельным коммитом.**
 
 ### Task 2: Файловый путь в parser и реестре
 
@@ -68,12 +68,12 @@
 - `AgentFileDefinition.location: string` — точный входной путь `AGENT.md`.
 - `AgentContributionRegistration.location?: string` — только для file-backed registrations.
 
-- [ ] **Step 1: Дополнить parser-тест точным `location` и тесты обеих registration-фабрик.**
-- [ ] **Step 2: Запустить адресные daemon-тесты и подтвердить красное состояние.**
-- [ ] **Step 3: Добавить поле в типы и обе registration-фабрики.**
-- [ ] **Step 4: Запустить**
+- [x] **Step 1: Дополнить parser-тест точным `location` и тесты обеих registration-фабрик.**
+- [x] **Step 2: Запустить адресные daemon-тесты и подтвердить красное состояние.**
+- [x] **Step 3: Добавить поле в типы и обе registration-фабрики.**
+- [x] **Step 4: Запустить**
       `pnpm --filter @sovereign/daemon exec node --test src/plugins/file-resource-parser.test.ts src/plugins/plugin-supervisor.test.ts src/plugins/standalone-file-resources.test.ts`.
-- [ ] **Step 5: Закоммитить перенос location отдельным коммитом.**
+- [x] **Step 5: Закоммитить перенос location отдельным коммитом.**
 
 ### Task 3: Runtime system prompt и live update
 
@@ -88,14 +88,14 @@
 - `AgentSession.setAgentDirectory(directory?: string): void`.
 - `systemPrompt` соединяет три непустые секции в утверждённом порядке.
 
-- [ ] **Step 1: Расширить runtime-тест: первый prompt содержит все три секции, второй меняет
+- [x] **Step 1: Расширить runtime-тест: первый prompt содержит все три секции, второй меняет
       directory и skills, третий убирает оба необязательных блока.**
-- [ ] **Step 2: Запустить**
+- [x] **Step 2: Запустить**
       `pnpm --filter @sovereign/agent-runtime-pi exec node --test src/agent-session.test.ts`
       и увидеть расхождение prompt/API.
-- [ ] **Step 3: Реализовать поле, mutator и композицию через `renderAgentData`.**
-- [ ] **Step 4: Повторить runtime-тест и typecheck пакета.**
-- [ ] **Step 5: Закоммитить runtime-часть отдельным коммитом.**
+- [x] **Step 3: Реализовать поле, mutator и композицию через `renderAgentData`.**
+- [x] **Step 4: Повторить runtime-тест и typecheck пакета.**
+- [x] **Step 5: Закоммитить runtime-часть отдельным коммитом.**
 
 ### Task 4: Sessions service и hot reload
 
@@ -110,12 +110,12 @@
   `dirname(agent.location)`.
 - `applyRuntimeDefinitions` вызывает `setAgentDirectory` перед `setSkills`.
 
-- [ ] **Step 1: Расширить test harness записью применённых directories и вызовов mutator-а.**
-- [ ] **Step 2: Красным тестом доказать create/open и повторное разрешение нового/отсутствующего
+- [x] **Step 1: Расширить test harness записью применённых directories и вызовов mutator-а.**
+- [x] **Step 2: Красным тестом доказать create/open и повторное разрешение нового/отсутствующего
       location перед queued operation.**
-- [ ] **Step 3: Реализовать единый helper построения `AgentDefinition` и live mutator.**
-- [ ] **Step 4: Запустить `pnpm --filter @sovereign/daemon exec node --test src/sessions/sessions.test.ts`.**
-- [ ] **Step 5: Закоммитить seam демона отдельным коммитом.**
+- [x] **Step 3: Реализовать единый helper построения `AgentDefinition` и live mutator.**
+- [x] **Step 4: Запустить `pnpm --filter @sovereign/daemon exec node --test src/sessions/sessions.test.ts`.**
+- [x] **Step 5: Закоммитить seam демона отдельным коммитом.**
 
 ### Task 5: Base agent, интеграция и нормативные документы
 
@@ -134,9 +134,9 @@
 - Base prompt требует `read` проектного и более близкого `AGENTS.md`, но не требует loader-а ядра.
 - Интеграционный scripted model видит directory файлового project-agent.
 
-- [ ] **Step 1: Добавить красный контрактный тест встроенного prompt и интеграционную проверку
+- [x] **Step 1: Добавить красный контрактный тест встроенного prompt и интеграционную проверку
       `<agent_data>`.**
-- [ ] **Step 2: Обновить `AGENT.md` и нормативные документы по фактическому контракту.**
-- [ ] **Step 3: Запустить адресные тесты base-agent и file-resources integration.**
-- [ ] **Step 4: Запустить полный `make check`.**
-- [ ] **Step 5: Отметить выполненные пункты плана и закоммитить завершение среза.**
+- [x] **Step 2: Обновить `AGENT.md` и нормативные документы по фактическому контракту.**
+- [x] **Step 3: Запустить адресные тесты base-agent и file-resources integration.**
+- [x] **Step 4: Запустить полный `make check`.**
+- [x] **Step 5: Отметить выполненные пункты плана и закоммитить завершение среза.**
