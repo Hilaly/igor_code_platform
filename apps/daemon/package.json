@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/main.ts .sovereign-dev",
+    "seed-runbook": "node src/plugins/seed-runbook-fixtures.ts",
     "start": "node src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"src/**/*.test.ts\""

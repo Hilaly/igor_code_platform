@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/browserless",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "browserless",
+    "worker": "src/worker.ts",
+    "platform": "^0.1.0"
+  }
+}
