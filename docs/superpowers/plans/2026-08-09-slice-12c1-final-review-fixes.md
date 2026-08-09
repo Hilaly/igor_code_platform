@@ -323,7 +323,7 @@ git diff --stat main...HEAD
 Expected: all commands exit 0; only the known Vite chunk-size warning remains; worktree contains only
 the plan checkbox update and documentation count changes before the final commit.
 
-- [ ] **Step 4: Mark this plan complete and commit docs**
+- [x] **Step 4: Mark this plan complete and commit docs**
 
 Отметить все steps `[x]`, затем:
 
@@ -332,7 +332,7 @@ git add docs/runbook.md docs/superpowers/specs/2026-08-09-slice-12c1-tabs-and-co
 git commit -m "docs(web): reconcile slice 12c-1 command counts"
 ```
 
-- [ ] **Step 5: Verify the final tree**
+- [x] **Step 5: Verify the final tree**
 
 ```bash
 git status --short --branch
