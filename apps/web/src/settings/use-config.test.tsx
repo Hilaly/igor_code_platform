@@ -250,4 +250,41 @@ describe("useConfig", () => {
 
     expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
   });
+
+  it("drops a reload that began while the current write was in flight", async () => {
+    const view = connect();
+
+    await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
+
+    let answerReload: ((config: unknown) => void) | undefined;
+    let answerWrite: ((config: unknown) => void) | undefined;
+
+    vi.stubGlobal("fetch", (_url: string, init?: RequestInit) => {
+      return new Promise<Response>((resolve) => {
+        const answerLater = (config: unknown): void => {
+          resolve({ ok: true, status: 200, json: () => Promise.resolve(config) } as Response);
+        };
+
+        if ((init?.method ?? "GET") === "GET") {
+          answerReload = answerLater;
+        } else {
+          answerWrite = answerLater;
+        }
+      });
+    });
+
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
+    await waitFor(() => expect(answerWrite).toBeDefined());
+
+    // The reload's response is a snapshot the server read before it processed this PUT.
+    act(() => view.bus.publish(configChanged));
+    await waitFor(() => expect(answerReload).toBeDefined());
+
+    await act(async () => answerWrite?.({ ...defaultConfig, maxConcurrentTurns: 8 }));
+    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
+
+    await act(async () => answerReload?.(defaultConfig));
+
+    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
+  });
 });

@@ -68,6 +68,9 @@ export function useConfig(options: UseConfigOptions): ConfigController {
   // Номер последней отправленной записи: две быстрые записи подряд рвут договор, если ответ на
   // первую приходит последним и возвращает то, что человек уже переписал.
   const writeSeq = useRef(0);
+  // Последняя актуальная запись, на которую уже пришёл ответ. Reload, начатый пока она в пути,
+  // мог быть обработан демоном раньше неё и потому не может стать снимком после её ответа.
+  const settledWriteSeq = useRef(0);
 
   const reload = useCallback(() => {
     pending.current?.abort();
@@ -75,17 +78,18 @@ export function useConfig(options: UseConfigOptions): ConfigController {
     const controller = new AbortController();
     pending.current = controller;
     const seq = writeSeq.current;
+    const writeWasInFlight = settledWriteSeq.current !== seq;
 
     void fetchConfig(controller.signal)
       .then((config) => {
-        if (controller.signal.aborted || writeSeq.current !== seq) {
+        if (controller.signal.aborted || writeSeq.current !== seq || writeWasInFlight) {
           return;
         }
 
         apply((current) => ({ ...current, config, failure: undefined }));
       })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted || writeSeq.current !== seq) {
+        if (controller.signal.aborted || writeSeq.current !== seq || writeWasInFlight) {
           return;
         }
 
@@ -137,6 +141,7 @@ export function useConfig(options: UseConfigOptions): ConfigController {
             return;
           }
 
+          settledWriteSeq.current = seq;
           apply((current) => ({ ...current, config: written, refusal: undefined }));
         })
         .catch((cause: unknown) => {
@@ -144,6 +149,7 @@ export function useConfig(options: UseConfigOptions): ConfigController {
             return;
           }
 
+          settledWriteSeq.current = seq;
           const reason = reasonOf(cause);
 
           onDiagnostic(`the daemon config was not written: ${reason}`);

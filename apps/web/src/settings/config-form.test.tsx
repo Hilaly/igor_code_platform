@@ -73,6 +73,25 @@ it("commits a valid numeric field when Enter finishes editing", () => {
   expect(onChange).toHaveBeenCalledWith("maxConcurrentTurns", 8);
 });
 
+it("does not commit the same numeric text again when Enter is followed by blur", () => {
+  const onChange = vi.fn();
+
+  show(state(), onChange);
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "8" } });
+  fireEvent.keyDown(field("Одновременных обращений"), { key: "Enter" });
+  fireEvent.blur(field("Одновременных обращений"));
+
+  expect(onChange).toHaveBeenCalledTimes(1);
+  expect(onChange).toHaveBeenCalledWith("maxConcurrentTurns", 8);
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "9" } });
+  fireEvent.blur(field("Одновременных обращений"));
+
+  expect(onChange).toHaveBeenCalledTimes(2);
+  expect(onChange).toHaveBeenLastCalledWith("maxConcurrentTurns", 9);
+});
+
 it("marks an invalid or empty numeric string without sending it", () => {
   const onChange = vi.fn();
 

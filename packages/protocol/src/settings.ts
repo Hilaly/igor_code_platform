@@ -208,7 +208,7 @@ export function parseConfigUpdate(raw: unknown): SettingsParseResult<Record<stri
     return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
   }
 
-  const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys);
+  const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys, "is retained");
   const suppliedKeys = configKeys.filter((key) => Object.hasOwn(fields, key));
 
   if (suppliedKeys.length === 0) {
@@ -606,10 +606,11 @@ function diagnoseUnknownKeys(
   file: string,
   fields: Record<string, unknown>,
   known: string[],
+  outcome = "is ignored",
 ): string[] {
   return Object.keys(fields)
     .filter((key) => !known.includes(key))
-    .map((key) => `${file}: unknown key ${JSON.stringify(key)} is ignored`);
+    .map((key) => `${file}: unknown key ${JSON.stringify(key)} ${outcome}`);
 }
 
 function isAppearanceVariant(value: unknown): value is AppearanceVariant {

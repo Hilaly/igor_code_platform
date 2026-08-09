@@ -31,6 +31,7 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
   );
   const latestRefusal = useRef(refusal);
   const dirtyKeys = useRef(new Set<keyof Config>());
+  const committedNumericText = useRef(new Map<Exclude<keyof Config, "logLevel">, string>());
 
   useEffect(() => {
     latestRefusal.current = refusal;
@@ -76,13 +77,23 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
 
   const setValue = (key: keyof Config, value: string): void => {
     dirtyKeys.current.add(key);
+
+    if (key !== "logLevel") {
+      committedNumericText.current.delete(key);
+    }
+
     setText((current) => (current === undefined ? current : { ...current, [key]: value }));
   };
   const commitNumber = (key: Exclude<keyof Config, "logLevel">): void => {
+    if (committedNumericText.current.get(key) === text[key]) {
+      return;
+    }
+
     const value = parseFiniteNumber(text[key]);
 
     if (value !== undefined) {
       dirtyKeys.current.delete(key);
+      committedNumericText.current.set(key, text[key]);
       onChange(key, value);
     }
   };

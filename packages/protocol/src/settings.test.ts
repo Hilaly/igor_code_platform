@@ -318,7 +318,7 @@ describe("parseConfigUpdate", () => {
       maxConcurrentTurns: 8,
       futureKey: 1,
     });
-    assert.match(result.diagnostics.join("; "), /unknown key "futureKey" is ignored/);
+    assert.match(result.diagnostics.join("; "), /unknown key "futureKey" is retained/);
   });
 
   it("refuses a body that is not an object", () => {
