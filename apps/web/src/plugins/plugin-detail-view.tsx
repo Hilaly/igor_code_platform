@@ -261,12 +261,25 @@ function TechnicalData({
                         locale: registration.locale,
                         messages: Object.keys(registration.messages).length,
                       }
-                    : {
-                        model: registration.model,
-                        thinkingLevel: registration.thinkingLevel,
-                        tools: registration.tools,
-                        skills: registration.skills,
-                      };
+                    : registration.kind === "place"
+                      ? {
+                          cardinality: registration.cardinality,
+                          replaceable: registration.replaceable,
+                          builtIn: registration.builtIn,
+                        }
+                      : registration.kind === "component"
+                        ? {
+                            placeId: registration.placeId,
+                            export: registration.export,
+                            group: registration.group,
+                            order: registration.order,
+                          }
+                        : {
+                            model: registration.model,
+                            thinkingLevel: registration.thinkingLevel,
+                            tools: registration.tools,
+                            skills: registration.skills,
+                          };
   if (data === undefined) return undefined;
   return (
     <Disclosure

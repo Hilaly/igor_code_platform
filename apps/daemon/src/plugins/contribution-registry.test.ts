@@ -846,3 +846,144 @@ describe("the message catalogue, the second contribution made of nothing but dat
     );
   });
 });
+
+describe("the place and the component, the two contributions that reach the interface", () => {
+  const board: PluginContribution = {
+    kind: "place",
+    id: "board",
+    cardinality: "collection",
+  };
+  const card: PluginContribution = {
+    kind: "component",
+    id: "card",
+    placeId: "hello.board",
+    export: "Card",
+  };
+
+  /** Снимком, а не тройкой аргументов: признак браузерной части есть только у снимка. */
+  const withBrowser = (contributions: PluginContribution[], hasBrowserEntry = true) =>
+    createContributionRegistry().applyPlugin({
+      plugin: dataHello,
+      contributions,
+      fileContributions: [],
+      disabledContributions: nothingDisabled,
+      hasBrowserEntry,
+    });
+
+  it("registers a place and a component of a plugin that has a browser bundle", () => {
+    const outcome = withBrowser([board, card]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(outcome.registered, [
+      {
+        ownership: "plugin",
+        kind: "component",
+        id: "hello.card",
+        declaredId: "card",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        placeId: "hello.board",
+        export: "Card",
+      },
+      {
+        ownership: "plugin",
+        kind: "place",
+        id: "hello.board",
+        declaredId: "board",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        cardinality: "collection",
+        replaceable: false,
+      },
+    ]);
+  });
+
+  /**
+   * Вклад в ещё не объявленное место — не ошибка: порядок подъёма плагинов не определён, и
+   * проверка существования означала бы, что вклад теряется из-за того, чей воркер встал первым.
+   */
+  it("takes a component addressed to a place that does not exist yet", () => {
+    const outcome = withBrowser([{ ...card, placeId: "someone.else" }]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(ids(outcome.registered), ["hello.card"]);
+  });
+
+  it("refuses a component from a plugin without a browser bundle: there is no export to name", () => {
+    const outcome = withBrowser([card], false);
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.match(outcome.problems[0] ?? "", /the component hello\.card needs a browser bundle/);
+  });
+
+  it("refuses a replaceable place without a built-in provider", () => {
+    const outcome = withBrowser([
+      { ...board, id: "panel", cardinality: "single", replaceable: true },
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.match(outcome.problems[0] ?? "", /the replaceable place hello\.panel/);
+  });
+
+  it("keeps the built-in provider of a replaceable place", () => {
+    const outcome = withBrowser([
+      { ...board, id: "panel", cardinality: "single", replaceable: true, builtIn: "Panel" },
+    ]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.equal(
+      outcome.registered[0]?.kind === "place" ? outcome.registered[0].builtIn : undefined,
+      "Panel",
+    );
+  });
+
+  it("refuses a broken declaration and keeps its valid siblings", () => {
+    const broken = (id: string, fields: Record<string, unknown>): PluginContribution =>
+      ({ ...board, id, ...fields }) as unknown as PluginContribution;
+    const brokenComponent = (id: string, fields: Record<string, unknown>): PluginContribution =>
+      ({ ...card, id, ...fields }) as unknown as PluginContribution;
+
+    const outcome = withBrowser([
+      board,
+      card,
+      broken("odd", { cardinality: "carousel" }),
+      // Заменяемость у коллекции бессмысленна: вклады там складываются, а не спорят.
+      broken("spread", { cardinality: "collection", replaceable: true, builtIn: "Spread" }),
+      brokenComponent("homeless", { placeId: "board" }),
+      brokenComponent("numbered", { placeId: 42 }),
+      brokenComponent("nameless", { export: "  " }),
+      brokenComponent("grouped", { group: 3 }),
+      brokenComponent("infinite", { order: Number.POSITIVE_INFINITY }),
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), ["hello.card", "hello.board"]);
+    assert.deepEqual(
+      outcome.problems.map((problem) => problem.split(" ")[2]),
+      [
+        "hello.odd",
+        "hello.spread",
+        "hello.homeless",
+        "hello.numbered",
+        "hello.nameless",
+        "hello.grouped",
+        "hello.infinite",
+      ],
+    );
+  });
+
+  /**
+   * Признак браузерной части нужен и месту: имя экспорта встроенного провайдера у плагина без
+   * бандла указывает в пустоту так же, как и у компонента.
+   */
+  it("refuses a built-in provider named by a plugin without a browser bundle", () => {
+    const outcome = withBrowser(
+      [{ ...board, id: "panel", cardinality: "single", replaceable: true, builtIn: "Panel" }],
+      false,
+    );
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.match(outcome.problems[0] ?? "", /the place hello\.panel names the built-in provider/);
+  });
+});

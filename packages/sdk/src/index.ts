@@ -12,9 +12,11 @@ import {
   currentPluginHost,
   type AgentContribution,
   type ColorSchemeContribution,
+  type ComponentContribution,
   type CustomContribution,
   type HookCriticality,
   type LocaleCatalogContribution,
+  type PlaceContribution,
   type PluginLogLevel,
   type RouteContribution,
 } from "./host.ts";
@@ -24,7 +26,7 @@ import { rememberToolInvoke, type PluginToolInvoke } from "./tools.ts";
 
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
-export { hookCriticalities, thinkingLevels } from "./host.ts";
+export { hookCriticalities, placeCardinalities, thinkingLevels } from "./host.ts";
 
 export type {
   AgentContribution,
@@ -32,12 +34,15 @@ export type {
   AgentToolSelection,
   ColorSchemeContribution,
   ColorSchemeDocument,
+  ComponentContribution,
   CustomContribution,
   EventContribution,
   HookContribution,
   HookCriticality,
   LocaleCatalogContribution,
   PayloadSchema,
+  PlaceCardinality,
+  PlaceContribution,
   PluginContribution,
   PluginHost,
   PluginIdentity,
@@ -321,6 +326,24 @@ export const contribute = {
    */
   localeCatalog: async (contribution: LocaleCatalogContribution): Promise<void> =>
     currentPluginHost().contribute({ kind: "locale-catalog", ...contribution }),
+
+  /**
+   * Объявить место, куда другие плагины кладут свои компоненты (docs/ui-extension-model.md).
+   * Заменяемым бывает только одиночное место, и у такого обязателен встроенный провайдер: иначе
+   * замена снималась бы в пустоту.
+   */
+  place: async (contribution: PlaceContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "place", ...contribution }),
+
+  /**
+   * Занять место своим компонентом. Экспорт ищется в браузерном бандле плагина, поэтому вклад
+   * осмыслен только у плагина, объявившего `sovereign.browser`.
+   *
+   * Место может ещё не появиться: порядок подъёма плагинов не определён, и вклад в неизвестное
+   * место ждёт своего места, а не отвергается.
+   */
+  component: async (contribution: ComponentContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "component", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {

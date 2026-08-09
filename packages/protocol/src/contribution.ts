@@ -244,6 +244,64 @@ export type LocaleCatalogContributionRegistration = RegistrationCommon & {
   messages: Record<string, string>;
 };
 
+/**
+ * Кардинальность места (docs/ui-extension-model.md): сколько экземпляров в нём живёт и как они
+ * складываются. Заменяемым бывает только одиночное: у коллекции и действия вклады не спорят, а
+ * выстраиваются в ряд.
+ *
+ * Вкладок здесь пока нет: правой панелью с несколькими открытыми экземплярами никто не владеет, а
+ * кардинальность без хоста — обещание, которое нечем сдержать.
+ */
+export const placeCardinalities = ["single", "collection", "action"] as const;
+
+export type PlaceCardinality = (typeof placeCardinalities)[number];
+
+export function isPlaceCardinality(value: unknown): value is PlaceCardinality {
+  return placeCardinalities.includes(value as PlaceCardinality);
+}
+
+/**
+ * Объявление места (docs/ui-extension-model.md). Место заводят одинаково и ядро, и плагин: иначе
+ * «плагин расширяет интерфейс другого плагина» осталось бы словами.
+ *
+ * **Кардинальность и заменяемость — поля, а не отдельные виды вклада.** Три вида вместо трёх
+ * значений поля заставили бы автора выбирать вид по свойству места, а не по тому, что он делает,
+ * и добавление четвёртой кардинальности ломало бы `everyKind` у всех потребителей разом.
+ */
+export type PlaceContributionRegistration = RegistrationCommon & {
+  kind: "place";
+  cardinality: PlaceCardinality;
+  /** Только у `single`: коллекцию и действие занять целиком нельзя. */
+  replaceable: boolean;
+  /**
+   * Имя экспорта встроенного провайдера в браузерном бандле владельца места. Обязательно у
+   * заменяемого места: заменять нечего, если под заменой ничего нет (docs/ui-extension-model.md).
+   */
+  builtIn?: string;
+};
+
+/**
+ * Вклад-компонент: заявка плагина на место (docs/ui-extension-model.md). Экземпляром он становится
+ * в браузере, когда место отрисовано, — реестр про экземпляры не знает и знать не может.
+ *
+ * Место может ещё не существовать: вклад в него не ошибка, он ждёт. Поэтому существование `placeId`
+ * при регистрации не проверяется — порядок появления плагинов не определён.
+ *
+ * Условия видимости у вклада нет: компонент решает это сам, вернув `null`. Предикат пришлось бы
+ * пронести через границу воркера структурным клонированием, а функции она не переносит; в браузере
+ * же компонент и предикат исполняются в одном realm, и второй способ сказать то же был бы лишним.
+ */
+export type ComponentContributionRegistration = RegistrationCommon & {
+  kind: "component";
+  /** Идентификатор места с неймспейсом: место чужое, поэтому неймспейс в нём чужой. */
+  placeId: string;
+  /** Имя экспорта в браузерном бандле плагина. */
+  export: string;
+  /** Порядок в коллекции: сперва группа, затем `order`, затем идентификатор вклада. */
+  group?: string;
+  order?: number;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -254,7 +312,9 @@ export type ContributionRegistration =
   | RouteContributionRegistration
   | PublicRouteContributionRegistration
   | ColorSchemeContributionRegistration
-  | LocaleCatalogContributionRegistration;
+  | LocaleCatalogContributionRegistration
+  | PlaceContributionRegistration
+  | ComponentContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
@@ -273,6 +333,8 @@ const everyKind = {
   "public-route": true,
   "color-scheme": true,
   "locale-catalog": true,
+  place: true,
+  component: true,
 } satisfies Record<ContributionKind, true>;
 
 /**
