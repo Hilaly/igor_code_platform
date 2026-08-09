@@ -156,6 +156,37 @@ describe("the NextTurnPicker", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("keeps the cascade open for a pointer selection in the model submenu", () => {
+    const onModelChange = vi.fn();
+    render(<Harness model="" onModelChange={onModelChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /выберите модель.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
+    fireEvent.click(screen.getByRole("treeitem", { name: "Anthropic" }).querySelector("div")!);
+
+    const option = screen.getByRole("treeitem", { name: "anthropic/claude" });
+    fireEvent.pointerDown(option);
+    fireEvent.click(option);
+
+    expect(onModelChange).toHaveBeenCalledWith("anthropic/claude");
+    expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
+  });
+
+  it("keeps the cascade open for a pointer selection in the reasoning submenu", () => {
+    const onThinkingLevelChange = vi.fn();
+    render(<Harness onThinkingLevelChange={onThinkingLevelChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*средний/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Уровень рассуждений/ }));
+
+    const option = screen.getByRole("option", { name: "Высокий" });
+    fireEvent.pointerDown(option);
+    fireEvent.click(option);
+
+    expect(onThinkingLevelChange).toHaveBeenCalledWith("high");
+    expect(screen.queryByRole("menu", { name: "Параметры следующего турна" })).toBeNull();
+  });
+
   it("focuses the local model tree when labels contain selector characters", () => {
     render(<Harness modelLabel={'Модель [a] "quoted"'} />);
     const trigger = screen.getByRole("button", { name: /anthropic\/claude.*средний/i });

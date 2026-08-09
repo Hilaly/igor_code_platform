@@ -2,7 +2,18 @@
  * Универсальный всплывающий контейнер Popover для произвольного содержимого.
  */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./popover.module.css";
@@ -24,6 +35,12 @@ export type PopoverProps = {
   narrowBelow?: boolean;
 };
 
+type PopoverScope = {
+  registerPopup: (popupRef: RefObject<HTMLDivElement | null>) => () => void;
+};
+
+const PopoverScopeContext = createContext<PopoverScope | null>(null);
+
 export function Popover({
   trigger,
   renderTrigger,
@@ -37,12 +54,28 @@ export function Popover({
   onOpenChange,
   narrowBelow = false,
 }: PopoverProps) {
+  const parentScope = useContext(PopoverScopeContext);
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
+  const descendantPopupRefs = useRef(new Set<RefObject<HTMLDivElement | null>>());
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+
+  const registerPopup = useCallback(
+    (descendantPopupRef: RefObject<HTMLDivElement | null>): (() => void) => {
+      descendantPopupRefs.current.add(descendantPopupRef);
+      const unregisterFromParent = parentScope?.registerPopup(descendantPopupRef);
+
+      return () => {
+        descendantPopupRefs.current.delete(descendantPopupRef);
+        unregisterFromParent?.();
+      };
+    },
+    [parentScope],
+  );
+  const scope = useMemo<PopoverScope>(() => ({ registerPopup }), [registerPopup]);
 
   const setOpen = (next: boolean): void => {
     if (next && !open && typeof document !== "undefined") {
@@ -58,6 +91,8 @@ export function Popover({
 
   const toggle = (): void => setOpen(!open);
 
+  useEffect(() => parentScope?.registerPopup(popupRef), [parentScope, popupRef]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -65,7 +100,10 @@ export function Popover({
       if (
         rootRef.current &&
         !rootRef.current.contains(event.target as Node) &&
-        !popupRef.current?.contains(event.target as Node)
+        !popupRef.current?.contains(event.target as Node) &&
+        !Array.from(descendantPopupRefs.current).some((descendantPopupRef) =>
+          descendantPopupRef.current?.contains(event.target as Node),
+        )
       ) {
         setOpen(false);
       }
@@ -87,35 +125,37 @@ export function Popover({
   }, [open, onOpenChange]);
 
   return (
-    <div className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} ref={rootRef}>
-      {renderTrigger === undefined ? (
-        <button
-          type="button"
-          className={styles.trigger}
-          onClick={toggle}
-          aria-expanded={open}
-          aria-controls={open ? popoverId : undefined}
+    <PopoverScopeContext.Provider value={scope}>
+      <div className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} ref={rootRef}>
+        {renderTrigger === undefined ? (
+          <button
+            type="button"
+            className={styles.trigger}
+            onClick={toggle}
+            aria-expanded={open}
+            aria-controls={open ? popoverId : undefined}
+          >
+            {trigger}
+          </button>
+        ) : (
+          renderTrigger({ contentId: popoverId, open, toggle })
+        )}
+        <FloatingLayer
+          open={open}
+          anchorRef={rootRef}
+          anchorChild
+          layerRef={popupRef}
+          side={side}
+          offset={8}
+          narrowBelow={narrowBelow}
+          id={popoverId}
+          className={`${styles.content}${contentClassName ? ` ${contentClassName}` : ""}`}
+          role={contentRole}
+          ariaLabel={ariaLabel}
         >
-          {trigger}
-        </button>
-      ) : (
-        renderTrigger({ contentId: popoverId, open, toggle })
-      )}
-      <FloatingLayer
-        open={open}
-        anchorRef={rootRef}
-        anchorChild
-        layerRef={popupRef}
-        side={side}
-        offset={8}
-        narrowBelow={narrowBelow}
-        id={popoverId}
-        className={`${styles.content}${contentClassName ? ` ${contentClassName}` : ""}`}
-        role={contentRole}
-        ariaLabel={ariaLabel}
-      >
-        {children}
-      </FloatingLayer>
-    </div>
+          {children}
+        </FloatingLayer>
+      </div>
+    </PopoverScopeContext.Provider>
   );
 }
