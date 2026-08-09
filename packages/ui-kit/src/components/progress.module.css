@@ -44,3 +44,67 @@
 .danger > .bar {
   background: var(--sovereign-danger);
 }
+.circular {
+  display: block;
+  width: var(--sovereign-control-height-sm);
+  height: var(--sovereign-control-height-sm);
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.circularTrack,
+.circularValue {
+  fill: none;
+  stroke-width: 3;
+}
+.circularTrack {
+  stroke: var(--sovereign-fill-surface);
+}
+.circularValue {
+  stroke: var(--sovereign-accent);
+  stroke-dasharray: var(--progress-number, 24) 100;
+  transition: stroke-dasharray var(--sovereign-duration-normal) var(--sovereign-ease-out);
+}
+.circular.success > .circularValue {
+  stroke: var(--sovereign-success);
+}
+.circular.warning > .circularValue {
+  stroke: var(--sovereign-warning);
+}
+.circular.danger > .circularValue {
+  stroke: var(--sovereign-danger);
+}
+.circular.indeterminate {
+  animation: circular-spin 1.2s linear infinite;
+}
+.circular.indeterminate > .circularValue {
+  stroke-dasharray: 24 76;
+  animation: circular-dash 1.4s var(--sovereign-ease-in-out) infinite;
+}
+@keyframes circular-spin {
+  to {
+    transform: rotate(270deg);
+  }
+}
+@keyframes circular-dash {
+  0% {
+    stroke-dasharray: 1 99;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 45 55;
+    stroke-dashoffset: -20;
+  }
+  100% {
+    stroke-dasharray: 1 99;
+    stroke-dashoffset: -100;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circular {
+    animation: none;
+  }
+  .circular.indeterminate > .circularValue {
+    animation: none;
+    stroke-dasharray: 24 76;
+  }
+}

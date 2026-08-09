@@ -7,6 +7,7 @@ import { Button } from "./button.tsx";
 import { Combobox } from "./combobox.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
 import { Input, Textarea } from "./input.tsx";
+import { SendIcon } from "./icons.tsx";
 import { List, ListRow } from "./list.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { Menu } from "./menu.tsx";
@@ -21,6 +22,7 @@ import {
   SettingsView,
 } from "./settings-frame.tsx";
 import { Slider } from "./slider.tsx";
+import { SplitButton } from "./split-button.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
 import { Toggle } from "./toggle.tsx";
@@ -389,6 +391,54 @@ describe("interactive components", () => {
 
     const menu = screen.getByRole("menu", { name: "Действия" });
     expect(menu.parentElement).toBe(document.body);
+  });
+
+  it("keeps a SplitButton primary action separate from its alternatives menu", () => {
+    const onAction = vi.fn();
+    const onAppend = vi.fn();
+    render(
+      <SplitButton
+        action={<SendIcon />}
+        actionLabel="Send"
+        onAction={onAction}
+        menuLabel="Send options"
+        menuTriggerLabel="Open send options"
+        items={[{ id: "append", label: "Append", onSelect: onAppend }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu", { name: "Send options" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open send options" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Append" }));
+    expect(onAppend).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables both SplitButton actions together", () => {
+    const onAction = vi.fn();
+    render(
+      <SplitButton
+        action={<SendIcon />}
+        actionLabel="Send"
+        onAction={onAction}
+        menuLabel="Send options"
+        menuTriggerLabel="Open send options"
+        items={[{ id: "append", label: "Append", onSelect: () => {} }]}
+        disabled
+      />,
+    );
+
+    const send = screen.getByRole("button", { name: "Send" });
+    const menu = screen.getByRole("button", { name: "Open send options" });
+    expect(send.hasAttribute("disabled")).toBe(true);
+    expect(menu.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(send);
+    fireEvent.click(menu);
+    expect(onAction).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu", { name: "Send options" })).toBeNull();
   });
 
   it("renders a regular menu popup in the document body", () => {

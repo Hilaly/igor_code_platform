@@ -189,6 +189,8 @@
 - [План компактного композера агентской сессии](superpowers/plans/2026-08-06-compact-session-composer.md) —
   TDD-задачи для иконок, каскадного выбора и двухзонной раскладки композера; итоговая проверка — в
   [task-4-report.md](../.superpowers/sdd/2026-08-06-compact-session-composer/task-4-report.md).
+- [Круговой контекст и единая отправка в композере](superpowers/plans/2026-08-09-composer-context-actions.md) —
+  TDD-план для общего tooltip, кругового Progress, SplitButton и новой нижней строки композера.
 - [Полировка левой панели](superpowers/specs/2026-08-06-sidebar-polish-design.md) — согласованное
   разделение панели на секции, плотное дерево проектов и сессий, hover/focus-действия, контекстные
   карточки и компактный аккаунт без горизонтального переполнения.

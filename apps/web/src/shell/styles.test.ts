@@ -166,11 +166,13 @@ describe("the style sheets of the application", () => {
     const sessions = readFileSync(join(import.meta.dirname, "../sessions/sessions.css"), "utf8");
 
     expect(sessions).toMatch(
-      /\.sessions-composer-actions\s*\{[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/s,
+      /\.sessions-composer-actions\s*\{[^}]*justify-content:\s*flex-end;[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*nowrap;/s,
     );
     expect(sessions).toMatch(
-      /@container\s*\(width\s*<=\s*40rem\)\s*\{[\s\S]*\.sessions-composer-actions\s*\{[^}]*flex:\s*0\s+1\s+auto;/s,
+      /\.sessions-composer-future-slot\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;/s,
     );
+    expect(sessions).not.toMatch(/\.sessions-modes/);
+    expect(sessions).not.toMatch(/\.sessions-composer-toolbar\s*\{[^}]*flex-direction:\s*column;/s);
     expect(sessions).not.toMatch(
       /\.sessions-composer-actions\s*\{[^}]*overflow(?:-x|-y)?\s*:\s*(?:auto|scroll|hidden)/s,
     );
@@ -227,6 +229,16 @@ describe("the style sheets of the application", () => {
       /\.sessions-composer-surface\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
     );
     expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
+  });
+
+  it("keeps usage inside the composer instead of restoring a full-width register", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(/\.sessions-usage-tooltip\s*\{[^}]*display:\s*grid;/s);
+    expect(sessions).toMatch(
+      /\.sessions-usage-tooltip\s*>\s*hr\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+currentColor;/s,
+    );
+    expect(sessions).not.toMatch(/\.sessions-usage(?:-context|-stat)?\s*\{/s);
   });
 
   it("keeps the central page in a permanent header and body grid", () => {
