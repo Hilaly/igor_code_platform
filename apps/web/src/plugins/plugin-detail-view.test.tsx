@@ -444,6 +444,20 @@ it("reports the placement of a command as joining the row", () => {
   expect(within(claim).getByText("joins the row")).toBeTruthy();
 });
 
+it("reports a command assigned to a known non-action place as incompatible", () => {
+  const misplaced: ContributionRegistration = {
+    ...runCommand,
+    ...(runCommand.kind === "command" ? { placeId: "core.sidebar.sections" } : {}),
+  };
+
+  showPlaces(withPlaces([misplaced]));
+
+  const claim = screen.getByRole("group", { name: "core.sidebar.sections" });
+
+  expect(within(claim).getByText("not applied: commands require an action place")).toBeTruthy();
+  expect(within(claim).queryByText("joins the row")).toBeNull();
+});
+
 /** Команда без места кнопки не просит, и в разделе занятых мест ей делать нечего. */
 it("leaves a command without a place out of the places section", () => {
   const placeless: ContributionRegistration = {

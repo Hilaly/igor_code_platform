@@ -59,7 +59,15 @@ type ContributionEntry = { registration: ContributionRegistration; off: boolean 
  * сломанный плагин.
  */
 type PlaceClaimOutcome =
-  "switchedOff" | "taken" | "free" | "overridden" | "disputed" | "added" | "waiting" | "project";
+  | "switchedOff"
+  | "taken"
+  | "free"
+  | "overridden"
+  | "disputed"
+  | "added"
+  | "incompatible"
+  | "waiting"
+  | "project";
 
 type PlaceClaim = {
   registration: PlacedContributionRegistration & { placeId: string };
@@ -74,6 +82,7 @@ const claimTones: Record<PlaceClaimOutcome, "success" | "muted" | "warning"> = {
   overridden: "warning",
   disputed: "warning",
   added: "success",
+  incompatible: "warning",
   waiting: "muted",
   project: "muted",
 };
@@ -349,6 +358,10 @@ function placeClaims(
 
       if (cardinality === undefined) {
         return { registration, outcome: "waiting" };
+      }
+
+      if (registration.kind === "command" && cardinality !== "action") {
+        return { registration, outcome: "incompatible" };
       }
 
       // Команда одиночное место занять не может: у неё нет содержимого, и в полосу действий она

@@ -427,6 +427,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.places.overridden": "не применён: место занял {holder}",
     "plugins.places.disputed": "не применён: претендентов равного ранга несколько",
     "plugins.places.added": "встаёт в ряд",
+    "plugins.places.incompatible": "не применён: команде требуется место-действие",
     "plugins.places.waiting": "ждёт: такого места пока никто не объявил",
     "plugins.places.project": "применяется только в контексте своего проекта",
     "plugins.public.title": "Открыто наружу",

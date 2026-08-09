@@ -428,6 +428,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.places.overridden": "not applied: the place is taken by {holder}",
     "plugins.places.disputed": "not applied: several claimants of equal rank",
     "plugins.places.added": "joins the row",
+    "plugins.places.incompatible": "not applied: commands require an action place",
     "plugins.places.waiting": "waiting: nobody has declared that place yet",
     "plugins.places.project": "applies inside its own project only",
     "plugins.public.title": "Open to the outside",
