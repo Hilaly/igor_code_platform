@@ -62,6 +62,27 @@ describe("locationOfDestination", () => {
   });
 
   it.each([
+    ["", "rival", "/p/~%2E%2E%2E/rival/board"],
+    ["rival", "", "/p/rival/~%2E%2E%2E/board"],
+  ])(
+    "keeps an empty destination identifier in the %s/%s pair as an opaque segment",
+    (pluginId, pageId, expectedUrl) => {
+      const location = locationOfDestination({
+        kind: "plugin-page",
+        pluginId,
+        pageId,
+        path: "board",
+      });
+      const url = urlOf(location);
+      const browserPath = new URL(url, "https://sovereign.invalid").pathname;
+
+      expect(url).toBe(expectedUrl);
+      expect(browserPath.startsWith("/p/")).toBe(true);
+      expect(matchLocation(browserPath)).toEqual(location);
+    },
+  );
+
+  it.each([
     [".", "..", "/p/~%2E/~%2E%2E"],
     ["..", ".", "/p/~%2E%2E/~%2E"],
     ["rival/child", "board/child", "/p/rival%2Fchild/board%2Fchild"],

@@ -79,9 +79,14 @@ function decodePathSegment(segment: string): string | undefined {
 /**
  * `.` и `..` браузер считает навигацией по каталогам даже в percent-кодировке. Префикс `~` не даёт
  * сегменту стать dot-segment; точка остаётся закодированной, чтобы не спутать эти два служебных
- * представления с обычными идентификаторами `~.` и `~..`.
+ * представления с обычными идентификаторами `~.` и `~..`. Три закодированные точки представляют
+ * пустую строку: обычный `encodeURIComponent` не создаёт такой сегмент, поскольку точку не кодирует.
  */
 function encodeOpaqueSegment(value: string): string {
+  if (value === "") {
+    return "~%2E%2E%2E";
+  }
+
   if (value === ".") {
     return "~%2E";
   }
@@ -94,6 +99,10 @@ function encodeOpaqueSegment(value: string): string {
 }
 
 function decodeOpaqueSegment(segment: string): string | undefined {
+  if (segment === "~%2E%2E%2E") {
+    return "";
+  }
+
   if (segment === "~%2E") {
     return ".";
   }

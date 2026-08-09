@@ -188,6 +188,8 @@ describe("pathOf", () => {
   });
 
   it.each([
+    ["", "rival", "/p/~%2E%2E%2E/rival"],
+    ["rival", "", "/p/rival/~%2E%2E%2E"],
     [".", "..", "/p/~%2E/~%2E%2E"],
     ["..", ".", "/p/~%2E%2E/~%2E"],
     ["rival/child", "board/child", "/p/rival%2Fchild/board%2Fchild"],
