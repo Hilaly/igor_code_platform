@@ -281,6 +281,14 @@ describe("the style sheets of the application", () => {
     );
   });
 
+  it("makes the contained route child fill its bounded content frame", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
+    );
+  });
+
   it("keeps clean-slate shell ownership free of dead plugin and historical selectors", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 

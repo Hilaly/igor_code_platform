@@ -142,6 +142,12 @@
   flex: 1 1 auto;
 }
 
+.shell-page[data-content-mode="contained"] .shell-content-frame > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 .shell-tabs {
   display: flex;
   flex: 1 1 auto;
