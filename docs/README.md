@@ -147,6 +147,9 @@
 - [План исправлений среза 12b-2 и browser SDK](superpowers/plans/2026-08-09-slice-12b2-browser-sdk-review-fixes.md) —
   десять TDD-задач от identity resolver и CSS lifecycle до tracked fixtures, живой проверки и
   переписывания локальной истории.
+- [Срез 12c-1: вкладки правой панели и команды](superpowers/specs/2026-08-09-slice-12c1-tabs-and-commands-design.md) —
+  четвёртая кардинальность места, `core.panel.tabs`, вид вклада «команда» с браузерным обработчиком,
+  команды ядра и палитра; почему `available` не воскрешает отвергнутый `when`.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
