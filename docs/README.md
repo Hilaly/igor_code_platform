@@ -155,6 +155,8 @@
 - [Исправления среза 12c-1 по ревью](superpowers/specs/2026-08-09-slice-12c1-review-fixes-design.md) —
   ленивый кеш команд, безопасный `available`, смена ревизии во время вызова, кардинальность мест и
   зарезервированный namespace `core`.
+- [План исправлений среза 12c-1 по ревью](superpowers/plans/2026-08-09-slice-12c1-review-fixes.md) —
+  девять атомарных этапов от объединения `main` и RED–GREEN исправлений до полной проверки ветки.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
