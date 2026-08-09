@@ -54,6 +54,7 @@ export * from "./components/select.tsx";
 export * from "./components/skeleton.tsx";
 export * from "./components/settings-frame.tsx";
 export * from "./components/slider.tsx";
+export * from "./components/split-button.tsx";
 export * from "./components/state.tsx";
 export * from "./components/status-dot.tsx";
 export * from "./components/streaming-text.tsx";

@@ -31,7 +31,6 @@ import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
-import { SessionUsage } from "./session-usage.tsx";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 import { useShellHeader } from "../shell/header.tsx";
 
@@ -272,7 +271,6 @@ export function ChatView(props: ChatViewProps) {
       />
 
       <div className="sessions-chat-bottom">
-        <SessionUsage stats={open.stats} context={open.context} translator={translator} />
         {archived ? undefined : (
           <MessageComposer
             sessionId={open.id}
@@ -297,6 +295,8 @@ export function ChatView(props: ChatViewProps) {
                 }`,
               );
             }}
+            context={open.context}
+            stats={open.stats}
             translator={translator}
           />
         )}

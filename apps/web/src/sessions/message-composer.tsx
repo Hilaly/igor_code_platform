@@ -1,23 +1,27 @@
 import {
+  type SessionContextUsage,
   type SessionMessage,
   type SessionMessageMode,
+  type SessionStats,
   type ThinkingLevel,
   type TurnRequest,
 } from "@sovereign/protocol";
 import {
   Button,
-  AppendIcon,
   NextTurnPicker,
   RaisedSurface,
   SendIcon,
-  SegmentedControl,
+  SplitButton,
   StopIcon,
   Textarea,
   Tooltip,
+  type MenuItemDescription,
   type ModelPickerGroup,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState } from "react";
+
+import { SessionUsage } from "./session-usage.tsx";
 
 export type MessageComposerProps = {
   sessionId: string;
@@ -36,15 +40,10 @@ export type MessageComposerProps = {
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   onError: (error: unknown) => void;
+  context: SessionContextUsage | undefined;
+  stats: SessionStats | undefined;
   translator: ScopedTranslator;
 };
-
-/**
- * Что делает кнопка отправки у занятой сессии. Турна она запустить не может — сессия занята, — и
- * выбор между тремя очередями заменяет его собой (docs/web-api.md). `append` требует простоя и
- * поэтому доступен отдельной кнопкой рядом с обычным запуском турна.
- */
-const busyModes: SessionMessageMode[] = ["steer", "follow-up", "next-turn"];
 
 export function MessageComposer({
   sessionId,
@@ -63,10 +62,11 @@ export function MessageComposer({
   onSendMessage,
   onInterrupt,
   onError,
+  context,
+  stats,
   translator,
 }: MessageComposerProps): React.JSX.Element {
   const { t } = translator;
-  const [mode, setMode] = useState<SessionMessageMode>("steer");
   const [submitting, setSubmitting] = useState(false);
   const operationToken = useRef(0);
   const currentSessionId = useRef(sessionId);
@@ -112,7 +112,7 @@ export function MessageComposer({
     );
   };
 
-  const send = (): void => {
+  const startSubmission = (acceptanceFactory: () => Promise<string | undefined>): void => {
     if (disabled || submitting || draft.trim() === "") {
       return;
     }
@@ -123,17 +123,7 @@ export function MessageComposer({
     let acceptance: Promise<string | undefined>;
 
     try {
-      if (busy) {
-        // У занятой сессии турна не запустить: текст уезжает в одну из очередей, и в какую именно —
-        // человек выбирает сам, потому что момент доставки у них разный.
-        acceptance = onSendMessage({ text: draft, mode });
-      } else {
-        acceptance = onSubmit({
-          text: draft,
-          model,
-          thinkingLevel: reasoningSupported ? thinkingLevel : "off",
-        });
-      }
+      acceptance = acceptanceFactory();
     } catch (error: unknown) {
       if (operationToken.current === token && currentSessionId.current === submittedSessionId) {
         setSubmitting(false);
@@ -146,120 +136,114 @@ export function MessageComposer({
     settle(acceptance, token, submittedSessionId);
   };
 
-  const append = (): void => {
-    if (disabled || submitting || draft.trim() === "") {
-      return;
-    }
-
-    setSubmitting(true);
-    const token = operationToken.current;
-    const submittedSessionId = sessionId;
-    let acceptance: Promise<string | undefined>;
-
-    try {
-      acceptance = onSendMessage({ text: draft, mode: "append" });
-    } catch (error: unknown) {
-      if (operationToken.current === token && currentSessionId.current === submittedSessionId) {
-        setSubmitting(false);
-        onError(error);
-      }
-
-      return;
-    }
-
-    settle(acceptance, token, submittedSessionId);
+  const submitTurn = (): void => {
+    startSubmission(() =>
+      onSubmit({
+        text: draft,
+        model,
+        thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+      }),
+    );
   };
+
+  const sendMessage = (mode: SessionMessageMode): void => {
+    startSubmission(() => onSendMessage({ text: draft, mode }));
+  };
+
+  const sendDefault = (): void => {
+    if (busy) {
+      sendMessage("steer");
+      return;
+    }
+
+    submitTurn();
+  };
+
+  const sendOptions: MenuItemDescription[] = [
+    {
+      id: "append",
+      label: t("chat.append"),
+      onSelect: () => sendMessage("append"),
+    },
+    ...(busy
+      ? ([
+          {
+            id: "follow-up",
+            label: t("chat.mode.follow-up.send"),
+            onSelect: () => sendMessage("follow-up"),
+          },
+          {
+            id: "next-turn",
+            label: t("chat.mode.next-turn.send"),
+            onSelect: () => sendMessage("next-turn"),
+          },
+        ] satisfies MenuItemDescription[])
+      : []),
+  ];
+
+  const sendDisabled = disabled || submitting || draft.trim() === "";
 
   return (
-    <>
-      {busy ? (
-        <div className="sessions-modes">
-          <SegmentedControl
-            options={busyModes.map((option) => ({
-              value: option,
-              label: t(`chat.mode.${option}`),
-            }))}
-            value={mode}
-            onChange={setMode}
-            label={t("chat.mode.label")}
-            disabled={disabled}
+    <div className="sessions-composer-surface">
+      <RaisedSurface>
+        <div className="sessions-composer">
+          <Textarea
+            value={draft}
+            onChange={onDraftChange}
+            onSubmit={sendDefault}
+            placeholder={t("chat.compose.placeholder")}
+            aria-label={t("chat.compose.label")}
+            autoGrow
+            rows={2}
+            maxRows={12}
+            disabled={disabled || submitting}
           />
-        </div>
-      ) : undefined}
-
-      <div className="sessions-composer-surface">
-        <RaisedSurface>
-          <div className="sessions-composer">
-            <Textarea
-              value={draft}
-              onChange={onDraftChange}
-              onSubmit={send}
-              placeholder={t("chat.compose.placeholder")}
-              aria-label={t("chat.compose.label")}
-              autoGrow
-              rows={2}
-              maxRows={12}
-              disabled={disabled || submitting}
-            />
-            <div className="sessions-composer-toolbar">
-              <div className="sessions-composer-future-slot" aria-hidden="true" />
-              <div className="sessions-composer-actions">
-                {!busy ? (
-                  <Tooltip content={t("chat.append")}>
-                    <Button
-                      iconOnly
-                      aria-label={t("chat.append")}
-                      onClick={append}
-                      disabled={disabled || submitting || draft.trim() === ""}
-                    >
-                      <AppendIcon />
-                    </Button>
-                  </Tooltip>
-                ) : null}
-                <Tooltip content={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}>
-                  <Button
-                    tone="secondary"
-                    iconOnly
-                    aria-label={busy ? t(`chat.mode.${mode}.send`) : t("chat.send")}
-                    onClick={send}
-                    disabled={disabled || submitting || draft.trim() === ""}
-                  >
-                    <SendIcon />
-                  </Button>
-                </Tooltip>
-                <NextTurnPicker
-                  model={model}
-                  modelGroups={modelGroups}
-                  onModelChange={onModelChange}
-                  onExpandModelGroup={onExpandModelGroup}
-                  thinkingLevel={thinkingLevel}
-                  reasoningSupported={reasoningSupported}
-                  onThinkingLevelChange={onThinkingLevelChange}
-                  modelLabel={t("chat.model")}
-                  reasoningLabel={t("chat.thinking")}
-                  triggerLabel={t("chat.nextTurn.settings")}
-                  placeholder={t("common.choose")}
-                  emptyText={t("state.empty")}
-                  translator={translator}
-                  disabled={disabled}
-                />
-                {busy ? (
-                  <Tooltip content={t("chat.stop")}>
-                    <Button
-                      iconOnly
-                      tone="danger"
-                      aria-label={t("chat.stop")}
-                      onClick={onInterrupt}
-                    >
-                      <StopIcon />
-                    </Button>
-                  </Tooltip>
-                ) : null}
-              </div>
+          <div className="sessions-composer-toolbar">
+            <div className="sessions-composer-future-slot" aria-hidden="true" />
+            <div className="sessions-composer-actions">
+              <SessionUsage stats={stats} context={context} translator={translator} />
+              <NextTurnPicker
+                model={model}
+                modelGroups={modelGroups}
+                onModelChange={onModelChange}
+                onExpandModelGroup={onExpandModelGroup}
+                thinkingLevel={thinkingLevel}
+                reasoningSupported={reasoningSupported}
+                onThinkingLevelChange={onThinkingLevelChange}
+                modelLabel={t("chat.model")}
+                reasoningLabel={t("chat.thinking")}
+                triggerLabel={t("chat.nextTurn.settings")}
+                placeholder={t("common.choose")}
+                emptyText={t("state.empty")}
+                translator={translator}
+                disabled={disabled}
+              />
+              <Tooltip content={t("chat.stop")}>
+                <Button
+                  iconOnly
+                  tone="danger"
+                  aria-label={t("chat.stop")}
+                  onClick={onInterrupt}
+                  disabled={disabled || !busy}
+                >
+                  <StopIcon />
+                </Button>
+              </Tooltip>
+              <SplitButton
+                action={<SendIcon />}
+                actionLabel={busy ? t("chat.mode.steer.send") : t("chat.send")}
+                onAction={sendDefault}
+                menuLabel={t("chat.send.options")}
+                menuTriggerLabel={t("chat.send.options")}
+                items={sendOptions}
+                placement="above"
+                tone="secondary"
+                disabled={sendDisabled}
+              />
             </div>
           </div>
-        </RaisedSurface>
-      </div>
-    </>
+        </div>
+      </RaisedSurface>
+    </div>
   );
 }

@@ -1,0 +1,10 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.root > * {
+  min-width: 0;
+}

@@ -45,6 +45,7 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import { SplitButton } from "./split-button.tsx";
 import {
   SettingsNavigationItem,
   SettingsPage,
@@ -586,6 +587,28 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('role="tooltip"');
   });
 
+  it("keeps structured static content inside the shared tooltip", () => {
+    const markup = renderToStaticMarkup(
+      <Tooltip
+        content={
+          <div>
+            <span>Context window</span>
+            <hr />
+            <span>Session tokens: 700</span>
+          </div>
+        }
+      >
+        <button type="button">Usage</button>
+      </Tooltip>,
+    );
+
+    const tooltipId = markup.match(/id="([^"]+)" role="tooltip"/)?.[1];
+    expect(tooltipId).toBeDefined();
+    expect(markup).toContain("Context window");
+    expect(markup).toContain("Session tokens: 700");
+    expect(markup).toContain(`aria-describedby="${tooltipId}"`);
+  });
+
   it("connects a tooltip to a UI-kit Button and preserves its description", () => {
     const markup = renderToStaticMarkup(
       <Tooltip content="почему">
@@ -632,6 +655,24 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain('role="menu"');
   });
 
+  it("renders a split action as two named buttons", () => {
+    const markup = renderToStaticMarkup(
+      <SplitButton
+        action={<SendIcon />}
+        actionLabel="Send"
+        onAction={() => {}}
+        menuLabel="Send options"
+        menuTriggerLabel="Open send options"
+        items={[{ id: "append", label: "Append", onSelect: () => {} }]}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Send"');
+    expect(markup).toContain('aria-label="Open send options"');
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).not.toContain("undefined");
+  });
+
   it("marks a menu trigger compact when requested", () => {
     const markup = renderToStaticMarkup(
       <Menu
@@ -670,6 +711,20 @@ describe("markup of the ported primitives", () => {
 
     const indeterminate = renderToStaticMarkup(<Progress label="Загрузка" tone="warning" />);
     expect(indeterminate).not.toContain("undefined");
+    expect(indeterminate).not.toContain("aria-valuenow");
+  });
+
+  it("renders circular progress with the same determinate and indeterminate semantics", () => {
+    const determinate = renderToStaticMarkup(
+      <Progress variant="circular" value={0.19} label="Context" tabIndex={0} />,
+    );
+    expect(determinate).toContain("<svg");
+    expect(determinate).toContain('aria-valuenow="19"');
+    expect(determinate).toContain('tabindex="0"');
+    expect(determinate.match(/<circle/g)).toHaveLength(2);
+
+    const indeterminate = renderToStaticMarkup(<Progress variant="circular" label="Context" />);
+    expect(indeterminate).toContain("<svg");
     expect(indeterminate).not.toContain("aria-valuenow");
   });
 

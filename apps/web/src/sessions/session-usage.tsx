@@ -5,7 +5,7 @@
  */
 
 import type { SessionContextUsage, SessionStats } from "@sovereign/protocol";
-import { Progress, Text, type ProgressTone, type ScopedTranslator } from "@sovereign/ui-kit";
+import { Progress, Tooltip, type ProgressTone, type ScopedTranslator } from "@sovereign/ui-kit";
 import type React from "react";
 
 export function contextTone(context: SessionContextUsage | undefined): ProgressTone {
@@ -40,36 +40,61 @@ function contextShare(context: SessionContextUsage | undefined): number | undefi
 export function SessionUsage({ stats, context, translator }: SessionUsageProps): React.JSX.Element {
   const { t } = translator;
   const share = contextShare(context);
-  const contextValue =
-    context === undefined
-      ? "—"
-      : share === undefined
-        ? t("chat.context.window-unknown", { used: String(context.tokens) })
-        : t("chat.context.value", {
+  const contextDetails =
+    context === undefined ? (
+      <div>—</div>
+    ) : share === undefined ? (
+      <div>{t("chat.context.window-unknown", { used: String(context.tokens) })}</div>
+    ) : (
+      <>
+        <div>
+          {t("chat.context.share", {
+            used: String(Math.round(share * 100)),
+            left: String(Math.max(0, 100 - Math.round(share * 100))),
+          })}
+        </div>
+        <div>
+          {t("chat.context.tokens-used", {
             used: String(context.tokens),
             window: String(context.contextWindow),
-            percent: String(Math.round(share * 100)),
-          });
+          })}
+        </div>
+      </>
+    );
 
   return (
-    <div className="sessions-usage">
-      <div className="sessions-usage-context" role="group" aria-label={t("chat.context.title")}>
-        <Text tone="muted">{t("chat.context.title")}</Text>
-        <Text tone="muted">{contextValue}</Text>
-        {share === undefined ? undefined : (
-          <Progress value={share} tone={contextTone(context)} label={t("chat.context.label")} />
-        )}
-      </div>
-
-      <div className="sessions-usage-stat" role="group" aria-label={t("chat.stats.tokens.label")}>
-        <Text tone="muted">{t("chat.stats.tokens.label")}</Text>
-        <Text tone="muted">{stats === undefined ? "—" : String(stats.totalTokens)}</Text>
-      </div>
-
-      <div className="sessions-usage-stat" role="group" aria-label={t("chat.stats.cost.label")}>
-        <Text tone="muted">{t("chat.stats.cost.label")}</Text>
-        <Text tone="muted">{stats === undefined ? "—" : `$${stats.costTotal.toFixed(4)}`}</Text>
-      </div>
-    </div>
+    <Tooltip
+      side="top"
+      content={
+        <div className="sessions-usage-tooltip">
+          <div className="sessions-usage-tooltip-section">
+            <div className="sessions-usage-tooltip-title">{t("chat.context.window.title")}</div>
+            {contextDetails}
+          </div>
+          <hr />
+          <div className="sessions-usage-tooltip-section">
+            <div className="sessions-usage-tooltip-title">{t("chat.stats.title")}</div>
+            <div>
+              {t("chat.stats.tokens", {
+                total: stats === undefined ? "—" : String(stats.totalTokens),
+              })}
+            </div>
+            <div>
+              {stats === undefined
+                ? t("chat.stats.cost.unavailable")
+                : t("chat.stats.cost", { cost: stats.costTotal.toFixed(4) })}
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <Progress
+        variant="circular"
+        value={share}
+        tone={contextTone(context)}
+        label={t("chat.context.label")}
+        tabIndex={0}
+      />
+    </Tooltip>
   );
 }

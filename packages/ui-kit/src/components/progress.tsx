@@ -8,13 +8,20 @@ import type { CSSProperties } from "react";
 import styles from "./progress.module.css";
 
 export type ProgressTone = "accent" | "success" | "warning" | "danger";
+export type ProgressVariant = "linear" | "circular";
 
 export type ProgressProps = {
   /** Доля выполненного, 0..1. Без значения полоса переходит в неопределённый режим. */
   value?: number;
   tone?: ProgressTone;
+  /** Представление: обычная полоса или компактное кольцо. */
+  variant?: ProgressVariant;
   /** Что именно выполняется: `aria-label` дорожки. Полоса без подписи ничего не сообщает. */
   label: string;
+  /** Делает компактное кольцо доступным trigger-элементом для описывающего Tooltip. */
+  tabIndex?: number;
+  /** Связь с подробным описанием, в том числе добавленная общим Tooltip. */
+  "aria-describedby"?: string;
 };
 
 /**
@@ -36,13 +43,45 @@ export function progressPercent(value: number): number {
   return Math.round(clampProgressValue(value) * 100);
 }
 
-export function Progress({ value, tone = "accent", label }: ProgressProps) {
+export function Progress({
+  value,
+  tone = "accent",
+  variant = "linear",
+  label,
+  tabIndex,
+  "aria-describedby": ariaDescribedBy,
+}: ProgressProps) {
+  if (variant === "circular") {
+    const percent = value === undefined ? undefined : progressPercent(value);
+    const fill =
+      percent === undefined ? undefined : ({ "--progress-number": percent } as CSSProperties);
+
+    return (
+      <svg
+        className={`${styles.circular} ${styles[tone]}${percent === undefined ? ` ${styles.indeterminate}` : ""}`}
+        viewBox="0 0 24 24"
+        style={fill}
+        role="progressbar"
+        aria-label={label}
+        aria-describedby={ariaDescribedBy}
+        {...(percent === undefined
+          ? {}
+          : { "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": percent })}
+        {...(tabIndex === undefined ? {} : { tabIndex })}
+      >
+        <circle className={styles.circularTrack} cx="12" cy="12" r="9" pathLength="100" />
+        <circle className={styles.circularValue} cx="12" cy="12" r="9" pathLength="100" />
+      </svg>
+    );
+  }
+
   if (value === undefined) {
     return (
       <div
         className={`${styles.track} ${styles.indeterminate} ${styles[tone]}`}
         role="progressbar"
         aria-label={label}
+        aria-describedby={ariaDescribedBy}
       >
         <div className={styles.bar} />
       </div>
@@ -61,6 +100,7 @@ export function Progress({ value, tone = "accent", label }: ProgressProps) {
       style={fill}
       role="progressbar"
       aria-label={label}
+      aria-describedby={ariaDescribedBy}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
