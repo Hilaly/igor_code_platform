@@ -595,7 +595,7 @@ Commit: `docs: reconcile slice 12c-1 with review fixes`
 
 - Produces fresh evidence for tests, build, clean diff and merge readiness.
 
-- [ ] **Step 1: Run the complete repository verification**
+- [x] **Step 1: Run the complete repository verification**
 
 Run:
 
@@ -607,19 +607,19 @@ git diff --check main...HEAD
 
 Expected: all commands exit 0; no new warnings beyond the pre-existing Vite chunk-size warning.
 
-- [ ] **Step 2: Repeat the suspected flaky test**
+- [x] **Step 2: Repeat the suspected flaky test**
 
 Run ten times:
 
 ```bash
 for run in {1..10}; do
-  NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web exec vitest run src/App.test.tsx -t "keeps a session rename dialog open when the write is refused" || break
+  NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web exec vitest run src/sessions/sidebar-projects.test.tsx -t "keeps a session rename dialog open when the write is refused" || break
 done
 ```
 
 Expected: ten passes. Any failure is captured verbatim and handled as a separate diagnosed defect.
 
-- [ ] **Step 3: Audit requirements and the final diff**
+- [x] **Step 3: Audit requirements and the final diff**
 
 Run:
 
@@ -633,7 +633,7 @@ git diff main...HEAD -- packages/browser-sdk/src/commands.tsx packages/browser-s
 Check each Global Constraint against code and tests. Ensure no conflict marker, temporary file,
 generated build artifact or unrelated refactor remains.
 
-- [ ] **Step 4: Mark this plan complete**
+- [x] **Step 4: Mark this plan complete**
 
 Change only completed checkboxes to `[x]`, run `git diff --check`, and commit:
 
