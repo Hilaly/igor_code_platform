@@ -325,15 +325,17 @@ it("labels a tab from the snapshot without loading the bundle", () => {
 **Files:**
 
 - Modify: `apps/daemon/src/plugins/fixtures/placed/src/worker.ts`, `src/browser.tsx`
-- Modify: `docs/runbook.md`, `docs/runtime-checks.md`, `docs/ui-extension-model.md`, `docs/ui-kit.md`,
+- Modify: `docs/runbook.md`, `docs/ui-extension-model.md`, `docs/ui-kit.md`,
   `docs/plugins.md`, `docs/public-contract.md`, `docs/backlog.md`, `docs/roadmap.md`, `docs/README.md`
 
 - [ ] **Step 1: Фикстура** — `placed` получает вкладку в `core.panel.tabs` и команду с
       `placeId: "core.view.header.actions"`, плюс экспорты `BoardTab` и `RunCommand` в `browser.tsx`.
 - [ ] **Step 2: Живая проверка** на собранном демоне из чистой временной директории данных по сценарию
       из спеки. Результат записать разделом «Вкладки и команды плагина живьём» в `docs/runbook.md`.
-- [ ] **Step 3: Замер** — стоимость открытия палитры и отсутствие загрузки бандлов при этом —
-      проверкой 37 в `docs/runtime-checks.md`.
+- [x] **Step 3: Замер отменён.** Отдельной проверки рантайма палитра не требует: она читает только
+      снимок и `moduleOf` не зовёт вовсе, поэтому «сколько бандлов грузит открытие палитры» — вопрос
+      не к Node, а к коду, и закрыт он тестом палитры на отсутствие обращений к кешу модулей. Замер
+      стоимости отрисовки четырнадцати строк списка ничего бы не решил.
 - [ ] **Step 4: Документы.** Отдельно: снять из `docs/roadmap.md` устаревшее «в 12c набор кита
       объявляется стабильным» — он объявлен стабильным срезом 12b-2; исправить формулировку пункта
       бэклога про состояние экземпляра; вписать уехавшее (горячие клавиши, воркерный обработчик, вызов

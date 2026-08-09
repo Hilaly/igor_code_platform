@@ -320,7 +320,7 @@ export type CoreCommand = {
 команды, «Почему так»), [ui-kit.md](../../ui-kit.md) (правая панель перестала быть пустой; палитра),
 [plugins.md](../../plugins.md) (перечень реализованных видов), [public-contract.md](../../public-contract.md)
 (рост поверхности браузерного SDK), [backlog.md](../../backlog.md), [roadmap.md](../../roadmap.md),
-[runbook.md](../../runbook.md), [runtime-checks.md](../../runtime-checks.md), [README.md](../../README.md).
+[runbook.md](../../runbook.md), [README.md](../../README.md).
 
 Отдельно: `roadmap.md` утверждает, что набор примитивов кита предстоит объявить стабильным в срезе 12c.
 Это устарело — кит объявлен стабильным срезом 12b-2, и в `ui-kit.md`, и в `packages/ui-kit/src/index.ts`.
