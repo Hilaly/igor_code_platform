@@ -9,7 +9,7 @@
  * `Text` — строчный `span`, и абзац им не собрать.
  */
 
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -78,7 +78,7 @@ export type MarkdownProps = {
   text: string;
 };
 
-export function Markdown({ text }: MarkdownProps): ReactNode {
+export const Markdown = memo(function Markdown({ text }: MarkdownProps): ReactNode {
   return (
     <div className={styles.root}>
       <ReactMarkdown
@@ -90,4 +90,4 @@ export function Markdown({ text }: MarkdownProps): ReactNode {
       </ReactMarkdown>
     </div>
   );
-}
+});

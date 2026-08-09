@@ -24,11 +24,11 @@ import {
   Notice,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { NavigationOutcome } from "./api.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
-import { MessageComposer } from "./message-composer.tsx";
+import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
@@ -73,7 +73,10 @@ export function ChatView(props: ChatViewProps) {
     translator,
   } = props;
   const { t } = translator;
-  const [draft, setDraft] = useState("");
+  const [draftReplacement, setDraftReplacement] = useState<ComposerDraftReplacement | undefined>(
+    undefined,
+  );
+  const draftReplacementSequence = useRef(0);
   const [model, setModel] = useState(open.summary?.model ?? "");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
     open.summary?.thinkingLevel ?? "off",
@@ -92,11 +95,14 @@ export function ChatView(props: ChatViewProps) {
   const busy = isBusy(open.summary);
   const agentAvailable = open.summary?.agentAvailable !== false;
   const sessionQueues = open.queues;
-  const waiting = [
-    ...(sessionQueues?.steer ?? []),
-    ...(sessionQueues?.followUp ?? []),
-    ...(sessionQueues?.nextTurn ?? []),
-  ];
+  const waiting = useMemo(
+    () => [
+      ...(sessionQueues?.steer ?? []),
+      ...(sessionQueues?.followUp ?? []),
+      ...(sessionQueues?.nextTurn ?? []),
+    ],
+    [sessionQueues?.followUp, sessionQueues?.nextTurn, sessionQueues?.steer],
+  );
   const reasoningSupported = selectedModel(model, models)?.reasoning !== false;
 
   const compact = async (): Promise<void> => {
@@ -117,7 +123,7 @@ export function ChatView(props: ChatViewProps) {
   const archived = open.summary?.archived === true;
 
   useEffect(() => {
-    setDraft("");
+    setDraftReplacement(undefined);
     setModel(open.summary?.model ?? "");
     setThinkingLevel(open.summary?.thinkingLevel ?? "off");
     overridesHydratedFor.current = open.summary === undefined ? undefined : open.id;
@@ -202,40 +208,49 @@ export function ChatView(props: ChatViewProps) {
     actions: headerActions,
   });
 
-  const notices = (
-    <>
-      {open.failure === undefined ? undefined : (
-        <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
-      )}
-      {agentAvailable ? undefined : (
-        <Notice
-          tone="warning"
-          title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
-        />
-      )}
-      {refusal?.what !== "compact" ? undefined : (
-        <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
-      )}
-      {open.degradations.map((lost, index) => (
-        <Notice
-          key={`${lost.kind}:${lost.name}:${String(index)}`}
-          tone="warning"
-          title={t(`chat.degraded.${lost.kind}`, { name: lost.name })}
-        />
-      ))}
-    </>
+  const notices = useMemo(
+    () => (
+      <>
+        {open.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("chat.turn.failed", { reason: open.failure })} />
+        )}
+        {agentAvailable ? undefined : (
+          <Notice
+            tone="warning"
+            title={t("chat.agent.missing", { agent: open.summary?.agentId ?? "" })}
+          />
+        )}
+        {refusal?.what !== "compact" ? undefined : (
+          <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
+        )}
+        {open.degradations.map((lost, index) => (
+          <Notice
+            key={`${lost.kind}:${lost.name}:${String(index)}`}
+            tone="warning"
+            title={t(`chat.degraded.${lost.kind}`, { name: lost.name })}
+          />
+        ))}
+      </>
+    ),
+    [agentAvailable, open.degradations, open.failure, open.summary?.agentId, refusal, t],
   );
 
-  const queueBadges =
-    waiting.length === 0 ? undefined : (
-      <div className="sessions-queues">
-        {waiting.map((text, index) => (
-          <Badge key={`${String(index)}:${text}`} tone="accent">
-            {text}
-          </Badge>
-        ))}
-      </div>
-    );
+  const queueBadges = useMemo(
+    () =>
+      waiting.length === 0 ? undefined : (
+        <div className="sessions-queues">
+          {waiting.map((text, index) => (
+            <Badge key={`${String(index)}:${text}`} tone="accent">
+              {text}
+            </Badge>
+          ))}
+        </div>
+      ),
+    [t, waiting],
+  );
+  const handleLabelRefusalChange = useCallback((reason: string | undefined): void => {
+    setRefusal(reason === undefined ? undefined : { what: "label", reason });
+  }, []);
 
   return (
     <section className="sessions-chat">
@@ -250,7 +265,14 @@ export function ChatView(props: ChatViewProps) {
         harnessAvailable={agentAvailable}
         onNavigate={props.onNavigate}
         onSetLabel={onSetLabel}
-        onEditorText={setDraft}
+        onEditorText={(text) => {
+          draftReplacementSequence.current += 1;
+          setDraftReplacement({
+            sessionId: open.id,
+            sequence: draftReplacementSequence.current,
+            text,
+          });
+        }}
         translator={translator}
       />
 
@@ -264,9 +286,7 @@ export function ChatView(props: ChatViewProps) {
         onFork={onFork}
         onSetLabel={onSetLabel}
         labelRefusal={refusal?.what === "label" ? refusal.reason : undefined}
-        onLabelRefusalChange={(reason) =>
-          setRefusal(reason === undefined ? undefined : { what: "label", reason })
-        }
+        onLabelRefusalChange={handleLabelRefusalChange}
         translator={translator}
       />
 
@@ -274,8 +294,7 @@ export function ChatView(props: ChatViewProps) {
         {archived ? undefined : (
           <MessageComposer
             sessionId={open.id}
-            draft={draft}
-            onDraftChange={setDraft}
+            {...(draftReplacement === undefined ? {} : { draftReplacement })}
             busy={busy}
             disabled={!agentAvailable}
             model={model}

@@ -25,8 +25,7 @@ import { SessionUsage } from "./session-usage.tsx";
 
 export type MessageComposerProps = {
   sessionId: string;
-  draft: string;
-  onDraftChange: (draft: string) => void;
+  draftReplacement?: ComposerDraftReplacement;
   busy: boolean;
   disabled?: boolean;
   model: string;
@@ -45,10 +44,15 @@ export type MessageComposerProps = {
   translator: ScopedTranslator;
 };
 
+export type ComposerDraftReplacement = {
+  sessionId: string;
+  sequence: number;
+  text: string;
+};
+
 export function MessageComposer({
   sessionId,
-  draft,
-  onDraftChange,
+  draftReplacement,
   busy,
   disabled = false,
   model,
@@ -67,15 +71,32 @@ export function MessageComposer({
   translator,
 }: MessageComposerProps): React.JSX.Element {
   const { t } = translator;
+  const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const operationToken = useRef(0);
   const currentSessionId = useRef(sessionId);
+  const appliedDraftReplacement = useRef<number | undefined>(undefined);
   currentSessionId.current = sessionId;
 
   useEffect(() => {
     operationToken.current += 1;
     setSubmitting(false);
+    setDraft("");
+    appliedDraftReplacement.current = undefined;
   }, [sessionId]);
+
+  useEffect(() => {
+    if (
+      draftReplacement === undefined ||
+      draftReplacement.sessionId !== sessionId ||
+      appliedDraftReplacement.current === draftReplacement.sequence
+    ) {
+      return;
+    }
+
+    appliedDraftReplacement.current = draftReplacement.sequence;
+    setDraft(draftReplacement.text);
+  }, [draftReplacement, sessionId]);
 
   useEffect(() => {
     if (!reasoningSupported && thinkingLevel !== "off") {
@@ -97,7 +118,7 @@ export function MessageComposer({
         setSubmitting(false);
 
         if (reason === undefined) {
-          onDraftChange("");
+          setDraft("");
         }
       },
       (error: unknown) => {
@@ -189,7 +210,7 @@ export function MessageComposer({
         <div className="sessions-composer">
           <Textarea
             value={draft}
-            onChange={onDraftChange}
+            onChange={setDraft}
             onSubmit={sendDefault}
             placeholder={t("chat.compose.placeholder")}
             aria-label={t("chat.compose.label")}
