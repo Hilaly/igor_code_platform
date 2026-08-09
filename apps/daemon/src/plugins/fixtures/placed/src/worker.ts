@@ -39,6 +39,28 @@ export const activate = async (): Promise<void> => {
   });
 
   await contribute.component({
+    id: "board-tab",
+    title: "Board",
+    placeId: "core.panel.tabs",
+    export: "BoardTab",
+    order: 1,
+  });
+
+  await contribute.command({
+    id: "run",
+    title: "Run the placed board",
+    export: "RunCommand",
+    placeId: "core.view.header.actions",
+    order: 2,
+  });
+
+  await contribute.command({
+    id: "boom-command",
+    title: "A command that throws when run",
+    export: "BoomCommand",
+  });
+
+  await contribute.component({
     id: "boom",
     title: "A component that throws while rendering",
     placeId: "core.sidebar.sections",

@@ -11,7 +11,10 @@ import { defaultLayout, type ShellLayout } from "../shell/layout.ts";
 import { CommandPalette, useCommandPaletteShortcut } from "./command-palette.tsx";
 import type { CoreCommandHost } from "./core-commands.ts";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  asked.length = 0;
+});
 
 const translator = createTranslator({
   catalogs: [coreEnglish],
@@ -41,6 +44,15 @@ const runCommand: ContributionRegistration = {
   export: "RunCommand",
 };
 
+const asked: string[] = [];
+
+/** Ответ стабилен по ссылке: `useSyncExternalStore` сверяет снимки именно ею. */
+const loadedModule = (() => {
+  let cached: { kind: "loaded"; module: Record<string, unknown> } | undefined;
+
+  return (module: Record<string, unknown>) => (cached ??= { kind: "loaded", module });
+})();
+
 function palette(
   options: {
     layout?: ShellLayout;
@@ -62,10 +74,11 @@ function palette(
       plugins={[placed]}
       onDiagnostic={() => {}}
       cache={{
-        moduleOf: () => ({
-          kind: "loaded",
-          module: { RunCommand: { run: () => ran.push("plugin command") } },
-        }),
+        moduleOf: (status) => {
+          asked.push(status.key);
+
+          return loadedModule({ RunCommand: { run: () => ran.push("plugin command") } });
+        },
         retain: () => {},
         subscribe: () => () => {},
         dispose: () => {},
@@ -158,6 +171,17 @@ describe("the command palette", () => {
     fireEvent.keyDown(field, { key: "Enter" });
 
     expect(host.navigate).toHaveBeenCalledWith({ kind: "session-archive" });
+  });
+
+  /**
+   * Палитра читает только снимок: чтобы показать команды плагинов, загружать их бандлы не нужно.
+   * Иначе открытие палитры тянуло бы код каждого установленного плагина разом.
+   */
+  it("shows plugin commands without loading a single bundle", () => {
+    palette({ contributions: [runCommand] });
+
+    expect(rows()).toContain("Run the board");
+    expect(asked).toEqual([]);
   });
 
   it("closes on Escape", () => {
