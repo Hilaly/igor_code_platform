@@ -83,9 +83,7 @@ available: (host) => !host.rightUnavailable && !host.layout.rightHidden;
 
 ```ts
 const rightUnavailable =
-  page.kind === "settings" ||
-  page.kind === "settings-project" ||
-  page.kind === "settings-plugin";
+  page.kind === "settings" || page.kind === "settings-project" || page.kind === "settings-plugin";
 ```
 
 Передать значение в `ShellWithPlaceTabs.rightUnavailable` и
@@ -156,12 +154,7 @@ Expected: FAIL because each current modified chord opens the palette.
 ```ts
 const platformModifier = event.metaKey !== event.ctrlKey;
 
-if (
-  event.key.toLowerCase() !== "k" ||
-  !platformModifier ||
-  event.shiftKey ||
-  event.altKey
-) {
+if (event.key.toLowerCase() !== "k" || !platformModifier || event.shiftKey || event.altKey) {
   return;
 }
 ```
@@ -272,11 +265,7 @@ Run точечную web-команду из Task 2. Expected: FAIL because disa
 - [ ] **Step 7: Implement palette integration**
 
 ```tsx
-<ListRow
-  key={entry.id}
-  onSelect={() => choose(entry)}
-  disabled={entry.disabled}
->
+<ListRow key={entry.id} onSelect={() => choose(entry)} disabled={entry.disabled}>
   {entry.title}
 </ListRow>
 ```
