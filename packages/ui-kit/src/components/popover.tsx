@@ -35,7 +35,6 @@ export function Popover({
   contentClassName,
   open: controlledOpen,
   onOpenChange,
-  viewportSafe = false,
   narrowBelow = false,
 }: PopoverProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
