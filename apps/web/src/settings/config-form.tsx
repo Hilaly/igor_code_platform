@@ -19,7 +19,7 @@ import type { ConfigState } from "./use-config.ts";
 
 export type ConfigFormProps = {
   state: ConfigState;
-  onChange: (key: keyof Config, value: Config[keyof Config]) => void;
+  onChange: <K extends keyof Config>(key: K, value: Config[K]) => void;
   translator: ScopedTranslator;
 };
 
@@ -30,6 +30,7 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
     config === undefined ? undefined : textOf(config),
   );
   const latestRefusal = useRef(refusal);
+  const dirtyKeys = useRef(new Set<keyof Config>());
 
   useEffect(() => {
     latestRefusal.current = refusal;
@@ -40,11 +41,25 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
       return;
     }
 
-    // A refusal is followed by a reload. Keep the just-typed control visible beside the daemon
-    // reason; a later successful snapshot resumes the normal authoritative update.
-    setText((current) =>
-      current === undefined || latestRefusal.current === undefined ? textOf(config) : current,
-    );
+    setText((current) => {
+      if (current === undefined) {
+        return textOf(config);
+      }
+
+      // A refusal is followed by a reload, so its text stays beside the daemon reason. Otherwise,
+      // only controls without pending local text accept the new authoritative snapshot.
+      if (latestRefusal.current !== undefined) {
+        return current;
+      }
+
+      const next = textOf(config);
+
+      for (const key of dirtyKeys.current) {
+        next[key] = current[key];
+      }
+
+      return next;
+    });
   }, [config]);
 
   if (config === undefined || text === undefined) {
@@ -60,12 +75,14 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
   }
 
   const setValue = (key: keyof Config, value: string): void => {
+    dirtyKeys.current.add(key);
     setText((current) => (current === undefined ? current : { ...current, [key]: value }));
   };
   const commitNumber = (key: Exclude<keyof Config, "logLevel">): void => {
     const value = parseFiniteNumber(text[key]);
 
     if (value !== undefined) {
+      dirtyKeys.current.delete(key);
       onChange(key, value);
     }
   };
@@ -88,6 +105,7 @@ export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
               options={logLevels.map((level) => ({ value: level, label: level }))}
               onChange={(value) => {
                 setValue(key, value);
+                dirtyKeys.current.delete(key);
                 onChange(key, value as Config["logLevel"]);
               }}
               placeholder={t("common.choose")}

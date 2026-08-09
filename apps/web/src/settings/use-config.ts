@@ -40,7 +40,7 @@ export const initialConfigState: ConfigState = {
 
 export type ConfigController = {
   state: ConfigState;
-  update: (key: keyof Config, value: Config[keyof Config]) => void;
+  update: <K extends keyof Config>(key: K, value: Config[K]) => void;
 };
 
 export type UseConfigOptions = {
@@ -74,11 +74,18 @@ export function useConfig(options: UseConfigOptions): ConfigController {
 
     const controller = new AbortController();
     pending.current = controller;
+    const seq = writeSeq.current;
 
     void fetchConfig(controller.signal)
-      .then((config) => apply((current) => ({ ...current, config, failure: undefined })))
+      .then((config) => {
+        if (controller.signal.aborted || writeSeq.current !== seq) {
+          return;
+        }
+
+        apply((current) => ({ ...current, config, failure: undefined }));
+      })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || writeSeq.current !== seq) {
           return;
         }
 
@@ -116,7 +123,7 @@ export function useConfig(options: UseConfigOptions): ConfigController {
   useEffect(() => () => pending.current?.abort(), []);
 
   const update = useCallback(
-    (key: keyof Config, value: Config[keyof Config]) => {
+    <K extends keyof Config>(key: K, value: Config[K]) => {
       apply((current) => ({ ...current, refusal: undefined }));
 
       const seq = writeSeq.current + 1;

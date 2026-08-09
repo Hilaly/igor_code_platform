@@ -35,7 +35,7 @@ export type DaemonSectionProps = {
   /** Локаль интерфейса: момент старта показывается локализованной датой, а не сырой ISO-строкой. */
   locale: string;
   config: ConfigState;
-  onChangeConfig: (key: keyof Config, value: Config[keyof Config]) => void;
+  onChangeConfig: <K extends keyof Config>(key: K, value: Config[K]) => void;
   translator: ScopedTranslator;
 };
 

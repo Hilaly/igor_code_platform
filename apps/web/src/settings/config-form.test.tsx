@@ -124,6 +124,21 @@ it("takes the latest daemon snapshot when no control has a refusal", () => {
   expect(field("Одновременных обращений").value).toBe("9");
 });
 
+it("keeps typed numeric text when an external snapshot arrives before blur", () => {
+  const view = show(state());
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "8" } });
+  view.rerender(
+    <ConfigForm
+      state={state({ config: { ...defaultConfig, maxConcurrentTurns: 9 } })}
+      onChange={() => {}}
+      translator={translator}
+    />,
+  );
+
+  expect(field("Одновременных обращений").value).toBe("8");
+});
+
 it("keeps typed text visible after a daemon refusal reloads the snapshot", () => {
   const view = show(state());
 
