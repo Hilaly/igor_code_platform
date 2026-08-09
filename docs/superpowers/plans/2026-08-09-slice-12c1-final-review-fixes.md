@@ -39,7 +39,7 @@ Make.
 - Produces: `CoreCommandHost.rightUnavailable: boolean`; одинаковое значение у `Shell` и
   `CommandPalette.host`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Расширить test helper параметром `rightUnavailable = false` и добавить проверку, которая ловит
 отсутствующую проверку этого состояния:
@@ -53,7 +53,7 @@ it("switches off both right-panel commands while the panel is unavailable", () =
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -63,7 +63,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web test -- s
 
 Expected: FAIL because `core.panel.right.hide` still returns `true` for visible layout.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Добавить обязательный host-признак и включить его в обе проверки:
 
@@ -89,11 +89,11 @@ const rightUnavailable =
 Передать значение в `ShellWithPlaceTabs.rightUnavailable` и
 `CommandPalette.host.rightUnavailable`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run ту же точечную команду. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/App.tsx apps/web/src/commands/core-commands.ts apps/web/src/commands/core-commands.test.ts
@@ -113,7 +113,7 @@ git commit -m "fix(web): disable unavailable panel commands"
 - Produces: `useCommandPaletteShortcut` принимает только XOR `metaKey`/`ctrlKey` при выключенных
   `shiftKey` и `altKey`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Добавить table-driven проверку реальных событий:
 
@@ -139,7 +139,7 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -149,7 +149,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web test -- s
 
 Expected: FAIL because each current modified chord opens the palette.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 const platformModifier = event.metaKey !== event.ctrlKey;
@@ -159,11 +159,11 @@ if (event.key.toLowerCase() !== "k" || !platformModifier || event.shiftKey || ev
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run ту же точечную команду. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/commands/command-palette.tsx apps/web/src/commands/command-palette.test.tsx
@@ -186,7 +186,7 @@ git commit -m "fix(web): narrow the command palette shortcut"
 - Consumes: существующие `ListRowProps.onSelect` и `.select` CSS.
 - Produces: `ListRowProps.disabled?: boolean`; выключенная команда палитры остаётся нативной кнопкой.
 
-- [ ] **Step 1: Write the failing UI-kit test**
+- [x] **Step 1: Write the failing UI-kit test**
 
 ```tsx
 it("keeps a disabled selectable list row semantic and inert", () => {
@@ -207,7 +207,7 @@ it("keeps a disabled selectable list row semantic and inert", () => {
 });
 ```
 
-- [ ] **Step 2: Run UI-kit test to verify it fails**
+- [x] **Step 2: Run UI-kit test to verify it fails**
 
 Run:
 
@@ -217,7 +217,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/ui-kit test -
 
 Expected: FAIL at TypeScript transform or assertion because `disabled` is absent.
 
-- [ ] **Step 3: Implement `ListRow.disabled`**
+- [x] **Step 3: Implement `ListRow.disabled`**
 
 Добавить prop, передать нативные атрибуты и убрать hover/cursor у выключенной строки:
 
@@ -242,11 +242,11 @@ disabled?: boolean;
 }
 ```
 
-- [ ] **Step 4: Run UI-kit test to verify it passes**
+- [x] **Step 4: Run UI-kit test to verify it passes**
 
 Run ту же UI-kit команду. Expected: PASS.
 
-- [ ] **Step 5: Write the failing palette test**
+- [x] **Step 5: Write the failing palette test**
 
 Изменить ожидание недоступной команды с отсутствующей кнопки на выключенную кнопку:
 
@@ -258,11 +258,11 @@ expect(hidden.getAttribute("aria-disabled")).toBe("true");
 
 Такую же семантику ожидать для недоступной plugin command и исключения из `available`.
 
-- [ ] **Step 6: Run palette test to verify it fails**
+- [x] **Step 6: Run palette test to verify it fails**
 
 Run точечную web-команду из Task 2. Expected: FAIL because disabled entries are still plain `li`.
 
-- [ ] **Step 7: Implement palette integration**
+- [x] **Step 7: Implement palette integration**
 
 ```tsx
 <ListRow key={entry.id} onSelect={() => choose(entry)} disabled={entry.disabled}>
@@ -272,11 +272,11 @@ Run точечную web-команду из Task 2. Expected: FAIL because disa
 
 Обновить комментарий палитры и публичное описание `ListRow` в `docs/ui-kit.md`.
 
-- [ ] **Step 8: Run both focused suites**
+- [x] **Step 8: Run both focused suites**
 
 Run обе точечные команды Task 2 и Task 3. Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/ui-kit/src/components/list.tsx packages/ui-kit/src/components/list.module.css packages/ui-kit/src/components/interactive-components.test.tsx apps/web/src/commands/command-palette.tsx apps/web/src/commands/command-palette.test.tsx docs/ui-kit.md
@@ -296,12 +296,12 @@ git commit -m "fix(ui-kit): preserve disabled list row semantics"
 - Consumes: фактические семь `settingsSections` и четыре panel commands.
 - Produces: документация сообщает 13 core-команд и 7 Settings-разделов.
 
-- [ ] **Step 1: Correct the counts**
+- [x] **Step 1: Correct the counts**
 
 Заменить «двенадцать команд ядра» на «тринадцать команд ядра» в runbook и «шесть разделов
 настроек» на «семь разделов настроек» в исходной spec.
 
-- [ ] **Step 2: Run focused tests together**
+- [x] **Step 2: Run focused tests together**
 
 ```bash
 NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web test -- src/commands/core-commands.test.ts src/commands/command-palette.test.tsx
@@ -310,7 +310,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/ui-kit test -
 
 Expected: PASS.
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
 ```bash
 NODE_OPTIONS=--no-experimental-webstorage make check
