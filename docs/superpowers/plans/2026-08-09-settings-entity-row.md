@@ -248,3 +248,68 @@ shadows, or card frames were added. Confirm all interactive controls remain inde
 git add docs/ui-kit.md docs/superpowers/specs/2026-08-09-settings-entity-row-design.md docs/README.md
 git commit -m "docs(ui): catalog settings entity row"
 ```
+
+### Task 5: Migrate provider index rows
+
+**Files:**
+
+- Modify: `apps/web/src/providers/providers-view.tsx`
+- Modify: `apps/web/src/providers/providers.css`
+- Modify: `apps/web/src/providers/providers-view.test.tsx`
+- Modify: `apps/web/src/providers/styles.test.ts`
+- Modify: `docs/ui-kit.md`
+
+**Interfaces:**
+
+- Consumes `SettingsEntityRow` for selectable providers and `SettingsRow` for conflicting providers
+  without a detail route.
+- Keeps `onOpen(provider.id)` and the existing conflict deletion confirmation unchanged.
+
+- [ ] **Step 1: Change provider style expectations to reject local row geometry**
+
+Update `providers/styles.test.ts` so `.providers-row` is forbidden while content-level wrapping for
+technical ids and model facts remains covered.
+
+- [ ] **Step 2: Run the provider style test and verify RED**
+
+```bash
+pnpm --filter @sovereign/web exec vitest run src/providers/styles.test.ts
+```
+
+Expected: FAIL while `.providers-row` still owns a custom grid.
+
+- [ ] **Step 3: Migrate the regular and conflicting provider rows**
+
+Use `SettingsEntityRow` for `ProviderRow`, placing identity/access copy on the left and auth/model
+metadata in the shared `meta` slot. Use `SettingsRow` for `ConflictingUserProviderRow`, placing the
+delete button in the right control area. Keep the existing UI-kit `Badge`, `Code`, `Text`, and
+`Button` components without local typography or color overrides.
+
+- [ ] **Step 4: Remove redundant provider row CSS**
+
+Delete `.providers-row`, `.providers-row-facts`, and `.providers-row-marks` geometry and their narrow
+container overrides. Retain only styles used by provider detail, models, login, and forms.
+
+- [ ] **Step 5: Run focused provider and style tests**
+
+```bash
+pnpm --filter @sovereign/web exec vitest run src/providers/providers-view.test.tsx src/providers/styles.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Run typecheck, lint, formatting, and build**
+
+```bash
+pnpm --filter @sovereign/web typecheck
+pnpm exec eslint apps/web/src/providers
+pnpm exec prettier --check apps/web/src/providers docs/ui-kit.md
+pnpm --filter @sovereign/web build
+```
+
+- [ ] **Step 7: Commit the provider migration**
+
+```bash
+git add apps/web/src/providers docs/ui-kit.md docs/superpowers/specs/2026-08-09-settings-entity-row-design.md docs/superpowers/plans/2026-08-09-settings-entity-row.md
+git commit -m "refactor(providers): use shared settings entity row"
+```
