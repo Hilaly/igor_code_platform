@@ -83,6 +83,12 @@
 - Порядок в коллекции детерминирован: группа, затем порядок, затем id. Появление нового плагина не
   переставляет существующие элементы.
 
+Каждая route-level рабочая страница ядра внутри авторизованной оболочки обязана быть одиночным
+заменяемым местом с built-in провайдером. Все разделы Settings входят в это правило независимо от
+того, насколько мал их встроенный React-компонент: прямое включение section view в контейнер
+Settings обошло бы единый resolver, fallback и диагностику мест. Shell chrome, login/bootstrap,
+страницы ошибок маршрутизатора и plugin-owned страницы этим правилом не охватываются.
+
 ## Места базовой поставки
 
 Имена мест — публичный контракт ([public-contract.md](public-contract.md)). Форма вклада описана в
@@ -93,8 +99,12 @@
 | `core.session.chat`        | одиночное      | да        | `sessionId`                          |
 | `core.session.new`         | одиночное      | да        | —                                    |
 | `core.settings.projects`   | одиночное      | да        | `view: list \| detail`, `projectId`  |
+| `core.settings.appearance` | одиночное      | да        | —                                    |
+| `core.settings.usage`      | одиночное      | да        | —                                    |
 | `core.settings.providers`  | одиночное      | да        | `view: list \| detail`, `providerId` |
 | `core.settings.plugins`    | одиночное      | да        | `view: list \| detail`, `pluginKey`  |
+| `core.settings.daemon`     | одиночное      | да        | —                                    |
+| `core.settings.diagnostics` | одиночное     | да        | —                                    |
 | `core.sidebar.sections`    | коллекция      | нет       | `page` — вид открытой страницы       |
 | `core.view.header.actions` | действие       | нет       | `page` — вид открытой страницы       |
 

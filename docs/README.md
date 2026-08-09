@@ -201,6 +201,11 @@
   единый портал и viewport-safe позиционирование для всех popup-компонентов UI Kit.
 - [План портальных всплывающих слоёв UI Kit](superpowers/plans/2026-08-09-ui-kit-portal-overlays.md) —
   последовательные TDD-задачи для общего слоя и миграции всех popup-компонентов.
+- [Заменяемые страницы ядра](superpowers/specs/2026-08-09-replaceable-core-pages-design.md) —
+  обязательный контракт route-level рабочих страниц и перенос всех разделов Settings на
+  replaceable core places.
+- [План заменяемых страниц ядра](superpowers/plans/2026-08-09-replaceable-core-pages.md) —
+  TDD-шаги для публичного реестра мест, HostPlace-композиции и полной проверки.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 
