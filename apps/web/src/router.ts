@@ -331,8 +331,6 @@ export type Navigation = {
   navigate: (target: Location | Page, options?: NavigateOptions) => void;
   /** Возвращает функцию отписки. Кнопка «назад» браузера — такое же событие, как наш переход. */
   subscribe: (listener: (location: Location) => void) => () => void;
-  /** Снимает слушателя истории: брошенный экземпляр иначе канонизирует адрес за спиной живого. */
-  dispose: () => void;
 };
 
 export function createNavigation(target: Window = window): Navigation {
@@ -362,8 +360,6 @@ export function createNavigation(target: Window = window): Navigation {
     }
   };
 
-  target.addEventListener("popstate", announce);
-
   return {
     current: readCurrent,
     navigate: (destination, options) => {
@@ -386,15 +382,23 @@ export function createNavigation(target: Window = window): Navigation {
       announce();
     },
     subscribe: (listener) => {
+      // Слушатель истории живёт ровно столько, сколько есть кому слушать. Привязать его к созданию
+      // навигации нельзя: снять его тогда можно только отдельным вызовом, а `StrictMode`
+      // проигрывает подписку дважды — после первой же отписки кнопка «назад» переставала бы
+      // доезжать до приложения, оставляя адрес и экран разошедшимися.
+      if (listeners.size === 0) {
+        target.addEventListener("popstate", announce);
+      }
+
       listeners.add(listener);
 
       return () => {
         listeners.delete(listener);
+
+        if (listeners.size === 0) {
+          target.removeEventListener("popstate", announce);
+        }
       };
-    },
-    dispose: () => {
-      target.removeEventListener("popstate", announce);
-      listeners.clear();
     },
   };
 }

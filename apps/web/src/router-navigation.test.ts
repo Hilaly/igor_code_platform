@@ -108,17 +108,34 @@ describe("navigation by the full address", () => {
   });
 
   /**
-   * Слушатель `popstate` снимается: `useMemo` под StrictMode создаёт два экземпляра навигации, и
-   * брошенный продолжал бы канонизировать адрес за спиной живого.
+   * Слушатель истории живёт ровно столько, сколько есть кому слушать: он появляется с первой
+   * подпиской и снимается с последней отпиской. Иначе он висел бы на окне навсегда.
    */
-  it("stops listening to history when disposed", () => {
+  it("listens to history only while somebody listens to it", () => {
     const navigation = createNavigation(window);
     const listener = vi.fn();
-    navigation.subscribe(listener);
 
-    navigation.dispose();
+    const unsubscribe = navigation.subscribe(listener);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    unsubscribe();
     window.dispatchEvent(new PopStateEvent("popstate"));
 
-    expect(listener).not.toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * `StrictMode` проигрывает подписку дважды: отписка второго прохода не вправе оставить окно без
+   * слушателя. Ловля живой проверкой — кнопка «назад» меняла адрес, а экран оставался прежним.
+   */
+  it("keeps history reaching the app after a subscription is replayed", () => {
+    const navigation = createNavigation(window);
+    const first = vi.fn();
+    const second = vi.fn();
+
+    navigation.subscribe(first)();
+    navigation.subscribe(second);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });

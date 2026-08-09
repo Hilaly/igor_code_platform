@@ -144,14 +144,7 @@ export function App() {
   useCommandPaletteShortcut(useCallback(() => setCommandsOpen(true), []));
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
-  useEffect(() => {
-    const unsubscribe = navigation.subscribe(setLocation);
-
-    return () => {
-      unsubscribe();
-      navigation.dispose();
-    };
-  }, [navigation]);
+  useEffect(() => navigation.subscribe(setLocation), [navigation]);
 
   // Выбранный проект живёт всё время маршрута новой сессии, чтобы место, форма и контроллер
   // видели один контекст. Уход с маршрута очищает его перед следующим открытием.
