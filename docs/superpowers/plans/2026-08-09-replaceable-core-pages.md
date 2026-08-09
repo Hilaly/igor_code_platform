@@ -18,6 +18,7 @@
 ### Task 1: Define the public rule and core Settings places
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 - Modify: `docs/ui-extension-model.md`
 - Modify: `docs/public-contract.md`
@@ -25,30 +26,31 @@
 - Modify: `packages/protocol/src/places.ts`
 - Test: `packages/protocol/src/places.test.ts`
 
-- [ ] Add a failing assertion that all `settingsSections` have a matching single replaceable core place.
-- [ ] Add `core.settings.appearance`, `core.settings.usage`, `core.settings.daemon`, and `core.settings.diagnostics`.
-- [ ] Document the rule, scope, fallback, and new public place names.
-- [ ] Run protocol tests and confirm the new registry assertion passes.
+- [x] Add a failing assertion that all Settings core places are present and single/replaceable.
+- [x] Add `core.settings.appearance`, `core.settings.usage`, `core.settings.daemon`, and `core.settings.diagnostics`.
+- [x] Document the rule, scope, fallback, and new public place names.
+- [x] Run protocol tests and confirm the new registry assertion passes.
 
 ### Task 2: Route every Settings section through HostPlace
 
 **Files:**
+
 - Modify: `apps/web/src/App.tsx`
-- Modify: `apps/web/src/settings/settings-view.tsx`
 - Test: `apps/web/src/App.test.tsx`
 - Test: `apps/web/src/places/place-host.test.tsx`
 
-- [ ] Add a failing App-level test that a usage replacement receives the canonical Settings context and built-in content is rendered when no replacement exists.
-- [ ] Create one memoized window-wide Settings context and render Appearance, Usage, Daemon, and Diagnostics through `HostPlace` with built-in nodes.
-- [ ] Keep existing Projects, Providers, and Plugins HostPlace behavior unchanged.
-- [ ] Run the targeted web tests with the Node webstorage flag.
+- [x] Add a failing App-level test that Usage receives the canonical Settings context and built-in content through `HostPlace`.
+- [x] Create one memoized window-wide Settings context and render Appearance, Usage, Daemon, and Diagnostics through `HostPlace` with built-in nodes.
+- [x] Keep existing Projects, Providers, and Plugins HostPlace behavior unchanged.
+- [x] Run the targeted web tests with the Node webstorage flag.
 
 ### Task 3: Verify the full contract
 
 **Files:**
+
 - No production files.
 
-- [ ] Run `make check`.
-- [ ] Run `make build`.
-- [ ] Run `git diff --check`.
-- [ ] Inspect the diff and confirm the main checkout remains on `main` while the feature branch is isolated in the worktree.
+- [x] Run `make check`.
+- [x] Run `make build`.
+- [x] Run `git diff --check`.
+- [x] Inspect the diff and confirm the main checkout remains on `main` while the feature branch is isolated in the worktree.

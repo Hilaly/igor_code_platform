@@ -65,6 +65,25 @@ describe("corePlaces", () => {
       [],
     );
   });
+
+  it("publishes every Settings section as a replaceable single place", () => {
+    const expected = [
+      "core.settings.projects",
+      "core.settings.appearance",
+      "core.settings.usage",
+      "core.settings.providers",
+      "core.settings.plugins",
+      "core.settings.daemon",
+      "core.settings.diagnostics",
+    ];
+
+    assert.deepEqual(
+      corePlaces
+        .filter(({ id }) => id.startsWith("core.settings."))
+        .map(({ id, cardinality, replaceable }) => ({ id, cardinality, replaceable })),
+      expected.map((id) => ({ id, cardinality: "single", replaceable: true })),
+    );
+  });
 });
 
 describe("resolvePlaceProvider", () => {

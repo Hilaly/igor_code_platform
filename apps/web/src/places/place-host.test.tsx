@@ -28,7 +28,7 @@ const plugin = (revision: string): PluginStatus => ({
   },
 });
 
-const claim = (): ComponentContributionRegistration => ({
+const claim = (placeId = "core.settings.plugins"): ComponentContributionRegistration => ({
   ownership: "plugin",
   pluginKey: "data:themed",
   pluginId: "themed",
@@ -36,8 +36,42 @@ const claim = (): ComponentContributionRegistration => ({
   kind: "component",
   id: "themed.board",
   declaredId: "board",
-  placeId: "core.settings.plugins",
+  placeId,
   export: "Panel",
+});
+
+it("lets a plugin replace Usage Analytics and falls back to its built-in view", async () => {
+  const imported = vi.fn(() => Promise.resolve({ Panel: () => <p>plugin usage</p> }));
+  const cache = createPluginModuleCache({ importModule: imported });
+  const view = render(
+    <BrowserRuntimeProvider
+      contributions={[claim("core.settings.usage")]}
+      plugins={[plugin("usage-r1")]}
+      onDiagnostic={() => {}}
+      cache={cache}
+    >
+      <HostPlace id="core.settings.usage" context={{}} builtIn={<p>built-in usage</p>} />
+    </BrowserRuntimeProvider>,
+  );
+  const link = stylesheet("usage-r1");
+
+  expect(screen.getByText("built-in usage")).toBeTruthy();
+  link.dispatchEvent(new Event("load"));
+  await flush();
+
+  expect(screen.getByText("plugin usage")).toBeTruthy();
+  view.rerender(
+    <BrowserRuntimeProvider
+      contributions={[]}
+      plugins={[plugin("usage-r1")]}
+      onDiagnostic={() => {}}
+      cache={cache}
+    >
+      <HostPlace id="core.settings.usage" context={{}} builtIn={<p>built-in usage</p>} />
+    </BrowserRuntimeProvider>,
+  );
+
+  expect(screen.getByText("built-in usage")).toBeTruthy();
 });
 
 const flush = async (): Promise<void> => {
