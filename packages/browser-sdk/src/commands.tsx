@@ -16,7 +16,7 @@ import { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from
 import type { ReactNode } from "react";
 
 import { useDiagnosticVoice } from "./diagnostics.ts";
-import type { PluginModuleLoad } from "./host.tsx";
+import type { LoadedPluginModule, PluginModuleCache } from "./host.tsx";
 import {
   BrowserRuntimeContext,
   type BrowserRuntime,
@@ -59,18 +59,28 @@ export type CommandInvoker = {
 export function useCommands(): CommandInvoker {
   const runtime = useContext(BrowserRuntimeContext);
   const say = useDiagnosticVoice(runtime);
+  const runtimeRef = useRef(runtime);
+  const sayRef = useRef(say);
+  runtimeRef.current = runtime;
+  sayRef.current = say;
   /**
    * Ожидающие загрузки вызовы. Размонтирование провайдера обязано их завершить: подписка на кеш
    * оборвётся вместе с ним, и обещание, которое некому исполнить, висело бы вечно.
    */
-  const waiting = useRef(new Set<(load: PluginModuleLoad) => void>());
+  const waiting = useRef(new Set<WaitingCheck>());
+
+  useEffect(() => {
+    for (const check of [...waiting.current]) {
+      check();
+    }
+  }, [runtime]);
 
   useEffect(() => {
     const abandoned = waiting.current;
 
     return () => {
-      for (const settle of [...abandoned]) {
-        settle({ kind: "failed", reason: "the browser runtime went away while the bundle loaded" });
+      for (const check of [...abandoned]) {
+        check("the browser runtime went away while the bundle loaded");
       }
       abandoned.clear();
     };
@@ -78,25 +88,33 @@ export function useCommands(): CommandInvoker {
 
   const invoke = useCallback(
     async (commandId: string, context: PlaceContext = {}): Promise<CommandOutcome> => {
-      if (runtime === undefined) {
+      const current = runtimeRef.current;
+
+      if (current === undefined) {
         return { kind: "unknown" };
       }
 
-      const registration = resolveCommand(commandId, runtime.contributions, context);
+      const registration = resolveCommand(commandId, current.contributions, context);
 
       if (registration === undefined || registration.ownership !== "plugin") {
         return { kind: "unknown" };
       }
 
-      const outcome = await runCommand(runtime, registration, context, waiting.current);
+      let outcome: CommandOutcome;
+
+      try {
+        outcome = await runCommand(runtimeRef, commandId, context, waiting.current);
+      } catch (cause: unknown) {
+        outcome = { kind: "failed", reason: reasonOf(cause) };
+      }
 
       if (outcome.kind === "failed") {
-        say(`the command ${commandId} failed: ${outcome.reason}`);
+        sayRef.current(`the command ${commandId} failed: ${outcome.reason}`);
       }
 
       return outcome;
     },
-    [runtime, say],
+    [],
   );
 
   return { invoke };
@@ -113,11 +131,79 @@ export function useCommandCatalog(context: PlaceContext): CommandContributionReg
 }
 
 async function runCommand(
-  runtime: BrowserRuntime,
-  registration: CommandContributionRegistration & { ownership: "plugin" },
+  runtimeRef: { current: BrowserRuntime | undefined },
+  commandId: string,
   context: PlaceContext,
-  waiting: Set<(load: PluginModuleLoad) => void>,
+  waiting: Set<WaitingCheck>,
 ): Promise<CommandOutcome> {
+  for (;;) {
+    const settled = await settledCommandModule(runtimeRef, commandId, context, waiting);
+
+    if (settled.kind === "failed") {
+      return settled;
+    }
+
+    // Promise continuation is a new microtask. Re-read once more before calling plugin code so a
+    // runtime update between the cache announcement and this continuation cannot revive a revision.
+    const current = inspectCommandModule(runtimeRef.current, commandId, context);
+
+    if (current.kind === "waiting") {
+      continue;
+    }
+    if (current.kind === "failed") {
+      return current;
+    }
+
+    try {
+      const command = current.module[current.registration.export];
+
+      if (!isCommand(command)) {
+        return {
+          kind: "failed",
+          reason: `the plugin ${current.registration.pluginKey} exports no command ${current.registration.export}`,
+        };
+      }
+      if (command.available?.(context) === false) {
+        return { kind: "unavailable" };
+      }
+
+      await command.run(context);
+      return { kind: "done" };
+    } catch (cause: unknown) {
+      return { kind: "failed", reason: reasonOf(cause) };
+    }
+  }
+}
+
+type WaitingCheck = (abandonedReason?: string) => void;
+
+type CommandModuleState =
+  | { kind: "waiting"; cache: PluginModuleCache }
+  | {
+      kind: "loaded";
+      module: LoadedPluginModule;
+      registration: CommandContributionRegistration & { ownership: "plugin" };
+    }
+  | { kind: "failed"; reason: string };
+
+function inspectCommandModule(
+  runtime: BrowserRuntime | undefined,
+  commandId: string,
+  context: PlaceContext,
+): CommandModuleState {
+  if (runtime === undefined) {
+    return { kind: "failed", reason: "the browser runtime went away while the bundle loaded" };
+  }
+
+  const registration = resolveCommand(commandId, runtime.contributions, context);
+
+  if (registration === undefined || registration.ownership !== "plugin") {
+    return {
+      kind: "failed",
+      reason: `the command ${commandId} left the snapshot while its bundle loaded`,
+    };
+  }
+
   const status = runtime.plugins.find((plugin) => plugin.key === registration.pluginKey);
 
   if (status === undefined) {
@@ -127,71 +213,73 @@ async function runCommand(
     };
   }
 
-  const load = await settledModule(runtime, status.key, waiting);
+  const load = runtime.cache.load(status);
 
+  if (load.kind === "loading") {
+    return { kind: "waiting", cache: runtime.cache };
+  }
   if (load.kind === "failed") {
-    return { kind: "failed", reason: load.reason };
+    return load;
   }
 
-  const command = load.module[registration.export];
-
-  if (!isCommand(command)) {
-    return {
-      kind: "failed",
-      reason: `the plugin ${status.key} exports no command ${registration.export}`,
-    };
-  }
-  if (command.available?.(context) === false) {
-    return { kind: "unavailable" };
-  }
-
-  try {
-    await command.run(context);
-  } catch (cause: unknown) {
-    return { kind: "failed", reason: cause instanceof Error ? cause.message : String(cause) };
-  }
-
-  return { kind: "done" };
+  return { kind: "loaded", module: load.module, registration };
 }
 
 /**
- * Дождаться, пока бандл перестанет быть «в пути». Кеш отвечает состоянием, а не обещанием, поэтому
- * ожидание строится на его же подписке — второй загрузчик рядом означал бы второй `import()`.
+ * Дождаться текущей ревизии. Изменение runtime будит check из хука, а смена cache заставляет этот
+ * waiter снять прежнюю подписку и слушать новый экземпляр.
  */
-function settledModule(
-  runtime: BrowserRuntime,
-  pluginKey: string,
-  waiting: Set<(load: PluginModuleLoad) => void>,
-): Promise<Exclude<PluginModuleLoad, { kind: "loading" }>> {
-  const current = (): PluginModuleLoad | undefined => {
-    const status = runtime.plugins.find((plugin) => plugin.key === pluginKey);
-
-    return status === undefined ? undefined : runtime.cache.load(status);
-  };
-  const first = current();
-
-  if (first !== undefined && first.kind !== "loading") {
-    return Promise.resolve(first);
-  }
-
+function settledCommandModule(
+  runtimeRef: { current: BrowserRuntime | undefined },
+  commandId: string,
+  context: PlaceContext,
+  waiting: Set<WaitingCheck>,
+): Promise<Exclude<CommandModuleState, { kind: "waiting" }>> {
   return new Promise((resolve) => {
-    let settle: (load: PluginModuleLoad) => void = () => {};
-    const unsubscribe = runtime.cache.subscribe(() => {
-      const load = current();
+    let subscribedCache: PluginModuleCache | undefined;
+    let unsubscribe = () => {};
+    let finished = false;
 
-      if (load !== undefined && load.kind !== "loading") {
-        settle(load);
+    const finish = (state: Exclude<CommandModuleState, { kind: "waiting" }>): void => {
+      if (finished) {
+        return;
       }
-    });
 
-    settle = (load) => {
-      waiting.delete(settle);
+      finished = true;
+      waiting.delete(check);
       unsubscribe();
-      resolve(
-        load.kind === "loading" ? { kind: "failed", reason: "the bundle never settled" } : load,
-      );
+      resolve(state);
     };
-    waiting.add(settle);
+
+    const check: WaitingCheck = (abandonedReason) => {
+      if (abandonedReason !== undefined) {
+        finish({ kind: "failed", reason: abandonedReason });
+        return;
+      }
+
+      let state: CommandModuleState;
+
+      try {
+        state = inspectCommandModule(runtimeRef.current, commandId, context);
+      } catch (cause: unknown) {
+        finish({ kind: "failed", reason: reasonOf(cause) });
+        return;
+      }
+
+      if (state.kind !== "waiting") {
+        finish(state);
+        return;
+      }
+
+      if (state.cache !== subscribedCache) {
+        unsubscribe();
+        subscribedCache = state.cache;
+        unsubscribe = state.cache.subscribe(check);
+      }
+    };
+
+    waiting.add(check);
+    check();
   });
 }
 
@@ -199,6 +287,10 @@ function isCommand(value: unknown): value is Command {
   return (
     typeof value === "object" && value !== null && typeof (value as Command).run === "function"
   );
+}
+
+function reasonOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 export type CommandButtonProps = {

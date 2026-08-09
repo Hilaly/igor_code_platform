@@ -83,6 +83,35 @@ function readyCache(module: LoadedPluginModule): PluginModuleCache {
   };
 }
 
+function revisionCache(): {
+  cache: PluginModuleCache;
+  settle(status: PluginStatus, module: LoadedPluginModule): void;
+} {
+  const listeners = new Set<() => void>();
+  const loads = new Map<string, PluginModuleLoad>();
+  const keyOf = (status: PluginStatus) => `${status.key}@${status.browser?.revision ?? ""}`;
+  let version = 0;
+
+  return {
+    cache: {
+      load: (status) => loads.get(keyOf(status)) ?? pending,
+      peek: (status) => loads.get(keyOf(status)),
+      version: () => version,
+      retain: () => {},
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      dispose: () => {},
+    },
+    settle(status, module) {
+      loads.set(keyOf(status), { kind: "loaded", module });
+      version += 1;
+      for (const listener of [...listeners]) listener();
+    },
+  };
+}
+
 const command = (
   extra: Partial<
     Pick<CommandContributionRegistration, "id" | "title" | "export" | "placeId" | "order">
@@ -200,6 +229,78 @@ describe("useCommands", () => {
     expect(outcomes).toEqual([{ kind: "done" }]);
   });
 
+  it("follows a rebuild and only runs the current browser revision", async () => {
+    const cache = revisionCache();
+    const r1 = placed;
+    const building: PluginStatus = { ...placed, state: "building", browser: undefined };
+    const r2: PluginStatus = {
+      ...placed,
+      browser: { revision: "r2", entry: "/assets/placed-r2.js" },
+    };
+    const ran: string[] = [];
+    const outcomes: CommandOutcome[] = [];
+    const caller = <Caller onOutcome={(outcome) => outcomes.push(outcome)} />;
+    const view = render(provider(caller, { cache: cache.cache, plugins: [r1] }));
+
+    await call();
+    await act(async () => {
+      view.rerender(provider(caller, { cache: cache.cache, plugins: [building] }));
+    });
+    await act(async () => {
+      cache.settle(r1, { RunCommand: { run: () => ran.push("r1") } });
+    });
+
+    expect(ran).toEqual([]);
+    expect(outcomes).toEqual([]);
+
+    await act(async () => {
+      view.rerender(provider(caller, { cache: cache.cache, plugins: [r2] }));
+    });
+    expect(outcomes).toEqual([]);
+
+    await act(async () => {
+      cache.settle(r2, { RunCommand: { run: () => ran.push("r2") } });
+    });
+
+    expect(ran).toEqual(["r2"]);
+    expect(outcomes).toEqual([{ kind: "done" }]);
+  });
+
+  it("fails a waiting call when its plugin leaves the snapshot", async () => {
+    const cache = revisionCache();
+    const outcomes: CommandOutcome[] = [];
+    const caller = <Caller onOutcome={(outcome) => outcomes.push(outcome)} />;
+    const view = render(provider(caller, { cache: cache.cache }));
+
+    await call();
+    await act(async () => {
+      view.rerender(provider(caller, { cache: cache.cache, plugins: [] }));
+    });
+
+    expect(outcomes).toEqual([
+      { kind: "failed", reason: "the plugin data:placed is not in the snapshot" },
+    ]);
+  });
+
+  it("fails a waiting call when its registration leaves the snapshot", async () => {
+    const cache = revisionCache();
+    const outcomes: CommandOutcome[] = [];
+    const caller = <Caller onOutcome={(outcome) => outcomes.push(outcome)} />;
+    const view = render(provider(caller, { cache: cache.cache }));
+
+    await call();
+    await act(async () => {
+      view.rerender(provider(caller, { cache: cache.cache, contributions: [] }));
+    });
+
+    expect(outcomes).toEqual([
+      {
+        kind: "failed",
+        reason: "the command placed.run left the snapshot while its bundle loaded",
+      },
+    ]);
+  });
+
   /** Обещание, которое некому исполнить, висело бы вечно, и звавший его никогда бы не узнал. */
   it("finishes a call orphaned by the runtime going away", async () => {
     const controllable = controllableCache();
@@ -236,6 +337,28 @@ describe("useCommands", () => {
 
     expect(ran).toEqual([]);
     expect(screen.getByText("unavailable")).toBeTruthy();
+  });
+
+  it("contains an exception thrown by the availability predicate", async () => {
+    const diagnostics: string[] = [];
+
+    render(
+      provider(<Caller />, {
+        cache: readyCache({
+          RunCommand: {
+            run: () => {},
+            available: () => {
+              throw new Error("availability broke");
+            },
+          },
+        }),
+        onDiagnostic: (text) => diagnostics.push(text),
+      }),
+    );
+    await call();
+
+    expect(screen.getByText("failed")).toBeTruthy();
+    expect(diagnostics).toEqual(["the command placed.run failed: availability broke"]);
   });
 
   it("calls a command unknown when nobody declared it", async () => {
