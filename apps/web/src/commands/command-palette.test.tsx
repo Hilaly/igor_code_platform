@@ -74,11 +74,16 @@ function palette(
       plugins={[placed]}
       onDiagnostic={() => {}}
       cache={{
-        moduleOf: (status) => {
+        load: (status) => {
           asked.push(status.key);
 
           return loadedModule({ RunCommand: { run: () => ran.push("plugin command") } });
         },
+        peek: () =>
+          loadedModule({
+            RunCommand: { run: () => ran.push("plugin command") },
+          }),
+        version: () => 0,
         retain: () => {},
         subscribe: () => () => {},
         dispose: () => {},

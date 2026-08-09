@@ -47,10 +47,13 @@ function controllableCache(): {
 } {
   const listeners = new Set<() => void>();
   let load: PluginModuleLoad = pending;
+  let version = 0;
 
   return {
     cache: {
-      moduleOf: () => load,
+      load: () => load,
+      peek: () => load,
+      version: () => version,
       retain: () => {},
       subscribe: (listener) => {
         listeners.add(listener);
@@ -61,6 +64,7 @@ function controllableCache(): {
     },
     settle(next) {
       load = next;
+      version += 1;
       for (const listener of [...listeners]) listener();
     },
   };
@@ -70,7 +74,9 @@ function readyCache(module: LoadedPluginModule): PluginModuleCache {
   const load: PluginModuleLoad = { kind: "loaded", module };
 
   return {
-    moduleOf: () => load,
+    load: () => load,
+    peek: () => load,
+    version: () => 0,
     retain: () => {},
     subscribe: () => () => {},
     dispose: () => {},

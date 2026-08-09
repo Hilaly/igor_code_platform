@@ -35,7 +35,9 @@ export type PluginModuleLoad =
   | { kind: "failed"; reason: string };
 
 export type PluginModuleCache = {
-  moduleOf(status: PluginStatus): PluginModuleLoad;
+  load(status: PluginStatus): PluginModuleLoad;
+  peek(status: PluginStatus): PluginModuleLoad | undefined;
+  version(): number;
   retain(statuses: readonly PluginStatus[]): void;
   subscribe(listener: () => void): () => void;
   dispose(): void;
@@ -288,7 +290,7 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
   const say = useDiagnosticVoice(runtime);
   const status = runtime?.plugins.find((plugin) => plugin.key === reference.pluginKey);
   const load = useSyncExternalStore(runtime?.cache.subscribe ?? emptySubscribe, () =>
-    runtime === undefined || status === undefined ? undefined : runtime.cache.moduleOf(status),
+    runtime === undefined || status === undefined ? undefined : runtime.cache.load(status),
   );
   const exported = load?.kind === "loaded" ? load.module[reference.exportName] : undefined;
   const complaint =

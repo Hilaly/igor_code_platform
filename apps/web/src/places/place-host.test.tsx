@@ -111,7 +111,7 @@ it("removes a real plugin stylesheet when the SDK adapter provider unmounts", as
   await flush();
 
   expect(document.head.querySelector("link[data-sovereign-plugin]")).toBeNull();
-  expect(cache.moduleOf(plugin("r1"))).toEqual({ kind: "loading" });
+  expect(cache.load(plugin("r1"))).toEqual({ kind: "loading" });
 });
 
 it("isolates a late callback from an old adapter mount", async () => {

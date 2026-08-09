@@ -51,11 +51,13 @@ function cache(modules: Record<string, LoadedPluginModule> = {}): {
   return {
     asked,
     cache: {
-      moduleOf(status): PluginModuleLoad {
+      load(status): PluginModuleLoad {
         asked.push(status.key);
 
         return loads.get(status.key) ?? pending;
       },
+      peek: (status) => loads.get(status.key),
+      version: () => 0,
       retain: () => {},
       subscribe: () => () => {},
       dispose: () => {},

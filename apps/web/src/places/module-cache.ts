@@ -35,7 +35,7 @@ export type PluginModuleCacheOptions = {
 };
 
 /**
- * Ответ «бандла ещё нет» один на всех и постоянный. Постоянный — потому что `moduleOf` зовётся из
+ * Ответ «бандла ещё нет» один на всех и постоянный. Постоянный — потому что `load` зовётся из
  * отрисовки через `useSyncExternalStore`, а тот сверяет ответы по ссылке: новый объект на каждый
  * вызов означает бесконечный цикл перерисовок.
  */
@@ -54,6 +54,7 @@ export function createPluginModuleCache(options: PluginModuleCacheOptions = {}):
   const listeners = new Set<() => void>();
   const ownedStylesheets = new Set<HTMLLinkElement>();
   let disposed = false;
+  let publishedVersion = 0;
 
   const removeStylesheet = (link: HTMLLinkElement): void => {
     ownedStylesheets.delete(link);
@@ -77,6 +78,8 @@ export function createPluginModuleCache(options: PluginModuleCacheOptions = {}):
     if (disposed) {
       return;
     }
+
+    publishedVersion += 1;
 
     for (const listener of [...listeners]) {
       if (disposed) {
@@ -185,7 +188,7 @@ export function createPluginModuleCache(options: PluginModuleCacheOptions = {}):
   };
 
   return {
-    moduleOf: (status) => {
+    load: (status) => {
       if (disposed) {
         return pendingModule;
       }
@@ -203,6 +206,16 @@ export function createPluginModuleCache(options: PluginModuleCacheOptions = {}):
 
       return (known?.revision === assets.revision ? known : begin(status.key, assets)).load;
     },
+    peek: (status) => {
+      if (disposed || status.browser === undefined) {
+        return undefined;
+      }
+
+      const known = entries.get(status.key);
+
+      return known?.revision === status.browser.revision ? known.load : undefined;
+    },
+    version: () => publishedVersion,
     retain: (statuses) => {
       if (disposed) {
         return;
@@ -214,11 +227,18 @@ export function createPluginModuleCache(options: PluginModuleCacheOptions = {}):
           .map((status) => stylesheetKey(status.key, status.browser?.revision ?? "")),
       );
 
+      let removed = false;
+
       for (const [pluginKey, entry] of [...entries]) {
         if (!alive.has(stylesheetKey(pluginKey, entry.revision))) {
           entries.delete(pluginKey);
           removeStylesheets(pluginKey);
+          removed = true;
         }
+      }
+
+      if (removed) {
+        announce();
       }
     },
     subscribe: (listener) => {

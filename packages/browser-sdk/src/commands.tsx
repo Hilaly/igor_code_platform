@@ -166,7 +166,7 @@ function settledModule(
   const current = (): PluginModuleLoad | undefined => {
     const status = runtime.plugins.find((plugin) => plugin.key === pluginKey);
 
-    return status === undefined ? undefined : runtime.cache.moduleOf(status);
+    return status === undefined ? undefined : runtime.cache.load(status);
   };
   const first = current();
 
@@ -223,7 +223,7 @@ export function CommandButton({ registration, context }: CommandButtonProps): Re
       ? runtime?.plugins.find((plugin) => plugin.key === registration.pluginKey)
       : undefined;
   const load = useSyncExternalStore(runtime?.cache.subscribe ?? emptySubscribe, () =>
-    runtime === undefined || status === undefined ? undefined : runtime.cache.moduleOf(status),
+    runtime === undefined || status === undefined ? undefined : runtime.cache.load(status),
   );
   const exported = load?.kind === "loaded" ? load.module[registration.export] : undefined;
   const unavailable = isCommand(exported) && exported.available?.(context) === false;

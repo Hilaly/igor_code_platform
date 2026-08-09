@@ -56,16 +56,53 @@ const deferred = <T>() => {
 };
 
 describe("createPluginModuleCache", () => {
+  it("keeps passive reads separate from loading and versions published changes", async () => {
+    const module: LoadedPluginModule = { Panel: () => null };
+    const importModule = vi.fn(() => Promise.resolve(module));
+    const cache = createPluginModuleCache({ importModule, document: freshDocument() });
+
+    expect(cache.peek(running("r1"))).toBeUndefined();
+    expect(importModule).not.toHaveBeenCalled();
+
+    const before = cache.version();
+    expect(cache.load(running("r1"))).toEqual({ kind: "loading" });
+    expect(cache.version()).toBe(before);
+
+    await settled();
+
+    expect(cache.version()).toBeGreaterThan(before);
+    expect(cache.peek(running("r1"))).toEqual({ kind: "loaded", module });
+  });
+
+  it("publishes removals without restarting an obsolete revision", async () => {
+    const importModule = vi.fn(() => Promise.resolve({}));
+    const listener = vi.fn();
+    const cache = createPluginModuleCache({ importModule, document: freshDocument() });
+
+    cache.subscribe(listener);
+    cache.load(running("r1"));
+    await settled();
+    const beforeRemoval = cache.version();
+    listener.mockClear();
+
+    cache.retain([]);
+
+    expect(cache.version()).toBeGreaterThan(beforeRemoval);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(cache.peek(running("r1"))).toBeUndefined();
+    expect(importModule).toHaveBeenCalledTimes(1);
+  });
+
   it("imports the bundle once and keeps the module for later renders", async () => {
     const module: LoadedPluginModule = { Panel: () => null };
     const importModule = vi.fn(() => Promise.resolve(module));
     const cache = createPluginModuleCache({ importModule, document: freshDocument() });
 
-    expect(cache.moduleOf(running("r1"))).toEqual({ kind: "loading" });
+    expect(cache.load(running("r1"))).toEqual({ kind: "loading" });
     await settled();
 
-    expect(cache.moduleOf(running("r1"))).toEqual({ kind: "loaded", module });
-    expect(cache.moduleOf(running("r1"))).toEqual({ kind: "loaded", module });
+    expect(cache.load(running("r1"))).toEqual({ kind: "loaded", module });
+    expect(cache.load(running("r1"))).toEqual({ kind: "loaded", module });
     expect(importModule).toHaveBeenCalledTimes(1);
   });
 
@@ -74,12 +111,12 @@ describe("createPluginModuleCache", () => {
     const importModule = vi.fn((address: string) => Promise.resolve({ address }));
     const cache = createPluginModuleCache({ importModule, document: freshDocument() });
 
-    cache.moduleOf(running("r1"));
+    cache.load(running("r1"));
     await settled();
-    cache.moduleOf(running("r2"));
+    cache.load(running("r2"));
     await settled();
 
-    expect(cache.moduleOf(running("r2"))).toEqual({
+    expect(cache.load(running("r2"))).toEqual({
       kind: "loaded",
       module: { address: "/plugin-assets/data%3Athemed/r2/browser.js" },
     });
@@ -94,7 +131,7 @@ describe("createPluginModuleCache", () => {
     });
 
     cache.subscribe(listener);
-    cache.moduleOf(running("r1"));
+    cache.load(running("r1"));
     await settled();
 
     expect(listener).toHaveBeenCalled();
@@ -108,16 +145,16 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     await settled();
 
     // Модуль ещё не отдан: первый кадр чужого компонента не должен ехать без оформления.
-    expect(cache.moduleOf(styled)).toEqual({ kind: "loading" });
+    expect(cache.load(styled)).toEqual({ kind: "loading" });
 
     loadSheet(sheet(target, "r1"));
     await settled();
 
-    expect(cache.moduleOf(styled).kind).toBe("loaded");
+    expect(cache.load(styled).kind).toBe("loaded");
   });
 
   /** Два листа одного плагина одинаково специфичны, и побеждал бы порядок вставки. */
@@ -128,13 +165,13 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     loadSheet(sheet(target, "r1"));
     await settled();
 
     expect(sheets(target)).toEqual(["data:themed@r1"]);
 
-    cache.moduleOf(running("r2", "/assets/r2.css"));
+    cache.load(running("r2", "/assets/r2.css"));
 
     // Прежний лист ещё на месте: снятый до загрузки нового, он заставил бы место мигнуть.
     expect(sheets(target)).toEqual(["data:themed@r1", "data:themed@r2"]);
@@ -152,9 +189,9 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     const r1 = sheet(target, "r1");
-    cache.moduleOf(running("r2", "/assets/r2.css"));
+    cache.load(running("r2", "/assets/r2.css"));
     const r2 = sheet(target, "r2");
 
     loadSheet(r2);
@@ -172,9 +209,9 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     const r1 = sheet(target, "r1");
-    cache.moduleOf(running("r2", "/assets/r2.css"));
+    cache.load(running("r2", "/assets/r2.css"));
     const r2 = sheet(target, "r2");
 
     loadSheet(r1);
@@ -194,12 +231,12 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     failSheet(sheet(target, "r1"));
     await settled();
 
     expect(sheets(target)).toEqual([]);
-    expect(cache.moduleOf(styled).kind).toBe("failed");
+    expect(cache.load(styled).kind).toBe("failed");
   });
 
   it("removes the stylesheet when the module import fails", async () => {
@@ -211,14 +248,14 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     loadSheet(sheet(target, "r1"));
     await settled();
     imported.reject(new Error("404 stale revision"));
     await settled();
 
     expect(sheets(target)).toEqual([]);
-    expect(cache.moduleOf(styled)).toEqual({
+    expect(cache.load(styled)).toEqual({
       kind: "failed",
       reason: "404 stale revision",
     });
@@ -231,9 +268,9 @@ describe("createPluginModuleCache", () => {
       document: target,
     });
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     const r1 = sheet(target, "r1");
-    cache.moduleOf(running("r2", "/assets/r2.css"));
+    cache.load(running("r2", "/assets/r2.css"));
     const r2 = sheet(target, "r2");
     loadSheet(r2);
     await settled();
@@ -248,10 +285,10 @@ describe("createPluginModuleCache", () => {
     const importModule = vi.fn(() => Promise.reject(new Error("404 stale revision")));
     const cache = createPluginModuleCache({ importModule, document: freshDocument() });
 
-    cache.moduleOf(running("r1"));
+    cache.load(running("r1"));
     await settled();
 
-    expect(cache.moduleOf(running("r1"))).toEqual({
+    expect(cache.load(running("r1"))).toEqual({
       kind: "failed",
       reason: "404 stale revision",
     });
@@ -270,8 +307,8 @@ describe("createPluginModuleCache", () => {
     });
     const withoutBundle: PluginStatus = { ...running("r1"), browser: undefined };
 
-    expect(cache.moduleOf(withoutBundle)).toEqual({ kind: "loading" });
-    expect(cache.moduleOf(withoutBundle)).toBe(cache.moduleOf(withoutBundle));
+    expect(cache.load(withoutBundle)).toEqual({ kind: "loading" });
+    expect(cache.load(withoutBundle)).toBe(cache.load(withoutBundle));
   });
 
   /** Та же сверка по ссылке: пока бандл едет, ответ обязан оставаться прежним объектом. */
@@ -281,7 +318,7 @@ describe("createPluginModuleCache", () => {
       document: freshDocument(),
     });
 
-    expect(cache.moduleOf(running("r1"))).toBe(cache.moduleOf(running("r1")));
+    expect(cache.load(running("r1"))).toBe(cache.load(running("r1")));
   });
 
   it("forgets a plugin that left the snapshot, and takes its stylesheet with it", async () => {
@@ -289,7 +326,7 @@ describe("createPluginModuleCache", () => {
     const importModule = vi.fn(() => Promise.resolve({}));
     const cache = createPluginModuleCache({ importModule, document: target });
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     loadSheet(sheet(target, "r1"));
     await settled();
 
@@ -297,7 +334,7 @@ describe("createPluginModuleCache", () => {
 
     expect(sheets(target)).toEqual([]);
 
-    cache.moduleOf(running("r1", "/assets/r1.css"));
+    cache.load(running("r1", "/assets/r1.css"));
     loadSheet(sheet(target, "r1"));
     await settled();
 
@@ -308,11 +345,11 @@ describe("createPluginModuleCache", () => {
     const importModule = vi.fn(() => Promise.resolve({}));
     const cache = createPluginModuleCache({ importModule, document: freshDocument() });
 
-    cache.moduleOf(running("r1"));
+    cache.load(running("r1"));
     await settled();
     cache.retain([running("r1")]);
 
-    expect(cache.moduleOf(running("r1")).kind).toBe("loaded");
+    expect(cache.load(running("r1")).kind).toBe("loaded");
     expect(importModule).toHaveBeenCalledTimes(1);
   });
 
@@ -323,10 +360,10 @@ describe("createPluginModuleCache", () => {
     const styled = running("r1", "/assets/r1.css");
     const cache = createPluginModuleCache({ importModule, document: target });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     const oldLink = sheet(target, "r1");
     cache.retain([]);
-    cache.moduleOf(styled);
+    cache.load(styled);
     const newLink = sheet(target, "r1");
 
     loadSheet(oldLink);
@@ -334,14 +371,14 @@ describe("createPluginModuleCache", () => {
 
     expect(newLink.isConnected).toBe(true);
     expect(importModule).not.toHaveBeenCalled();
-    expect(cache.moduleOf(styled).kind).toBe("loading");
+    expect(cache.load(styled).kind).toBe("loading");
 
     loadSheet(newLink);
     await settled();
 
     expect(newLink.isConnected).toBe(true);
     expect(importModule).toHaveBeenCalledTimes(1);
-    expect(cache.moduleOf(styled)).toEqual({ kind: "loaded", module });
+    expect(cache.load(styled)).toEqual({ kind: "loaded", module });
   });
 
   it("ignores a late stylesheet error from a forgotten copy of the same revision", async () => {
@@ -351,10 +388,10 @@ describe("createPluginModuleCache", () => {
     const styled = running("r1", "/assets/r1.css");
     const cache = createPluginModuleCache({ importModule, document: target });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     const oldLink = sheet(target, "r1");
     cache.retain([]);
-    cache.moduleOf(styled);
+    cache.load(styled);
     const newLink = sheet(target, "r1");
 
     failSheet(oldLink);
@@ -362,14 +399,14 @@ describe("createPluginModuleCache", () => {
 
     expect(newLink.isConnected).toBe(true);
     expect(importModule).not.toHaveBeenCalled();
-    expect(cache.moduleOf(styled).kind).toBe("loading");
+    expect(cache.load(styled).kind).toBe("loading");
 
     loadSheet(newLink);
     await settled();
 
     expect(newLink.isConnected).toBe(true);
     expect(importModule).toHaveBeenCalledTimes(1);
-    expect(cache.moduleOf(styled)).toEqual({ kind: "loaded", module });
+    expect(cache.load(styled)).toEqual({ kind: "loaded", module });
   });
 
   it("ignores an import settled by a forgotten copy of the same revision", async () => {
@@ -383,20 +420,20 @@ describe("createPluginModuleCache", () => {
     const styled = running("r1", "/assets/r1.css");
     const cache = createPluginModuleCache({ importModule, document: target });
 
-    cache.moduleOf(styled);
+    cache.load(styled);
     loadSheet(sheet(target, "r1"));
     await settled();
     expect(importModule).toHaveBeenCalledTimes(1);
 
     cache.retain([]);
-    cache.moduleOf(styled);
+    cache.load(styled);
     const newLink = sheet(target, "r1");
 
     imports[0]?.resolve({ obsolete: true });
     await settled();
 
     expect(newLink.isConnected).toBe(true);
-    expect(cache.moduleOf(styled).kind).toBe("loading");
+    expect(cache.load(styled).kind).toBe("loading");
 
     loadSheet(newLink);
     await settled();
@@ -405,7 +442,7 @@ describe("createPluginModuleCache", () => {
     imports[1]?.resolve(module);
     await settled();
 
-    expect(cache.moduleOf(styled)).toEqual({ kind: "loaded", module });
+    expect(cache.load(styled)).toEqual({ kind: "loaded", module });
   });
 
   it("disposes its stylesheets idempotently without touching a new cache", async () => {
@@ -413,7 +450,7 @@ describe("createPluginModuleCache", () => {
     const oldImport = vi.fn(() => Promise.resolve({}));
     const oldCache = createPluginModuleCache({ importModule: oldImport, document: target });
 
-    oldCache.moduleOf(running("r1", "/assets/r1.css"));
+    oldCache.load(running("r1", "/assets/r1.css"));
     const oldLink = sheet(target, "r1");
     oldCache.dispose();
     oldCache.dispose();
@@ -421,7 +458,7 @@ describe("createPluginModuleCache", () => {
 
     const newImport = vi.fn(() => Promise.resolve({}));
     const newCache = createPluginModuleCache({ importModule: newImport, document: target });
-    newCache.moduleOf(running("r2", "/assets/r2.css"));
+    newCache.load(running("r2", "/assets/r2.css"));
     const newLink = sheet(target, "r2");
 
     loadSheet(oldLink);
@@ -443,7 +480,7 @@ describe("createPluginModuleCache", () => {
     });
 
     cache.subscribe(listener);
-    cache.moduleOf(running("r1"));
+    cache.load(running("r1"));
     await settled();
     expect(importModule).toHaveBeenCalledTimes(1);
 
@@ -460,8 +497,8 @@ describe("createPluginModuleCache", () => {
 
     cache.dispose();
 
-    expect(cache.moduleOf(running("r1"))).toBe(cache.moduleOf(running("r1")));
-    expect(cache.moduleOf(running("r1"))).toEqual({ kind: "loading" });
+    expect(cache.load(running("r1"))).toBe(cache.load(running("r1")));
+    expect(cache.load(running("r1"))).toEqual({ kind: "loading" });
     expect(importModule).not.toHaveBeenCalled();
   });
 });
