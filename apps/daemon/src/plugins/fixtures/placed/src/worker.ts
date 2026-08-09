@@ -68,5 +68,11 @@ export const activate = async (): Promise<void> => {
     order: 2,
   });
 
+  await contribute.page({
+    id: "log",
+    title: "Log of the placed plugin",
+    export: "LogPage",
+  });
+
   await log.info("the placed plugin is active");
 };
