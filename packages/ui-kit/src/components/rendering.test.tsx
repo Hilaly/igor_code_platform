@@ -772,11 +772,14 @@ describe("text that is still arriving", () => {
     expect(finished).not.toContain("aria-hidden");
   });
 
-  it("keeps the line breaks the model sent", () => {
-    // Разметки здесь нет вовсе, и переводы строк — единственное, чем текст структурирован.
-    const markup = renderToStaticMarkup(<StreamingText text={"первая\nвторая"} streaming />);
+  it("renders markdown while the model is still sending text", () => {
+    const markup = renderToStaticMarkup(
+      <StreamingText text={"**жирный**\n\n- первый\n- второй"} streaming />,
+    );
 
-    expect(markup).toContain("первая\nвторая");
+    expect(markup).toContain("<strong>жирный</strong>");
+    expect(markup).toContain("<ul>");
+    expect(markup).toContain("<li>первый</li>");
   });
 });
 

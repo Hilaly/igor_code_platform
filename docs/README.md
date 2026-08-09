@@ -210,6 +210,10 @@
   replaceable core places.
 - [План заменяемых страниц ядра](superpowers/plans/2026-08-09-replaceable-core-pages.md) —
   TDD-шаги для публичного реестра мест, HostPlace-композиции и полной проверки.
+- [Live-рендеринг сессии и Markdown](superpowers/specs/2026-08-09-session-live-markdown-rendering-design.md) —
+  ограниченная колонка live tool call и немедленный Markdown для reasoning и ответа агента.
+- [План live-рендеринга сессии](superpowers/plans/2026-08-09-session-live-markdown-rendering.md) —
+  TDD-срез для live tool call, reasoning и стримингового Markdown.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 

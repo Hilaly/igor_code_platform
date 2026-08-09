@@ -497,7 +497,7 @@ function ContentBlock(props: {
     // Свёрнуто: размышления бывают длиннее самого ответа, и разворачивает их тот, кому интересно.
     return (
       <Disclosure summary={t("chat.reasoning")}>
-        <Text tone="muted">{block.text}</Text>
+        <Markdown text={block.text} />
       </Disclosure>
     );
   }
@@ -529,14 +529,16 @@ function LiveMessage(props: { item: StreamedItem; translator: ScopedTranslator }
     const status = !item.done ? "running" : item.failed === true ? "failed" : "done";
 
     return (
-      <ToolCall
-        icon="◇"
-        toolName={item.toolName}
-        summary={toolSummary(item.toolName, item.input)}
-        status={status}
-        statusLabel={t(`chat.tool.${status}`)}
-        argumentsText={JSON.stringify(item.input, undefined, 2) ?? ""}
-      />
+      <Message role="agent">
+        <ToolCall
+          icon="◇"
+          toolName={item.toolName}
+          summary={toolSummary(item.toolName, item.input)}
+          status={status}
+          statusLabel={t(`chat.tool.${status}`)}
+          argumentsText={JSON.stringify(item.input, undefined, 2) ?? ""}
+        />
+      </Message>
     );
   }
 
@@ -544,13 +546,9 @@ function LiveMessage(props: { item: StreamedItem; translator: ScopedTranslator }
     <Message role={item.role === "user" ? "human" : "agent"}>
       {item.reasoning === "" ? undefined : (
         <Disclosure summary={t("chat.reasoning")}>
-          <Text tone="muted">{item.reasoning}</Text>
+          <Markdown text={item.reasoning} />
         </Disclosure>
       )}
-      {/*
-       * Дописанное сообщение показывается размёткой, идущее — плоским текстом: разбор markdown на
-       * каждой дельте заставлял бы ответ прыгать на каждом токене (docs/ui-kit.md).
-       */}
       {item.done ? (
         <Markdown text={item.text} />
       ) : (
