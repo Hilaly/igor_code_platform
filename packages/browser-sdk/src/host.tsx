@@ -8,7 +8,6 @@ import {
   type PluginStatus,
 } from "@sovereign/protocol";
 import {
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -18,6 +17,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { CommandButton } from "./commands.tsx";
+import { useDiagnosticVoice } from "./diagnostics.ts";
 import { boundaryKey, InstanceBoundary } from "./instance-boundary.tsx";
 import {
   BrowserRuntimeContext,
@@ -246,8 +247,14 @@ function CollectionPlace({
   return (
     <>
       {orderPlaceContributions(id, runtime.contributions, context).map((registration) => {
-        // Кнопку команды рисует отдельная ветка; здесь — только вклады с содержимым.
-        const reference = registration.kind === "component" ? referenceOf(registration) : undefined;
+        // Команда содержимого не даёт: за неё в полосе стоит кнопка с заголовком из снимка.
+        if (registration.kind === "command") {
+          return (
+            <CommandButton key={registration.id} registration={registration} context={context} />
+          );
+        }
+
+        const reference = referenceOf(registration);
 
         return reference === undefined ? null : (
           <PlaceInstance
@@ -327,20 +334,4 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
 
 function emptySubscribe(): () => void {
   return () => {};
-}
-
-function useDiagnosticVoice(runtime: BrowserRuntime | undefined): (text: string) => void {
-  const named = useRef(new Set<string>());
-
-  return useCallback(
-    (text: string) => {
-      if (runtime === undefined || named.current.has(text)) {
-        return;
-      }
-
-      named.current.add(text);
-      runtime.onDiagnostic(text);
-    },
-    [runtime],
-  );
 }

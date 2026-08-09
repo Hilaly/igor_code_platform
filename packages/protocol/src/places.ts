@@ -12,6 +12,7 @@
 
 import {
   projectOfContribution,
+  type CommandContributionRegistration,
   type ComponentContributionRegistration,
   type ContributionRegistration,
   type PlacedContributionRegistration,
@@ -148,6 +149,28 @@ export function contributionsForPlace(
   );
 }
 
+/**
+ * Команда по идентификатору в этом контексте. Живёт рядом с местами, а не отдельно: адрес команды
+ * разрешается **теми же** правилами контекста и ранга источника, и второй набор этих правил разошёлся
+ * бы с первым при первой же правке.
+ *
+ * Команду зовут и по чужому идентификатору — так же, как ссылаются на чужое место.
+ */
+export function resolveCommand(
+  commandId: string,
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): CommandContributionRegistration | undefined {
+  const commands = contributions.filter(
+    (registration): registration is CommandContributionRegistration =>
+      registration.kind === "command",
+  );
+
+  return registrationsForContext(commands, context).find(
+    (registration) => registration.id === commandId,
+  );
+}
+
 export function resolvePlaceProvider(
   placeId: string,
   contributions: readonly ContributionRegistration[],
@@ -204,6 +227,8 @@ function byIdentifier(
 function registrationsForContext<
   T extends PlaceContributionRegistration | PlacedContributionRegistration,
 >(registrations: readonly T[], context: PlaceContext): T[] {
+  // Спор равного ранга снимает всех претендентов на идентификатор — то же правило, что у вкладов в
+  // реестре: молча выбранный победитель зависел бы от порядка обхода.
   const applicable = registrations.filter((registration) => {
     const project = projectOfContribution(registration);
 

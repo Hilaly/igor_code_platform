@@ -9,8 +9,13 @@ import { Place, PlaceCollection, PlaceTabs, type PlaceContext } from "./index.ts
 
 afterEach(cleanup);
 
-it("exports only the public place components at runtime", () => {
-  expect(Object.keys(browserSdk).sort()).toEqual(["Place", "PlaceCollection", "PlaceTabs"]);
+it("exports only the public places and the command invoker at runtime", () => {
+  expect(Object.keys(browserSdk).sort()).toEqual([
+    "Place",
+    "PlaceCollection",
+    "PlaceTabs",
+    "useCommands",
+  ]);
 });
 
 it("keeps its public place context structurally compatible with the protocol", () => {
