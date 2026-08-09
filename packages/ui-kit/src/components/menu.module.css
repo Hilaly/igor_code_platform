@@ -59,36 +59,19 @@
   border-color: var(--sovereign-accent-border);
 }
 .menu {
-  position: absolute;
-  top: calc(100% + var(--sovereign-space-1));
-  left: 0;
-  z-index: var(--sovereign-z-overlay);
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
-  min-width: 100%;
+  width: max-content;
   padding: var(--sovereign-space-1);
   background: var(--sovereign-panel-surface);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-sm);
   box-shadow: var(--sovereign-elevation-2);
 }
-.menu.above {
-  top: auto;
-  bottom: calc(100% + var(--sovereign-space-1));
-}
-.menu.portal {
-  position: fixed;
-  top: auto;
-  left: auto;
-  width: max-content;
+.menu.compactMenu {
   min-width: 0;
   max-width: calc(100vw - var(--sovereign-space-4));
-  margin-top: var(--sovereign-space-1);
-}
-.menu.portal.above {
-  bottom: auto;
-  margin-top: calc(var(--sovereign-space-1) * -1);
 }
 .item {
   display: flex;

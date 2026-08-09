@@ -332,7 +332,7 @@ describe("the NextTurnPicker", () => {
     });
   });
 
-  it("clamps top-facing content at the top viewport gap", async () => {
+  it("flips top-facing content below when the opposite side has more room", async () => {
     render(
       <Popover side="top" viewportSafe trigger="Probe" ariaLabel="Probe">
         <div>Content</div>
@@ -366,10 +366,13 @@ describe("the NextTurnPicker", () => {
       toJSON: () => ({}),
     });
     fireEvent.resize(window);
-    await waitFor(() => expect(Number.parseFloat(content.style.top)).toBe(8));
+    await waitFor(() => {
+      expect(content.getAttribute("data-side")).toBe("bottom");
+      expect(Number.parseFloat(content.style.top)).toBe(28);
+    });
   });
 
-  it("clamps bottom-facing content at the bottom viewport gap", async () => {
+  it("flips bottom-facing content above when the opposite side has more room", async () => {
     render(
       <Popover side="bottom" viewportSafe trigger="Probe" ariaLabel="Probe">
         <div>Content</div>
@@ -403,7 +406,10 @@ describe("the NextTurnPicker", () => {
       toJSON: () => ({}),
     });
     fireEvent.resize(window);
-    await waitFor(() => expect(Number.parseFloat(content.style.top)).toBe(62));
+    await waitFor(() => {
+      expect(content.getAttribute("data-side")).toBe("top");
+      expect(Number.parseFloat(content.style.top)).toBe(52);
+    });
   });
 
   it("opens provider-grouped model submenu and preserves lazy expansion callback", () => {

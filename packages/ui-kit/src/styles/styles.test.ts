@@ -419,14 +419,12 @@ describe("stylesheets of the kit", () => {
     expect(nextTurnCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 
-  it("leaves compact Menu portal coordinates to the inline positioning contract", () => {
+  it("leaves Menu portal coordinates to the shared floating layer", () => {
     const menuCss = withoutComments(
       readFileSync(join(kitRoot, "components", "menu.module.css"), "utf8"),
     );
 
-    expect(menuCss).toMatch(
-      /\.menu\.portal\s*\{[^}]*position:\s*fixed;[^}]*top:\s*auto;[^}]*left:\s*auto;/s,
-    );
+    expect(menuCss).not.toMatch(/\.menu\s*\{[^}]*position:\s*(?:absolute|fixed);/s);
     expect(menuCss).not.toMatch(/var\(--menu-(?:top|left)/);
   });
 

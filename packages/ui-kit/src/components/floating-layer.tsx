@@ -6,6 +6,7 @@ import {
   useState,
   type AriaRole,
   type CSSProperties,
+  type PointerEventHandler,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -22,12 +23,15 @@ export type FloatingLayerProps = {
   side?: FloatingLayerSide;
   matchAnchorWidth?: boolean;
   offset?: number;
+  narrowBelow?: boolean;
   id?: string;
   role?: AriaRole;
   ariaLabel?: string;
   ariaMultiselectable?: boolean;
   className?: string;
   layerRef?: RefObject<HTMLDivElement | null>;
+  onPointerEnter?: PointerEventHandler<HTMLDivElement>;
+  onPointerLeave?: PointerEventHandler<HTMLDivElement>;
 };
 
 type LayerGeometry = {
@@ -95,6 +99,7 @@ function geometry(
   return {
     side,
     style: {
+      position: "fixed",
       left: `${clamp(rawLeft, viewportGutter, viewportWidth - width - viewportGutter)}px`,
       top: `${clamp(rawTop, viewportGutter, viewportHeight - height - viewportGutter)}px`,
       maxWidth: `${maxWidth}px`,
@@ -111,12 +116,15 @@ export function FloatingLayer({
   side = "bottom",
   matchAnchorWidth = false,
   offset = 4,
+  narrowBelow = false,
   id,
   role,
   ariaLabel,
   ariaMultiselectable,
   className,
   layerRef: externalLayerRef,
+  onPointerEnter,
+  onPointerLeave,
 }: FloatingLayerProps) {
   const internalLayerRef = useRef<HTMLDivElement | null>(null);
   const layerRef = externalLayerRef ?? internalLayerRef;
@@ -127,15 +135,21 @@ export function FloatingLayer({
       setResolved(undefined);
       return;
     }
-    const anchor = anchorRef.current;
-    const layer = layerRef.current;
-    const ownerWindow = anchor?.ownerDocument.defaultView;
-    if (!anchor || !layer || !ownerWindow) return;
+    const ownerWindow =
+      anchorRef.current?.ownerDocument.defaultView ??
+      (typeof document === "undefined" ? undefined : document.defaultView);
+    if (!ownerWindow) return;
+    let active = true;
 
     const update = () => {
+      const anchor = anchorRef.current;
+      const layer = layerRef.current;
+      if (!active || !anchor || !layer) return;
       setResolved(
         geometry(
-          side,
+          narrowBelow && ownerWindow.innerWidth <= 640 && (side === "left" || side === "right")
+            ? "bottom"
+            : side,
           anchor.getBoundingClientRect(),
           layer.getBoundingClientRect(),
           ownerWindow.innerWidth,
@@ -147,15 +161,19 @@ export function FloatingLayer({
     };
 
     update();
+    queueMicrotask(update);
     ownerWindow.addEventListener("resize", update);
     ownerWindow.addEventListener("scroll", update, true);
     return () => {
+      active = false;
       ownerWindow.removeEventListener("resize", update);
       ownerWindow.removeEventListener("scroll", update, true);
     };
-  }, [anchorRef, layerRef, matchAnchorWidth, offset, open, side]);
+  }, [anchorRef, layerRef, matchAnchorWidth, narrowBelow, offset, open, side]);
 
-  const body = anchorRef.current?.ownerDocument.body;
+  const body =
+    anchorRef.current?.ownerDocument.body ??
+    (typeof document === "undefined" ? undefined : document.body);
   if (!open || !body) return null;
 
   return createPortal(
@@ -167,7 +185,9 @@ export function FloatingLayer({
       aria-multiselectable={ariaMultiselectable}
       className={`${styles.layer}${className ? ` ${className}` : ""}`}
       data-side={resolved?.side ?? side}
-      style={{ ...resolved?.style, visibility: resolved ? undefined : "hidden" }}
+      style={resolved?.style}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       {children}
     </div>,

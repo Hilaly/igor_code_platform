@@ -11,8 +11,6 @@
   cursor: pointer;
 }
 .content {
-  position: absolute;
-  z-index: var(--sovereign-z-overlay);
   min-width: 12rem;
   padding: var(--sovereign-space-3);
   color: var(--sovereign-text);
@@ -20,24 +18,4 @@
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-md);
   box-shadow: var(--sovereign-elevation-2);
-}
-.top {
-  bottom: calc(100% + var(--sovereign-space-2));
-  left: 50%;
-  transform: translateX(-50%);
-}
-.bottom {
-  top: calc(100% + var(--sovereign-space-2));
-  left: 50%;
-  transform: translateX(-50%);
-}
-.left {
-  top: 50%;
-  right: calc(100% + var(--sovereign-space-2));
-  transform: translateY(-50%);
-}
-.right {
-  top: 50%;
-  left: calc(100% + var(--sovereign-space-2));
-  transform: translateY(-50%);
 }

@@ -326,7 +326,7 @@ describe("interactive components", () => {
     }
   });
 
-  it("anchors a Tree context to the visible row and shrinks it on the right", () => {
+  it("clamps a Tree context to the viewport and follows the row after resize", () => {
     const originalWidth = window.innerWidth;
     const originalHeight = window.innerHeight;
 
@@ -355,13 +355,14 @@ describe("interactive components", () => {
       );
       fireEvent(window, new Event("resize"));
 
-      expect(context.style.left).toBe("324px");
-      expect(context.style.width).toBe("268px");
+      expect(context.getAttribute("data-side")).toBe("right");
+      expect(context.style.left).toBe("208px");
       expect(context.style.top).toBe("172px");
 
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
       fireEvent(window, new Event("resize"));
-      expect(context.style.width).toBe("384px");
+      expect(context.getAttribute("data-side")).toBe("right");
+      expect(context.style.left).toBe("324px");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
       Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
@@ -383,6 +384,19 @@ describe("interactive components", () => {
 
     const menu = screen.getByRole("menu", { name: "Действия" });
     expect(menu.parentElement).toBe(document.body);
+  });
+
+  it("renders a regular menu popup in the document body", () => {
+    render(
+      <Menu
+        label="Account"
+        trigger="Account"
+        items={[{ id: "settings", label: "Settings", onSelect: () => {} }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.getByRole("menu", { name: "Account" }).parentElement).toBe(document.body);
   });
 
   it("keeps a compact popup sized to its contents instead of the document", () => {
@@ -411,7 +425,7 @@ describe("interactive components", () => {
     fireEvent.click(trigger);
 
     const menu = screen.getByRole("menu", { name: "Действия" });
-    expect(menu.style.maxWidth).toBe("calc(100vw - 16px)");
+    expect(menu.style.maxWidth).toBe(`${window.innerWidth - 16}px`);
     expect(menu.style.left).toBe("220px");
   });
 
@@ -469,7 +483,7 @@ describe("interactive components", () => {
       </Popover>,
     );
 
-    expect(screen.getByRole("tree")).not.toBeNull();
+    expect(screen.getByRole("tree").parentElement).toBe(document.body);
     fireEvent.click(screen.getByRole("button", { name: "Модель" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

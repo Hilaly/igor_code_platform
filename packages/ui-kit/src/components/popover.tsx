@@ -2,8 +2,9 @@
  * Универсальный всплывающий контейнер Popover для произвольного содержимого.
  */
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
+import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./popover.module.css";
 
 export type PopoverSide = "top" | "bottom" | "left" | "right";
@@ -41,9 +42,9 @@ export function Popover({
   const open = controlledOpen ?? uncontrolledOpen;
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const anchorRef = useRef<HTMLElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const [resolvedSide, setResolvedSide] = useState(side);
-  const [viewportStyle, setViewportStyle] = useState<React.CSSProperties | undefined>();
 
   const setOpen = (next: boolean): void => {
     if (next && !open && typeof document !== "undefined") {
@@ -59,66 +60,15 @@ export function Popover({
 
   const toggle = (): void => setOpen(!open);
 
-  useLayoutEffect(() => {
-    if (!open || !viewportSafe || typeof window === "undefined") return;
-    const resolveSide = (): void => {
-      const root = rootRef.current;
-      const content = root?.querySelector<HTMLElement>(`[role="${contentRole}"]`);
-      const trigger = root?.firstElementChild as HTMLElement | null;
-      if (!root || !content || !trigger) return;
-      const triggerRect = trigger.getBoundingClientRect();
-      const contentRect = content.getBoundingClientRect();
-      const roomRight = window.innerWidth - triggerRect.right;
-      const roomLeft = triggerRect.left;
-      const gap = 8;
-      const maxWidth = Math.max(0, window.innerWidth - gap * 2);
-      const maxHeight = Math.max(0, window.innerHeight - gap * 2);
-      const width = Math.min(contentRect.width, maxWidth);
-      const height = Math.min(contentRect.height, maxHeight);
-      content.style.maxWidth = `${width}px`;
-      content.style.maxHeight = `${height}px`;
-      const nextSide =
-        narrowBelow && window.innerWidth <= 640 && (side === "right" || side === "left")
-          ? "bottom"
-          : side === "right" && roomRight < width && roomLeft >= width
-            ? "left"
-            : side === "left" && roomLeft < width && roomRight >= width
-              ? "right"
-              : side;
-      const belowFallback = nextSide === "bottom" && side !== "bottom";
-      const preferredLeft = belowFallback
-        ? triggerRect.left
-        : nextSide === "left"
-          ? triggerRect.left - gap - width
-          : triggerRect.right + gap;
-      const horizontalLeft = Math.max(
-        gap,
-        Math.min(preferredLeft, window.innerWidth - width - gap),
-      );
-      const preferredTop = belowFallback
-        ? triggerRect.bottom + gap
-        : nextSide === "top"
-          ? triggerRect.top - height - gap
-          : triggerRect.top;
-      const top = Math.max(gap, Math.min(preferredTop, window.innerHeight - height - gap));
-      setViewportStyle({
-        position: "fixed",
-        left: `${horizontalLeft}px`,
-        top: `${top}px`,
-        transform: "none",
-      });
-      setResolvedSide(nextSide);
-    };
-    resolveSide();
-    window.addEventListener("resize", resolveSide);
-    return () => window.removeEventListener("resize", resolveSide);
-  }, [contentRole, narrowBelow, open, side, viewportSafe]);
-
   useEffect(() => {
     if (!open) return;
 
     function handlePointerDown(event: PointerEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(event.target as Node) &&
+        !popupRef.current?.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -139,7 +89,13 @@ export function Popover({
   }, [open, onOpenChange]);
 
   return (
-    <div className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} ref={rootRef}>
+    <div
+      className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`}
+      ref={(element) => {
+        rootRef.current = element;
+        anchorRef.current = element?.firstElementChild as HTMLElement | null;
+      }}
+    >
       {renderTrigger === undefined ? (
         <button
           type="button"
@@ -153,18 +109,20 @@ export function Popover({
       ) : (
         renderTrigger({ contentId: popoverId, open, toggle })
       )}
-      {open ? (
-        <div
-          id={popoverId}
-          className={`${styles.content} ${styles[resolvedSide]}${contentClassName ? ` ${contentClassName}` : ""}`}
-          data-side={resolvedSide}
-          style={viewportSafe ? viewportStyle : undefined}
-          role={contentRole}
-          aria-label={ariaLabel}
-        >
-          {children}
-        </div>
-      ) : null}
+      <FloatingLayer
+        open={open}
+        anchorRef={anchorRef}
+        layerRef={popupRef}
+        side={side}
+        offset={8}
+        narrowBelow={narrowBelow}
+        id={popoverId}
+        className={`${styles.content}${contentClassName ? ` ${contentClassName}` : ""}`}
+        role={contentRole}
+        ariaLabel={ariaLabel}
+      >
+        {children}
+      </FloatingLayer>
     </div>
   );
 }
