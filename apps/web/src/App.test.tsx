@@ -14,6 +14,7 @@ import { App } from "./App.tsx";
 
 const selectProject = vi.fn();
 let lastNewSessionContext: unknown;
+let lastUsagePlace: { context: unknown; builtIn?: ReactNode } | undefined;
 
 const project = {
   id: "p1",
@@ -132,6 +133,10 @@ vi.mock("./places/place-host.tsx", () => ({
       lastNewSessionContext = props.context;
     }
 
+    if (props.id === "core.settings.usage") {
+      lastUsagePlace = { context: props.context, builtIn: props.builtIn };
+    }
+
     return props.builtIn;
   },
 }));
@@ -188,6 +193,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   lastNewSessionContext = undefined;
+  lastUsagePlace = undefined;
 });
 
 beforeEach(() => {
@@ -254,6 +260,8 @@ describe("App shell composition", () => {
     expect(
       within(screen.getByRole("region", { name: "Usage" })).getByRole("status").textContent,
     ).toBe("Loading usage…");
+    expect(lastUsagePlace?.context).toEqual({});
+    expect(lastUsagePlace?.builtIn).toBeDefined();
   });
 });
 

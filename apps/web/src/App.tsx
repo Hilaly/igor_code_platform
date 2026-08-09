@@ -385,7 +385,7 @@ export function App() {
   // Контекст места считается один раз на изменение: новый объект на каждой отрисовке перерисовывал
   // бы экземпляр плагина вместе с любым событием оболочки.
   //
-  // У пяти мест базовой поставки `project` стоит только там, где место и правда принадлежит проекту.
+  // У мест базовой поставки `project` стоит только там, где место и правда принадлежит проекту.
   // Оконным вью настроек его не дают намеренно: иначе плагин из папки открытого проекта заменил бы
   // общий для окна список — решение владельца продукта (docs/ui-extension-model.md).
   const chatContext = useMemo<PlaceContext>(
@@ -406,6 +406,7 @@ export function App() {
   // Боковая полоса и полоса действий шапки принадлежат окну целиком, и предмет у них один — та
   // страница, что сейчас открыта: вклад решает по ней, показываться ли ему.
   const pageContext = useMemo<PlaceContext>(() => ({ subject: { page: page.kind } }), [page.kind]);
+  const settingsContext = useMemo<PlaceContext>(() => ({}), []);
   const settingsProjectsContext = useMemo(
     () =>
       settingsSubject("projectId", page.kind === "settings-project" ? page.projectId : undefined),
@@ -858,17 +859,29 @@ export function App() {
                 />
               }
               appearance={
-                <AppearanceSection
-                  preferences={preferences}
-                  effectiveScheme={effectiveScheme}
-                  schemes={describeSchemes(schemes, windowWide, translator)}
-                  locales={locales}
-                  onChange={change}
-                  refusal={refusal}
-                  translator={translator}
+                <HostPlace
+                  id="core.settings.appearance"
+                  context={settingsContext}
+                  builtIn={
+                    <AppearanceSection
+                      preferences={preferences}
+                      effectiveScheme={effectiveScheme}
+                      schemes={describeSchemes(schemes, windowWide, translator)}
+                      locales={locales}
+                      onChange={change}
+                      refusal={refusal}
+                      translator={translator}
+                    />
+                  }
                 />
               }
-              usage={<UsageView state={usage} translator={translator} />}
+              usage={
+                <HostPlace
+                  id="core.settings.usage"
+                  context={settingsContext}
+                  builtIn={<UsageView state={usage} translator={translator} />}
+                />
+              }
               providers={
                 <HostPlace
                   id="core.settings.providers"
@@ -953,17 +966,29 @@ export function App() {
                 />
               }
               daemon={
-                <DaemonSection
-                  stream={stream}
-                  health={health}
-                  failure={failure}
-                  locale={preferences.locale}
-                  config={config.state}
-                  onSaveConfig={config.save}
-                  translator={translator}
+                <HostPlace
+                  id="core.settings.daemon"
+                  context={settingsContext}
+                  builtIn={
+                    <DaemonSection
+                      stream={stream}
+                      health={health}
+                      failure={failure}
+                      locale={preferences.locale}
+                      config={config.state}
+                      onSaveConfig={config.save}
+                      translator={translator}
+                    />
+                  }
                 />
               }
-              diagnostics={<DiagnosticsSection diagnostics={reported} translator={translator} />}
+              diagnostics={
+                <HostPlace
+                  id="core.settings.diagnostics"
+                  context={settingsContext}
+                  builtIn={<DiagnosticsSection diagnostics={reported} translator={translator} />}
+                />
+              }
               translator={translator}
             />
           }

@@ -57,8 +57,12 @@ export const corePlaces = [
   /** Экран создания сессии. */
   { id: "core.session.new", cardinality: "single", replaceable: true },
   { id: "core.settings.projects", cardinality: "single", replaceable: true },
+  { id: "core.settings.appearance", cardinality: "single", replaceable: true },
+  { id: "core.settings.usage", cardinality: "single", replaceable: true },
   { id: "core.settings.providers", cardinality: "single", replaceable: true },
   { id: "core.settings.plugins", cardinality: "single", replaceable: true },
+  { id: "core.settings.daemon", cardinality: "single", replaceable: true },
+  { id: "core.settings.diagnostics", cardinality: "single", replaceable: true },
   /** Секции левой панели под деревом проектов. */
   { id: "core.sidebar.sections", cardinality: "collection", replaceable: false },
   /** Действия в шапке центральной колонки, после действий самого вью. */
