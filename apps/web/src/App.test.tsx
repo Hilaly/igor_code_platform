@@ -18,6 +18,21 @@ let lastTabsRequest: { id: string; context: unknown } | undefined;
 let placeTabs: { id: string; label: string; content: ReactNode }[] = [];
 let lastUsagePlace: { context: unknown; builtIn?: ReactNode } | undefined;
 
+function testStorage(): Storage {
+  const values = new Map<string, string>();
+
+  return {
+    get length() {
+      return values.size;
+    },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => values.set(key, value),
+  };
+}
+
 const project = {
   id: "p1",
   name: "Project one",
@@ -206,6 +221,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  vi.stubGlobal("localStorage", testStorage());
   localStorage.clear();
   history.replaceState(null, "", "/");
   vi.stubGlobal(
@@ -220,6 +236,21 @@ beforeEach(() => {
 });
 
 describe("App shell composition", () => {
+  it("uses page mode for the new-session route and contained mode for an open session", async () => {
+    history.replaceState(null, "", "/sessions/new");
+    const newSession = render(<App />);
+
+    await screen.findByRole("navigation", { name: "Navigation" });
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("page");
+
+    newSession.unmount();
+    history.replaceState(null, "", "/sessions/a1b2c3d4");
+    render(<App />);
+
+    await screen.findByRole("navigation", { name: "Navigation" });
+    expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("contained");
+  });
+
   /**
    * Правая панель общая на всё окно, поэтому контекста проекта у её вкладок нет: плагин из папки
    * открытого проекта не вправе принести туда вкладку.

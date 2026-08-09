@@ -3,8 +3,8 @@
  * ширина, и список моделей в нём не помещался; адресуемый экран решает и это, и рабочую кнопку «назад»,
  * и перезагрузку (docs/sessions-and-projects.md).
  *
- * Поле провайдера убрано: модель выбирается одной двойной выборкой через `ModelPicker` — провайдер
- * → его модели. Дефолты модели и уровня размышлений берутся из агента, а не захардкожены: агент и
+ * Поле провайдера убрано: модель и reasoning выбираются каскадным `NextTurnPicker` композера.
+ * Дефолты модели и уровня размышлений берутся из агента, а не захардкожены: агент и
  * есть тот, кто знает свои умолчания. Первый текст уезжает вместе с созданием одним действием
  * человека, но двумя запросами — `POST /sessions`, а затем `POST .../turns`. Контракт от этого не
  * меняется: `SessionDraft` остаётся четырёхполевным, текст в нём не появляется.
@@ -12,7 +12,6 @@
 
 import {
   parseModelReference,
-  thinkingLevels,
   type Project,
   type ProviderSummary,
   type SessionDraft,
@@ -21,12 +20,12 @@ import {
 } from "@sovereign/protocol";
 import {
   Button,
-  Field,
-  Form,
   Link,
-  ModelPicker,
+  NextTurnPicker,
   Notice,
+  RaisedSurface,
   Select,
+  SendIcon,
   Spinner,
   Text,
   Textarea,
@@ -59,6 +58,19 @@ export type NewSessionViewProps = {
   translator: ScopedTranslator;
 };
 
+type GreetingKey =
+  | "sessions.new.greeting.morning"
+  | "sessions.new.greeting.afternoon"
+  | "sessions.new.greeting.evening"
+  | "sessions.new.greeting.night";
+
+function greetingKey(hour: number): GreetingKey {
+  if (hour >= 5 && hour < 12) return "sessions.new.greeting.morning";
+  if (hour >= 12 && hour < 18) return "sessions.new.greeting.afternoon";
+  if (hour >= 18 && hour < 23) return "sessions.new.greeting.evening";
+  return "sessions.new.greeting.night";
+}
+
 export function NewSessionView(props: NewSessionViewProps) {
   const { projects, projectAgents, providers, models, translator } = props;
   const { t } = translator;
@@ -68,6 +80,7 @@ export function NewSessionView(props: NewSessionViewProps) {
   const [modelRef, setModelRef] = useState<string | undefined>(undefined);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
   const [firstMessage, setFirstMessage] = useState("");
+  const [greeting] = useState<GreetingKey>(() => greetingKey(new Date().getHours()));
   const [refusal, setRefusal] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
 
@@ -155,11 +168,17 @@ export function NewSessionView(props: NewSessionViewProps) {
   const chosenModel = selectedModel(modelRef, models);
   const reasoning = chosenModel === undefined || chosenModel.reasoning;
 
-  // Готовность — проект и агент. Модель НЕ обязательна: у агента может быть дефолт, и тогда демон
-  // возьмёт её сам. Первый текст необязателен тоже: создать пустую сессию — законное действие.
-  const ready = project !== undefined && agent !== undefined;
+  // Стартовый экран создаёт разговор только вместе с первым турном. Модель не обязательна: агент
+  // может предоставить свой default, который демон применит после создания.
+  const ready = project !== undefined && agent !== undefined && firstMessage.trim() !== "";
 
   const create = (): void => {
+    const text = firstMessage.trim();
+
+    if (!ready || busy || text === "") {
+      return;
+    }
+
     setBusy(true);
     setRefusal(undefined);
 
@@ -182,18 +201,14 @@ export function NewSessionView(props: NewSessionViewProps) {
         // турном: контракт `SessionDraft` текст не несёт, и ломать его ради одного экрана не стоит.
         props.onNavigate(outcome.sessionId);
 
-        const trimmed = firstMessage.trim();
-
-        if (trimmed !== "") {
-          props.onSubmit(outcome.sessionId, { text: trimmed });
-        }
+        props.onSubmit(outcome.sessionId, { text });
       });
   };
 
   return (
     <section className="new-session" aria-label={t("sessions.new.title")}>
-      <header className="new-session-head">
-        <Text>{t("sessions.new.hint")}</Text>
+      <header className="new-session-greeting" data-testid="new-session-greeting">
+        <Text>{t(greeting)}</Text>
       </header>
 
       {refusal === undefined ? undefined : (
@@ -242,84 +257,87 @@ export function NewSessionView(props: NewSessionViewProps) {
         </Notice>
       ) : undefined}
 
-      <div className="new-session-form-region">
-        <Form onSubmit={create} disabled={!ready || busy}>
-          <div className="new-session-form">
-            <Select
-              label={t("sessions.new.project")}
-              value={projectId}
-              onChange={pickProject}
-              options={(projects ?? []).map((project) => ({
-                value: project.id,
-                label: `${project.name} — ${project.folder}`,
-              }))}
-              placeholder={t("common.choose")}
+      <div className="new-session-project-agent">
+        <div className="new-session-project-control">
+          <Select
+            label={t("sessions.new.project")}
+            value={projectId}
+            onChange={pickProject}
+            options={(projects ?? []).map((project) => ({
+              value: project.id,
+              label: `${project.name} — ${project.folder}`,
+            }))}
+            placeholder={t("common.choose")}
+          />
+        </div>
+
+        <div className="new-session-agent-control">
+          <Select
+            label={t("sessions.new.agent")}
+            value={agentId}
+            onChange={pickAgent}
+            disabled={
+              projectId === "" ||
+              projectAgents.projectId !== projectId ||
+              projectAgents.loading ||
+              projectAgents.failure !== undefined
+            }
+            options={(agents ?? []).map((candidate) => ({
+              value: candidate.id,
+              label: candidate.title ?? candidate.id,
+            }))}
+            placeholder={t("common.choose")}
+          />
+        </div>
+      </div>
+
+      {projectId === "" ? <Text tone="muted">{t("sessions.new.agent.disabled")}</Text> : undefined}
+
+      <div className="new-session-composer">
+        <RaisedSurface>
+          <div className="sessions-composer">
+            <Textarea
+              value={firstMessage}
+              onChange={setFirstMessage}
+              onSubmit={create}
+              placeholder={t("chat.compose.placeholder")}
+              aria-label={t("chat.compose.label")}
+              autoGrow
+              rows={2}
+              maxRows={12}
+              disabled={busy}
             />
-
-            <Select
-              label={t("sessions.new.agent")}
-              value={agentId}
-              onChange={pickAgent}
-              disabled={
-                projectId === "" ||
-                projectAgents.projectId !== projectId ||
-                projectAgents.loading ||
-                projectAgents.failure !== undefined
-              }
-              options={(agents ?? []).map((candidate) => ({
-                value: candidate.id,
-                label: candidate.title ?? candidate.id,
-              }))}
-              placeholder={t("common.choose")}
-            />
-
-            {projectId === "" ? (
-              <Text tone="muted">{t("sessions.new.agent.disabled")}</Text>
-            ) : undefined}
-
-            <ModelPicker
-              label={t("sessions.new.model")}
-              groups={groups}
-              value={modelRef}
-              onChange={setModelRef}
-              onExpandGroup={props.onPickProvider}
-              placeholder={t("common.choose")}
-              emptyText={t("state.empty")}
-            />
-
-            <Select
-              label={t("sessions.new.thinking")}
-              value={reasoning ? thinkingLevel : "off"}
-              onChange={(value) => setThinkingLevel(value as ThinkingLevel)}
-              disabled={!reasoning}
-              options={thinkingLevels.map((level) => ({
-                value: level,
-                label: t(`thinking.${level}`),
-              }))}
-              placeholder={t("common.choose")}
-            />
-
-            <Field label={t("sessions.new.first-message")}>
-              {(control) => (
-                <Textarea
-                  {...control}
-                  value={firstMessage}
-                  onChange={setFirstMessage}
-                  placeholder={t("sessions.new.first-message")}
-                  autoGrow
-                  rows={3}
-                  maxRows={12}
+            <div className="sessions-composer-toolbar">
+              <div className="sessions-composer-actions">
+                <NextTurnPicker
+                  model={modelRef ?? ""}
+                  modelGroups={groups}
+                  onModelChange={setModelRef}
+                  onExpandModelGroup={props.onPickProvider}
+                  thinkingLevel={thinkingLevel}
+                  reasoningSupported={reasoning}
+                  onThinkingLevelChange={setThinkingLevel}
+                  modelLabel={t("sessions.new.model")}
+                  reasoningLabel={t("sessions.new.thinking")}
+                  triggerLabel={t("chat.nextTurn.settings")}
+                  placeholder={t("common.choose")}
+                  emptyText={t("state.empty")}
+                  translator={translator}
+                  disabled={busy}
                 />
-              )}
-            </Field>
+                <Button
+                  iconOnly
+                  aria-label={t("chat.send")}
+                  onClick={create}
+                  tone="secondary"
+                  disabled={!ready || busy}
+                >
+                  <SendIcon />
+                </Button>
+              </div>
+            </div>
           </div>
-
-          <div className="new-session-actions">
-            <Button type="submit" tone="accent" disabled={!ready} busy={busy}>
-              {t("sessions.new.create")}
-            </Button>
-          </div>
-        </Form>
+        </RaisedSurface>
       </div>
 
       {agent?.description === undefined ? undefined : <Text tone="muted">{agent.description}</Text>}

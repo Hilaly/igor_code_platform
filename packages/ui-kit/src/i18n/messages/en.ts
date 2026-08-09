@@ -593,6 +593,10 @@ export const coreEnglish: CatalogRegistration = {
     "sessions.new.agents.loading": "Loading project agents…",
     "sessions.new.create": "Create",
     "sessions.new.first-message": "First message",
+    "sessions.new.greeting.afternoon": "Good afternoon. What shall we work on?",
+    "sessions.new.greeting.evening": "Good evening. What shall we do?",
+    "sessions.new.greeting.morning": "Good morning. Where shall we start?",
+    "sessions.new.greeting.night": "Still awake? Let's get something done.",
     "sessions.new.hint":
       "Pick a project, an agent and a model — and write where to start right away.",
     "sessions.new.model": "Model",

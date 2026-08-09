@@ -228,7 +228,27 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(
       /\.sessions-composer-surface\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
     );
-    expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
+    expect(sessions).toMatch(/\.new-session-composer\s*\{[^}]*min-width:\s*0;/s);
+  });
+
+  it("centres the new-session start screen at reader width with safe fallbacks", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*flex:\s*1 1 auto;[^}]*width:\s*min\(100%,\s*var\(--sovereign-reading-width\)\);[^}]*margin:\s*auto;/s,
+    );
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*justify-content:\s*center;[^}]*container-type:\s*inline-size;/s,
+    );
+    expect(sessions).toMatch(
+      /\.new-session-project-agent\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/s,
+    );
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<\s*32rem\)\s*\{[^}]*\.new-session-project-agent\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
+    expect(sessions).toMatch(
+      /@media\s*\(height\s*<\s*42rem\)\s*\{[^}]*\.new-session\s*\{[^}]*margin-block:\s*0\s+auto;/s,
+    );
   });
 
   it("keeps usage inside the composer instead of restoring a full-width register", () => {
@@ -259,11 +279,57 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("lets contained content fill the shell body", () => {
+  it("keeps one full-width content frame without imposing a reading width", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*display:\s*flex;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*width:\s*100%;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*margin-inline:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-width:\s*0;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-height:\s*0;/s);
+    expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*max-width\s*:/s);
+  });
+
+  it("centers page route children while contained content remains full width", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*align-items:\s*center;/s);
+    expect(shell).toMatch(
+      /\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+    );
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*align-items:\s*stretch;/s,
+    );
+  });
+
+  it("gives page content a definite body height while keeping the body as scroll owner", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-body\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*overflow:\s*auto;/s,
+    );
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s);
+    expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*overflow(?:-x|-y)?\s*:/s);
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-height:\s*100%;[^}]*margin:\s*auto;/s,
+    );
+  });
+
+  it("lets the contained content frame fill the body without owning a second scroll", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s);
+    expect(shell).not.toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*overflow(?:-x|-y)?\s*:/s,
+    );
+  });
+
+  it("makes the contained route child fill its bounded content frame", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
     expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;/s,
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
     );
   });
 
