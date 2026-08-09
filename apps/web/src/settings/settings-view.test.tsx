@@ -31,6 +31,7 @@ it("shows one selected settings section and only its content", () => {
       onSectionChange={onSectionChange}
       projects={<div>project content</div>}
       appearance={<div>appearance content</div>}
+      usage={<div>usage content</div>}
       providers={<div>provider content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
@@ -71,6 +72,7 @@ it.each(["64rem", "24rem"])(
             onSectionChange={vi.fn()}
             projects={<div>project content</div>}
             appearance={<div>appearance content</div>}
+            usage={<div>usage content</div>}
             providers={<div>provider content</div>}
             plugins={<div>plugin content</div>}
             daemon={<div>daemon</div>}
@@ -133,6 +135,7 @@ it.each([
         onSectionChange={vi.fn()}
         projects={<div>project content</div>}
         appearance={<div>appearance content</div>}
+        usage={<div>usage content</div>}
         providers={section === "providers" ? content : <div>provider content</div>}
         plugins={section === "plugins" ? content : <div>plugin content</div>}
         daemon={<div>daemon</div>}
@@ -156,6 +159,7 @@ it("puts a plugin object into the full Settings context chain", () => {
         onSectionChange={vi.fn()}
         projects={<div>project content</div>}
         appearance={<div>appearance content</div>}
+        usage={<div>usage content</div>}
         providers={<div>provider content</div>}
         plugins={
           <>
@@ -183,6 +187,7 @@ it("keeps projects selected for both the list and a project detail", () => {
       onSectionChange={vi.fn()}
       projects={<div>project list content</div>}
       appearance={<div>appearance content</div>}
+      usage={<div>usage content</div>}
       providers={<div>provider content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
@@ -207,6 +212,7 @@ it("keeps projects selected for both the list and a project detail", () => {
         </>
       }
       appearance={<div>appearance content</div>}
+      usage={<div>usage content</div>}
       providers={<div>provider content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}

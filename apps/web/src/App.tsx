@@ -69,6 +69,8 @@ import { DaemonSection } from "./settings/daemon-section.tsx";
 import { DiagnosticsSection } from "./settings/diagnostics-section.tsx";
 import { useConfig } from "./settings/use-config.ts";
 import { SettingsView } from "./settings/settings-view.tsx";
+import { useUsage } from "./usage/use-usage.ts";
+import { UsageView } from "./usage/usage-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { describePage, PageView } from "./shell/page.tsx";
@@ -372,6 +374,12 @@ export function App() {
     stream: page.kind === "session-archive" ? stream : "connecting",
     onDiagnostic: diagnostics.record,
     archived: true,
+  });
+  const usage = useUsage({
+    enabled: page.kind === "settings" && page.section === "usage",
+    bus,
+    stream,
+    onDiagnostic: diagnostics.record,
   });
 
   // Контекст места считается один раз на изменение: новый объект на каждой отрисовке перерисовывал
@@ -860,6 +868,7 @@ export function App() {
                   translator={translator}
                 />
               }
+              usage={<UsageView state={usage} translator={translator} />}
               providers={
                 <HostPlace
                   id="core.settings.providers"

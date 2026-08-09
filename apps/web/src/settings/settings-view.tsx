@@ -25,6 +25,7 @@ export type SettingsViewProps = {
   onSectionChange: (section: SettingsSection) => void;
   projects: ReactNode;
   appearance: ReactNode;
+  usage: ReactNode;
   providers: ReactNode;
   plugins: ReactNode;
   detailTitle?: string;
@@ -38,6 +39,7 @@ export function SettingsView({
   onSectionChange,
   projects,
   appearance,
+  usage,
   providers,
   plugins,
   detailTitle,
@@ -53,13 +55,15 @@ export function SettingsView({
       ? projects
       : section === "appearance"
         ? appearance
-        : section === "providers"
-          ? providers
-          : section === "plugins"
-            ? plugins
-            : section === "daemon"
-              ? daemon
-              : diagnostics;
+        : section === "usage"
+          ? usage
+          : section === "providers"
+            ? providers
+            : section === "plugins"
+              ? plugins
+              : section === "daemon"
+                ? daemon
+                : diagnostics;
 
   const title = detailTitle ?? t(`settings.section.${section}`);
 

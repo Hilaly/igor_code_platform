@@ -13,6 +13,22 @@ describe("settings and plugin layout styles", () => {
     expect(styles).not.toMatch(/\.settings-appearance-preview/);
   });
 
+  it("keeps exact usage metrics, chart and table responsive without card frames", () => {
+    expect(styles).toMatch(
+      /\.usage-totals\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /@container\s*\(width\s*<\s*36rem\)[\s\S]*\.usage-totals\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s,
+    );
+    expect(styles).toMatch(
+      /@container\s*\(width\s*<\s*22rem\)[\s\S]*\.usage-totals\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
+    expect(styles).toMatch(/\.usage-table-scroll\s*\{[^}]*overflow-x:\s*auto;/s);
+    expect(styles).not.toMatch(
+      /\.usage-(?:view|totals|section|chart|table-scroll)\s*\{[^}]*(?:box-shadow|border-radius|background)\s*:/s,
+    );
+  });
+
   it("uses clean plugin containers without historical selector compensation", () => {
     expect(styles).toMatch(
       /\.plugins,\s*\.plugin-detail\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;[^}]*container-type:\s*inline-size;/s,
