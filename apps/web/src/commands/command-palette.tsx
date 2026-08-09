@@ -42,12 +42,7 @@ export function useCommandPaletteShortcut(onOpen: () => void): void {
     const listen = (event: KeyboardEvent): void => {
       const platformModifier = event.metaKey !== event.ctrlKey;
 
-      if (
-        event.key.toLowerCase() !== "k" ||
-        !platformModifier ||
-        event.shiftKey ||
-        event.altKey
-      ) {
+      if (event.key.toLowerCase() !== "k" || !platformModifier || event.shiftKey || event.altKey) {
         return;
       }
 
@@ -145,11 +140,7 @@ export function CommandPalette({
             и «показать панель» пропадала бы ровно тогда, когда её ищут.
           */}
           {shown.map((entry) => (
-            <ListRow
-              key={entry.id}
-              onSelect={() => choose(entry)}
-              disabled={entry.disabled}
-            >
+            <ListRow key={entry.id} onSelect={() => choose(entry)} disabled={entry.disabled}>
               {entry.title}
             </ListRow>
           ))}
