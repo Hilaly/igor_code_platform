@@ -180,7 +180,7 @@ describe("the style sheets of the application", () => {
     const projects = sheets.find((sheet) => sheet.name === "projects.css")?.styles ?? "";
 
     expect(projects).toMatch(
-      /:root\[data-sovereign-input-modality="keyboard"\]\s+\.projects-list\s*>\s*li\s*>\s*button:focus\s+\.projects-row-facts\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
+      /:root\[data-sovereign-input-modality="keyboard"\]\s+\.projects-list\s*>\s*li\s*>\s*\[role="group"\]:has\(>\s*button:focus\)\s+\.projects-row-folder\s+\[role="tooltip"\]\s*\{[^}]*display:\s*block;[^}]*opacity:\s*1;/s,
     );
   });
 
