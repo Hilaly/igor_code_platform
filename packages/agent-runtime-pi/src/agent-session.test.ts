@@ -11,6 +11,7 @@ import { foldEntryLabels, type SessionDelta } from "@sovereign/protocol";
 import {
   createAgentSessionStore,
   createCoreTools,
+  type AgentDefinition,
   type AgentSession,
   type AgentSessionStore,
   type CompactionTuning,
@@ -54,6 +55,7 @@ async function withStore(
   beforeAnswer?: (index: number) => void,
   tuning: () => CompactionTuning = compactionSettings,
   hooks?: RuntimeHookSeam,
+  definition: AgentDefinition = agent,
 ) {
   const scripted = scriptedModelProvider({
     turns,
@@ -82,7 +84,7 @@ async function withStore(
       folderKey: folder.toLowerCase(),
       model: `scripted-model/${scripted.model.id}`,
       thinkingLevel: "off",
-      agent,
+      agent: definition,
     });
 
     assert.ok(!("kind" in created), "модель двойника обязана резолвиться");
@@ -177,12 +179,15 @@ describe("an agent session over pi", () => {
     await session.close();
   });
 
-  it("uses the latest instructions and skills on every turn", async () => {
-    const { open, requests } = await withStore([
-      { text: "reviewed" },
-      { text: "deployed" },
-      { text: "finished" },
-    ]);
+  it("uses the latest instructions, agent data and skills on every turn", async () => {
+    const { open, requests } = await withStore(
+      [{ text: "reviewed" }, { text: "deployed" }, { text: "finished" }],
+      undefined,
+      undefined,
+      compactionSettings,
+      undefined,
+      { ...agent, directory: "/tmp/review-agent" },
+    );
     const session = await open();
 
     session.setSkills([
@@ -196,10 +201,11 @@ describe("an agent session over pi", () => {
 
     assert.equal(
       requests[0]?.systemPrompt,
-      `ты двойник\n\n<available_skills>\n  <skill>\n    <name>review</name>\n    <description>Review the change</description>\n    <location>/tmp/review/SKILL.md</location>\n  </skill>\n</available_skills>`,
+      `ты двойник\n\n<agent_data>\n  <directory>/tmp/review-agent</directory>\n</agent_data>\n\n<available_skills>\n  <skill>\n    <name>review</name>\n    <description>Review the change</description>\n    <location>/tmp/review/SKILL.md</location>\n  </skill>\n</available_skills>`,
     );
 
     session.setInstructions("updated");
+    session.setAgentDirectory("/tmp/deploy-agent");
     session.setSkills([
       {
         name: "deploy",
@@ -211,9 +217,10 @@ describe("an agent session over pi", () => {
 
     assert.equal(
       requests[1]?.systemPrompt,
-      `updated\n\n<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the change</description>\n    <location>/tmp/deploy/SKILL.md</location>\n  </skill>\n</available_skills>`,
+      `updated\n\n<agent_data>\n  <directory>/tmp/deploy-agent</directory>\n</agent_data>\n\n<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the change</description>\n    <location>/tmp/deploy/SKILL.md</location>\n  </skill>\n</available_skills>`,
     );
 
+    session.setAgentDirectory(undefined);
     session.setSkills([]);
     await session.prompt("finish", "t3");
 
