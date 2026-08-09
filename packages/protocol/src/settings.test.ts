@@ -292,7 +292,14 @@ describe("parseConfigUpdate", () => {
     const result = parseConfigUpdate({});
 
     assert.equal(result.kind, "rejected");
-    assert.match(result.diagnostics.join("; "), /at least one key is required/);
+    assert.match(result.diagnostics.join("; "), /at least one.*key is required/);
+  });
+
+  it("refuses an update that names no known configuration key", () => {
+    const result = parseConfigUpdate({ futureKey: 1 });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join("; "), /at least one known key is required/);
   });
 
   it("refuses a wrong value the same way reading the file does", () => {

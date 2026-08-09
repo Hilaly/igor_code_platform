@@ -200,7 +200,16 @@ describe("configRoutes", () => {
     const answer = await put({});
 
     assert.equal(answer.status, 400);
-    assert.match(answer.body, /at least one key is required/);
+    assert.match(answer.body, /at least one.*key is required/);
+    assert.equal(existsSync(join(directory, configFileName)), false);
+  });
+
+  it("refuses a body that names only unknown fields and writes nothing", async () => {
+    const { directory, put } = await serve();
+    const answer = await put({ futureKey: "keep me" });
+
+    assert.equal(answer.status, 400);
+    assert.match(answer.body, /at least one known key is required/);
     assert.equal(existsSync(join(directory, configFileName)), false);
   });
 

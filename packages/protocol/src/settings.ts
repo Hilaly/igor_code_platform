@@ -209,20 +209,17 @@ export function parseConfigUpdate(raw: unknown): SettingsParseResult<Record<stri
   }
 
   const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys);
+  const suppliedKeys = configKeys.filter((key) => Object.hasOwn(fields, key));
 
-  if (Object.keys(fields).length === 0) {
-    diagnostics.push(`${configFileName}: at least one key is required for an update`);
+  if (suppliedKeys.length === 0) {
+    diagnostics.push(`${configFileName}: at least one known key is required for an update`);
 
     return { kind: "rejected", diagnostics };
   }
 
   const value = { ...fields };
 
-  for (const key of configKeys) {
-    if (!Object.hasOwn(fields, key)) {
-      continue;
-    }
-
+  for (const key of suppliedKeys) {
     // Правило у значения не расходится с чтением файла: берём результат общей проверки, но только
     // для поля, которое тело действительно назвало. Неизвестные поля остаются в `value` как есть.
     const parsed = parseConfigFields({ [key]: fields[key] }, diagnostics);
