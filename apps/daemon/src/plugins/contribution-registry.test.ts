@@ -1134,3 +1134,84 @@ describe("the command, a contribution that has no content of its own", () => {
     );
   });
 });
+
+describe("the page, a contribution that takes a whole address", () => {
+  const log: PluginContribution = {
+    kind: "page",
+    id: "log",
+    title: "Log",
+    export: "LogPage",
+  };
+
+  const withBrowser = (contributions: PluginContribution[], hasBrowserEntry = true) =>
+    createContributionRegistry().applyPlugin({
+      plugin: dataHello,
+      contributions,
+      fileContributions: [],
+      disabledContributions: nothingDisabled,
+      hasBrowserEntry,
+    });
+
+  /**
+   * Адрес страницы — `/p/hello/log`, то есть пара «идентификатор плагина, объявленный
+   * идентификатор». Неймспейс при этом ставится как всем: по нему считается спор и перекрытие.
+   */
+  it("registers a page of a plugin that has a browser bundle", () => {
+    const outcome = withBrowser([log]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(outcome.registered, [
+      {
+        ownership: "plugin",
+        kind: "page",
+        id: "hello.log",
+        declaredId: "log",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        title: "Log",
+        export: "LogPage",
+      },
+    ]);
+  });
+
+  it("refuses a page from a plugin without a browser bundle: there is no component to name", () => {
+    const outcome = withBrowser([log], false);
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.match(outcome.problems[0] ?? "", /the page hello\.log needs a browser bundle/);
+  });
+
+  it("refuses a broken page and keeps its valid siblings", () => {
+    const broken = (id: string, fields: Record<string, unknown>): PluginContribution =>
+      ({ ...log, id, ...fields }) as unknown as PluginContribution;
+
+    const outcome = withBrowser([
+      log,
+      // Заголовок несущий: страницу не показать ни ссылкой, ни шапкой без него.
+      broken("nameless", { title: " " }),
+      broken("numbered", { title: 7 }),
+      broken("bodyless", { export: "" }),
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), ["hello.log"]);
+    assert.deepEqual(
+      outcome.problems.map((problem) => problem.split(" ")[2]),
+      ["hello.nameless", "hello.numbered", "hello.bodyless"],
+    );
+  });
+
+  /**
+   * Идентификатор уже проверен общим шаблоном, и отдельной проверки на URL-безопасность не нужно:
+   * `.` и `..` не начинаются с буквы или цифры, а слэша шаблон не допускает вовсе.
+   */
+  it("keeps a dot segment out of the address by the shared identifier rule", () => {
+    const outcome = withBrowser([
+      { ...log, id: ".." } as PluginContribution,
+      { ...log, id: "a/b" } as PluginContribution,
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.equal(outcome.problems.length, 2);
+  });
+});

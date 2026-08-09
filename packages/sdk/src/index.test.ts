@@ -550,6 +550,16 @@ describe("the testing seam", () => {
     ]);
   });
 
+  it("records a page the way the plugin declared it", async () => {
+    const host = installTestHost();
+
+    await contribute.page({ id: "log", title: "Log", export: "LogPage" });
+
+    assert.deepEqual(host.contributions, [
+      { kind: "page", id: "log", title: "Log", export: "LogPage" },
+    ]);
+  });
+
   it("tells the plugin who it is", () => {
     installTestHost({ id: "hello", source: "builtin" });
 

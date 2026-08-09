@@ -255,6 +255,22 @@ export type CommandContribution = {
   order?: number;
 };
 
+/**
+ * Целая страница плагина на его адресе `/p/<pluginId>/<pageId>/*` (docs/ui-extension-model.md).
+ * Пути в объявлении нет: адрес складывается из идентификатора плагина и идентификатора страницы, и
+ * право назвать путь самому было бы вторым способом занять чужой адрес.
+ *
+ * Заголовок обязателен, как у команды: страница представлена ссылкой и шапкой до того, как её код
+ * загружен.
+ */
+export type PageContribution = {
+  id: string;
+  title: string;
+  description?: string;
+  /** Имя экспорта в браузерном бандле плагина: компонент страницы. */
+  export: string;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
@@ -268,7 +284,8 @@ export type PluginContribution =
   | ({ kind: "locale-catalog" } & LocaleCatalogContribution)
   | ({ kind: "place" } & PlaceContribution)
   | ({ kind: "component" } & ComponentContribution)
-  | ({ kind: "command" } & CommandContribution);
+  | ({ kind: "command" } & CommandContribution)
+  | ({ kind: "page" } & PageContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

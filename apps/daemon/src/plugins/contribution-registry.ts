@@ -984,6 +984,36 @@ function programmaticRegistration(
     };
   }
 
+  if (contribution.kind === "page") {
+    // Страница — это экспорт браузерного бандла, и у плагина без браузерной части его нет.
+    if (!hasBrowserEntry) {
+      problems.push(
+        `the page ${id} needs a browser bundle, but the plugin declares no ${manifestField}.browser`,
+      );
+      return undefined;
+    }
+
+    const title = typeof contribution.title === "string" ? contribution.title.trim() : "";
+
+    // Заголовок несущий, как у команды: страница представлена ссылкой и шапкой до загрузки бандла.
+    if (title === "") {
+      problems.push(`the page ${id} must name itself: it is shown by its title before its code is`);
+      return undefined;
+    }
+
+    const body = typeof contribution.export === "string" ? contribution.export.trim() : "";
+
+    if (body === "") {
+      problems.push(`the page ${id} must name the export that renders it`);
+      return undefined;
+    }
+
+    // Проверки на URL-безопасность идентификатора здесь нет и не нужно: общий шаблон выше требует
+    // начинать с буквы или цифры и не допускает слэша, то есть `.`, `..` и вложенный путь в сегмент
+    // адреса не попадают по построению.
+    return { ...common, kind: "page", title, export: body };
+  }
+
   const instructions =
     typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
   if (instructions === "") {

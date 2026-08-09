@@ -17,6 +17,7 @@ import {
   type CustomContribution,
   type HookCriticality,
   type LocaleCatalogContribution,
+  type PageContribution,
   type PlaceContribution,
   type PluginLogLevel,
   type RouteContribution,
@@ -43,6 +44,7 @@ export type {
   HookContribution,
   HookCriticality,
   LocaleCatalogContribution,
+  PageContribution,
   PayloadSchema,
   PlaceCardinality,
   PlaceContribution,
@@ -357,6 +359,17 @@ export const contribute = {
    */
   command: async (contribution: CommandContribution): Promise<void> =>
     currentPluginHost().contribute({ kind: "command", ...contribution }),
+
+  /**
+   * Занять целую страницу на своём адресе `/p/<pluginId>/<pageId>/*`
+   * (docs/ui-extension-model.md). Внутри неё плагин строит свою навигацию: базовый путь,
+   * относительный путь, параметры и переходы даёт хук `usePageNavigation` браузерного SDK.
+   *
+   * Компонент ищется по имени экспорта в браузерном бандле, поэтому вклад осмыслен только у плагина
+   * с `sovereign.browser`.
+   */
+  page: async (contribution: PageContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "page", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {
