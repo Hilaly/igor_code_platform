@@ -232,6 +232,25 @@ describe("interactive components", () => {
     );
   });
 
+  it("keeps a disabled selectable list row semantic and inert", () => {
+    const onSelect = vi.fn();
+
+    render(
+      <List>
+        <ListRow onSelect={onSelect} disabled>
+          Unavailable command
+        </ListRow>
+      </List>,
+    );
+
+    const row = screen.getByRole("button", { name: "Unavailable command" });
+
+    expect(row.hasAttribute("disabled")).toBe(true);
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(row);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["positive", "Daemon connected"],
     ["pending", "Daemon reconnecting"],

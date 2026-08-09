@@ -928,6 +928,62 @@ function programmaticRegistration(
     };
   }
 
+  if (contribution.kind === "command") {
+    // Обработчик — имя экспорта, а у плагина без браузерной точки входа бандла нет вовсе.
+    if (!hasBrowserEntry) {
+      problems.push(
+        `the command ${id} needs a browser bundle, but the plugin declares no ${manifestField}.browser`,
+      );
+      return undefined;
+    }
+
+    const title = typeof contribution.title === "string" ? contribution.title.trim() : "";
+
+    // Заголовок несущий: команду не показать ни кнопкой, ни строкой палитры, а падать на
+    // идентификатор здесь нельзя — человек читал бы `hello.run` вместо человеческого имени.
+    if (title === "") {
+      problems.push(
+        `the command ${id} must name itself: it is shown by its title and nothing else`,
+      );
+      return undefined;
+    }
+
+    const handler = typeof contribution.export === "string" ? contribution.export.trim() : "";
+
+    if (handler === "") {
+      problems.push(`the command ${id} must name the export that runs it`);
+      return undefined;
+    }
+    if (
+      contribution.placeId !== undefined &&
+      (typeof contribution.placeId !== "string" || !placeIdPattern.test(contribution.placeId))
+    ) {
+      problems.push(
+        `the command ${id} must name a place matching ${placeIdPattern.source}, got ${JSON.stringify(contribution.placeId)}`,
+      );
+      return undefined;
+    }
+    if (contribution.group !== undefined && typeof contribution.group !== "string") {
+      problems.push(`the command ${id} must name its group with a string`);
+      return undefined;
+    }
+    if (contribution.order !== undefined && !Number.isFinite(contribution.order)) {
+      problems.push(`the command ${id} must order itself with a finite number`);
+      return undefined;
+    }
+
+    // Существование места не проверяется по тем же причинам, что у компонента: вклад ждёт.
+    return {
+      ...common,
+      kind: "command",
+      title,
+      export: handler,
+      ...(contribution.placeId === undefined ? {} : { placeId: contribution.placeId }),
+      ...(contribution.group === undefined ? {} : { group: contribution.group }),
+      ...(contribution.order === undefined ? {} : { order: contribution.order }),
+    };
+  }
+
   const instructions =
     typeof contribution.instructions === "string" ? contribution.instructions.trim() : "";
   if (instructions === "") {

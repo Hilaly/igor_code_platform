@@ -2,7 +2,7 @@ import {
   corePlace,
   projectOfContribution,
   resolvePlaceProvider,
-  type ComponentContributionRegistration,
+  type PlacedContributionRegistration,
   type ContributionRegistration,
   type PlaceCardinality,
   type PluginLifecycleState,
@@ -59,10 +59,18 @@ type ContributionEntry = { registration: ContributionRegistration; off: boolean 
  * сломанный плагин.
  */
 type PlaceClaimOutcome =
-  "switchedOff" | "taken" | "free" | "overridden" | "disputed" | "added" | "waiting" | "project";
+  | "switchedOff"
+  | "taken"
+  | "free"
+  | "overridden"
+  | "disputed"
+  | "added"
+  | "incompatible"
+  | "waiting"
+  | "project";
 
 type PlaceClaim = {
-  registration: ComponentContributionRegistration;
+  registration: PlacedContributionRegistration & { placeId: string };
   outcome: PlaceClaimOutcome;
   holder?: string;
 };
@@ -74,6 +82,7 @@ const claimTones: Record<PlaceClaimOutcome, "success" | "muted" | "warning"> = {
   overridden: "warning",
   disputed: "warning",
   added: "success",
+  incompatible: "warning",
   waiting: "muted",
   project: "muted",
 };
@@ -330,8 +339,11 @@ function placeClaims(
       (
         entry,
       ): entry is ContributionEntry & {
-        registration: ComponentContributionRegistration;
-      } => entry.registration.kind === "component",
+        registration: PlacedContributionRegistration & { placeId: string };
+      } =>
+        entry.registration.kind === "component" ||
+        // Команда без места кнопки не просит: показывать её среди занятых мест нечего.
+        (entry.registration.kind === "command" && entry.registration.placeId !== undefined),
     )
     .map(({ registration, off }): PlaceClaim => {
       if (off) {
@@ -348,7 +360,13 @@ function placeClaims(
         return { registration, outcome: "waiting" };
       }
 
-      if (cardinality !== "single") {
+      if (registration.kind === "command" && cardinality !== "action") {
+        return { registration, outcome: "incompatible" };
+      }
+
+      // Команда одиночное место занять не может: у неё нет содержимого, и в полосу действий она
+      // становится в ряд наравне с компонентами.
+      if (cardinality !== "single" || registration.kind === "command") {
         return { registration, outcome: "added" };
       }
 
@@ -431,12 +449,19 @@ function TechnicalData({
                             group: registration.group,
                             order: registration.order,
                           }
-                        : {
-                            model: registration.model,
-                            thinkingLevel: registration.thinkingLevel,
-                            tools: registration.tools,
-                            skills: registration.skills,
-                          };
+                        : registration.kind === "command"
+                          ? {
+                              export: registration.export,
+                              placeId: registration.placeId,
+                              group: registration.group,
+                              order: registration.order,
+                            }
+                          : {
+                              model: registration.model,
+                              thinkingLevel: registration.thinkingLevel,
+                              tools: registration.tools,
+                              skills: registration.skills,
+                            };
   if (data === undefined) return undefined;
   return (
     <Disclosure

@@ -1,4 +1,5 @@
 import {
+  corePlace,
   orderPlaceContributions,
   resolvePlaceDeclaration,
   resolvePlaceProvider,
@@ -8,7 +9,6 @@ import {
   type PluginStatus,
 } from "@sovereign/protocol";
 import {
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -18,6 +18,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { CommandButton } from "./commands.tsx";
+import { useDiagnosticVoice } from "./diagnostics.ts";
 import { boundaryKey, InstanceBoundary } from "./instance-boundary.tsx";
 import {
   BrowserRuntimeContext,
@@ -25,6 +27,8 @@ import {
   type PlaceContext,
   type PlaceProps,
 } from "./runtime-context.tsx";
+
+export { useHostCommandCatalog, type HostCommandCatalogEntry } from "./commands.tsx";
 
 export type LoadedPluginModule = Record<string, unknown>;
 
@@ -34,7 +38,9 @@ export type PluginModuleLoad =
   | { kind: "failed"; reason: string };
 
 export type PluginModuleCache = {
-  moduleOf(status: PluginStatus): PluginModuleLoad;
+  load(status: PluginStatus): PluginModuleLoad;
+  peek(status: PluginStatus): PluginModuleLoad | undefined;
+  version(): number;
   retain(statuses: readonly PluginStatus[]): void;
   subscribe(listener: () => void): () => void;
   dispose(): void;
@@ -128,9 +134,16 @@ export function HostPlace({ id, context, builtIn }: HostPlaceProps): ReactNode {
 
 export function HostPlaceCollection({ id, context }: PlaceProps): ReactNode {
   const runtime = useContext(BrowserRuntimeContext);
+  const declaration = corePlace(id);
 
-  return runtime === undefined ? null : (
-    <CollectionPlace id={id} context={context} runtime={runtime} />
+  return runtime === undefined ||
+    (declaration?.cardinality !== "collection" && declaration?.cardinality !== "action") ? null : (
+    <CollectionPlace
+      id={id}
+      context={context}
+      runtime={runtime}
+      cardinality={declaration.cardinality}
+    />
   );
 }
 
@@ -173,7 +186,14 @@ export function PluginPlaceCollection({ id, context }: PlaceProps): ReactNode {
     return null;
   }
 
-  return <CollectionPlace id={id} context={context} runtime={runtime} />;
+  return (
+    <CollectionPlace
+      id={id}
+      context={context}
+      runtime={runtime}
+      cardinality={declaration.cardinality}
+    />
+  );
 }
 
 function ownerBuiltIn(
@@ -242,15 +262,34 @@ function CollectionPlace({
   id,
   context,
   runtime,
-}: PlaceProps & { runtime: BrowserRuntime }): ReactNode {
+  cardinality,
+}: PlaceProps & {
+  runtime: BrowserRuntime;
+  cardinality: "collection" | "action";
+}): ReactNode {
+  const registrations = orderPlaceContributions(id, runtime.contributions, context).filter(
+    (registration) => cardinality === "action" || registration.kind !== "command",
+  );
+
   return (
     <>
-      {orderPlaceContributions(id, runtime.contributions, context).map((registration) => {
+      {registrations.map((registration) => {
+        // Команда содержимого не даёт: за неё в полосе стоит кнопка с заголовком из снимка.
+        if (registration.kind === "command") {
+          return (
+            <CommandButton
+              key={`${registration.kind}:${registration.id}`}
+              registration={registration}
+              context={context}
+            />
+          );
+        }
+
         const reference = referenceOf(registration);
 
         return reference === undefined ? null : (
           <PlaceInstance
-            key={registration.id}
+            key={`${registration.kind}:${registration.id}`}
             reference={reference}
             context={context}
             fallback={null}
@@ -280,7 +319,7 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
   const say = useDiagnosticVoice(runtime);
   const status = runtime?.plugins.find((plugin) => plugin.key === reference.pluginKey);
   const load = useSyncExternalStore(runtime?.cache.subscribe ?? emptySubscribe, () =>
-    runtime === undefined || status === undefined ? undefined : runtime.cache.moduleOf(status),
+    runtime === undefined || status === undefined ? undefined : runtime.cache.load(status),
   );
   const exported = load?.kind === "loaded" ? load.module[reference.exportName] : undefined;
   const complaint =
@@ -326,20 +365,4 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
 
 function emptySubscribe(): () => void {
   return () => {};
-}
-
-function useDiagnosticVoice(runtime: BrowserRuntime | undefined): (text: string) => void {
-  const named = useRef(new Set<string>());
-
-  return useCallback(
-    (text: string) => {
-      if (runtime === undefined || named.current.has(text)) {
-        return;
-      }
-
-      named.current.add(text);
-      runtime.onDiagnostic(text);
-    },
-    [runtime],
-  );
 }

@@ -66,6 +66,16 @@ describe("parsePluginManifest", () => {
     }
   });
 
+  it("reserves the core namespace for the host", () => {
+    const result = parsePluginManifest(validManifest({ id: "core" }));
+
+    assert.equal(result.kind, "refused");
+    assert.equal(
+      result.kind === "refused" ? result.reason : "",
+      "sovereign.id core is reserved for the host",
+    );
+  });
+
   it("refuses a missing entry point", () => {
     const result = parsePluginManifest(validManifest({ worker: undefined }));
 

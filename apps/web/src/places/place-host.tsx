@@ -4,6 +4,7 @@ import {
   HostPlaceCollection,
   type BrowserRuntimeProviderProps as SdkBrowserRuntimeProviderProps,
 } from "@sovereign/browser-sdk/host";
+import { useHostPlaceTabs, type HostPlaceTab } from "@sovereign/browser-sdk/tabs";
 import type { ReactNode } from "react";
 
 import { createPluginModuleCache } from "./module-cache.ts";
@@ -14,4 +15,5 @@ export function BrowserRuntimeProvider(props: BrowserRuntimeProviderProps): Reac
   return <SdkBrowserRuntimeProvider {...props} createCache={createPluginModuleCache} />;
 }
 
-export { HostPlace, HostPlaceCollection };
+export { HostPlace, HostPlaceCollection, useHostPlaceTabs };
+export type { HostPlaceTab };

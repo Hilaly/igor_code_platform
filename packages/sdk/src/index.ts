@@ -12,6 +12,7 @@ import {
   currentPluginHost,
   type AgentContribution,
   type ColorSchemeContribution,
+  type CommandContribution,
   type ComponentContribution,
   type CustomContribution,
   type HookCriticality,
@@ -35,6 +36,7 @@ export type {
   AgentToolSelection,
   ColorSchemeContribution,
   ColorSchemeDocument,
+  CommandContribution,
   ComponentContribution,
   CustomContribution,
   EventContribution,
@@ -345,6 +347,16 @@ export const contribute = {
    */
   component: async (contribution: ComponentContribution): Promise<void> =>
     currentPluginHost().contribute({ kind: "component", ...contribution }),
+
+  /**
+   * Объявить команду — именованное действие (docs/ui-extension-model.md). Обработчик ищется по имени
+   * экспорта в браузерном бандле, поэтому вклад осмыслен только у плагина с `sovereign.browser`.
+   *
+   * `placeId` необязателен: команда без места живёт в палитре и вызывается по идентификатору, в том
+   * числе чужим плагином. Место, если указано, обязано быть кардинальности «действие».
+   */
+  command: async (contribution: CommandContribution): Promise<void> =>
+    currentPluginHost().contribute({ kind: "command", ...contribution }),
 };
 
 type RouteDeclaration = Omit<RouteContribution, "method"> & {

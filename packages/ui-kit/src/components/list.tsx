@@ -17,6 +17,8 @@ export function List({ children }: ListProps) {
 
 export type ListRowProps = {
   selected?: boolean;
+  /** Выбираемая строка остаётся видимой кнопкой, но не принимает фокус и выбор. */
+  disabled?: boolean;
   /** id элемента с полным описанием выбираемой строки. */
   describedBy?: string;
   onSelect?: () => void;
@@ -33,6 +35,7 @@ export type ListRowProps = {
 
 export function ListRow({
   selected = false,
+  disabled = false,
   describedBy,
   onSelect,
   onDoubleClick,
@@ -55,9 +58,11 @@ export function ListRow({
       <button
         type="button"
         className={styles.select}
+        disabled={disabled}
         onClick={onSelect}
         onDoubleClick={onDoubleClick}
         aria-current={selected}
+        aria-disabled={disabled || undefined}
         aria-describedby={describedBy}
       >
         {children}

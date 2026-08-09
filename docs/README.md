@@ -153,6 +153,21 @@
 - [План исправлений среза 12b-2 и browser SDK](superpowers/plans/2026-08-09-slice-12b2-browser-sdk-review-fixes.md) —
   десять TDD-задач от identity resolver и CSS lifecycle до tracked fixtures, живой проверки и
   переписывания локальной истории.
+- [Срез 12c-1: вкладки правой панели и команды](superpowers/specs/2026-08-09-slice-12c1-tabs-and-commands-design.md) —
+  четвёртая кардинальность места, `core.panel.tabs`, вид вклада «команда» с браузерным обработчиком,
+  команды ядра и палитра; почему `available` не воскрешает отвергнутый `when`.
+- [План среза 12c-1](superpowers/plans/2026-08-09-slice-12c1-tabs-and-commands.md) — тринадцать
+  TDD-задач от кардинальности и реестра до палитры, живой проверки и переписывания локальной истории.
+- [Исправления среза 12c-1 по ревью](superpowers/specs/2026-08-09-slice-12c1-review-fixes-design.md) —
+  ленивый кеш команд, безопасный `available`, смена ревизии во время вызова, кардинальность мест и
+  зарезервированный namespace `core`.
+- [План исправлений среза 12c-1 по ревью](superpowers/plans/2026-08-09-slice-12c1-review-fixes.md) —
+  девять атомарных этапов от объединения `main` и RED–GREEN исправлений до полной проверки ветки.
+- [Дополнительные исправления среза 12c-1 по ревью](superpowers/specs/2026-08-09-slice-12c1-final-review-fixes-design.md) —
+  доступность команд правой панели, точный аккорд палитры, выключенная строка `ListRow` и актуальный
+  состав команд ядра.
+- [План дополнительных исправлений среза 12c-1](superpowers/plans/2026-08-09-slice-12c1-final-review-fixes.md) —
+  четыре TDD-этапа для доступности команд, точного shortcut, семантики `ListRow` и полной проверки.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —

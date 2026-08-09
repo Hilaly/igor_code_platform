@@ -1,0 +1,318 @@
+// @vitest-environment jsdom
+
+import type { ContributionRegistration, PluginStatus } from "@sovereign/protocol";
+import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState, type ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { BrowserRuntimeProvider } from "../places/place-host.tsx";
+import { defaultLayout, type ShellLayout } from "../shell/layout.ts";
+import { CommandPalette, useCommandPaletteShortcut } from "./command-palette.tsx";
+import type { CoreCommandHost } from "./core-commands.ts";
+
+afterEach(() => {
+  cleanup();
+  asked.length = 0;
+  peeked.length = 0;
+});
+
+const translator = createTranslator({
+  catalogs: [coreEnglish],
+  locale: "en",
+  namespace: coreNamespace,
+  onDiagnostic: () => {},
+});
+
+const placed: PluginStatus = {
+  key: "data:placed",
+  id: "placed",
+  source: "data",
+  directory: "/plugins/placed",
+  state: "running",
+  browser: { revision: "r1", entry: "/plugin-assets/placed/r1/browser.js" },
+};
+
+const runCommand: ContributionRegistration = {
+  ownership: "plugin",
+  pluginKey: placed.key,
+  pluginId: "placed",
+  source: "data",
+  kind: "command",
+  id: "placed.run",
+  declaredId: "run",
+  title: "Run the board",
+  export: "RunCommand",
+};
+
+const asked: string[] = [];
+const peeked: string[] = [];
+
+function palette(
+  options: {
+    layout?: ShellLayout;
+    contributions?: readonly ContributionRegistration[];
+    onClose?: () => void;
+    ran?: string[];
+    cacheEmpty?: boolean;
+    pluginModule?: Record<string, unknown>;
+    onDiagnostic?: (text: string) => void;
+  } = {},
+): CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } {
+  const ran = options.ran ?? [];
+  const pluginModule =
+    options.pluginModule ?? ({ RunCommand: { run: () => ran.push("plugin command") } } as const);
+  const cached = options.cacheEmpty
+    ? undefined
+    : ({ kind: "loaded", module: pluginModule } as const);
+  const host: CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } = {
+    layout: options.layout ?? defaultLayout,
+    navigate: vi.fn(),
+    onLayoutChange: vi.fn(),
+    rightUnavailable: false,
+  };
+
+  render(
+    <BrowserRuntimeProvider
+      contributions={options.contributions ?? []}
+      plugins={[placed]}
+      onDiagnostic={options.onDiagnostic ?? (() => {})}
+      cache={{
+        load: (status) => {
+          asked.push(status.key);
+
+          return cached ?? { kind: "loading" };
+        },
+        peek: (status) => {
+          peeked.push(status.key);
+          return cached;
+        },
+        version: () => 0,
+        retain: () => {},
+        subscribe: () => () => {},
+        dispose: () => {},
+      }}
+    >
+      <CommandPalette
+        open
+        onClose={options.onClose ?? (() => {})}
+        host={host}
+        context={{ subject: { page: "home" } }}
+        translator={translator}
+      />
+    </BrowserRuntimeProvider>,
+  );
+
+  return host;
+}
+
+const rows = (): string[] => screen.queryAllByRole("listitem").map((row) => row.textContent ?? "");
+
+describe("the command palette", () => {
+  /**
+   * Главное, ради чего команды ядра объявлены данными хоста: на чистой установке без единого
+   * плагина палитре есть что показать.
+   */
+  it("has commands to show with no plugin installed at all", () => {
+    palette();
+
+    expect(rows()).toContain("New session");
+    expect(rows().length).toBeGreaterThan(1);
+  });
+
+  /** Для человека это одинаковые действия, поэтому источник в списке не выделен ничем. */
+  it("puts the commands of the core and of a plugin into one list", () => {
+    palette({ contributions: [runCommand] });
+
+    expect(rows()).toContain("New session");
+    expect(rows()).toContain("Run the board");
+  });
+
+  it("filters by a substring of the title", () => {
+    palette({ contributions: [runCommand] });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find a command" }), {
+      target: { value: "board" },
+    });
+
+    expect(rows()).toEqual(["Run the board"]);
+  });
+
+  it("says so when nothing goes by that name", () => {
+    palette();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find a command" }), {
+      target: { value: "nothing of the sort" },
+    });
+
+    expect(screen.getByText("No command goes by that name")).toBeDefined();
+    expect(rows()).toEqual([]);
+  });
+
+  it("runs a core command and closes itself", () => {
+    const onClose = vi.fn();
+    const host = palette({ onClose });
+
+    fireEvent.click(screen.getByRole("button", { name: "New session" }));
+
+    expect(host.navigate).toHaveBeenCalledWith({ kind: "new-session" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("runs a plugin command through the same list", async () => {
+    const ran: string[] = [];
+
+    palette({ contributions: [runCommand], ran });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Run the board" }));
+    });
+
+    expect(ran).toEqual(["plugin command"]);
+  });
+
+  it("runs the first available command on Enter", () => {
+    const host = palette();
+
+    const field = screen.getByRole("searchbox", { name: "Find a command" });
+
+    fireEvent.change(field, { target: { value: "archive" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    expect(host.navigate).toHaveBeenCalledWith({ kind: "session-archive" });
+  });
+
+  /**
+   * Палитра читает только снимок: чтобы показать команды плагинов, загружать их бандлы не нужно.
+   * Иначе открытие палитры тянуло бы код каждого установленного плагина разом.
+   */
+  it("shows plugin commands without loading a single bundle", () => {
+    palette({ contributions: [runCommand], cacheEmpty: true });
+
+    expect(rows()).toContain("Run the board");
+    expect(screen.getByRole("button", { name: "Run the board" })).toBeDefined();
+    expect(peeked).toEqual([placed.key]);
+    expect(asked).toEqual([]);
+  });
+
+  it("keeps a cached unavailable plugin command visible as a disabled button", () => {
+    palette({
+      contributions: [runCommand],
+      pluginModule: { RunCommand: { run: () => {}, available: () => false } },
+    });
+
+    expect(rows()).toContain("Run the board");
+    const button = screen.getByRole("button", { name: "Run the board" });
+
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(asked).toEqual([]);
+  });
+
+  it("contains a broken plugin availability predicate and reports it after render", async () => {
+    const diagnostics: string[] = [];
+
+    palette({
+      contributions: [runCommand],
+      pluginModule: {
+        RunCommand: {
+          run: () => {},
+          available: () => {
+            throw new Error("availability broke");
+          },
+        },
+      },
+      onDiagnostic: (text) => diagnostics.push(text),
+    });
+
+    expect(rows()).toContain("Run the board");
+    const button = screen.getByRole("button", { name: "Run the board" });
+
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    await act(async () => {});
+    expect(diagnostics).toEqual([
+      "the command placed.run could not determine availability: availability broke",
+    ]);
+  });
+
+  it("closes on Escape", () => {
+    const onClose = vi.fn();
+
+    palette({ onClose });
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  /** Недоступная команда сохраняет геометрию строки, но нативная кнопка не принимает выбор. */
+  it("leaves an unavailable command in the list as a disabled button", () => {
+    palette({ layout: { ...defaultLayout, rightHidden: true } });
+
+    expect(rows()).toContain("Hide the side panel");
+    const hidden = screen.getByRole("button", { name: "Hide the side panel" });
+
+    expect(hidden.hasAttribute("disabled")).toBe(true);
+    expect(hidden.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("button", { name: "Show the side panel" })).toBeDefined();
+  });
+});
+
+describe("the command palette shortcut", () => {
+  function Probe(): ReactNode {
+    const [count, setCount] = useState(0);
+
+    useCommandPaletteShortcut(() => setCount((previous) => previous + 1));
+
+    return <p>{`opened ${count}`}</p>;
+  }
+
+  it("opens on Cmd or Ctrl+K and takes the chord away from the browser", () => {
+    render(<Probe />);
+
+    const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true });
+
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.getByText("opened 1")).toBeDefined();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "K", metaKey: true }));
+    });
+
+    expect(screen.getByText("opened 2")).toBeDefined();
+  });
+
+  it("leaves a bare k alone", () => {
+    render(<Probe />);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k" }));
+    });
+
+    expect(screen.getByText("opened 0")).toBeDefined();
+  });
+
+  it.each([
+    { ctrlKey: true, shiftKey: true },
+    { ctrlKey: true, altKey: true },
+    { metaKey: true, shiftKey: true },
+    { metaKey: true, altKey: true },
+    { metaKey: true, ctrlKey: true },
+  ])("leaves modified Cmd or Ctrl+K chords alone", (modifiers) => {
+    render(<Probe />);
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      cancelable: true,
+      ...modifiers,
+    });
+
+    act(() => window.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.getByText("opened 0")).toBeDefined();
+  });
+});

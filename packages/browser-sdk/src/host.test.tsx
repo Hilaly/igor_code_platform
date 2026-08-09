@@ -37,7 +37,9 @@ afterEach(() => {
 const pending: PluginModuleLoad = { kind: "loading" };
 
 type FakeCache = PluginModuleCache & {
-  moduleOf: Mock<PluginModuleCache["moduleOf"]>;
+  load: Mock<PluginModuleCache["load"]>;
+  peek: Mock<PluginModuleCache["peek"]>;
+  version: Mock<PluginModuleCache["version"]>;
   retain: Mock<PluginModuleCache["retain"]>;
   subscribe: Mock<PluginModuleCache["subscribe"]>;
   dispose: Mock<PluginModuleCache["dispose"]>;
@@ -50,8 +52,12 @@ function fakeCache(initial: Record<string, PluginModuleLoad> = {}): {
   const loads = new Map(Object.entries(initial));
   const listeners = new Set<() => void>();
   const keyOf = (status: PluginStatus) => `${status.key}@${status.browser?.revision ?? ""}`;
+  const known = (status: PluginStatus) => loads.get(keyOf(status));
+  let version = 0;
   const cache: FakeCache = {
-    moduleOf: vi.fn((status) => loads.get(keyOf(status)) ?? pending),
+    load: vi.fn((status) => known(status) ?? pending),
+    peek: vi.fn(known),
+    version: vi.fn(() => version),
     retain: vi.fn(),
     subscribe: vi.fn((listener) => {
       listeners.add(listener);
@@ -64,6 +70,7 @@ function fakeCache(initial: Record<string, PluginModuleLoad> = {}): {
     cache,
     set(status, load) {
       loads.set(keyOf(status), load);
+      version += 1;
       for (const listener of [...listeners]) listener();
     },
   };
@@ -249,7 +256,7 @@ describe("BrowserRuntimeProvider lifecycle", () => {
 
       if (runtime !== undefined) {
         observed.push(runtime);
-        runtime.cache.moduleOf(firstPlugin);
+        runtime.cache.load(firstPlugin);
       }
 
       return null;
@@ -265,11 +272,11 @@ describe("BrowserRuntimeProvider lifecycle", () => {
     expect(observed).toHaveLength(2);
     expect(new Set(observed.map((runtime) => runtime.cache)).size).toBe(1);
 
-    const used = caches.filter((cache) => cache.moduleOf.mock.calls.length > 0);
-    const discarded = caches.filter((cache) => cache.moduleOf.mock.calls.length === 0);
+    const used = caches.filter((cache) => cache.load.mock.calls.length > 0);
+    const discarded = caches.filter((cache) => cache.load.mock.calls.length === 0);
 
     expect(used).toHaveLength(1);
-    expect(used[0]?.moduleOf).toHaveBeenCalledTimes(2);
+    expect(used[0]?.load).toHaveBeenCalledTimes(2);
     expect(discarded).toHaveLength(1);
     expect(discarded[0]?.retain).not.toHaveBeenCalled();
 
@@ -324,7 +331,7 @@ describe("core places", () => {
     );
 
     expect(screen.getByText("built-in")).toBeTruthy();
-    expect(cache.moduleOf).not.toHaveBeenCalled();
+    expect(cache.load).not.toHaveBeenCalled();
   });
 
   it("applies neither claimant of equal rank and says so once", () => {
@@ -355,7 +362,7 @@ describe("core places", () => {
     expect(screen.getByText("built-in")).toBeTruthy();
     expect(onDiagnostic).toHaveBeenCalledTimes(1);
     expect(onDiagnostic.mock.calls[0]?.[0]).toContain("first.panel, second.panel");
-    expect(cache.moduleOf).not.toHaveBeenCalled();
+    expect(cache.load).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -457,6 +464,7 @@ describe("core places", () => {
   });
 
   it("orders a collection and isolates a failing instance", () => {
+    const collectionId = "core.sidebar.sections";
     const plugins = [status("late", "data"), status("early", "data"), status("broken", "data")];
     const onDiagnostic = vi.fn();
     const { cache } = fakeCache({
@@ -471,11 +479,11 @@ describe("core places", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
-      provider(<HostPlaceCollection id={placeId} context={context} />, {
+      provider(<HostPlaceCollection id={collectionId} context={context} />, {
         contributions: [
-          component("late", "data", placeId, { order: 2 }),
-          component("early", "data", placeId, { order: 1 }),
-          component("broken", "data", placeId, { order: 3 }),
+          component("late", "data", collectionId, { order: 2 }),
+          component("early", "data", collectionId, { order: 1 }),
+          component("broken", "data", collectionId, { order: 3 }),
         ],
         plugins,
         onDiagnostic,
@@ -516,7 +524,7 @@ describe("plugin-owned single places", () => {
 
     expect(screen.getByText("owner:work")).toBeTruthy();
     expect(onDiagnostic).not.toHaveBeenCalled();
-    expect(cache.moduleOf).toHaveBeenCalledWith(placed);
+    expect(cache.load).toHaveBeenCalledWith(placed);
   });
 
   it("replaces the owner and passes the same context", () => {
@@ -579,7 +587,7 @@ describe("plugin-owned single places", () => {
     expect(screen.getByText("owner")).toBeTruthy();
     expect(onDiagnostic).toHaveBeenCalledTimes(1);
     expect(onDiagnostic.mock.calls[0]?.[0]).toContain("first.board, second.board");
-    expect(cache.moduleOf.mock.calls.every(([plugin]) => plugin === placed)).toBe(true);
+    expect(cache.load.mock.calls.every(([plugin]) => plugin === placed)).toBe(true);
   });
 
   it.each([
@@ -645,7 +653,7 @@ describe("plugin-owned single places", () => {
 
     expect(document.body.textContent).toBe("");
     expect(onDiagnostic).not.toHaveBeenCalled();
-    expect(cache.moduleOf).not.toHaveBeenCalled();
+    expect(cache.load).not.toHaveBeenCalled();
   });
 
   it.each(["Board", undefined])(
@@ -668,10 +676,10 @@ describe("plugin-owned single places", () => {
 
       if (builtIn === undefined) {
         expect(document.body.textContent).toBe("");
-        expect(cache.moduleOf).not.toHaveBeenCalled();
+        expect(cache.load).not.toHaveBeenCalled();
       } else {
         expect(screen.getByText("owner")).toBeTruthy();
-        expect(cache.moduleOf).toHaveBeenCalledWith(placed);
+        expect(cache.load).toHaveBeenCalledWith(placed);
       }
     },
   );
@@ -690,7 +698,7 @@ describe("plugin-owned single places", () => {
       );
 
       expect(document.body.textContent).toBe("");
-      expect(cache.moduleOf).not.toHaveBeenCalled();
+      expect(cache.load).not.toHaveBeenCalled();
     },
   );
 });
@@ -783,8 +791,95 @@ describe.each(["collection", "action"] as const)("plugin-owned %s places", (card
     );
 
     expect(document.body.textContent).toBe("");
-    expect(cache.moduleOf).not.toHaveBeenCalled();
+    expect(cache.load).not.toHaveBeenCalled();
   });
+
+  it(`renders an assigned command only when the place is action`, () => {
+    const alpha = status("alpha", "data");
+    const { cache } = fakeCache();
+
+    render(
+      provider(<PlaceCollection id={placeId} context={{}} />, {
+        contributions: [
+          declaration,
+          {
+            ownership: "plugin",
+            pluginKey: alpha.key,
+            pluginId: "alpha",
+            source: "data",
+            kind: "command",
+            id: "alpha.run",
+            declaredId: "run",
+            title: "Run alpha",
+            export: "RunCommand",
+            placeId,
+          },
+        ],
+        plugins: [alpha],
+        cache,
+      }),
+    );
+
+    const button = screen.queryByRole("button", { name: "Run alpha" });
+
+    if (cardinality === "action") {
+      expect(button).toBeTruthy();
+    } else {
+      expect(button).toBeNull();
+    }
+  });
+});
+
+it("uses distinct React keys for a component and command with the same id", () => {
+  const alpha = status("alpha", "data");
+  const action = board({
+    id: "placed.action",
+    declaredId: "action",
+    cardinality: "action",
+    replaceable: false,
+    builtIn: undefined,
+  });
+  const { cache } = fakeCache({
+    "data:alpha@r1": loaded({
+      Item: () => <button type="button">Component alpha</button>,
+      RunCommand: { run: () => {} },
+    }),
+  });
+  const onError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  render(
+    provider(<PlaceCollection id={action.id} context={{}} />, {
+      contributions: [
+        action,
+        component("alpha", "data", action.id, {
+          id: "alpha.shared",
+          export: "Item",
+        }),
+        {
+          ownership: "plugin",
+          pluginKey: alpha.key,
+          pluginId: "alpha",
+          source: "data",
+          kind: "command",
+          id: "alpha.shared",
+          declaredId: "shared",
+          title: "Command alpha",
+          export: "RunCommand",
+          placeId: action.id,
+        },
+      ],
+      plugins: [alpha],
+      cache,
+    }),
+  );
+
+  expect(screen.getByRole("button", { name: "Component alpha" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Command alpha" })).toBeTruthy();
+  expect(
+    onError.mock.calls.some(([message]) =>
+      String(message).includes("Encountered two children with the same key"),
+    ),
+  ).toBe(false);
 });
 
 it("does not render a single declaration through PlaceCollection", () => {
@@ -799,7 +894,7 @@ it("does not render a single declaration through PlaceCollection", () => {
   );
 
   expect(document.body.textContent).toBe("");
-  expect(cache.moduleOf).not.toHaveBeenCalled();
+  expect(cache.load).not.toHaveBeenCalled();
 });
 
 describe("instance boundary identity", () => {

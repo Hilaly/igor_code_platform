@@ -355,6 +355,38 @@ describe("hiding and restoring the panels", () => {
     });
   });
 
+  /**
+   * Полоса не объявляет себя вкладками ARIA: у тех выбрана ровно одна, а здесь повторный щелчок
+   * закрывает открытую. Кнопки-переключатели описывают это честно, а `role="tab"` — нет.
+   */
+  it("announces the tab strip as toggle buttons, not as an ARIA tablist", () => {
+    show({
+      layout: rightVisible,
+      tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
+    });
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("button", { name: "Вид" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  /**
+   * Вклад исчезает из снимка на каждой пересборке плагина. Стереть забытый идентификатор значило бы
+   * закрывать вкладку человека при каждой правке исходников, поэтому раскладка не трогается, а
+   * панель показывает заглушку и возвращает ту же вкладку, когда вклад вернулся.
+   */
+  it("keeps the remembered tab while its contribution is gone", () => {
+    const { onLayoutChange, again } = show({ layout: rightVisible, tabs: [] });
+
+    expect(screen.getByText("вкладок нет")).toBeDefined();
+    expect(onLayoutChange).not.toHaveBeenCalled();
+
+    again(rightVisible, {
+      tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
+    });
+
+    expect(screen.getByText("вид")).toBeDefined();
+  });
+
   it("the right panel is hidden by default", () => {
     show();
 

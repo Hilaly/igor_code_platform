@@ -31,32 +31,32 @@
 **Публичность объявляется в документе, который описывает интерфейс.** Правило применяется к тому, что
 названо публичным явно; «видно из кода» публичным не делает.
 
-| Поверхность                                                                                                 | Где описана                                          |
-| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `@sovereign/sdk` и `@sovereign/sdk/testing`                                                                 | [plugins.md](plugins.md)                             |
-| Основной entrypoint `@sovereign/browser-sdk`: `Place`, `PlaceCollection`; типы `PlaceContext`, `PlaceProps` | [ui-extension-model.md](ui-extension-model.md)       |
-| Поверхность `providers.*` и её типы в SDK                                                                   | [models-and-providers.md](models-and-providers.md)   |
-| Отбор инструментов и скилов агента                                                                          | [plugins.md](plugins.md)                             |
-| Манифест: поле `sovereign` и состав его полей                                                               | [plugins.md](plugins.md)                             |
-| Виды вкладов и состав каждого                                                                               | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
-| Имена мест и правила разрешения провайдеров                                                                 | [ui-extension-model.md](ui-extension-model.md)       |
-| `toolCallPlaceId(toolName)` и семейство `core.session.tool-call.*`                                          | [ui-extension-model.md](ui-extension-model.md)       |
-| Реестр модулей хоста: ключ и состав                                                                         | [ui-extension-model.md](ui-extension-model.md)       |
-| Адрес браузерных ассетов плагина и заголовки                                                                | [web-api.md](web-api.md)                             |
-| Контракт CSS Modules браузерной части плагина                                                               | [ui-extension-model.md](ui-extension-model.md)       |
-| UI-кит: компоненты и их свойства                                                                            | [ui-kit.md](ui-kit.md)                               |
-| Семантические токены и политика устаревания                                                                 | [ui-kit.md](ui-kit.md)                               |
-| Палитра, форма схемы и `tokenContractMajor`                                                                 | [ui-kit.md](ui-kit.md)                               |
-| HTTP API ядра и форма SSE-потока                                                                            | [web-api.md](web-api.md)                             |
-| Проектные каталоги агентов и файловых ресурсов                                                              | [plugins.md](plugins.md)                             |
-| Схемы событий ядра                                                                                          | [event-bus.md](event-bus.md)                         |
-| Хуки: перечень, виды, слияние, форма отказа                                                                 | [hooks.md](hooks.md)                                 |
-| Типы событий Pi, реэкспортированные из `sdk`                                                                | [hooks.md](hooks.md)                                 |
-| Поверхность `sessions.*` и её типы в SDK                                                                    | [sessions-and-projects.md](sessions-and-projects.md) |
-| Хранилище плагина: ключ и папка                                                                             | [plugins.md](plugins.md)                             |
-| Поверхность `storage.*` и её типы в SDK                                                                     | [plugins.md](plugins.md)                             |
-| Маршруты плагина: адрес, форма запроса, ответ                                                               | [web-api.md](web-api.md)                             |
-| Снимок конфликтов адресов маршрутов                                                                         | [web-api.md](web-api.md)                             |
+| Поверхность                                                                                                                                                                                                 | Где описана                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `@sovereign/sdk` и `@sovereign/sdk/testing`                                                                                                                                                                 | [plugins.md](plugins.md)                             |
+| Основной entrypoint `@sovereign/browser-sdk`: `Place`, `PlaceCollection`, `PlaceTabs`, `useCommands`, `useCommandCatalog`; типы `PlaceContext`, `PlaceProps`, `Command`, `CommandInvoker`, `CommandOutcome` | [ui-extension-model.md](ui-extension-model.md)       |
+| Поверхность `providers.*` и её типы в SDK                                                                                                                                                                   | [models-and-providers.md](models-and-providers.md)   |
+| Отбор инструментов и скилов агента                                                                                                                                                                          | [plugins.md](plugins.md)                             |
+| Манифест: поле `sovereign`, состав его полей и зарезервированный идентификатор `core`                                                                                                                       | [plugins.md](plugins.md)                             |
+| Виды вкладов и состав каждого                                                                                                                                                                               | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
+| Имена мест и правила разрешения провайдеров                                                                                                                                                                 | [ui-extension-model.md](ui-extension-model.md)       |
+| `toolCallPlaceId(toolName)` и семейство `core.session.tool-call.*`                                                                                                                                          | [ui-extension-model.md](ui-extension-model.md)       |
+| Реестр модулей хоста: ключ и состав                                                                                                                                                                         | [ui-extension-model.md](ui-extension-model.md)       |
+| Адрес браузерных ассетов плагина и заголовки                                                                                                                                                                | [web-api.md](web-api.md)                             |
+| Контракт CSS Modules браузерной части плагина                                                                                                                                                               | [ui-extension-model.md](ui-extension-model.md)       |
+| UI-кит: компоненты и их свойства                                                                                                                                                                            | [ui-kit.md](ui-kit.md)                               |
+| Семантические токены и политика устаревания                                                                                                                                                                 | [ui-kit.md](ui-kit.md)                               |
+| Палитра, форма схемы и `tokenContractMajor`                                                                                                                                                                 | [ui-kit.md](ui-kit.md)                               |
+| HTTP API ядра и форма SSE-потока                                                                                                                                                                            | [web-api.md](web-api.md)                             |
+| Проектные каталоги агентов и файловых ресурсов                                                                                                                                                              | [plugins.md](plugins.md)                             |
+| Схемы событий ядра                                                                                                                                                                                          | [event-bus.md](event-bus.md)                         |
+| Хуки: перечень, виды, слияние, форма отказа                                                                                                                                                                 | [hooks.md](hooks.md)                                 |
+| Типы событий Pi, реэкспортированные из `sdk`                                                                                                                                                                | [hooks.md](hooks.md)                                 |
+| Поверхность `sessions.*` и её типы в SDK                                                                                                                                                                    | [sessions-and-projects.md](sessions-and-projects.md) |
+| Хранилище плагина: ключ и папка                                                                                                                                                                             | [plugins.md](plugins.md)                             |
+| Поверхность `storage.*` и её типы в SDK                                                                                                                                                                     | [plugins.md](plugins.md)                             |
+| Маршруты плагина: адрес, форма запроса, ответ                                                                                                                                                               | [web-api.md](web-api.md)                             |
+| Снимок конфликтов адресов маршрутов                                                                                                                                                                         | [web-api.md](web-api.md)                             |
 
 Публичная поверхность кита — это ровно то, что он экспортирует из `src/index.ts`: примитивы,
 токены (палитра, роли, объявление схемы, `applyRoles` и `applyScale`), список схем поставки
@@ -65,11 +65,14 @@
 (`components/roving-focus.ts`): это внутренности двух конкретных примитивов, а не то, из чего строят
 интерфейс.
 
-Основной entrypoint `@sovereign/browser-sdk` стабилен и сейчас отдаёт на исполнении ровно `Place` и
-`PlaceCollection`, а типами — `PlaceContext` и `PlaceProps`. Подпуть
-`@sovereign/browser-sdk/host` предназначен только для `apps/web` и публичным контрактом автора
-плагина не является. Browser SDK не реэкспортирует UI-кит: первый отвечает за взаимодействие
-браузерного UI плагина с платформой, второй — за его вид.
+Основной entrypoint `@sovereign/browser-sdk` стабилен и сейчас отдаёт на исполнении ровно `Place`,
+`PlaceCollection`, `PlaceTabs`, `useCommands` и `useCommandCatalog`, а типами — `PlaceContext`,
+`PlaceProps`, `Command`, `CommandInvoker` и `CommandOutcome`. Подпути
+`@sovereign/browser-sdk/host` и `@sovereign/browser-sdk/tabs` предназначены только для `apps/web` и
+публичным контрактом автора плагина не являются. Browser SDK не реэкспортирует UI-кит: первый
+отвечает за взаимодействие браузерного UI плагина с платформой, второй — за его вид. Зависеть от кита
+SDK при этом вправе и зависит: полосу вкладок и кнопку команды рисует он сам, а стабильность кита это
+позволяет.
 
 **Мажорная версия React — часть контракта, хотя своей строки в таблице у неё нет.** Браузерная часть
 плагина получает React из реестра модулей хоста, а не привозит свой
@@ -94,12 +97,16 @@
 минор; убрать место или сузить его контекст — мажор.
 
 ```ts
-type PlaceCardinality = "single" | "collection" | "action";
+type PlaceCardinality = "single" | "collection" | "action" | "tabs";
 type PlaceContext = {
   project?: string;
   subject?: Readonly<Record<string, string>>;
 };
 ```
+
+Пассивное отображение команды — кнопка или строка палитры — не загружает browser-бандл ради
+метаданных или доступности. До первой загрузки команда считается доступной; уже загруженный
+дескриптор может обновить это состояние через `available` одинаково во всех представлениях хоста.
 
 Ключи `subject` — часть контракта места, а не свободная форма: вклад читает их по именам из таблицы
 мест. Значения — только строки: контекст пересекает границу «хост → компонент плагина» и обязан

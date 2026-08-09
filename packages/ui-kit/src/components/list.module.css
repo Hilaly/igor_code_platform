@@ -44,8 +44,12 @@
   overflow: visible;
   white-space: normal;
 }
-.select:hover {
+.select:hover:not(:disabled) {
   background: var(--sovereign-control-surface-hover);
+}
+.select:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 .actions {
   position: absolute;

@@ -36,7 +36,13 @@ import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
-import { BrowserRuntimeProvider, HostPlace, HostPlaceCollection } from "./places/place-host.tsx";
+import { CommandPalette, useCommandPaletteShortcut } from "./commands/command-palette.tsx";
+import {
+  BrowserRuntimeProvider,
+  HostPlace,
+  HostPlaceCollection,
+  useHostPlaceTabs,
+} from "./places/place-host.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
@@ -74,7 +80,7 @@ import { UsageView } from "./usage/usage-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { describePage, PageView } from "./shell/page.tsx";
-import { Shell } from "./shell/shell.tsx";
+import { Shell, type ShellProps } from "./shell/shell.tsx";
 
 /** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
 type Access = AuthenticationState | "asking";
@@ -121,8 +127,15 @@ export function App() {
   const [loginRefusal, setLoginRefusal] = useState<string | undefined>(undefined);
   const [loginBusy, setLoginBusy] = useState(false);
   const [expired, setExpired] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
 
   const authenticated = access === "authenticated";
+  const rightUnavailable =
+    page.kind === "settings" || page.kind === "settings-project" || page.kind === "settings-plugin";
+
+  // Аккорд слушается всегда, но палитра сама себя не покажет неаутентифицированному: до входа
+  // оболочки на экране нет вовсе.
+  useCommandPaletteShortcut(useCallback(() => setCommandsOpen(true), []));
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
   useEffect(() => navigation.subscribe(setPage), [navigation]);
@@ -566,7 +579,8 @@ export function App() {
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
     >
-      <Shell
+      <ShellWithPlaceTabs
+        tabsContext={pageContext}
         layout={layout}
         onLayoutChange={setLayout}
         contentMode={page.kind === "session" ? "contained" : "page"}
@@ -580,7 +594,14 @@ export function App() {
           showLeft: translator.t("panel.left.show"),
           showRight: translator.t("panel.right.show"),
         }}
-        headerActions={<HostPlaceCollection id="core.view.header.actions" context={pageContext} />}
+        headerActions={
+          <>
+            <Button size="sm" onClick={() => setCommandsOpen(true)}>
+              {translator.t("commands.open")}
+            </Button>
+            <HostPlaceCollection id="core.view.header.actions" context={pageContext} />
+          </>
+        }
         navigation={
           <>
             <SidebarProjects
@@ -629,12 +650,7 @@ export function App() {
             translator={translator}
           />
         }
-        tabs={[]}
-        rightUnavailable={
-          page.kind === "settings" ||
-          page.kind === "settings-project" ||
-          page.kind === "settings-plugin"
-        }
+        rightUnavailable={rightUnavailable}
       >
         <PageView
           page={page}
@@ -994,7 +1010,33 @@ export function App() {
           }
           translator={translator}
         />
-      </Shell>
+        <CommandPalette
+          open={commandsOpen}
+          onClose={() => setCommandsOpen(false)}
+          host={{
+            navigate: navigation.navigate,
+            layout,
+            onLayoutChange: setLayout,
+            rightUnavailable,
+          }}
+          context={pageContext}
+          translator={translator}
+        />
+      </ShellWithPlaceTabs>
     </BrowserRuntimeProvider>
+  );
+}
+
+/**
+ * Оболочка, у которой вкладки правой панели приезжают из места `core.panel.tabs`. Отдельный
+ * компонент нужен потому, что набор берётся хуком, а хук читает контекст браузерного рантайма —
+ * тот самый провайдер, внутри которого оболочка и стоит.
+ */
+function ShellWithPlaceTabs({
+  tabsContext,
+  ...shell
+}: Omit<ShellProps, "tabs"> & { tabsContext: PlaceContext }) {
+  return (
+    <Shell {...shell} tabs={useHostPlaceTabs({ id: "core.panel.tabs", context: tabsContext })} />
   );
 }

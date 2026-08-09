@@ -12,8 +12,10 @@
 
 import {
   projectOfContribution,
+  type CommandContributionRegistration,
   type ComponentContributionRegistration,
   type ContributionRegistration,
+  type PlacedContributionRegistration,
   type PlaceContributionRegistration,
   type PlaceCardinality,
 } from "./contribution.ts";
@@ -65,6 +67,11 @@ export const corePlaces = [
   { id: "core.settings.diagnostics", cardinality: "single", replaceable: true },
   /** Секции левой панели под деревом проектов. */
   { id: "core.sidebar.sections", cardinality: "collection", replaceable: false },
+  /**
+   * Вкладки правой панели. Полосой и выбором открытой вкладки владеет оболочка, поэтому место
+   * незаменяемо: вклад приносит содержимое вкладки, а не саму панель.
+   */
+  { id: "core.panel.tabs", cardinality: "tabs", replaceable: false },
   /** Действия в шапке центральной колонки, после действий самого вью. */
   { id: "core.view.header.actions", cardinality: "action", replaceable: false },
 ] as const satisfies readonly CorePlace[];
@@ -135,6 +142,60 @@ export function componentsForPlace(
   );
 }
 
+/**
+ * Всё, что хост расставляет по месту: и компоненты, и команды. Отдельно от `componentsForPlace`,
+ * потому что у той единственный потребитель — разрешение провайдера, а команда одиночное место занять
+ * не может: у неё нет содержимого, и подмешивать её в спор за провайдера значило бы разрешить
+ * заменить вью действием.
+ */
+export function contributionsForPlace(
+  placeId: string,
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): PlacedContributionRegistration[] {
+  const placed = contributions.filter(
+    (registration): registration is PlacedContributionRegistration =>
+      registration.kind === "component" || registration.kind === "command",
+  );
+
+  return registrationsForContext(placed, context).filter(
+    (registration) => registration.placeId === placeId,
+  );
+}
+
+/**
+ * Команда по идентификатору в этом контексте. Живёт рядом с местами, а не отдельно: адрес команды
+ * разрешается **теми же** правилами контекста и ранга источника, и второй набор этих правил разошёлся
+ * бы с первым при первой же правке.
+ *
+ * Команду зовут и по чужому идентификатору — так же, как ссылаются на чужое место.
+ */
+export function resolveCommand(
+  commandId: string,
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): CommandContributionRegistration | undefined {
+  return commandsForContext(contributions, context).find(
+    (registration) => registration.id === commandId,
+  );
+}
+
+/**
+ * Все команды, действующие в этом контексте, по идентификатору. Нужны палитре: она показывает набор
+ * целиком, а не одну команду по имени.
+ */
+export function commandsForContext(
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): CommandContributionRegistration[] {
+  const commands = contributions.filter(
+    (registration): registration is CommandContributionRegistration =>
+      registration.kind === "command",
+  );
+
+  return registrationsForContext(commands, context).sort(byIdentifier);
+}
+
 export function resolvePlaceProvider(
   placeId: string,
   contributions: readonly ContributionRegistration[],
@@ -167,8 +228,8 @@ export function orderPlaceContributions(
   placeId: string,
   contributions: readonly ContributionRegistration[],
   context: PlaceContext,
-): ComponentContributionRegistration[] {
-  return componentsForPlace(placeId, contributions, context).sort((left, right) => {
+): PlacedContributionRegistration[] {
+  return contributionsForPlace(placeId, contributions, context).sort((left, right) => {
     const byGroup = (left.group ?? "").localeCompare(right.group ?? "", "en");
 
     if (byGroup !== 0) {
@@ -182,15 +243,17 @@ export function orderPlaceContributions(
 }
 
 function byIdentifier(
-  left: ComponentContributionRegistration,
-  right: ComponentContributionRegistration,
+  left: PlacedContributionRegistration,
+  right: PlacedContributionRegistration,
 ): number {
   return left.id.localeCompare(right.id, "en");
 }
 
 function registrationsForContext<
-  T extends PlaceContributionRegistration | ComponentContributionRegistration,
+  T extends PlaceContributionRegistration | PlacedContributionRegistration,
 >(registrations: readonly T[], context: PlaceContext): T[] {
+  // Спор равного ранга снимает всех претендентов на идентификатор — то же правило, что у вкладов в
+  // реестре: молча выбранный победитель зависел бы от порядка обхода.
   const applicable = registrations.filter((registration) => {
     const project = projectOfContribution(registration);
 
@@ -216,7 +279,7 @@ function registrationsForContext<
  * declarations have no source specificity and therefore share the base rank.
  */
 function registrationRank(
-  registration: PlaceContributionRegistration | ComponentContributionRegistration,
+  registration: PlaceContributionRegistration | PlacedContributionRegistration,
 ): number {
   return registration.ownership === "plugin" ? pluginSourceRank(registration.source) : 0;
 }
