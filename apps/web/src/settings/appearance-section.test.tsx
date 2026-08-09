@@ -80,6 +80,9 @@ describe("AppearanceSection", () => {
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Colour scheme" }));
+    const schemeList = screen.getByRole("listbox", { name: "Colour scheme" });
+    expect(schemeList.parentElement).toBe(document.body);
+    expect(schemeList.closest('[role="group"]')).toBeNull();
     fireEvent.click(screen.getByRole("option", { name: "Nord (arctic)" }));
     expect(onChange).toHaveBeenLastCalledWith({
       ...preferences,

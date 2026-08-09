@@ -24,6 +24,8 @@ import { Progress } from "./progress.tsx";
 import { RadioGroup } from "./radio-group.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
+import { Select } from "./select.tsx";
+import { SettingsRow } from "./settings-frame.tsx";
 import { Slider } from "./slider.tsx";
 import { Skeleton } from "./skeleton.tsx";
 import { Tabs } from "./tabs.tsx";
@@ -338,6 +340,43 @@ export const Selectors = () => {
         value={scheme}
         onChange={setScheme}
       />
+    </div>
+  );
+};
+
+export const PortalOverlays = () => {
+  const [scheme, setScheme] = useState("sage");
+  const [variant, setVariant] = useState("light");
+
+  return (
+    <div style={{ ...column, maxWidth: "48rem" }}>
+      <SettingsRow label="Colour scheme" description="The list must cover following rows">
+        <Select
+          label=""
+          ariaLabel="Colour scheme"
+          value={scheme}
+          onChange={setScheme}
+          placeholder="Choose a scheme"
+          options={[
+            { value: "imperium", label: "Imperium" },
+            { value: "nord", label: "Nord" },
+            { value: "oled", label: "OLED" },
+            { value: "sage", label: "Sage" },
+          ]}
+        />
+      </SettingsRow>
+      <SettingsRow label="Theme">
+        <SegmentedControl
+          label="Theme"
+          value={variant}
+          onChange={setVariant}
+          options={[
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
+            { value: "system", label: "System" },
+          ]}
+        />
+      </SettingsRow>
     </div>
   );
 };
