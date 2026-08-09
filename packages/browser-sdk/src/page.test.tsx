@@ -75,6 +75,13 @@ function LogPage(): ReactNode {
         deeper
       </button>
       <button onClick={() => navigation.navigate("/../../elsewhere")}>escape</button>
+      <button onClick={() => navigation.navigate("/..\\..\\settings/plugins")}>
+        backslash escape
+      </button>
+      <button onClick={() => navigation.navigate("/%2e%2e\\.%2E\\settings/plugins")}>
+        mixed backslash escape
+      </button>
+      <button onClick={() => navigation.navigate("/entry%5C..%5Clog")}>encoded backslash</button>
       <button onClick={() => navigation.navigate("/", { replace: true })}>root</button>
       <button onClick={() => navigation.navigateCore({ kind: "settings", section: "plugins" })}>
         leave
@@ -149,6 +156,22 @@ describe("usePageNavigation", () => {
 
     expect(navigation.onNavigate).toHaveBeenCalledWith("/elsewhere", {}, false);
   });
+
+  it.each([
+    ["backslash escape", "/settings/plugins"],
+    ["mixed backslash escape", "/settings/plugins"],
+    ["encoded backslash", "/entry%5C..%5Clog"],
+  ])(
+    "treats raw backslashes as separators but keeps encoded ones as data for %s",
+    (label, path) => {
+      const { navigation, element } = host();
+
+      render(element);
+      fireEvent.click(screen.getByText(label));
+
+      expect(navigation.onNavigate).toHaveBeenCalledWith(path, {}, false);
+    },
+  );
 
   it("passes replace through, because a filter must not fill the history", () => {
     const { navigation, element } = host();

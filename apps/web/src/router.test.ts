@@ -187,6 +187,24 @@ describe("pathOf", () => {
     expect(matchPage("/providers/%")).toEqual({ kind: "unknown", path: "/providers/%" });
   });
 
+  it.each([
+    [".", "..", "/p/~%2E/~%2E%2E"],
+    ["..", ".", "/p/~%2E%2E/~%2E"],
+    ["rival/child", "board/child", "/p/rival%2Fchild/board%2Fchild"],
+    ["rival\\child", "board\\child", "/p/rival%5Cchild/board%5Cchild"],
+    ["%2e%2e", "%2F%5C", "/p/%252e%252e/%252F%255C"],
+  ])("round-trips opaque plugin page identifiers %s and %s", (pluginId, pageId, path) => {
+    const page = { kind: "plugin" as const, pluginId, pageId, rest: "" };
+
+    expect(pathOf(page)).toBe(path);
+    expect(matchPage(path)).toEqual(page);
+  });
+
+  it("takes malformed percent encoding in a plugin page identifier for an unknown address", () => {
+    expect(matchPage("/p/%/board")).toEqual({ kind: "unknown", path: "/p/%/board" });
+    expect(matchPage("/p/rival/%")).toEqual({ kind: "unknown", path: "/p/rival/%" });
+  });
+
   it("survives a round trip", () => {
     for (const path of [
       "/",

@@ -241,9 +241,16 @@ export function matchPage(path: string): Page {
   }
 
   if (segments[0] === pluginPagePrefix) {
-    const [, pluginId, pageId, ...rest] = segments;
+    const [, encodedPluginId, encodedPageId, ...rest] = segments;
 
     // Полпути — не страница плагина: адрес без идентификатора страницы открывать нечем.
+    if (encodedPluginId === undefined || encodedPageId === undefined) {
+      return { kind: "unknown", path };
+    }
+
+    const pluginId = decodeOpaqueSegment(encodedPluginId);
+    const pageId = decodeOpaqueSegment(encodedPageId);
+
     if (pluginId === undefined || pageId === undefined) {
       return { kind: "unknown", path };
     }
@@ -277,7 +284,7 @@ export function pathOf(page: Page): string {
     case "settings-project":
       return `${settingsPagePath}/projects/${encodeURIComponent(page.projectId)}`;
     case "plugin":
-      return `/${pluginPagePrefix}/${page.pluginId}/${page.pageId}${page.rest === "" ? "" : `/${page.rest}`}`;
+      return `/${pluginPagePrefix}/${encodeOpaqueSegment(page.pluginId)}/${encodeOpaqueSegment(page.pageId)}${page.rest === "" ? "" : `/${page.rest}`}`;
     case "unknown":
       return page.path;
   }
