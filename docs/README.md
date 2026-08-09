@@ -155,6 +155,8 @@
   для публичных примитивов UI kit, всех вложенных экранов и визуальной сверки с мокапом.
 - [План Projects внутри Settings](superpowers/plans/2026-08-05-settings-projects-section.md) —
   TDD-перенос маршрутов, обоих Projects-вью и полной композиции в единое окно настроек.
+- [Кликабельная строка сущности в Settings](superpowers/specs/2026-08-09-settings-entity-row-design.md) —
+  общий UI-kit паттерн для строк проектов и плагинов с независимыми действиями справа.
 - [Исправления UI polish по повторному ревью](superpowers/specs/2026-08-05-ui-polish-review-fixes-design.md) —
   переносимое усечение пути, доступная подсказка, контрастный бренд-блок и чистая история ветки.
 - [План исправлений UI polish](superpowers/plans/2026-08-05-ui-polish-review-fixes.md) —
