@@ -48,6 +48,27 @@ describe("resolvePluginPageState", () => {
     });
   });
 
+  it("uses the status of the registration that won source resolution", () => {
+    const builtin = { ...placed, key: "builtin:placed", source: "builtin" as const };
+    const dataPage = log;
+    const builtinPage = { ...log, pluginKey: builtin.key, source: builtin.source };
+
+    expect(
+      resolvePluginPageState(
+        snapshot({
+          plugins: [builtin, placed],
+          contributions: [builtinPage, dataPage],
+        }),
+        "placed",
+        "log",
+      ),
+    ).toEqual({
+      kind: "open",
+      registration: dataPage,
+      status: placed,
+    });
+  });
+
   it("waits while the snapshot has not arrived", () => {
     expect(resolvePluginPageState(undefined, "placed", "log")).toEqual({ kind: "waiting" });
   });

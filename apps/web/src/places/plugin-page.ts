@@ -40,11 +40,13 @@ export function resolvePluginPageState(
     windowWideContributions(snapshot.contributions),
     {},
   );
-  const status = windowWideStatus(snapshot.plugins, pluginId);
 
   if (registration !== undefined) {
+    const status = snapshot.plugins.find(({ key }) => key === registration.pluginKey);
     return { kind: "open", registration, ...(status === undefined ? {} : { status }) };
   }
+
+  const status = windowWideStatus(snapshot.plugins, pluginId);
 
   const switchedOff = resolvePluginPage(
     pluginId,
