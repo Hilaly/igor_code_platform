@@ -36,7 +36,12 @@ import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
-import { BrowserRuntimeProvider, HostPlace, HostPlaceCollection } from "./places/place-host.tsx";
+import {
+  BrowserRuntimeProvider,
+  HostPlace,
+  HostPlaceCollection,
+  useHostPlaceTabs,
+} from "./places/place-host.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
@@ -72,7 +77,7 @@ import { SettingsView } from "./settings/settings-view.tsx";
 import { AccountControl } from "./shell/account-control.tsx";
 import { readLayout, writeLayout, type ShellLayout } from "./shell/layout.ts";
 import { describePage, PageView } from "./shell/page.tsx";
-import { Shell } from "./shell/shell.tsx";
+import { Shell, type ShellProps } from "./shell/shell.tsx";
 
 /** Пока состояние входа не спрошено, показывать нечего: и оболочка, и форма были бы догадкой. */
 type Access = AuthenticationState | "asking";
@@ -557,7 +562,8 @@ export function App() {
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
     >
-      <Shell
+      <ShellWithPlaceTabs
+        tabsContext={pageContext}
         layout={layout}
         onLayoutChange={setLayout}
         contentMode={page.kind === "session" ? "contained" : "page"}
@@ -620,7 +626,6 @@ export function App() {
             translator={translator}
           />
         }
-        tabs={[]}
         rightUnavailable={
           page.kind === "settings" ||
           page.kind === "settings-project" ||
@@ -960,7 +965,21 @@ export function App() {
           }
           translator={translator}
         />
-      </Shell>
+      </ShellWithPlaceTabs>
     </BrowserRuntimeProvider>
+  );
+}
+
+/**
+ * Оболочка, у которой вкладки правой панели приезжают из места `core.panel.tabs`. Отдельный
+ * компонент нужен потому, что набор берётся хуком, а хук читает контекст браузерного рантайма —
+ * тот самый провайдер, внутри которого оболочка и стоит.
+ */
+function ShellWithPlaceTabs({
+  tabsContext,
+  ...shell
+}: Omit<ShellProps, "tabs"> & { tabsContext: PlaceContext }) {
+  return (
+    <Shell {...shell} tabs={useHostPlaceTabs({ id: "core.panel.tabs", context: tabsContext })} />
   );
 }

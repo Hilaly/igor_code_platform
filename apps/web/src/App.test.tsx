@@ -14,6 +14,8 @@ import { App } from "./App.tsx";
 
 const selectProject = vi.fn();
 let lastNewSessionContext: unknown;
+let lastTabsRequest: { id: string; context: unknown } | undefined;
+let placeTabs: { id: string; label: string; content: ReactNode }[] = [];
 
 const project = {
   id: "p1",
@@ -127,6 +129,11 @@ vi.mock("./sessions/use-sessions.ts", () => ({
 vi.mock("./places/place-host.tsx", () => ({
   BrowserRuntimeProvider: (props: { children?: ReactNode }) => props.children,
   HostPlaceCollection: () => null,
+  useHostPlaceTabs: (props: { id: string; context: unknown }) => {
+    lastTabsRequest = props;
+
+    return placeTabs;
+  },
   HostPlace: (props: { id: string; context: unknown; builtIn?: ReactNode }) => {
     if (props.id === "core.session.new") {
       lastNewSessionContext = props.context;
@@ -188,6 +195,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   lastNewSessionContext = undefined;
+  lastTabsRequest = undefined;
+  placeTabs = [];
 });
 
 beforeEach(() => {
@@ -205,6 +214,29 @@ beforeEach(() => {
 });
 
 describe("App shell composition", () => {
+  /**
+   * Правая панель общая на всё окно, поэтому контекста проекта у её вкладок нет: плагин из папки
+   * открытого проекта не вправе принести туда вкладку.
+   */
+  it("fills the right panel from the tabs place, in the page context and without a project", async () => {
+    placeTabs = [
+      { id: "placed.board", label: "Board", content: createElement("p", null, "доска") },
+    ];
+    render(<App />);
+
+    await screen.findByRole("navigation", { name: "Navigation" });
+
+    expect(lastTabsRequest).toEqual({
+      id: "core.panel.tabs",
+      context: { subject: { page: "home" } },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show the side panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
+
+    expect(screen.getByText("доска")).toBeDefined();
+  });
+
   it("wires the localized product brand and real new-session action into authenticated navigation", async () => {
     render(<App />);
 

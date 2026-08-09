@@ -187,7 +187,12 @@ export function Shell({
             style={{ width: `${rightWidth}px` }}
           >
             <div className="shell-right-head">
-              <div className="shell-tabs" role="tablist">
+              {/*
+                Не `role="tablist"`: у вкладок ARIA выбрана ровно одна, а здесь повторный щелчок по
+                открытой вкладке закрывает её. Это группа кнопок-переключателей, чем `aria-pressed`
+                у каждой кнопки её и объявляет.
+              */}
+              <div className="shell-tabs">
                 {tabs.map((tab) => (
                   <Button
                     key={tab.id}
