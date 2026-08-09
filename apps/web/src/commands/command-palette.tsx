@@ -7,7 +7,8 @@
  * разница источников видна во вью плагинов.
  */
 
-import { useCommandCatalog, useCommands, type PlaceContext } from "@sovereign/browser-sdk";
+import { useCommands, type PlaceContext } from "@sovereign/browser-sdk";
+import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import { Dialog, Input, List, ListRow, type Translator } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -61,7 +62,7 @@ export function CommandPalette({
   translator,
 }: CommandPaletteProps): ReactNode {
   const { invoke } = useCommands();
-  const catalog = useCommandCatalog(context);
+  const catalog = useHostCommandCatalog(context);
   const [filter, setFilter] = useState("");
 
   // Набранное живёт только пока палитра открыта: следующий вызов начинается с чистого поля.
@@ -79,12 +80,10 @@ export function CommandPalette({
         disabled: command.available?.(host) === false,
         run: () => command.run(host),
       })),
-      ...catalog.map((registration) => ({
+      ...catalog.map(({ registration, disabled }) => ({
         id: registration.id,
         title: registration.title,
-        // Доступность команды плагина знает только её загруженный бандл, и `invoke` ответит
-        // `unavailable`. Гасить строку заранее значило бы решать за код, которого ещё нет.
-        disabled: false,
+        disabled,
         run: () => {
           void invoke(registration.id, context);
         },

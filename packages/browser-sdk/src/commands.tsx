@@ -12,7 +12,7 @@ import {
   type CommandContributionRegistration,
 } from "@sovereign/protocol";
 import { Button } from "@sovereign/ui-kit";
-import { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { useDiagnosticVoice } from "./diagnostics.ts";
@@ -128,6 +128,38 @@ export function useCommandCatalog(context: PlaceContext): CommandContributionReg
   const runtime = useContext(BrowserRuntimeContext);
 
   return runtime === undefined ? [] : commandsForContext(runtime.contributions, context);
+}
+
+export type HostCommandCatalogEntry = {
+  registration: CommandContributionRegistration;
+  disabled: boolean;
+};
+
+/** Каталог хоста дополняет публичные registrations пассивно прочитанной доступностью. */
+export function useHostCommandCatalog(context: PlaceContext): HostCommandCatalogEntry[] {
+  const runtime = useContext(BrowserRuntimeContext);
+  const say = useDiagnosticVoice(runtime);
+  const cacheVersion = useCacheVersion(runtime);
+  const entries = useMemo<Array<HostCommandCatalogEntry & { complaint?: string }>>(() => {
+    if (runtime === undefined) {
+      return [];
+    }
+
+    return commandsForContext(runtime.contributions, context).map((registration) => ({
+      registration,
+      ...cachedAvailability(runtime, registration, context),
+    }));
+  }, [cacheVersion, context, runtime]);
+
+  useEffect(() => {
+    for (const entry of entries) {
+      if (entry.complaint !== undefined) {
+        say(entry.complaint);
+      }
+    }
+  }, [entries, say]);
+
+  return entries;
 }
 
 async function runCommand(
@@ -310,27 +342,87 @@ export type CommandButtonProps = {
 export function CommandButton({ registration, context }: CommandButtonProps): ReactNode {
   const runtime = useContext(BrowserRuntimeContext);
   const { invoke } = useCommands();
-  const status =
-    registration.ownership === "plugin"
-      ? runtime?.plugins.find((plugin) => plugin.key === registration.pluginKey)
-      : undefined;
-  const load = useSyncExternalStore(runtime?.cache.subscribe ?? emptySubscribe, () =>
-    runtime === undefined || status === undefined ? undefined : runtime.cache.load(status),
+  const say = useDiagnosticVoice(runtime);
+  const cacheVersion = useCacheVersion(runtime);
+  const availability = useMemo(
+    () => cachedAvailability(runtime, registration, context),
+    [cacheVersion, context, registration, runtime],
   );
-  const exported = load?.kind === "loaded" ? load.module[registration.export] : undefined;
-  const unavailable = isCommand(exported) && exported.available?.(context) === false;
+
+  useEffect(() => {
+    if (availability.complaint !== undefined) {
+      say(availability.complaint);
+    }
+  }, [availability.complaint, say]);
 
   return (
     <Button
       size="sm"
       tone="secondary"
-      disabled={unavailable}
+      disabled={availability.disabled}
       onClick={() => {
         void invoke(registration.id, context);
       }}
     >
       {registration.title}
     </Button>
+  );
+}
+
+type CachedAvailability = { disabled: boolean; complaint?: string };
+
+function cachedAvailability(
+  runtime: BrowserRuntime | undefined,
+  registration: CommandContributionRegistration,
+  context: PlaceContext,
+): CachedAvailability {
+  if (runtime === undefined || registration.ownership !== "plugin") {
+    return { disabled: false };
+  }
+
+  const status = runtime.plugins.find((plugin) => plugin.key === registration.pluginKey);
+
+  if (status === undefined) {
+    return {
+      disabled: true,
+      complaint: `the command ${registration.id} names the plugin ${registration.pluginKey}, which is not in the snapshot`,
+    };
+  }
+
+  const load = runtime.cache.peek(status);
+
+  if (load === undefined || load.kind === "loading") {
+    return { disabled: false };
+  }
+  if (load.kind === "failed") {
+    return {
+      disabled: true,
+      complaint: `the command ${registration.id} could not be loaded: ${load.reason}`,
+    };
+  }
+
+  try {
+    const command = load.module[registration.export];
+
+    if (!isCommand(command)) {
+      return {
+        disabled: true,
+        complaint: `the plugin ${status.key} exports no command ${registration.export}`,
+      };
+    }
+
+    return { disabled: command.available?.(context) === false };
+  } catch (cause: unknown) {
+    return {
+      disabled: true,
+      complaint: `the command ${registration.id} could not determine availability: ${reasonOf(cause)}`,
+    };
+  }
+}
+
+function useCacheVersion(runtime: BrowserRuntime | undefined): number {
+  return useSyncExternalStore(runtime?.cache.subscribe ?? emptySubscribe, () =>
+    runtime === undefined ? 0 : runtime.cache.version(),
   );
 }
 

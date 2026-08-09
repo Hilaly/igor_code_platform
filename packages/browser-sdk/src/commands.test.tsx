@@ -454,6 +454,26 @@ describe("the command button in an action place", () => {
     expect(screen.getByRole("button", { name: "Run the board" })).toBeTruthy();
   });
 
+  it("reads cached availability without starting a bundle load", () => {
+    const load = vi.fn(() => pending);
+    const peek = vi.fn(() => undefined);
+
+    strip({
+      cache: {
+        load,
+        peek,
+        version: () => 0,
+        retain: () => {},
+        subscribe: () => () => {},
+        dispose: () => {},
+      },
+    });
+
+    expect(peek).toHaveBeenCalledWith(placed);
+    expect(load).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Run the board" })).toHaveProperty("disabled", false);
+  });
+
   it("runs the command when clicked", async () => {
     const ran: unknown[] = [];
 
@@ -472,6 +492,28 @@ describe("the command button in an action place", () => {
     });
 
     expect(screen.getByRole("button", { name: "Run the board" })).toHaveProperty("disabled", true);
+  });
+
+  it("contains a broken availability predicate and disables the button", async () => {
+    const diagnostics: string[] = [];
+
+    strip({
+      cache: readyCache({
+        RunCommand: {
+          run: () => {},
+          available: () => {
+            throw new Error("availability broke");
+          },
+        },
+      }),
+      onDiagnostic: (text) => diagnostics.push(text),
+    });
+
+    expect(screen.getByRole("button", { name: "Run the board" })).toHaveProperty("disabled", true);
+    await act(async () => {});
+    expect(diagnostics).toEqual([
+      "the command placed.run could not determine availability: availability broke",
+    ]);
   });
 
   it("stands in the same order as the components of the strip", () => {

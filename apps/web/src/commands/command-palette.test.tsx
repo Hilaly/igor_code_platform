@@ -14,6 +14,7 @@ import type { CoreCommandHost } from "./core-commands.ts";
 afterEach(() => {
   cleanup();
   asked.length = 0;
+  peeked.length = 0;
 });
 
 const translator = createTranslator({
@@ -45,13 +46,7 @@ const runCommand: ContributionRegistration = {
 };
 
 const asked: string[] = [];
-
-/** Ответ стабилен по ссылке: `useSyncExternalStore` сверяет снимки именно ею. */
-const loadedModule = (() => {
-  let cached: { kind: "loaded"; module: Record<string, unknown> } | undefined;
-
-  return (module: Record<string, unknown>) => (cached ??= { kind: "loaded", module });
-})();
+const peeked: string[] = [];
 
 function palette(
   options: {
@@ -59,9 +54,17 @@ function palette(
     contributions?: readonly ContributionRegistration[];
     onClose?: () => void;
     ran?: string[];
+    cacheEmpty?: boolean;
+    pluginModule?: Record<string, unknown>;
+    onDiagnostic?: (text: string) => void;
   } = {},
 ): CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } {
   const ran = options.ran ?? [];
+  const pluginModule =
+    options.pluginModule ?? ({ RunCommand: { run: () => ran.push("plugin command") } } as const);
+  const cached = options.cacheEmpty
+    ? undefined
+    : ({ kind: "loaded", module: pluginModule } as const);
   const host: CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } = {
     layout: options.layout ?? defaultLayout,
     navigate: vi.fn(),
@@ -72,17 +75,17 @@ function palette(
     <BrowserRuntimeProvider
       contributions={options.contributions ?? []}
       plugins={[placed]}
-      onDiagnostic={() => {}}
+      onDiagnostic={options.onDiagnostic ?? (() => {})}
       cache={{
         load: (status) => {
           asked.push(status.key);
 
-          return loadedModule({ RunCommand: { run: () => ran.push("plugin command") } });
+          return cached ?? { kind: "loading" };
         },
-        peek: () =>
-          loadedModule({
-            RunCommand: { run: () => ran.push("plugin command") },
-          }),
+        peek: (status) => {
+          peeked.push(status.key);
+          return cached;
+        },
         version: () => 0,
         retain: () => {},
         subscribe: () => () => {},
@@ -183,10 +186,47 @@ describe("the command palette", () => {
    * Иначе открытие палитры тянуло бы код каждого установленного плагина разом.
    */
   it("shows plugin commands without loading a single bundle", () => {
-    palette({ contributions: [runCommand] });
+    palette({ contributions: [runCommand], cacheEmpty: true });
 
     expect(rows()).toContain("Run the board");
+    expect(screen.getByRole("button", { name: "Run the board" })).toBeDefined();
+    expect(peeked).toEqual([placed.key]);
     expect(asked).toEqual([]);
+  });
+
+  it("keeps a cached unavailable plugin command visible but unselectable", () => {
+    palette({
+      contributions: [runCommand],
+      pluginModule: { RunCommand: { run: () => {}, available: () => false } },
+    });
+
+    expect(rows()).toContain("Run the board");
+    expect(screen.queryByRole("button", { name: "Run the board" })).toBeNull();
+    expect(asked).toEqual([]);
+  });
+
+  it("contains a broken plugin availability predicate and reports it after render", async () => {
+    const diagnostics: string[] = [];
+
+    palette({
+      contributions: [runCommand],
+      pluginModule: {
+        RunCommand: {
+          run: () => {},
+          available: () => {
+            throw new Error("availability broke");
+          },
+        },
+      },
+      onDiagnostic: (text) => diagnostics.push(text),
+    });
+
+    expect(rows()).toContain("Run the board");
+    expect(screen.queryByRole("button", { name: "Run the board" })).toBeNull();
+    await act(async () => {});
+    expect(diagnostics).toEqual([
+      "the command placed.run could not determine availability: availability broke",
+    ]);
   });
 
   it("closes on Escape", () => {

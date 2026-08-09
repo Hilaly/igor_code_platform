@@ -27,6 +27,8 @@ import {
   type PlaceProps,
 } from "./runtime-context.tsx";
 
+export { useHostCommandCatalog, type HostCommandCatalogEntry } from "./commands.tsx";
+
 export type LoadedPluginModule = Record<string, unknown>;
 
 export type PluginModuleLoad =
