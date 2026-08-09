@@ -349,6 +349,7 @@ export const coreEnglish: CatalogRegistration = {
     "projects.new.title": "New project",
     "projects.new.hint": "The folder is set once and does not change afterwards.",
     "projects.new.submit": "Create the project",
+    "projects.open": "Open {name}",
     "projects.remove.title": "Delete the project \u201c{name}\u201d for good?",
     "projects.remove.confirm": "Delete for good",
     "projects.remove.folder":

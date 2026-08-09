@@ -212,12 +212,14 @@ describe("markup of the ported primitives", () => {
         actions={<button type="button">Switch</button>}
         onSelect={() => {}}
         selectLabel="Open Example"
+        describedBy="entity-description"
       />,
     );
 
     expect(markup).toContain('role="group"');
     expect(markup).toContain('aria-label="Example"');
     expect(markup).toContain('aria-label="Open Example"');
+    expect(markup).toContain('aria-describedby="entity-description"');
     expect(markup).toContain("data:example");
     expect(markup).toContain("Running");
     expect(markup).toContain("Switch");

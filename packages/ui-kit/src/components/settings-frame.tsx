@@ -106,11 +106,13 @@ export function SettingsPage({
 }
 
 type SettingsRowSelection =
-  | { onSelect?: undefined; selectLabel?: never }
+  | { onSelect?: undefined; selectLabel?: never; describedBy?: never }
   | {
       onSelect: () => void;
       /** Accessible name of the full-row selection target. */
       selectLabel: string;
+      /** id of content that gives the full-row target additional context. */
+      describedBy?: string;
     };
 
 export type SettingsRowProps = {
@@ -126,6 +128,7 @@ export function SettingsRow({
   children,
   onSelect,
   selectLabel,
+  describedBy,
 }: SettingsRowProps) {
   return (
     <div
@@ -139,6 +142,7 @@ export function SettingsRow({
           className={styles.rowSelect}
           onClick={onSelect}
           aria-label={selectLabel}
+          aria-describedby={describedBy}
         />
       )}
       <div className={styles.rowCopy}>
@@ -159,6 +163,7 @@ export type SettingsEntityRowProps = {
   actions?: ReactNode;
   onSelect: () => void;
   selectLabel: string;
+  describedBy?: string;
 };
 
 /** A selectable Settings entity with independent metadata and action controls. */
@@ -169,6 +174,7 @@ export function SettingsEntityRow({
   actions,
   onSelect,
   selectLabel,
+  describedBy,
 }: SettingsEntityRowProps) {
   return (
     <SettingsRow
@@ -176,6 +182,7 @@ export function SettingsEntityRow({
       description={description}
       onSelect={onSelect}
       selectLabel={selectLabel}
+      describedBy={describedBy}
     >
       <div className={styles.entityControl}>
         {meta === undefined ? undefined : <div className={styles.entityMeta}>{meta}</div>}

@@ -347,6 +347,7 @@ export const coreRussian: CatalogRegistration = {
     "projects.new.title": "Новый проект",
     "projects.new.hint": "Папка задаётся один раз и потом не меняется.",
     "projects.new.submit": "Создать проект",
+    "projects.open": "Открыть {name}",
     "projects.remove.title": "Удалить проект «{name}» безвозвратно?",
     "projects.remove.confirm": "Удалить безвозвратно",
     "projects.remove.folder": "Папку на диске платформа не трогает: уходит только запись проекта.",
