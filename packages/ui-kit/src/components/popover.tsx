@@ -42,7 +42,6 @@ export function Popover({
   const open = controlledOpen ?? uncontrolledOpen;
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const anchorRef = useRef<HTMLElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -89,13 +88,7 @@ export function Popover({
   }, [open, onOpenChange]);
 
   return (
-    <div
-      className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`}
-      ref={(element) => {
-        rootRef.current = element;
-        anchorRef.current = element?.firstElementChild as HTMLElement | null;
-      }}
-    >
+    <div className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} ref={rootRef}>
       {renderTrigger === undefined ? (
         <button
           type="button"
@@ -111,7 +104,8 @@ export function Popover({
       )}
       <FloatingLayer
         open={open}
-        anchorRef={anchorRef}
+        anchorRef={rootRef}
+        anchorChild
         layerRef={popupRef}
         side={side}
         offset={8}

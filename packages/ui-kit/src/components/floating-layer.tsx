@@ -19,6 +19,7 @@ export type FloatingLayerSide = "top" | "bottom" | "left" | "right";
 export type FloatingLayerProps = {
   open: boolean;
   anchorRef: RefObject<HTMLElement | null>;
+  anchorChild?: boolean;
   children: ReactNode;
   side?: FloatingLayerSide;
   matchAnchorWidth?: boolean;
@@ -112,6 +113,7 @@ function geometry(
 export function FloatingLayer({
   open,
   anchorRef,
+  anchorChild = false,
   children,
   side = "bottom",
   matchAnchorWidth = false,
@@ -142,7 +144,11 @@ export function FloatingLayer({
     let active = true;
 
     const update = () => {
-      const anchor = anchorRef.current;
+      const anchorRoot = anchorRef.current;
+      const anchor =
+        anchorChild && anchorRoot?.firstElementChild instanceof HTMLElement
+          ? anchorRoot.firstElementChild
+          : anchorRoot;
       const layer = layerRef.current;
       if (!active || !anchor || !layer) return;
       setResolved(
@@ -161,7 +167,6 @@ export function FloatingLayer({
     };
 
     update();
-    queueMicrotask(update);
     ownerWindow.addEventListener("resize", update);
     ownerWindow.addEventListener("scroll", update, true);
     return () => {
@@ -169,7 +174,7 @@ export function FloatingLayer({
       ownerWindow.removeEventListener("resize", update);
       ownerWindow.removeEventListener("scroll", update, true);
     };
-  }, [anchorRef, layerRef, matchAnchorWidth, narrowBelow, offset, open, side]);
+  }, [anchorChild, anchorRef, layerRef, matchAnchorWidth, narrowBelow, offset, open, side]);
 
   const body =
     anchorRef.current?.ownerDocument.body ??
