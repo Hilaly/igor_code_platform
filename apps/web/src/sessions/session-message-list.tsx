@@ -28,13 +28,13 @@ import {
   StreamingText,
   Text,
   Tooltip,
-  ToolCall,
   type ScopedTranslator,
   type TooltipSide,
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
+import { ToolCallPlace } from "./tool-call-place.tsx";
 
 export type SessionMessageListProps = {
   open: OpenSession;
@@ -218,6 +218,10 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
                   key={entry.id}
                   entry={entry}
                   outcomes={outcomes}
+                  sessionId={open.id}
+                  {...(open.summary?.projectId === undefined
+                    ? {}
+                    : { projectId: open.summary.projectId })}
                   {...(mark === undefined ? {} : { label: mark })}
                   // Метка архивной сессии отклоняется `409`: действия в ней не показываются вовсе, а
                   // у занятой остаются видимыми, но выключенными.
@@ -262,7 +266,15 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
               const item = live?.items[key];
 
               return item === undefined ? undefined : (
-                <LiveMessage key={key} item={item} translator={translator} />
+                <LiveMessage
+                  key={key}
+                  item={item}
+                  sessionId={open.id}
+                  {...(open.summary?.projectId === undefined
+                    ? {}
+                    : { projectId: open.summary.projectId })}
+                  translator={translator}
+                />
               );
             })}
           </>
@@ -316,6 +328,8 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
 function EntryMessage(props: {
   entry: SessionEntry;
   outcomes: Map<string, ToolOutcome>;
+  sessionId: string;
+  projectId?: string;
   /** Действующая метка записи, если она есть. Значение уже свёрнуто состоянием. */
   label?: string;
   /** Чем метку правят. Нет вовсе — метку в этой сессии не поставить: она архивная. */
@@ -324,7 +338,8 @@ function EntryMessage(props: {
   copying?: { copied: boolean; onCopy: () => void };
   translator: ScopedTranslator;
 }) {
-  const { entry, outcomes, label, marking, forking, copying, translator } = props;
+  const { entry, outcomes, sessionId, projectId, label, marking, forking, copying, translator } =
+    props;
   const { t } = translator;
 
   if (entry.kind === "model-change") {
@@ -374,6 +389,8 @@ function EntryMessage(props: {
             key={`${entry.id}:${String(index)}`}
             block={block}
             outcomes={outcomes}
+            sessionId={sessionId}
+            {...(projectId === undefined ? {} : { projectId })}
             translator={translator}
           />
         ))}
@@ -484,9 +501,11 @@ function messageText(entry: Extract<SessionEntry, { kind: "message" }>): string 
 function ContentBlock(props: {
   block: SessionContentBlock;
   outcomes: Map<string, ToolOutcome>;
+  sessionId: string;
+  projectId?: string;
   translator: ScopedTranslator;
 }) {
-  const { block, outcomes, translator } = props;
+  const { block, outcomes, sessionId, projectId, translator } = props;
   const { t } = translator;
 
   if (block.kind === "text") {
@@ -506,7 +525,10 @@ function ContentBlock(props: {
   const status = outcome === undefined ? "running" : outcome.failed ? "failed" : "done";
 
   return (
-    <ToolCall
+    <ToolCallPlace
+      sessionId={sessionId}
+      {...(projectId === undefined ? {} : { projectId })}
+      toolCallId={block.toolCallId}
       icon="◇"
       toolName={block.toolName}
       summary={toolSummary(block.toolName, block.input)}
@@ -520,8 +542,13 @@ function ContentBlock(props: {
   );
 }
 
-function LiveMessage(props: { item: StreamedItem; translator: ScopedTranslator }) {
-  const { item, translator } = props;
+function LiveMessage(props: {
+  item: StreamedItem;
+  sessionId: string;
+  projectId?: string;
+  translator: ScopedTranslator;
+}) {
+  const { item, sessionId, projectId, translator } = props;
   const { t } = translator;
 
   if (item.kind === "tool") {
@@ -530,7 +557,10 @@ function LiveMessage(props: { item: StreamedItem; translator: ScopedTranslator }
 
     return (
       <Message role="agent">
-        <ToolCall
+        <ToolCallPlace
+          sessionId={sessionId}
+          {...(projectId === undefined ? {} : { projectId })}
+          toolCallId={item.toolCallId}
           icon="◇"
           toolName={item.toolName}
           summary={toolSummary(item.toolName, item.input)}
