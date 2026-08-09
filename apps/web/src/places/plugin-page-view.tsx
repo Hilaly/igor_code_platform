@@ -6,8 +6,8 @@
  * живым, чтобы включение вернуло страницу на том же URL.
  */
 
+import type { CoreDestination } from "@sovereign/browser-sdk";
 import { HostPluginPage, type HostPageNavigation } from "@sovereign/browser-sdk/host";
-import type { CoreDestination } from "@sovereign/protocol";
 import { Button, EmptyState, type ScopedTranslator } from "@sovereign/ui-kit";
 import { useMemo, type ReactNode } from "react";
 

@@ -13,7 +13,6 @@ export * from "./filesystem.ts";
 export * from "./health.ts";
 export * from "./hook.ts";
 export * from "./log.ts";
-export * from "./navigation.ts";
 export * from "./places.ts";
 export * from "./plugin-browser.ts";
 export * from "./plugin-lifecycle.ts";

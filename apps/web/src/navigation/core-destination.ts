@@ -6,7 +6,7 @@
  * маршрутов чинится в двух местах, а ломается в одном.
  */
 
-import type { CoreDestination } from "@sovereign/protocol";
+import type { CoreDestination } from "@sovereign/browser-sdk";
 import { normalizePagePath } from "@sovereign/browser-sdk/host";
 
 import type { Location } from "../router.ts";

@@ -4,6 +4,7 @@
  * (docs/web-api.md), и владелец у него один.
  */
 
+import type { CoreDestination } from "@sovereign/browser-sdk";
 import {
   coreEventTypes,
   healthPath,
@@ -11,7 +12,6 @@ import {
   streamGapType,
   type AppearancePreferences,
   type AuthenticationState,
-  type CoreDestination,
   type Health,
   type LoginStepFrame,
   type PlaceContext,

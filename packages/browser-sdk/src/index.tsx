@@ -8,6 +8,7 @@ import {
   type CommandOutcome,
 } from "./commands.tsx";
 import { PluginPlace, PluginPlaceCollection } from "./host.tsx";
+import { settingsSections, type CoreDestination, type SettingsSection } from "./navigation.ts";
 import { usePageNavigation, type PageNavigateOptions, type PageNavigation } from "./page.tsx";
 import type { PlaceContext, PlaceProps } from "./runtime-context.tsx";
 import { PluginPlaceTabs } from "./tabs.tsx";
@@ -16,13 +17,15 @@ export type {
   Command,
   CommandInvoker,
   CommandOutcome,
+  CoreDestination,
   PageNavigateOptions,
   PageNavigation,
   PlaceContext,
   PlaceProps,
+  SettingsSection,
 };
 
-export { useCommandCatalog, useCommands, usePageNavigation };
+export { settingsSections, useCommandCatalog, useCommands, usePageNavigation };
 
 export function Place(props: PlaceProps): ReactNode {
   return <PluginPlace {...props} />;

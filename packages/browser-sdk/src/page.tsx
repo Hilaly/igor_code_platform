@@ -9,10 +9,11 @@
  * живёт в одном месте и проверяется здесь же, а не повторяется у каждого, кто рисует страницу.
  */
 
-import type { CoreDestination, PluginOwnedPageRegistration } from "@sovereign/protocol";
+import type { PluginOwnedPageRegistration } from "@sovereign/protocol";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import { PlaceInstance } from "./host.tsx";
+import type { CoreDestination } from "./navigation.ts";
 import { normalizePagePath } from "./page-path.ts";
 import type { PlaceContext } from "./runtime-context.tsx";
 

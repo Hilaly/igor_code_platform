@@ -5,18 +5,65 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 
 import * as browserSdk from "./index.tsx";
-import { Place, PlaceCollection, PlaceTabs, type PlaceContext } from "./index.tsx";
+import {
+  Place,
+  PlaceCollection,
+  PlaceTabs,
+  settingsSections,
+  type CoreDestination,
+  type PlaceContext,
+  type SettingsSection,
+} from "./index.tsx";
 
 afterEach(cleanup);
 
-it("exports only the public places and the command invoker at runtime", () => {
+it("exports only the public browser SDK surface at runtime", () => {
   expect(Object.keys(browserSdk).sort()).toEqual([
     "Place",
     "PlaceCollection",
     "PlaceTabs",
+    "settingsSections",
     "useCommandCatalog",
     "useCommands",
     "usePageNavigation",
+  ]);
+});
+
+it("exports every public navigation destination from the browser SDK root", () => {
+  const sections: SettingsSection[] = [
+    "projects",
+    "appearance",
+    "usage",
+    "providers",
+    "plugins",
+    "daemon",
+    "diagnostics",
+  ];
+  const destinations: CoreDestination[] = [
+    { kind: "home" },
+    { kind: "session", sessionId: "01JD8Z" },
+    { kind: "new-session" },
+    { kind: "session-archive" },
+    { kind: "settings", section: "plugins" },
+    { kind: "plugin-page", pluginId: "placed", pageId: "log" },
+    {
+      kind: "plugin-page",
+      pluginId: "placed",
+      pageId: "log",
+      path: "/entry/3",
+      query: { filter: "warn" },
+    },
+  ];
+
+  expect(settingsSections).toEqual(sections);
+  expect(destinations.map((destination) => destination.kind)).toEqual([
+    "home",
+    "session",
+    "new-session",
+    "session-archive",
+    "settings",
+    "plugin-page",
+    "plugin-page",
   ]);
 });
 

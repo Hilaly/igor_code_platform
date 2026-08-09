@@ -11,14 +11,11 @@
  * поселить `query?` в одиннадцати местах ради маршрутов, у которых параметров нет ни одного.
  */
 
-import {
-  isSessionId,
-  isSettingsSection,
-  settingsSections,
-  type SettingsSection,
-} from "@sovereign/protocol";
+import { settingsSections, type SettingsSection } from "@sovereign/browser-sdk";
+import { isSettingsSection } from "@sovereign/browser-sdk/host";
+import { isSessionId } from "@sovereign/protocol";
 
-// Перечень разделов переехал в протокол: он и так публичен именами мест `core.settings.<section>`.
+// Перечень разделов живёт в browser SDK: он и так публичен именами мест `core.settings.<section>`.
 // Реэкспорт оставлен, чтобы потребители внутри `apps/web` продолжали брать его у маршрутизатора —
 // раздел для них это прежде всего адрес.
 export { settingsSections, type SettingsSection };
