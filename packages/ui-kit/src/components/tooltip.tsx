@@ -19,8 +19,8 @@ import styles from "./tooltip.module.css";
 export type TooltipSide = "top" | "bottom" | "left" | "right";
 
 export type TooltipProps = {
-  /** Текст подсказки, уже переведённый. */
-  content: string;
+  /** Уже переведённое статическое содержимое подсказки: строка или несколько смысловых секций. */
+  content: ReactNode;
   /** Явный id нужен, когда описание связано с фокусируемым предком триггера. */
   id?: string;
   side?: TooltipSide;

@@ -586,6 +586,28 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('role="tooltip"');
   });
 
+  it("keeps structured static content inside the shared tooltip", () => {
+    const markup = renderToStaticMarkup(
+      <Tooltip
+        content={
+          <div>
+            <span>Context window</span>
+            <hr />
+            <span>Session tokens: 700</span>
+          </div>
+        }
+      >
+        <button type="button">Usage</button>
+      </Tooltip>,
+    );
+
+    const tooltipId = markup.match(/id="([^"]+)" role="tooltip"/)?.[1];
+    expect(tooltipId).toBeDefined();
+    expect(markup).toContain("Context window");
+    expect(markup).toContain("Session tokens: 700");
+    expect(markup).toContain(`aria-describedby="${tooltipId}"`);
+  });
+
   it("connects a tooltip to a UI-kit Button and preserves its description", () => {
     const markup = renderToStaticMarkup(
       <Tooltip content="почему">
