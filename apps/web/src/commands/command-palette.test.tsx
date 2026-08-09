@@ -69,6 +69,7 @@ function palette(
     layout: options.layout ?? defaultLayout,
     navigate: vi.fn(),
     onLayoutChange: vi.fn(),
+    rightUnavailable: false,
   };
 
   render(

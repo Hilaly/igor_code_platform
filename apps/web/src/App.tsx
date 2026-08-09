@@ -130,6 +130,10 @@ export function App() {
   const [commandsOpen, setCommandsOpen] = useState(false);
 
   const authenticated = access === "authenticated";
+  const rightUnavailable =
+    page.kind === "settings" ||
+    page.kind === "settings-project" ||
+    page.kind === "settings-plugin";
 
   // Аккорд слушается всегда, но палитра сама себя не покажет неаутентифицированному: до входа
   // оболочки на экране нет вовсе.
@@ -648,11 +652,7 @@ export function App() {
             translator={translator}
           />
         }
-        rightUnavailable={
-          page.kind === "settings" ||
-          page.kind === "settings-project" ||
-          page.kind === "settings-plugin"
-        }
+        rightUnavailable={rightUnavailable}
       >
         <PageView
           page={page}
@@ -1015,7 +1015,7 @@ export function App() {
         <CommandPalette
           open={commandsOpen}
           onClose={() => setCommandsOpen(false)}
-          host={{ navigate: navigation.navigate, layout, onLayoutChange: setLayout }}
+          host={{ navigate: navigation.navigate, layout, onLayoutChange: setLayout, rightUnavailable }}
           context={pageContext}
           translator={translator}
         />

@@ -13,6 +13,7 @@ import type { ShellLayout } from "../shell/layout.ts";
 export type CoreCommandHost = {
   navigate: (page: Page) => void;
   layout: ShellLayout;
+  rightUnavailable: boolean;
   onLayoutChange: (layout: ShellLayout) => void;
 };
 
@@ -66,13 +67,13 @@ const panels: CoreCommand[] = [
   {
     id: "core.panel.right.show",
     titleKey: "command.panel.right.show",
-    available: (host) => host.layout.rightHidden,
+    available: (host) => !host.rightUnavailable && host.layout.rightHidden,
     run: (host) => host.onLayoutChange({ ...host.layout, rightHidden: false }),
   },
   {
     id: "core.panel.right.hide",
     titleKey: "command.panel.right.hide",
-    available: (host) => !host.layout.rightHidden,
+    available: (host) => !host.rightUnavailable && !host.layout.rightHidden,
     // Ту же вкладку оболочка закрывает и своей кнопкой: скрытая панель открытой вкладки не имеет.
     run: (host) => host.onLayoutChange({ ...host.layout, rightHidden: true, openTab: undefined }),
   },

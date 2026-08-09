@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { defaultLayout } from "../shell/layout.ts";
 import { coreCommands, type CoreCommandHost } from "./core-commands.ts";
 
-function host(layout = defaultLayout): CoreCommandHost & {
+function host(layout = defaultLayout, rightUnavailable = false): CoreCommandHost & {
   navigate: ReturnType<typeof vi.fn>;
   onLayoutChange: ReturnType<typeof vi.fn>;
+  rightUnavailable: boolean;
 } {
-  return { layout, navigate: vi.fn(), onLayoutChange: vi.fn() };
+  return { layout, navigate: vi.fn(), onLayoutChange: vi.fn(), rightUnavailable };
 }
 
 const command = (id: string) => {
@@ -75,6 +76,13 @@ describe("core commands", () => {
     expect(command("core.panel.right.hide").available?.(hidden)).toBe(false);
     expect(command("core.panel.right.show").available?.(shown)).toBe(false);
     expect(command("core.panel.right.hide").available?.(shown)).toBe(true);
+  });
+
+  it("switches off both right-panel commands while the panel is unavailable", () => {
+    const shell = host(defaultLayout, true);
+
+    expect(command("core.panel.right.show").available?.(shell)).toBe(false);
+    expect(command("core.panel.right.hide").available?.(shell)).toBe(false);
   });
 
   /** Скрытая правая панель открытой вкладки не имеет — то же, что делает кнопка оболочки. */
