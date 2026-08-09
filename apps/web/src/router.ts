@@ -1,8 +1,14 @@
 /**
  * Свой маршрутизатор вместо библиотеки: маршрутов ядра единицы, а неймспейс страниц плагина —
  * `/p/<pluginId>/<pageId>/*` — задан моделью расширения (ui-extension-model.md), а не библиотекой.
- * Внешняя библиотека станет вопросом тогда, когда появятся страницы плагинов со своими вложенными
- * маршрутами; до тех пор она была бы зависимостью ради `history.pushState`.
+ *
+ * Вопрос внешней библиотеки задан вместе со страницами плагина и закрыт решением владельца в пользу
+ * своего роутера: вложенные маршруты внутри `/p/…` строит сам плагин своим кодом, и хосту нужен от
+ * них один сегмент базы и хвост строкой.
+ *
+ * Адрес здесь — не путь, а `Location`: путь плюс параметры. `Page` продолжает отвечать за путь,
+ * потому что параметры — вторая ось адреса, и вписывать их в каждый вариант `Page` значило бы
+ * поселить `query?` в одиннадцати местах ради маршрутов, у которых параметров нет ни одного.
  */
 
 import {
@@ -42,9 +48,24 @@ export type Page =
   | { kind: "settings-project"; projectId: string }
   /** Административная деталь плагина; не смешивается с пользовательскими страницами `/p/...`. */
   | { kind: "settings-plugin"; pluginKey: string }
-  /** Страница плагина. Открыть её пока нечем: браузерный код плагина демон ещё не собирает. */
+  /**
+   * Страница плагина. `rest` — хвост адреса после базы, как он стоит в URL: разбирать его на
+   * сегменты — дело самой страницы, только она знает, где у неё разделитель.
+   */
   | { kind: "plugin"; pluginId: string; pageId: string; rest: string }
   | { kind: "unknown"; path: string };
+
+/**
+ * Полный адрес: страница и её параметры. Параметров нет ни у одного маршрута ядра — они заведены
+ * ради страниц плагина, которые кладут в адрес своё состояние.
+ *
+ * Повторяющийся ключ теряет всё, кроме последнего значения (docs/backlog.md). Цена принята:
+ * `URLSearchParams` умеет больше, но он изменяемый, и правка его копии выглядела бы переходом,
+ * ничего не меняя.
+ */
+export type Location = { page: Page; query: Readonly<Record<string, string>> };
+
+const withoutParameters: Readonly<Record<string, string>> = Object.freeze({});
 
 function decodePathSegment(segment: string): string | undefined {
   try {
@@ -265,30 +286,74 @@ export function pathOf(page: Page): string {
   }
 }
 
+/**
+ * Разбирает адрес целиком. Якорь отбрасывается: он адресует место внутри страницы, а не страницу, и
+ * маршруту не принадлежит.
+ */
+export function matchLocation(url: string): Location {
+  const [addressed = ""] = url.split("#");
+  const questionMark = addressed.indexOf("?");
+  const path = questionMark === -1 ? addressed : addressed.slice(0, questionMark);
+  const search = questionMark === -1 ? "" : addressed.slice(questionMark + 1);
+
+  return { page: matchPage(path), query: parseQuery(search) };
+}
+
+export function urlOf(location: Location): string {
+  const path = pathOf(location.page);
+  const search = new URLSearchParams(Object.entries(location.query)).toString();
+
+  return search === "" ? path : `${path}?${search}`;
+}
+
+function parseQuery(search: string): Readonly<Record<string, string>> {
+  if (search === "") {
+    return withoutParameters;
+  }
+
+  const query: Record<string, string> = {};
+
+  for (const [key, value] of new URLSearchParams(search)) {
+    query[key] = value;
+  }
+
+  return query;
+}
+
 export type Navigation = {
-  current: () => Page;
-  navigate: (page: Page) => void;
+  current: () => Location;
+  /** Голый `Page` значит «без параметров»: маршруты ядра о них не знают. */
+  navigate: (target: Location | Page) => void;
   /** Возвращает функцию отписки. Кнопка «назад» браузера — такое же событие, как наш переход. */
-  subscribe: (listener: (page: Page) => void) => () => void;
+  subscribe: (listener: (location: Location) => void) => () => void;
+  /** Снимает слушателя истории: брошенный экземпляр иначе канонизирует адрес за спиной живого. */
+  dispose: () => void;
 };
 
 export function createNavigation(target: Window = window): Navigation {
-  const listeners = new Set<(page: Page) => void>();
-  const readCurrent = (): Page => {
-    const page = matchPage(target.location.pathname);
-    const canonicalPath = pathOf(page);
+  const listeners = new Set<(location: Location) => void>();
+  const addressed = (): string => `${target.location.pathname}${target.location.search}`;
+  const readCurrent = (): Location => {
+    const location = matchLocation(addressed());
+    const canonicalPath = pathOf(location.page);
 
+    // Канонизация трогает только путь. Параметры и якорь маршруту не принадлежат, и переезд со
+    // старого системного адреса на новый не вправе их стирать.
     if (canonicalPath !== target.location.pathname) {
-      target.history.replaceState(undefined, "", canonicalPath);
+      target.history.replaceState(
+        undefined,
+        "",
+        `${canonicalPath}${target.location.search}${target.location.hash}`,
+      );
     }
 
-    return page;
+    return location;
   };
   const announce = (): void => {
-    const page = readCurrent();
+    const location = readCurrent();
 
     for (const listener of [...listeners]) {
-      listener(page);
+      listener(location);
     }
   };
 
@@ -296,14 +361,18 @@ export function createNavigation(target: Window = window): Navigation {
 
   return {
     current: readCurrent,
-    navigate: (page) => {
-      const path = pathOf(page);
+    navigate: (destination) => {
+      const location =
+        "page" in destination ? destination : { page: destination, query: withoutParameters };
+      const url = urlOf(location);
 
-      if (path === target.location.pathname) {
+      // Сравнение по полному адресу, а не по пути: переход, меняющий только параметры, — это
+      // переход, и молчать о нём значило бы не пускать страницу плагина в её же адрес.
+      if (url === addressed()) {
         return;
       }
 
-      target.history.pushState(undefined, "", path);
+      target.history.pushState(undefined, "", url);
       announce();
     },
     subscribe: (listener) => {
@@ -312,6 +381,10 @@ export function createNavigation(target: Window = window): Navigation {
       return () => {
         listeners.delete(listener);
       };
+    },
+    dispose: () => {
+      target.removeEventListener("popstate", announce);
+      listeners.clear();
     },
   };
 }

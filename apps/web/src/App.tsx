@@ -68,7 +68,7 @@ import { ChatView } from "./sessions/chat-view.tsx";
 import { SidebarProjects } from "./sessions/sidebar-projects.tsx";
 import { SessionRouteView } from "./sessions/session-route-view.tsx";
 import { useSessions } from "./sessions/use-sessions.ts";
-import { createNavigation, type Page } from "./router.ts";
+import { createNavigation, type Location } from "./router.ts";
 import { logIn, logOut, probeSession, register } from "./session.ts";
 import { AppearanceSection } from "./settings/appearance-section.tsx";
 import { DaemonSection } from "./settings/daemon-section.tsx";
@@ -119,7 +119,7 @@ export function App() {
   const [stream, setStream] = useState<StreamStatus>("connecting");
   const [health, setHealth] = useState<Health | undefined>(undefined);
   const [failure, setFailure] = useState<string | undefined>(undefined);
-  const [page, setPage] = useState<Page>(() => navigation.current());
+  const [location, setLocation] = useState<Location>(() => navigation.current());
   const [draftProjectId, setDraftProjectId] = useState<string | undefined>(undefined);
   const [newSessionResetKey, setNewSessionResetKey] = useState(0);
   const [layout, setLayout] = useState<ShellLayout>(() => readLayout(localStorage));
@@ -129,6 +129,8 @@ export function App() {
   const [expired, setExpired] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
 
+  // Страница — это то, что рисуется; параметры принадлежат странице плагина и дальше неё не идут.
+  const page = location.page;
   const authenticated = access === "authenticated";
   const rightUnavailable =
     page.kind === "settings" || page.kind === "settings-project" || page.kind === "settings-plugin";
@@ -138,7 +140,14 @@ export function App() {
   useCommandPaletteShortcut(useCallback(() => setCommandsOpen(true), []));
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
-  useEffect(() => navigation.subscribe(setPage), [navigation]);
+  useEffect(() => {
+    const unsubscribe = navigation.subscribe(setLocation);
+
+    return () => {
+      unsubscribe();
+      navigation.dispose();
+    };
+  }, [navigation]);
 
   // Выбранный проект живёт всё время маршрута новой сессии, чтобы место, форма и контроллер
   // видели один контекст. Уход с маршрута очищает его перед следующим открытием.

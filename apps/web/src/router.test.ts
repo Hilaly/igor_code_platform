@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchPage, pathOf } from "./router.ts";
+import { matchLocation, matchPage, pathOf, urlOf } from "./router.ts";
 
 describe("matchPage", () => {
   it("opens an administrative plugin detail from an encoded plugin key", () => {
@@ -205,6 +205,49 @@ describe("pathOf", () => {
       "/nowhere",
     ]) {
       expect(pathOf(matchPage(path))).toBe(path === "" ? "/" : path);
+    }
+  });
+});
+
+describe("matchLocation", () => {
+  it("reads the parameters next to the page, not inside it", () => {
+    expect(matchLocation("/p/tracker/board/15?filter=warn&sort=age")).toEqual({
+      page: { kind: "plugin", pluginId: "tracker", pageId: "board", rest: "15" },
+      query: { filter: "warn", sort: "age" },
+    });
+  });
+
+  it("gives an address without parameters an empty set of them", () => {
+    expect(matchLocation("/settings/plugins").query).toEqual({});
+  });
+
+  /** Якорь маршруту не принадлежит вовсе: он адресует место внутри страницы, а не страницу. */
+  it("ignores the fragment", () => {
+    expect(matchLocation("/p/tracker/board?tab=open#row-3")).toEqual({
+      page: { kind: "plugin", pluginId: "tracker", pageId: "board", rest: "" },
+      query: { tab: "open" },
+    });
+  });
+
+  /** Записанное ограничение: повторяющийся ключ теряет всё, кроме последнего значения. */
+  it("keeps the last value of a repeated key", () => {
+    expect(matchLocation("/p/tracker/board?tag=a&tag=b").query).toEqual({ tag: "b" });
+  });
+});
+
+describe("urlOf", () => {
+  it("leaves an address without parameters without a question mark", () => {
+    expect(urlOf({ page: { kind: "home" }, query: {} })).toBe("/");
+  });
+
+  it("survives a round trip together with its parameters", () => {
+    for (const url of [
+      "/p/tracker/board?filter=warn",
+      "/p/tracker/board/15/edit?filter=warn&sort=age",
+      "/settings/plugins",
+      "/p/tracker/board?query=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9",
+    ]) {
+      expect(urlOf(matchLocation(url))).toBe(url);
     }
   });
 });
