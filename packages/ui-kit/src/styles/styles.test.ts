@@ -256,6 +256,25 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  it("draws circular Progress with token strokes and reduced-motion fallback", () => {
+    const progress = withoutComments(
+      readFileSync(join(kitRoot, "components", "progress.module.css"), "utf8"),
+    );
+
+    expect(progress).toMatch(
+      /\.circularTrack,\s*\.circularValue\s*\{[^}]*fill:\s*none;[^}]*stroke-width:/s,
+    );
+    expect(progress).toMatch(
+      /\.circularTrack\s*\{[^}]*stroke:\s*var\(--sovereign-fill-surface\);/s,
+    );
+    expect(progress).toMatch(
+      /\.circularValue\s*\{[^}]*stroke:\s*var\(--sovereign-accent\);[^}]*stroke-dasharray:/s,
+    );
+    expect(progress).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.circular[\s\S]*?animation:\s*none;/s,
+    );
+  });
+
   it("shows compact Toggle labels only on hover without removing focus tooltips elsewhere", () => {
     const tooltipCss = withoutComments(
       readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),

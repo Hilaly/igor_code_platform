@@ -695,6 +695,20 @@ describe("markup of the ported primitives", () => {
     expect(indeterminate).not.toContain("aria-valuenow");
   });
 
+  it("renders circular progress with the same determinate and indeterminate semantics", () => {
+    const determinate = renderToStaticMarkup(
+      <Progress variant="circular" value={0.19} label="Context" tabIndex={0} />,
+    );
+    expect(determinate).toContain("<svg");
+    expect(determinate).toContain('aria-valuenow="19"');
+    expect(determinate).toContain('tabindex="0"');
+    expect(determinate.match(/<circle/g)).toHaveLength(2);
+
+    const indeterminate = renderToStaticMarkup(<Progress variant="circular" label="Context" />);
+    expect(indeterminate).toContain("<svg");
+    expect(indeterminate).not.toContain("aria-valuenow");
+  });
+
   it("skeleton", () => {
     const markup = renderToStaticMarkup(<Skeleton variant="circle" width="2rem" />);
     expect(markup).not.toContain("undefined");
