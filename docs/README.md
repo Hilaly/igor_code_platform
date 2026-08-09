@@ -152,6 +152,9 @@
   команды ядра и палитра; почему `available` не воскрешает отвергнутый `when`.
 - [План среза 12c-1](superpowers/plans/2026-08-09-slice-12c1-tabs-and-commands.md) — тринадцать
   TDD-задач от кардинальности и реестра до палитры, живой проверки и переписывания локальной истории.
+- [Исправления среза 12c-1 по ревью](superpowers/specs/2026-08-09-slice-12c1-review-fixes-design.md) —
+  ленивый кеш команд, безопасный `available`, смена ревизии во время вызова, кардинальность мест и
+  зарезервированный namespace `core`.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
