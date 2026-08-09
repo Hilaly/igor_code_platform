@@ -25,12 +25,14 @@
 ### Task 1: Content frame оболочки
 
 **Files:**
+
 - Modify: `apps/web/src/shell/shell.tsx`
 - Modify: `apps/web/src/shell/shell.css`
 - Modify: `apps/web/src/shell/shell.test.tsx`
 - Modify: `apps/web/src/shell/styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ShellProps.contentMode`, `ShellHeaderProvider`, route-level `children`.
 - Produces: один `.shell-content-frame` между `.shell-body` и route-level `children`.
 
@@ -81,6 +83,7 @@ git commit -m "feat(shell): center route content systematically"
 ### Task 2: Стартовая композиция новой сессии
 
 **Files:**
+
 - Modify: `apps/web/src/sessions/new-session-view.tsx`
 - Modify: `apps/web/src/sessions/new-session-view.test.tsx`
 - Modify: `apps/web/src/sessions/sessions.css`
@@ -89,6 +92,7 @@ git commit -m "feat(shell): center route content systematically"
 - Modify: `packages/ui-kit/src/i18n/i18n.test.ts`
 
 **Interfaces:**
+
 - Consumes: `NewSessionViewProps.onCreate`, `onNavigate`, `onSubmit`, `modelPickerGroups`, `selectedModel`, `thinkingLevels`.
 - Produces: submit handler requiring `{ projectId, agentId, text }`, preserving `onCreate(draft) → onNavigate(sessionId) → onSubmit(sessionId, { text })`.
 
@@ -142,11 +146,13 @@ git commit -m "feat(sessions): redesign new session start screen"
 ### Task 3: Интеграционная проверка и документация
 
 **Files:**
+
 - Modify: `docs/ui-kit.md`
 - Modify: `docs/README.md` only if the existing entry needs its status updated
 - Test: `apps/web/src/App.test.tsx` only if current route composition needs a regression assertion
 
 **Interfaces:**
+
 - Consumes: Tasks 1–2 and their public rendered contracts.
 - Produces: documented Shell content-frame and new session start-screen geometry.
 
