@@ -220,36 +220,51 @@
 
 .new-session {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  justify-content: center;
   gap: var(--sovereign-space-4);
-  width: min(100%, 40rem);
+  width: min(100%, var(--sovereign-reading-width));
+  min-width: 0;
+  min-height: 100%;
+  margin: auto;
+  container-type: inline-size;
+}
+
+.new-session-greeting {
+  font-size: var(--sovereign-font-size-xl);
+  font-weight: var(--sovereign-font-weight-medium);
   min-width: 0;
 }
 
-.new-session-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-1);
-  min-width: 0;
-}
-
-.new-session-form-region {
-  min-width: 0;
-}
-
-.new-session-form {
-  display: flex;
-  flex-direction: column;
+.new-session-project-agent {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sovereign-space-3);
   min-width: 0;
 }
 
-.new-session-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sovereign-space-2);
+.new-session-project-control,
+.new-session-agent-control,
+.new-session-composer {
   min-width: 0;
-  padding-block-start: var(--sovereign-space-2);
+}
+
+.new-session-composer .sessions-composer-toolbar {
+  justify-content: flex-end;
+}
+
+@container (width < 32rem) {
+  .new-session-project-agent {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (height < 42rem) {
+  .new-session {
+    justify-content: flex-start;
+    margin-block: 0 auto;
+  }
 }
 
 .archive-sessions-groups {
@@ -296,8 +311,7 @@
 /* Deterministic interaction and narrow-container fallbacks ------------- */
 
 .sessions-entry-meta button:focus-visible,
-.sessions-composer-actions button:focus-visible,
-.new-session-actions button:focus-visible {
+.sessions-composer-actions button:focus-visible {
   position: relative;
   z-index: 1;
 }

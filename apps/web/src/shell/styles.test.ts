@@ -228,7 +228,27 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(
       /\.sessions-composer-surface\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
     );
-    expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
+    expect(sessions).toMatch(/\.new-session-composer\s*\{[^}]*min-width:\s*0;/s);
+  });
+
+  it("centres the new-session start screen at reader width with safe fallbacks", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*flex:\s*1 1 auto;[^}]*width:\s*min\(100%,\s*var\(--sovereign-reading-width\)\);[^}]*margin:\s*auto;/s,
+    );
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*justify-content:\s*center;[^}]*container-type:\s*inline-size;/s,
+    );
+    expect(sessions).toMatch(
+      /\.new-session-project-agent\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/s,
+    );
+    expect(sessions).toMatch(
+      /@container\s*\(width\s*<\s*32rem\)\s*\{[^}]*\.new-session-project-agent\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    );
+    expect(sessions).toMatch(
+      /@media\s*\(height\s*<\s*42rem\)\s*\{[^}]*\.new-session\s*\{[^}]*margin-block:\s*0\s+auto;/s,
+    );
   });
 
   it("keeps usage inside the composer instead of restoring a full-width register", () => {

@@ -96,6 +96,31 @@ describe("createTranslator", () => {
     );
   });
 
+  it("ships every new-session greeting in both locales", () => {
+    expect([
+      translator("ru").t("sessions.new.greeting.morning"),
+      translator("ru").t("sessions.new.greeting.afternoon"),
+      translator("ru").t("sessions.new.greeting.evening"),
+      translator("ru").t("sessions.new.greeting.night"),
+    ]).toEqual([
+      "Доброе утро. С чего начнём?",
+      "Добрый день. Над чем поработаем?",
+      "Добрый вечер. Что сделаем?",
+      "Не спится? Давай займёмся делом.",
+    ]);
+    expect([
+      translator("en").t("sessions.new.greeting.morning"),
+      translator("en").t("sessions.new.greeting.afternoon"),
+      translator("en").t("sessions.new.greeting.evening"),
+      translator("en").t("sessions.new.greeting.night"),
+    ]).toEqual([
+      "Good morning. Where shall we start?",
+      "Good afternoon. What shall we work on?",
+      "Good evening. What shall we do?",
+      "Still awake? Let's get something done.",
+    ]);
+  });
+
   it("names the unavailable saved agent in both shipped locales", () => {
     expect(translator("ru").t("chat.agent.missing", { agent: "base-agent.agent" })).toContain(
       "base-agent.agent",

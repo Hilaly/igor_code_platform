@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Экран создания сессии на настоящем DOM. Проверяется двойная выборка модели через ModelPicker
+ * Стартовый экран сессии на настоящем DOM. Проверяется каскадный выбор модели
  * (провайдер → модель с ленивой подгрузкой), предзаполнение модели и уровня размышлений из агента,
  * модель без размышлений, отказ демона (экран остаётся), и отправка первого сообщения вместе
  * с созданием одним действием человека, но двумя запросами — без изменения контракта `SessionDraft`.
@@ -20,7 +20,10 @@ import type { ModelsEntry } from "./state.ts";
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const translator = createTranslator({
   locale: "ru",
@@ -80,7 +83,7 @@ const ready: Record<string, ModelsEntry> = {
 };
 
 const show = (overrides: Partial<NewSessionViewProps> = {}) => {
-  const onCreate: NewSessionViewProps["onCreate"] = vi.fn(() =>
+  const onCreate = vi.fn<NewSessionViewProps["onCreate"]>(() =>
     Promise.resolve({ sessionId: "0199" }),
   );
   const onPickProvider = vi.fn();
@@ -113,9 +116,10 @@ const show = (overrides: Partial<NewSessionViewProps> = {}) => {
   };
 };
 
-/** Раскрыть группу провайдера в ModelPicker: клик по триггеру, затем по шапке группы. */
+/** Раскрыть группу провайдера в каскадном пикере композера. */
 const expandProvider = (label: string, group: string): void => {
-  fireEvent.click(screen.getByRole("combobox", { name: label }));
+  fireEvent.click(screen.getByRole("button", { name: /выберите… · средний/i }));
+  fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(`^${label}:`) }));
   fireEvent.click(screen.getByRole("treeitem", { name: group }).querySelector("div")!);
 };
 
@@ -124,27 +128,78 @@ const pick = (label: string, option: string): void => {
   fireEvent.click(screen.getByRole("option", { name: option }));
 };
 
+const writeMessage = (text: string): void => {
+  fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+    target: { value: text },
+  });
+};
+
+const send = (): void => {
+  fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+};
+
 describe("the screen that creates a session", () => {
-  it("exposes one named form region with its page heading", () => {
+  it("exposes one named start region without a second page heading", () => {
     show();
 
     const region = screen.getByRole("region", { name: "Новая сессия" });
     expect(within(region).queryByRole("heading", { level: 1 })).toBeNull();
-    expect(region.querySelector("form")).not.toBeNull();
+    expect(region.querySelector("form")).toBeNull();
   });
 
-  it("uses a valid header composition for the page title and hint", () => {
+  it("orders the greeting, project-agent controls, and composer", () => {
     show();
 
     const region = screen.getByRole("region", { name: "Новая сессия" });
-    const header = region.querySelector("header");
+    const greeting = within(region).getByTestId("new-session-greeting");
+    const projectControl = within(region).getByRole("combobox", { name: "Проект" });
+    const agentControl = within(region).getByRole("combobox", { name: "Агент" });
+    const composer = within(region).getByRole("textbox", { name: "Сообщение агенту" });
 
-    expect(region.querySelector("hgroup")).toBeNull();
-    expect(header).not.toBeNull();
-    expect(within(header!).queryByRole("heading", { level: 1 })).toBeNull();
     expect(
-      within(header!).getByText("Выбери проект, агента и модель — и сразу напиши, с чего начать."),
-    ).not.toBeNull();
+      greeting.compareDocumentPosition(projectControl) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(greeting.compareDocumentPosition(agentControl) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(
+      projectControl.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(agentControl.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(within(region).queryByRole("button", { name: "Создать" })).toBeNull();
+  });
+
+  it.each([
+    [5, "Доброе утро. С чего начнём?"],
+    [12, "Добрый день. Над чем поработаем?"],
+    [18, "Добрый вечер. Что сделаем?"],
+    [23, "Не спится? Давай займёмся делом."],
+  ])("chooses a stable localized greeting for local hour %i", (hour, greeting) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 9, hour));
+    const view = show();
+
+    expect(screen.getByTestId("new-session-greeting").textContent).toBe(greeting);
+
+    writeMessage("перерендери экран");
+    view.rerender(
+      <NewSessionView
+        projects={[project]}
+        projectAgents={{ projectId: "b7Kq", agents: [baseAgent], loading: false }}
+        providers={[provider]}
+        models={{}}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+    expect(screen.getByTestId("new-session-greeting").textContent).toBe(greeting);
   });
 
   it("prepares the draft on mount", () => {
@@ -155,10 +210,21 @@ describe("the screen that creates a session", () => {
     expect(onPrepareDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses to create until project and agent are chosen", () => {
+  it("enables send only after project, agent, and non-whitespace text are present", () => {
     show();
 
-    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+    const sendButton = screen.getByRole("button", { name: "Отправить" });
+    writeMessage("   ");
+    expect(sendButton.hasAttribute("disabled")).toBe(true);
+
+    pick("Проект", "Платформа — /code/platform");
+    expect(sendButton.hasAttribute("disabled")).toBe(true);
+
+    pick("Агент", "Базовый агент");
+    expect(sendButton.hasAttribute("disabled")).toBe(true);
+
+    writeMessage("разбери баг");
+    expect(sendButton.hasAttribute("disabled")).toBe(false);
   });
 
   it("disables agent selection until a project is chosen", () => {
@@ -286,10 +352,7 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Другой — /code/platform");
 
     expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Выберите");
-    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
-    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
-      "Средний",
-    );
+    expect(screen.getByRole("button", { name: /выберите… · средний/i })).not.toBeNull();
     expect(view.onSelectProject).toHaveBeenLastCalledWith("p2");
   });
 
@@ -322,11 +385,8 @@ describe("the screen that creates a session", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
-    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
-      "Средний",
-    );
+    expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: /выберите… · средний/i })).not.toBeNull();
   });
 
   it("clears the project and every dependent field when the selectable projects drop it", async () => {
@@ -362,12 +422,9 @@ describe("the screen that creates a session", () => {
       expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Выберите"),
     );
     expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Выберите");
-    expect(screen.getByRole("combobox", { name: "Модель" }).textContent).toContain("Выберите");
-    expect(screen.getByRole("combobox", { name: "Уровень размышлений" }).textContent).toContain(
-      "Средний",
-    );
-    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    expect(screen.getByRole("button", { name: /выберите… · средний/i })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(true);
+    send();
     expect(view.onCreate).not.toHaveBeenCalled();
     expect(view.onSelectProject).toHaveBeenLastCalledWith("");
   });
@@ -382,7 +439,7 @@ describe("the screen that creates a session", () => {
     expect(view.onPickProvider).toHaveBeenCalledWith("anthropic");
   });
 
-  it("sends the four fields of the draft, with the model as one reference, and navigates", async () => {
+  it("creates, navigates, and submits the typed text in order", async () => {
     const view = show({ models: ready });
 
     pick("Проект", "Платформа — /code/platform");
@@ -390,7 +447,8 @@ describe("the screen that creates a session", () => {
     expandProvider("Модель", "Anthropic");
     fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    writeMessage("привет, разбери баг");
+    send();
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
     expect(view.onCreate).toHaveBeenCalledWith({
@@ -400,6 +458,13 @@ describe("the screen that creates a session", () => {
       thinkingLevel: "medium",
     });
     expect(view.onNavigate).toHaveBeenCalledWith("0199");
+    expect(view.onSubmit).toHaveBeenCalledWith("0199", { text: "привет, разбери баг" });
+    expect(view.onCreate.mock.invocationCallOrder[0]).toBeLessThan(
+      view.onNavigate.mock.invocationCallOrder[0]!,
+    );
+    expect(view.onNavigate.mock.invocationCallOrder[0]).toBeLessThan(
+      view.onSubmit.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("prefills the model and thinking level from the chosen agent", async () => {
@@ -419,7 +484,8 @@ describe("the screen that creates a session", () => {
     // Модель из агента предзаполнена, и провайдер её уже опрошен.
     expect(view.onPickProvider).toHaveBeenCalledWith("anthropic");
 
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    writeMessage("начни работу");
+    send();
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
     expect(view.onCreate).toHaveBeenCalledWith(
@@ -452,7 +518,8 @@ describe("the screen that creates a session", () => {
     pick("Проект", "Платформа — /code/platform");
     pick("Агент", "Агент с умолчаниями");
     pick("Агент", "Агент без умолчаний");
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    writeMessage("начни работу");
+    send();
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
     expect(view.onCreate).toHaveBeenCalledWith({
@@ -473,16 +540,17 @@ describe("the screen that creates a session", () => {
     fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
 
     expect(
-      screen.getByRole("combobox", { name: "Уровень размышлений" }).getAttribute("aria-disabled"),
-    ).toBe("true");
+      screen.getByRole("button", { name: /anthropic\/claude-opus-4-5 · выключены/i }),
+    ).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    writeMessage("начни работу");
+    send();
 
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
     expect(view.onCreate).toHaveBeenCalledWith(expect.objectContaining({ thinkingLevel: "off" }));
   });
 
-  it("stays and says why when the daemon refused", async () => {
+  it("keeps the composer text and says why when the daemon refused", async () => {
     const onCreate = vi.fn(() => Promise.resolve({ reason: "the project is archived" }));
     show({ models: ready, onCreate });
 
@@ -490,39 +558,19 @@ describe("the screen that creates a session", () => {
     pick("Агент", "Базовый агент");
     expandProvider("Модель", "Anthropic");
     fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+    writeMessage("не потеряй этот текст");
+    send();
 
     await waitFor(() => expect(screen.getByText(/the project is archived/)).not.toBeNull());
-    expect(screen.getByRole("button", { name: "Создать" })).not.toBeNull();
-  });
-
-  it("sends the first message as a turn after the session was created", async () => {
-    const view = show({ models: ready });
-
-    pick("Проект", "Платформа — /code/platform");
-    pick("Агент", "Базовый агент");
-    expandProvider("Модель", "Anthropic");
-    fireEvent.click(screen.getByRole("treeitem", { name: /claude-opus-4-5/ }));
-
-    const composer = screen.getByRole("textbox", { name: "Первое сообщение" });
-    fireEvent.change(composer, { target: { value: "привет, разбери баг" } });
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
-
-    await waitFor(() => expect(view.onNavigate).toHaveBeenCalledWith("0199"));
-    // Текст уезжает турном уже в созданную сессию — отдельным запросом, не полем черновика.
-    expect(view.onSubmit).toHaveBeenCalledWith("0199", { text: "привет, разбери баг" });
-  });
-
-  it("creates a session without a turn when the first message is empty", async () => {
-    const view = show({ models: ready });
-
-    pick("Проект", "Платформа — /code/platform");
-    pick("Агент", "Базовый агент");
-
-    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
-
-    await waitFor(() => expect(view.onNavigate).toHaveBeenCalledWith("0199"));
-    expect(view.onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "Сообщение агенту" }).getAttribute("value")).toBe(
+      null,
+    );
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("не потеряй этот текст");
+    expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Платформа");
+    expect(screen.getByRole("combobox", { name: "Агент" }).textContent).toContain("Базовый агент");
+    expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("explains an empty platform without pretending that a global agent list exists", () => {
@@ -531,7 +579,7 @@ describe("the screen that creates a session", () => {
     expect(screen.getByText(/сначала заведи проект/)).not.toBeNull();
     expect(screen.getByText(/Сначала выбери проект/)).not.toBeNull();
     expect(screen.getByText(/Модели нужен кред/)).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Создать" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("shows the model failure reason inside the expanded group", () => {
