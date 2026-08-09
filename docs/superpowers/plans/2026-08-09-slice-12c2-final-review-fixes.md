@@ -322,3 +322,85 @@ Expected: сборка завершается с кодом 0; существу�
 
 Reviewer сравнивает `main...HEAD` с утверждённой спецификацией, продуктовой моделью и критериями
 готовности к merge; Critical и Important замечания закрываются до итогового отчёта.
+
+---
+
+### Task 6: Закрыть оставшиеся обходы владения URL
+
+**Files:**
+
+- Modify: `packages/browser-sdk/src/page-path.ts`
+- Modify: `packages/browser-sdk/src/page-path.test.ts`
+- Modify: `packages/browser-sdk/src/page.test.tsx`
+- Modify: `apps/web/src/router.ts`
+- Modify: `apps/web/src/router.test.ts`
+- Modify: `apps/web/src/navigation/core-destination.test.ts`
+- Modify: `docs/ui-extension-model.md`
+- Modify: `docs/public-contract.md`
+- Modify: `docs/superpowers/specs/2026-08-09-slice-12c2-plugin-pages-design.md`
+
+**Interfaces:**
+
+- Raw `\\` behaves as a URL path separator before dot-segment folding; encoded `%5C` remains data.
+- `pathOf({ kind: "plugin" })` encodes `pluginId` and `pageId` with the router's existing opaque
+  segment codec; `matchPage` decodes both with the inverse codec.
+- Valid registered identifiers keep their existing URL spelling.
+
+- [ ] **Step 1: Write RED tests for raw backslash escapes**
+
+Cover literal and mixed encoded-dot/backslash inputs in `normalizePagePath`, the page-local
+`navigate` facade, and `locationOfDestination({ kind: "plugin-page" })`. Assert that encoded `%5C`
+is not treated as a separator.
+
+- [ ] **Step 2: Run focused tests and observe the expected RED**
+
+Run:
+`pnpm --filter @sovereign/browser-sdk exec vitest run src/page-path.test.ts src/page.test.tsx && pnpm --filter @sovereign/web exec vitest run src/navigation/core-destination.test.ts`
+
+Expected: raw-backslash cases escape or remain unnormalised before production changes.
+
+- [ ] **Step 3: Fold raw backslashes before page-path normalisation**
+
+Split on both `/` and raw `\\`, while leaving percent-encoded backslashes inside their segment.
+
+- [ ] **Step 4: Write RED router tests for hostile destination identifiers**
+
+Exercise `.`, `..`, encoded-dot-looking text, `/`, and raw `\\` in `pluginId/pageId`. Assert that
+`urlOf(locationOfDestination(destination))` stays below `/p/` and round-trips through
+`matchLocation` without opening a core route.
+
+- [ ] **Step 5: Run router tests and observe the expected RED**
+
+Run: `pnpm --filter @sovereign/web exec vitest run src/router.test.ts src/navigation/core-destination.test.ts`
+
+Expected: at least the `..` or separator case changes route structure before opaque encoding.
+
+- [ ] **Step 6: Reuse the router opaque-segment codec for plugin page identifiers**
+
+Do not publish a second grammar or duplicate daemon regexes. Existing valid IDs remain unchanged;
+invalid author input becomes a safely encoded, unresolved page address.
+
+- [ ] **Step 7: Update the three normative explanations**
+
+State that raw backslash follows browser URL separator semantics, encoded backslash is data, and
+plugin/page identifiers are opaque URL segments. Keep the boundary explicitly an API ownership
+contract, not a security sandbox.
+
+- [ ] **Step 8: Focused GREEN, full check, and commit**
+
+Run the focused commands above, then
+`NODE_OPTIONS=--no-experimental-webstorage make check`.
+
+Commit: `fix(navigation): close remaining page URL escapes`
+
+---
+
+### Task 7: Повторить финальный merge gate
+
+- [ ] **Step 1:** `git diff --check main...HEAD` and clean `git status --short`.
+- [ ] **Step 2:** fresh `NODE_OPTIONS=--no-experimental-webstorage make check`.
+- [ ] **Step 3:** fresh `NODE_OPTIONS=--no-experimental-webstorage make build`.
+- [ ] **Step 4:** scoped review of Task 6 and broad read-only review of `main...HEAD` with no open
+      Critical or Important findings.
+- [ ] **Step 5:** record whether browser UI repetition remains externally blocked; do not turn the
+      unavailable browser backend into a code defect or a false passed claim.
