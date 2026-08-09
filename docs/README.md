@@ -166,6 +166,8 @@
 - [Дополнительные исправления среза 12c-1 по ревью](superpowers/specs/2026-08-09-slice-12c1-final-review-fixes-design.md) —
   доступность команд правой панели, точный аккорд палитры, выключенная строка `ListRow` и актуальный
   состав команд ядра.
+- [План дополнительных исправлений среза 12c-1](superpowers/plans/2026-08-09-slice-12c1-final-review-fixes.md) —
+  четыре TDD-этапа для доступности команд, точного shortcut, семантики `ListRow` и полной проверки.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
