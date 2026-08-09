@@ -89,6 +89,9 @@ export function pluginEnabledByDefault(source: PluginSource): boolean {
  */
 export const pluginIdPattern = /^[a-z0-9][a-z0-9-]*$/;
 
+/** Идентификаторы хоста, которые плагин не вправе занимать. */
+export const reservedPluginIds: ReadonlySet<string> = new Set(["core"]);
+
 export type PluginManifest = {
   /** Не имя npm-пакета: у имени со скоупом есть слэш, а идентификатор идёт в путь (docs/plugins.md). */
   id: string;
@@ -149,6 +152,10 @@ export function parsePluginManifest(
     return refuse(
       `${manifestField}.id must match ${pluginIdPattern.source}, got ${JSON.stringify(id)}`,
     );
+  }
+
+  if (reservedPluginIds.has(id)) {
+    return refuse(`${manifestField}.id ${id} is reserved for the host`);
   }
 
   const worker = fields["worker"];
