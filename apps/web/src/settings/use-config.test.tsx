@@ -251,13 +251,13 @@ describe("useConfig", () => {
     expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
   });
 
-  it("drops a reload that began while the current write was in flight", async () => {
+  it("reloads an external change deferred until the current write settles", async () => {
     const view = connect();
 
     await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
 
-    let answerReload: ((config: unknown) => void) | undefined;
     let answerWrite: ((config: unknown) => void) | undefined;
+    let reloads = 0;
 
     vi.stubGlobal("fetch", (_url: string, init?: RequestInit) => {
       return new Promise<Response>((resolve) => {
@@ -266,7 +266,8 @@ describe("useConfig", () => {
         };
 
         if ((init?.method ?? "GET") === "GET") {
-          answerReload = answerLater;
+          reloads += 1;
+          resolve(answer(stored));
         } else {
           answerWrite = answerLater;
         }
@@ -276,15 +277,17 @@ describe("useConfig", () => {
     act(() => view.result.current.update("maxConcurrentTurns", 8));
     await waitFor(() => expect(answerWrite).toBeDefined());
 
-    // The reload's response is a snapshot the server read before it processed this PUT.
+    // The daemon has handled our PUT, but the HTTP answer is still in flight.
+    stored = { ...defaultConfig, maxConcurrentTurns: 8 };
+    // Another writer changes the file before its event reaches this tab.
+    stored = { ...stored, maxConcurrentTurns: 9 };
     act(() => view.bus.publish(configChanged));
-    await waitFor(() => expect(answerReload).toBeDefined());
+    // The event must be retained, not fetched from a point that could still be before our PUT.
+    expect(reloads).toBe(0);
 
     await act(async () => answerWrite?.({ ...defaultConfig, maxConcurrentTurns: 8 }));
-    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
 
-    await act(async () => answerReload?.(defaultConfig));
-
-    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
+    await waitFor(() => expect(reloads).toBe(1));
+    await waitFor(() => expect(view.result.current.state.config?.maxConcurrentTurns).toBe(9));
   });
 });

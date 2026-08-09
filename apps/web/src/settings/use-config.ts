@@ -71,8 +71,17 @@ export function useConfig(options: UseConfigOptions): ConfigController {
   // Последняя актуальная запись, на которую уже пришёл ответ. Reload, начатый пока она в пути,
   // мог быть обработан демоном раньше неё и потому не может стать снимком после её ответа.
   const settledWriteSeq = useRef(0);
+  // Событие о внешней правке во время своей записи нельзя читать сразу: снимок мог быть сделан до
+  // PUT. Оно сливается в один перезапрос сразу после ответа на актуальную запись.
+  const reloadAfterWrite = useRef(false);
 
   const reload = useCallback(() => {
+    if (settledWriteSeq.current !== writeSeq.current) {
+      reloadAfterWrite.current = true;
+      return;
+    }
+
+    reloadAfterWrite.current = false;
     pending.current?.abort();
 
     const controller = new AbortController();
@@ -143,6 +152,10 @@ export function useConfig(options: UseConfigOptions): ConfigController {
 
           settledWriteSeq.current = seq;
           apply((current) => ({ ...current, config: written, refusal: undefined }));
+
+          if (reloadAfterWrite.current) {
+            reload();
+          }
         })
         .catch((cause: unknown) => {
           if (writeSeq.current !== seq) {
