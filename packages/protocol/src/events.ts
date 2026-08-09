@@ -7,7 +7,7 @@
  * опубликовал демон, и проверить это должен компилятор, а не человек.
  */
 
-import type { ContributionRegistration } from "./contribution.ts";
+import type { PublicContributionRegistration } from "./contribution.ts";
 import type { HookCriticality } from "./hook.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginSource } from "./plugin.ts";
@@ -86,7 +86,7 @@ export const coreEventTypes = {
 export type PluginContributionsChanged = {
   /** Ревизия реестра: по ней снимок и поток сверяются, кто из них свежее (docs/event-bus.md). */
   revision: number;
-  contributions: ContributionRegistration[];
+  contributions: PublicContributionRegistration[];
 };
 
 /** Только инвалидация: единого разрешённого набора без контекста проекта больше нет. */

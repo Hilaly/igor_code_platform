@@ -8,6 +8,7 @@ import {
   defaultConfig,
   defaultPreferences,
   pluginsPath,
+  type AgentContributionRegistration,
   type PluginPreferences,
   type PluginStatus,
 } from "@sovereign/protocol";
@@ -49,6 +50,34 @@ function sources(statuses: PluginStatus[], plugins: Record<string, PluginPrefere
 }
 
 describe("buildPluginsSnapshot", () => {
+  it("does not expose file-backed agent locations in the public snapshot", () => {
+    const state = sources([running]);
+    const agent: AgentContributionRegistration = {
+      ownership: "plugin",
+      pluginKey: "data:hello",
+      pluginId: "hello",
+      source: "data",
+      id: "hello.agent",
+      declaredId: "agent",
+      kind: "agent",
+      location: "/private/plugins/hello/agents/agent/AGENT.md",
+      instructions: "instructions",
+      tools: { include: [], exclude: [] },
+      skills: { include: [], exclude: [] },
+    };
+
+    const registry = {
+      ...state.registry,
+      pluginContributions: () => [agent],
+      switchedOff: () => [agent],
+    };
+
+    const snapshot = buildPluginsSnapshot({ ...state, registry });
+
+    assert.equal("location" in snapshot.contributions[0]!, false);
+    assert.equal("location" in snapshot.switchedOffContributions[0]!, false);
+  });
+
   it("puts together the supervisor statuses, the contributions and the revision", () => {
     const state = sources([running, refused]);
 

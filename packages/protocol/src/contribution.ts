@@ -363,6 +363,14 @@ export type ContributionRegistration =
   | CommandContributionRegistration
   | PageContributionRegistration;
 
+/** Wire-safe agent registration: the absolute definition path is runtime provenance, not UI data. */
+export type PublicAgentContributionRegistration = Omit<AgentContributionRegistration, "location">;
+
+/** Contributions published through HTTP and the browser event stream. */
+export type PublicContributionRegistration =
+  | Exclude<ContributionRegistration, AgentContributionRegistration>
+  | PublicAgentContributionRegistration;
+
 export type ContributionKind = ContributionRegistration["kind"];
 
 /**

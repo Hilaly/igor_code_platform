@@ -16,6 +16,7 @@ import type { ContributionRegistry } from "./contribution-registry.ts";
 import { respondWithJson, type Route } from "../http/public.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import type { PluginSupervisor } from "./plugin-supervisor.ts";
+import { publicContributions } from "./public-contributions.ts";
 import type { SettingsStore } from "../settings/public.ts";
 
 export type PluginsSnapshotSources = {
@@ -55,13 +56,13 @@ export function buildPluginsSnapshot(sources: PluginsSnapshotSources): PluginsSn
     };
   }
 
-  const contributions = sources.registry.pluginContributions();
+  const contributions = publicContributions(sources.registry.pluginContributions());
 
   return {
     revision: sources.registry.revision(),
     plugins: statuses,
     contributions,
-    switchedOffContributions: sources.registry.switchedOff(),
+    switchedOffContributions: publicContributions(sources.registry.switchedOff()),
     conflicts: sources.registry.conflicts(),
     routeConflicts: routeConflictsOf(contributions),
     enablement,
