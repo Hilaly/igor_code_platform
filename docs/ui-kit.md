@@ -398,8 +398,9 @@ translator.scope("tracker").t("title"); // строка плагина, в ег�
   делает кнопку квадратной без боковых отступов, а контент отцентрованным — это кнопка-значок, и
   видимого текста у неё нет, поэтому имя обязан дать `aria-label`, а подсказку — `title`.
 - **`List` и `ListRow`** — семантический список и его строка. `ListRow` принимает `selected`,
-  `onSelect`, `onDoubleClick`, `actions` и `describedBy`: при наличии `onSelect` строка становится
-  кнопкой и получает `aria-describedby`, а действия остаются рядом, не вкладывая кнопку в кнопку.
+  `disabled`, `onSelect`, `onDoubleClick`, `actions` и `describedBy`: при наличии `onSelect` строка
+  становится кнопкой и получает `aria-describedby`, а `disabled` сохраняет эту кнопку видимой, но
+  недоступной для фокуса и выбора. Действия остаются рядом, не вкладывая кнопку в кнопку.
 - **`SettingsEntityRow`** — кликабельная строка сущности поверх `SettingsRow`: `label` и
   `description` образуют левую часть, `meta` и `actions` — общий правый rail. `onSelect` и
   `selectLabel` обязательны, `describedBy` связывает полноразмерную цель с дополнительным

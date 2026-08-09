@@ -195,14 +195,17 @@ describe("the command palette", () => {
     expect(asked).toEqual([]);
   });
 
-  it("keeps a cached unavailable plugin command visible but unselectable", () => {
+  it("keeps a cached unavailable plugin command visible as a disabled button", () => {
     palette({
       contributions: [runCommand],
       pluginModule: { RunCommand: { run: () => {}, available: () => false } },
     });
 
     expect(rows()).toContain("Run the board");
-    expect(screen.queryByRole("button", { name: "Run the board" })).toBeNull();
+    const button = screen.getByRole("button", { name: "Run the board" });
+
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(asked).toEqual([]);
   });
 
@@ -223,7 +226,10 @@ describe("the command palette", () => {
     });
 
     expect(rows()).toContain("Run the board");
-    expect(screen.queryByRole("button", { name: "Run the board" })).toBeNull();
+    const button = screen.getByRole("button", { name: "Run the board" });
+
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
     await act(async () => {});
     expect(diagnostics).toEqual([
       "the command placed.run could not determine availability: availability broke",
@@ -239,12 +245,15 @@ describe("the command palette", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  /** Недоступная команда видна, но выбрать её нечем: строка списка, а не кнопка. */
-  it("leaves an unavailable command in the list without a way to pick it", () => {
+  /** Недоступная команда сохраняет геометрию строки, но нативная кнопка не принимает выбор. */
+  it("leaves an unavailable command in the list as a disabled button", () => {
     palette({ layout: { ...defaultLayout, rightHidden: true } });
 
     expect(rows()).toContain("Hide the side panel");
-    expect(screen.queryByRole("button", { name: "Hide the side panel" })).toBeNull();
+    const hidden = screen.getByRole("button", { name: "Hide the side panel" });
+
+    expect(hidden.hasAttribute("disabled")).toBe(true);
+    expect(hidden.getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByRole("button", { name: "Show the side panel" })).toBeDefined();
   });
 });
