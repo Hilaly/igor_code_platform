@@ -846,6 +846,16 @@ describe("createPluginSupervisor", () => {
         ["skill", "file-resources.review"],
       ],
     );
+    const fileAgent = registrations.find(
+      (registration) => registration.id === "file-resources.helper",
+    );
+    assert.equal(fileAgent?.kind, "agent");
+    if (fileAgent?.kind === "agent") {
+      assert.equal(
+        fileAgent.location,
+        join(fixtures, "file-resources", "agents", "helper", "AGENT.md"),
+      );
+    }
     assert.equal(registry.revision(), 1);
 
     const status = supervisor.statuses().find((entry) => entry.key === "data:file-resources");

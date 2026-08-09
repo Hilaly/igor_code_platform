@@ -79,6 +79,7 @@ export type EventContributionRegistration = RegistrationCommon & {
  */
 export type AgentContributionRegistration = RegistrationCommon & {
   kind: "agent";
+  location?: string;
   instructions: string;
   tools: AgentToolSelection;
   model?: string;

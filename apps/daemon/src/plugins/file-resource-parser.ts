@@ -10,6 +10,7 @@ export type AgentFileDefinition = {
   kind: "agent";
   name: string;
   description: string;
+  location: string;
   instructions: string;
   tools: NamePatternSelection;
   skills: NamePatternSelection;
@@ -105,6 +106,7 @@ export function parseAgentFile(input: FileResourceInput): ParsedFileResource<Age
       kind: "agent",
       name: split.frontmatter.name as string,
       description,
+      location: input.path,
       instructions,
       tools: tools.selection,
       skills: skills.selection,

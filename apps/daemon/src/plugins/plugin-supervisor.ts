@@ -1048,6 +1048,7 @@ function fileRegistration(
     return {
       ...common,
       kind: "agent",
+      location: definition.location,
       instructions: definition.instructions,
       tools: definition.tools,
       skills: definition.skills,
