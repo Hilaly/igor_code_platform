@@ -24,7 +24,9 @@ export type PluginPageViewProps = {
   translator: ScopedTranslator;
 };
 
-export function pluginPageBasePath(pluginId: string, pageId: string): string {
+// Не экспортируется: у файла с компонентом экспорт не-компонента ломает Fast Refresh, а базу
+// страницы больше никто не строит — адрес для ссылок считает `plugins/state.ts`.
+function pluginPageBasePath(pluginId: string, pageId: string): string {
   return `/${pluginPagePrefix}/${pluginId}/${pageId}`;
 }
 
