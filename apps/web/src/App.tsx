@@ -35,7 +35,7 @@ import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
-import { BrowserRuntimeProvider, HostPlace } from "./places/place-host.tsx";
+import { BrowserRuntimeProvider, HostPlace, HostPlaceCollection } from "./places/place-host.tsx";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
@@ -389,6 +389,9 @@ export function App() {
     () => (draftProjectId === undefined ? {} : { project: draftProjectId }),
     [draftProjectId],
   );
+  // Боковая полоса и полоса действий шапки принадлежат окну целиком, и предмет у них один — та
+  // страница, что сейчас открыта: вклад решает по ней, показываться ли ему.
+  const pageContext = useMemo<PlaceContext>(() => ({ subject: { page: page.kind } }), [page.kind]);
   const settingsProjectsContext = useMemo(
     () =>
       settingsSubject("projectId", page.kind === "settings-project" ? page.projectId : undefined),
@@ -546,31 +549,35 @@ export function App() {
           showLeft: translator.t("panel.left.show"),
           showRight: translator.t("panel.right.show"),
         }}
+        headerActions={<HostPlaceCollection id="core.view.header.actions" context={pageContext} />}
         navigation={
-          <SidebarProjects
-            projects={projects.state.snapshot?.projects}
-            sessions={sessions.state.sessions}
-            projectsLoading={
-              projects.state.snapshot === undefined && projects.state.failure === undefined
-            }
-            projectsFailure={projects.state.failure}
-            sessionsLoading={
-              sessions.state.sessions === undefined && sessions.state.failure === undefined
-            }
-            sessionsFailure={sessions.state.failure}
-            selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
-            storage={localStorage}
-            onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-            onNewSession={(projectId) => {
-              setDraftProjectId(projectId);
-              navigation.navigate({ kind: "new-session" });
-            }}
-            onUpdateProject={projects.update}
-            onRemoveProject={projects.remove}
-            onUpdateSession={sessions.updateSession}
-            onRemoveSession={sessions.removeSession}
-            translator={translator}
-          />
+          <>
+            <SidebarProjects
+              projects={projects.state.snapshot?.projects}
+              sessions={sessions.state.sessions}
+              projectsLoading={
+                projects.state.snapshot === undefined && projects.state.failure === undefined
+              }
+              projectsFailure={projects.state.failure}
+              sessionsLoading={
+                sessions.state.sessions === undefined && sessions.state.failure === undefined
+              }
+              sessionsFailure={sessions.state.failure}
+              selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
+              storage={localStorage}
+              onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
+              onNewSession={(projectId) => {
+                setDraftProjectId(projectId);
+                navigation.navigate({ kind: "new-session" });
+              }}
+              onUpdateProject={projects.update}
+              onRemoveProject={projects.remove}
+              onUpdateSession={sessions.updateSession}
+              onRemoveSession={sessions.removeSession}
+              translator={translator}
+            />
+            <HostPlaceCollection id="core.sidebar.sections" context={pageContext} />
+          </>
         }
         navigationHeader={
           <div className="shell-nav-header">
