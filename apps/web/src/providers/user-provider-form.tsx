@@ -320,7 +320,7 @@ function ManualModelsEditor({
     );
 
   return (
-    <section className="provider-manual-models">
+    <section className="provider-manual-models" aria-label={t("providers.user.models.manual")}>
       <div className="provider-form-section-label">
         <Text>{t("providers.user.models.manual")}</Text>
         <Text tone="muted">{t("providers.user.models.manual.hint")}</Text>

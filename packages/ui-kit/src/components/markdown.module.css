@@ -1,23 +1,16 @@
-/*
- * Оформление размётки от агента. Тонкое намеренно: заголовки, ссылки и код одеты своими примитивами,
- * здесь остаётся то, у чего примитива нет, — ритм между блоками, список, таблица, цитата.
- *
- * Селекторы потомков, а не классы: узлы рождает `react-markdown`, и повесить на них класс негде.
- */
-
 .root {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-3);
+  min-width: 0;
+  max-width: 100%;
   color: var(--sovereign-text);
   font-family: inherit;
   font-size: var(--sovereign-font-size-sm);
   line-height: inherit;
-  /* Реплика модели приносит и длинные пути, и ссылки без пробелов: ломаем их, а не раскладку. */
   overflow-wrap: anywhere;
 }
 
-/* Первый и последний блок не добавляют отступа: внешние поля задаёт лента сообщений. */
 .root > :first-child {
   margin-block-start: 0;
 }
@@ -32,11 +25,11 @@
 
 .root ul,
 .root ol {
-  margin: 0;
-  padding-inline-start: var(--sovereign-space-5);
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
+  margin: 0;
+  padding-inline-start: var(--sovereign-space-5);
 }
 
 .root li::marker {
@@ -46,7 +39,7 @@
 .root blockquote {
   margin: 0;
   padding-inline-start: var(--sovereign-space-3);
-  border-inline-start: var(--sovereign-stroke-emphasis) solid var(--sovereign-border);
+  border-inline-start: var(--sovereign-stroke-emphasis) solid var(--sovereign-accent-border);
   color: var(--sovereign-text-muted);
 }
 
@@ -54,35 +47,34 @@
   width: 100%;
   height: var(--sovereign-stroke-thin);
   margin: 0;
-  border: none;
+  border: 0;
   background: var(--sovereign-border-subtle);
 }
 
-/*
- * Таблица прокручивается внутри себя: колонок в ответе модели бывает больше, чем влезает в панель
- * чата, а растянуть страницу таблица не вправе — то же правило, что у блока кода.
- */
 .root table {
   display: block;
+  max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
+  font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
 }
 
 .root th,
 .root td {
-  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   text-align: start;
 }
 
 .root th {
+  background: var(--sovereign-fill-surface);
   color: var(--sovereign-text-muted);
-  font-weight: var(--sovereign-font-weight-medium);
+  font-weight: var(--sovereign-font-weight-semibold);
 }
 
 .root img {
   max-width: 100%;
   height: auto;
-  border-radius: var(--sovereign-radius-xs);
+  border-radius: var(--sovereign-radius-sm);
 }

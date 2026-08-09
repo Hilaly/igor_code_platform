@@ -1,47 +1,30 @@
 .track {
   width: 100%;
   height: var(--sovereign-space-2);
+  overflow: hidden;
   border-radius: var(--sovereign-radius-full);
   background: var(--sovereign-fill-surface);
-  /* Полоса внутри не выходит за скругления дорожки. */
-  overflow: hidden;
 }
-
 .bar {
   height: 100%;
   border-radius: var(--sovereign-radius-full);
 }
-
-/* Определённый режим: ширину задаёт доля, которую прокинул компонент. */
 .track:not(.indeterminate) > .bar {
   width: var(--progress, 0%);
   transition: width var(--sovereign-duration-normal) var(--sovereign-ease-out);
 }
-
 .indeterminate > .bar {
   width: 40%;
-  /*
-   * Период пробега не из шкалы длительностей: там максимум 320ms — время реакции на действие, а
-   * бесконечный цикл такой скорости мельтешит.
-   */
   animation: sweep 1.4s var(--sovereign-ease-in-out) infinite;
 }
-
 @keyframes sweep {
   from {
     transform: translateX(-100%);
   }
-
   to {
     transform: translateX(350%);
   }
 }
-
-/*
- * Просьба обойтись без движения обнуляет длительности переходов (styles/tokens.css), но не отменяет
- * бесконечную анимацию: её период объявлен здесь. Полоса остаётся видимой и приглушённой — иначе
- * «идёт» превращается в «сделано целиком».
- */
 @media (prefers-reduced-motion: reduce) {
   .indeterminate > .bar {
     width: 100%;
@@ -49,20 +32,15 @@
     animation: none;
   }
 }
-
-/* Тон красит только полосу: дорожка остаётся нейтральной, иначе цвет читается как состояние целиком. */
 .accent > .bar {
   background: var(--sovereign-accent);
 }
-
 .success > .bar {
   background: var(--sovereign-success);
 }
-
 .warning > .bar {
   background: var(--sovereign-warning);
 }
-
 .danger > .bar {
   background: var(--sovereign-danger);
 }

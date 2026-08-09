@@ -14,6 +14,7 @@
  */
 
 export * from "./components/accordion.tsx";
+export * from "./components/appearance-preview.tsx";
 export * from "./components/badge.tsx";
 export * from "./components/brand-lockup.tsx";
 export * from "./components/breadcrumbs.tsx";

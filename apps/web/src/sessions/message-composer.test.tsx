@@ -178,6 +178,25 @@ describe("the session message composer", () => {
     expect(composer?.querySelectorAll("button")).toHaveLength(3);
   });
 
+  it("keeps the idle action set named and leaves planning controls out of the composer", () => {
+    render(<ComposerHarness />);
+
+    expect(screen.getByRole("button", { name: "Дописать без запуска" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Отправить" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /plan|tools/i })).toBeNull();
+  });
+
+  it("keeps the busy action set named and exposes stop without planning controls", () => {
+    render(<ComposerHarness busy />);
+
+    expect(screen.getByRole("button", { name: "Вклинить" })).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "К следующему турну" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Остановить" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /plan|tools/i })).toBeNull();
+  });
+
   it("shows the compact combined trigger instead of two visible comboboxes", () => {
     render(<ComposerHarness />);
     expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();

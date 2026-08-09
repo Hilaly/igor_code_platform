@@ -1,22 +1,17 @@
-/*
- * Стиль ссылки. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
- * дисциплина цвета»).
- */
-
 .link {
+  border-radius: var(--sovereign-radius-2xs);
   color: var(--sovereign-accent-text);
-  /*
-   * Подчёркивание есть всегда, а не только при наведении: цвет — единственное отличие ссылки от
-   * текста, и человеку, который цвет не различает, отличать её нечем.
-   */
   text-decoration: underline;
   text-underline-offset: var(--sovereign-space-1);
-  border-radius: var(--sovereign-radius-2xs);
-  transition: color var(--sovereign-duration-fast) var(--sovereign-ease-out);
-  /* Длинный адрес входа переносится, а не растягивает панель. */
   overflow-wrap: anywhere;
+  transition: color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .link:hover {
   color: var(--sovereign-accent-strong);
+}
+
+.link:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-space-1);
 }

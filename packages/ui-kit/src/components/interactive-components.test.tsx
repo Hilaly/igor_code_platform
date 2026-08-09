@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Button } from "./button.tsx";
 import { Combobox } from "./combobox.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
+import { Input, Textarea } from "./input.tsx";
 import { List, ListRow } from "./list.tsx";
-import { Textarea } from "./input.tsx";
 import { MultiSelect } from "./multi-select.tsx";
 import { Menu } from "./menu.tsx";
 import { Popover } from "./popover.tsx";
+import { RadioGroup } from "./radio-group.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
+import { SettingsNavigationItem, SettingsPage, SettingsView } from "./settings-frame.tsx";
+import { Slider } from "./slider.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
 import { Toggle } from "./toggle.tsx";
@@ -46,8 +50,78 @@ function rect(values: Partial<DOMRect> = {}): DOMRect {
 afterEach(cleanup);
 
 describe("interactive components", () => {
+  it.each(["normal", "secondary", "accent", "danger"] as const)(
+    "keeps the %s Button tone on the native button contract",
+    (tone) => {
+      const onClick = vi.fn();
+      render(
+        <Button tone={tone} onClick={onClick} pressed={tone === "accent"}>
+          Continue
+        </Button>,
+      );
+
+      const button = screen.getByRole("button", { name: "Continue" });
+      expect(button.getAttribute("type")).toBe("button");
+      expect(button.getAttribute("aria-pressed")).toBe(tone === "accent" ? "true" : "false");
+      fireEvent.click(button);
+      expect(onClick).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("maps Button busy state to native disabled and aria-busy semantics", () => {
+    const onClick = vi.fn();
+    render(
+      <Button busy onClick={onClick}>
+        Save
+      </Button>,
+    );
+
+    const button = screen.getByRole("button", { name: "Save" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("keeps an icon-only Button named and permits explicit form submission", () => {
+    render(
+      <Button type="submit" size="sm" iconOnly aria-label="Send">
+        →
+      </Button>,
+    );
+
+    expect(screen.getByRole("button", { name: "Send" }).getAttribute("type")).toBe("submit");
+  });
+
+  it("forwards composite and validation state through the native Input", () => {
+    render(
+      <Input
+        value="query"
+        onChange={() => {}}
+        role="combobox"
+        aria-label="Search models"
+        aria-autocomplete="list"
+        aria-activedescendant="model-one"
+        aria-controls="models"
+        aria-expanded
+        aria-haspopup="listbox"
+        invalid
+        disabled
+      />,
+    );
+
+    const input = screen.getByRole("combobox", { name: "Search models" });
+    expect(input.getAttribute("aria-autocomplete")).toBe("list");
+    expect(input.getAttribute("aria-activedescendant")).toBe("model-one");
+    expect(input.getAttribute("aria-controls")).toBe("models");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(input.getAttribute("aria-haspopup")).toBe("listbox");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.hasAttribute("disabled")).toBe(true);
+  });
+
   it.each(["visible", "tooltip"] as const)(
-    "names the %s-label toggle with its required label",
+    "names the %s-label toggle and exposes a tooltip only when requested",
     (labelDisplay) => {
       render(
         <Toggle
@@ -59,6 +133,7 @@ describe("interactive components", () => {
       );
 
       expect(screen.getByRole("checkbox", { name: "Enable provider" })).toBeTruthy();
+      expect(document.querySelector('[role="tooltip"]') !== null).toBe(labelDisplay === "tooltip");
     },
   );
 
@@ -69,6 +144,67 @@ describe("interactive components", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable provider" }));
 
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("maps Toggle disabled state to its native checkbox", () => {
+    render(<Toggle checked onChange={() => {}} label="Enable provider" disabled />);
+
+    const toggle = screen.getByRole("checkbox", { name: "Enable provider" });
+    expect(toggle.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps native radio grouping, checked state, and disabled choices", () => {
+    const onChange = vi.fn();
+    render(
+      <RadioGroup
+        name="delivery"
+        label="Delivery"
+        value="standard"
+        onChange={onChange}
+        options={[
+          { value: "standard", label: "Standard" },
+          { value: "express", label: "Express", disabled: true },
+        ]}
+      />,
+    );
+
+    const standard = screen.getByRole("radio", { name: "Standard" });
+    const express = screen.getByRole("radio", { name: "Express" });
+    expect(screen.getByRole("radiogroup", { name: "Delivery" })).toBeTruthy();
+    expect(standard.getAttribute("name")).toBe("delivery");
+    expect(standard.getAttribute("value")).toBe("standard");
+    expect((standard as HTMLInputElement).checked).toBe(true);
+    expect(express.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(express);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps Slider numeric bounds and optional value on a native range input", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <Slider
+        id="volume"
+        label="Volume"
+        value={25}
+        min={10}
+        max={90}
+        step={5}
+        onChange={onChange}
+        showValue
+      />,
+    );
+
+    const slider = screen.getByRole("slider", { name: "Volume" });
+    expect(slider.getAttribute("min")).toBe("10");
+    expect(slider.getAttribute("max")).toBe("90");
+    expect(slider.getAttribute("step")).toBe("5");
+    expect(screen.getByText("25")).toBeTruthy();
+    fireEvent.change(slider, { target: { value: "35" } });
+    expect(onChange).toHaveBeenCalledWith(35);
+
+    rerender(<Slider label="Volume" value={35} onChange={onChange} disabled />);
+    expect(screen.getByRole("slider", { name: "Volume" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText("35")).toBeNull();
   });
 
   it("connects a selectable list row to an explicitly identified tooltip", () => {
@@ -89,11 +225,15 @@ describe("interactive components", () => {
     );
   });
 
-  it("names a status dot without exposing its color as meaning", () => {
-    render(<StatusDot tone="positive" label="Демон подключён" />);
+  it.each([
+    ["positive", "Daemon connected"],
+    ["pending", "Daemon reconnecting"],
+    ["danger", "Daemon unavailable"],
+  ] as const)("names the %s status dot without exposing color as meaning", (tone, label) => {
+    render(<StatusDot tone={tone} label={label} />);
 
-    const dot = screen.getByRole("status", { name: "Демон подключён" });
-    expect(dot.getAttribute("title")).toBe("Демон подключён");
+    const dot = screen.getByRole("status", { name: label });
+    expect(dot.getAttribute("title")).toBe(label);
   });
 
   it("keeps Tree actions independent from row selection", () => {
@@ -723,6 +863,26 @@ describe("interactive components", () => {
     expect(onChange).toHaveBeenCalledWith("third");
   });
 
+  it("closes an open Select after a pointer press outside its root", () => {
+    render(
+      <>
+        <Select
+          options={options}
+          value="second"
+          onChange={() => {}}
+          label="Scheme"
+          placeholder="Choose..."
+        />
+        <button type="button">Outside</button>
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Scheme" }));
+    expect(screen.getByRole("listbox", { name: "Scheme" })).toBeTruthy();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
+    expect(screen.queryByRole("listbox", { name: "Scheme" })).toBeNull();
+  });
+
   it("does not expose a disabled Select value as selected and marks a disabled trigger", () => {
     const { rerender } = render(
       <Select
@@ -914,6 +1074,28 @@ describe("interactive components", () => {
 });
 
 describe("tool call", () => {
+  it.each([
+    ["running", "Выполняется", "●"],
+    ["done", "Готово", "✓"],
+    ["failed", "Не удалось", "×"],
+  ] as const)(
+    "exposes the visible %s machine outcome with a decorative status sign",
+    (status, label, signText) => {
+      const { container } = render(
+        <ToolCall toolName="read_file" status={status} statusLabel={label} argumentsText="{}" />,
+      );
+
+      const statusBlock = container.querySelector(`[data-status="${status}"]`);
+      expect(statusBlock).not.toBeNull();
+      expect(within(statusBlock as HTMLElement).getByText(label)).toBeTruthy();
+
+      const sign = within(statusBlock as HTMLElement).getByText(signText);
+      expect(sign.getAttribute("aria-hidden")).toBe("true");
+      expect(sign.hasAttribute("aria-label")).toBe(false);
+      expect(sign.hasAttribute("role")).toBe(false);
+    },
+  );
+
   it("keeps a complete technical summary available when its visible path is truncated", () => {
     const completeSummary =
       "apps/web/src/sessions/a-very-long-technical-directory/session-message-list.tsx";
@@ -1013,6 +1195,31 @@ describe("tool call", () => {
 
     expect(container.querySelectorAll("pre")).toHaveLength(2);
     expect(screen.getByText("Вывод")).not.toBeNull();
+  });
+});
+
+describe("settings frame", () => {
+  it("shows its navigation heading inside the named settings navigation", () => {
+    render(
+      <SettingsView
+        context="Sovereign · Settings"
+        navigationLabel="SETTINGS"
+        navigation={
+          <SettingsNavigationItem selected onSelect={() => {}}>
+            Appearance
+          </SettingsNavigationItem>
+        }
+      >
+        <SettingsPage title="Appearance">Appearance controls</SettingsPage>
+      </SettingsView>,
+    );
+
+    const navigation = screen.getByRole("navigation", { name: "SETTINGS" });
+    expect(within(navigation).getByText("SETTINGS")).toBeTruthy();
+    expect(screen.getAllByRole("heading")).toHaveLength(1);
+    expect(
+      within(navigation).getByRole("button", { name: "Appearance" }).getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
 

@@ -88,6 +88,10 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
+  const contributions = screen.getByRole("region", { name: "Contributions · 2" });
+  expect(within(contributions).getAllByRole("listitem")).toHaveLength(2);
   expect(container.querySelector(".plugin-detail-surface")).toBeNull();
   for (const [name, checked] of [
     ["Switched on", true],
@@ -139,6 +143,85 @@ it("shows a not-found state for an unknown plugin key", () => {
     />,
   );
   expect(screen.getByText(/not found/i)).toBeTruthy();
+});
+
+it("does not claim a stale missing plugin is authoritatively absent", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot: { ...snapshot, plugins: [] }, stale: true }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
+  expect(screen.getByText("What you see may be out of date")).toBeTruthy();
+  expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
+  expect(screen.getByText("Loading…")).toBeTruthy();
+  expect(screen.queryByText(/plugin not found/i)).toBeNull();
+});
+
+it("keeps a failed missing plugin non-authoritative until a later snapshot recovers", () => {
+  const { rerender } = render(
+    <PluginDetailView
+      state={{ snapshot: { ...snapshot, plugins: [] }, stale: false, failure: "snapshot failed" }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
+  expect(screen.getByText("The plugins could not be read: snapshot failed")).toBeTruthy();
+  expect(screen.queryByText(/plugin not found/i)).toBeNull();
+
+  rerender(
+    <PluginDetailView
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
+  expect(screen.queryByText("The plugins could not be read: snapshot failed")).toBeNull();
+});
+
+it("keeps stale and write-failure notices visible on the detail route", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: true, failure: "write failed" }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("What you see may be out of date")).toBeTruthy();
+  expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
+  expect(screen.getByText("The choice was not written: write failed")).toBeTruthy();
+});
+
+it("shows a stale warning while the first detail snapshot is still loading", () => {
+  render(
+    <PluginDetailView
+      state={{ stale: true }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText("What you see may be out of date")).toBeTruthy();
+  expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
+  expect(screen.getByText("Loading…")).toBeTruthy();
 });
 
 it("names the kind of a public route and shows the address it answers at", () => {

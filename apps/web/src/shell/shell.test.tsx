@@ -7,12 +7,14 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 
 import { Shell, type ShellProps } from "./shell.tsx";
 import { useShellHeader } from "./header.tsx";
-import { defaultLayout, panelWidthLimits, type ShellLayout } from "./layout.ts";
+import { defaultLayout, panelWidthLimits, shellResizerWidth, type ShellLayout } from "./layout.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -164,6 +166,15 @@ function drag(separator: HTMLElement, startX: number, moves: number[]): void {
 }
 
 describe("PanelResizer", () => {
+  it("keeps the CSS hit area footprint aligned with the layout geometry constant", () => {
+    const styles = readFileSync(join(import.meta.dirname, "shell.css"), "utf8");
+    const width = styles.match(/\.shell-resizer\s*\{[^}]*width:\s*([0-9]+)px;/s)?.[1];
+    const minimumWidth = styles.match(/\.shell-resizer\s*\{[^}]*min-width:\s*([0-9]+)px;/s)?.[1];
+
+    expect(width).toBe(String(shellResizerWidth));
+    expect(minimumWidth).toBe(String(shellResizerWidth));
+  });
+
   it("moves the left edge by the whole dragged distance, not just the last frame", () => {
     const { onLayoutChange } = show();
     const separator = screen.getByRole("separator", { name: "левая панель" });

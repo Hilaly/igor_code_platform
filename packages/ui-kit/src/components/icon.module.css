@@ -1,8 +1,8 @@
 .icon {
   display: inline-block;
   flex-shrink: 0;
-  vertical-align: middle;
   fill: currentColor;
+  vertical-align: middle;
 }
 
 .xs {

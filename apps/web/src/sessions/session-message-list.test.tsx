@@ -229,7 +229,7 @@ describe("the session message list", () => {
 
     const summary = screen.getByText("unknown_tool").closest("summary");
 
-    expect(summary?.textContent).toBe("◇unknown_toolГотово");
+    expect(summary?.textContent).toBe("◇unknown_tool✓Готово");
   });
 
   it("deduplicates the persisted first prompt but keeps repeated steering", () => {

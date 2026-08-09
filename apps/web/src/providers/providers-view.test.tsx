@@ -298,6 +298,20 @@ describe("ProvidersView", () => {
     expect(screen.getByRole("group", { name: "Вход в Anthropic" })).toBeDefined();
   });
 
+  it("names the access and model regions independently", () => {
+    show(
+      applyModels(
+        markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),
+        "anthropic",
+        [model("claude-opus-4")],
+      ),
+      "anthropic",
+    );
+
+    expect(screen.getByRole("region", { name: "Вход в Anthropic" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Модели: Anthropic" })).toBeDefined();
+  });
+
   it("shows the models of the open provider with the window and the price", () => {
     const state = applyModels(
       markModelsLoading(withProviders([provider("anthropic")]), "anthropic"),

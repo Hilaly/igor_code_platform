@@ -1,8 +1,8 @@
 /**
  * Страница настроек: локальная навигация разделов слева, содержимое раздела справа. Это одна
  * поверхность центрального вью с границей между областями, а не две вложенные карточки: настройки
- * уже находятся внутри оболочки приложения. Единственный заголовок страницы называет активный
- * раздел, а под-навигация собрана из того же `List`/`ListRow`, что и навигация оболочки.
+ * уже находятся внутри оболочки приложения. В оболочке активный раздел называет единственный
+ * документный заголовок; локальный контекст повторяет полный путь, но не рисует второй крупный title.
  *
  * Адрес раздела (`/settings/<section>`) переживает перезагрузку и является единственным источником
  * выбранного состояния: голый `/settings` маршрутизатор заменяет на `/settings/appearance`.
@@ -66,7 +66,8 @@ export function SettingsView({
   return (
     <SettingsKitView
       navigationLabel={t("settings.sections")}
-      context={t("settings.context.title")}
+      navigationTitle="SETTINGS"
+      context={`◆ Sovereign · ${t("settings.context.title")} · ${title}`}
       navigation={
         <>
           {settingsSections.map((candidate) => (
@@ -83,7 +84,7 @@ export function SettingsView({
     >
       <SettingsPage
         title={title}
-        headingLevel={embedded ? 2 : 1}
+        headingLevel={embedded ? "none" : 1}
         description={
           detailTitle === undefined ? t(`settings.section.description.${section}`) : undefined
         }

@@ -163,6 +163,36 @@ describe("applyAppearance", () => {
 
     expect(attributes.get(scaleAttributeName)).toBe("larger");
   });
+
+  it.each(["light", "dark"] as const)(
+    "contains a malformed plugin %s palette and applies Imperium with the requested scale",
+    (variant) => {
+      const malformed: ColorScheme = {
+        ...oledScheme,
+        id: "themed.broken",
+        variants: {
+          ...oledScheme.variants,
+          [variant]: { ...oledScheme.variants[variant], surface: "" },
+        },
+      };
+      const preferences: AppearancePreferences = {
+        appearance: { colorScheme: malformed.id, variant, scale: "larger" },
+        locale: "en",
+      };
+
+      expect(() => applied(preferences, false, [...shippedSchemes, malformed])).not.toThrow();
+      const { written, attributes, diagnostics } = applied(preferences, false, [
+        ...shippedSchemes,
+        malformed,
+      ]);
+
+      expect(written.get(rolePropertyName("pageSurface"))).toBe(
+        imperiumScheme.variants[variant].surface,
+      );
+      expect(attributes.get(scaleAttributeName)).toBe("larger");
+      expect(diagnostics.join("\n")).toMatch(new RegExp(`${variant} palette.*surface`));
+    },
+  );
 });
 
 describe("colour schemes brought by plugins", () => {
@@ -194,6 +224,51 @@ describe("colour schemes brought by plugins", () => {
     // Выбрать её нельзя, потому что применить её нечем: неполная палитра дала бы сломанный CSS.
     expect(schemes.map((scheme) => scheme.id)).toEqual(["themed.midnight"]);
     expect(diagnostics.join("\n")).toMatch(/themed.sparse has no surface/);
+  });
+
+  it.each([
+    ["light", "surface", ""],
+    ["dark", "accent", "not-a-color"],
+  ] as const)(
+    "contains a daemon handoff with an invalid %s palette colour",
+    (variant, role, value) => {
+      const { schemes, diagnostics } = diagnosed([
+        colorScheme("broken", {
+          tokenContract: tokenContractMajor,
+          variants: {
+            light: midnightPalette,
+            dark: midnightPalette,
+            [variant]: { ...midnightPalette, [role]: value },
+          },
+        }),
+      ]);
+      const preferences: AppearancePreferences = {
+        appearance: { colorScheme: "themed.broken", variant, scale: "smaller" },
+        locale: "en",
+      };
+      const fallback = applied(preferences, false, [...shippedSchemes, ...schemes]);
+
+      expect(schemes).toEqual([]);
+      expect(diagnostics.join("\n")).toMatch(new RegExp(`${variant} palette.*${role}`));
+      expect(fallback.written.get(rolePropertyName("pageSurface"))).toBe(
+        imperiumScheme.variants[variant].surface,
+      );
+      expect(fallback.attributes.get(scaleAttributeName)).toBe("smaller");
+      expect(fallback.diagnostics.join("\n")).toMatch(/no colour scheme themed\.broken/);
+    },
+  );
+
+  it("keeps a scheme with an invalid known role override out of the list", () => {
+    const { schemes, diagnostics } = diagnosed([
+      colorScheme("broken", {
+        tokenContract: tokenContractMajor,
+        variants: { light: midnightPalette, dark: midnightPalette },
+        roleOverrides: { accent: "not-a-color" },
+      }),
+    ]);
+
+    expect(schemes).toEqual([]);
+    expect(diagnostics.join("\n")).toMatch(/role accent/);
   });
 
   it("keeps a scheme written for another token contract out of the list and says why", () => {

@@ -12,6 +12,7 @@
  */
 
 import type { Palette } from "./palette.ts";
+import { chooseLegibleForeground } from "./secondary-contrast.ts";
 
 export const roleNames = [
   "pageSurface",
@@ -31,6 +32,7 @@ export const roleNames = [
   /** Третья ступень текста: подсказка в поле ввода, единицы измерения. */
   "textSubtle",
   "textOnAccent",
+  "textOnSecondary",
   "accent",
   "accentHover",
   /** Акцент на шаг глубже: нажатое состояние и особо заметная смысловая метка. */
@@ -43,8 +45,13 @@ export const roleNames = [
   "controlSurface",
   "controlSurfaceHover",
   "focusRing",
-  /** Второй акцент для редких смысловых меток и надзаголовков, а не действий. */
+  /** Второй акцент для редких ключевых действий и смысловых меток. */
   "secondary",
+  "secondaryHover",
+  "secondaryStrong",
+  "secondarySurface",
+  "secondaryBorder",
+  "secondaryText",
   "danger",
   "dangerSurface",
   "dangerBorder",
@@ -92,6 +99,29 @@ export function deriveRoles(palette: Palette): Roles {
   /** Второстепенный текст чуть сдвинут к основному ради утопленной поверхности полей. */
   const readableMuted = `color-mix(in oklab, ${palette.inkMuted} 96%, ${palette.ink} 4%)`;
 
+  const secondary = palette.secondary;
+  const secondaryHover = towardsInk(secondary, hoverShift);
+  const secondaryStrong = towardsInk(secondary, "18%");
+
+  /**
+   * Второй акцент — самостоятельный цвет, поэтому `accentInk` не обещает контраст на нём. Один
+   * нейтральный foreground выбирается по худшему из трёх заполненных состояний после композиции
+   * поверх реальной поднятой поверхности кнопки.
+   */
+  const secondaryForegroundCandidates = [
+    palette.ink,
+    palette.surface,
+    palette.surfaceRaised,
+    palette.surfaceSunken,
+    palette.accentInk,
+    palette.dangerInk,
+  ];
+  const textOnSecondary = chooseLegibleForeground(
+    secondaryForegroundCandidates,
+    [secondary, secondaryHover, secondaryStrong],
+    [palette.surface, palette.surfaceRaised],
+  ).foreground;
+
   // Своего значения у «к сведению» в палитре нет: акцент, сведённый к второстепенному тексту.
   const info = `color-mix(in oklab, ${palette.accent} 55%, ${palette.inkMuted} 45%)`;
 
@@ -108,18 +138,26 @@ export function deriveRoles(palette: Palette): Roles {
     textMuted: readableMuted,
     textSubtle: readableMuted,
     textOnAccent: palette.accentInk,
+    textOnSecondary,
     accent: palette.accent,
     accentHover: towardsInk(palette.accent, hoverShift),
-    accentStrong: towardsInk(palette.accent, "18%"),
+    // Палитра гарантирует контраст `accentInk` только на исходном акценте. Сильное состояние
+    // остаётся тем же заполнением, а различие pressed даёт утопленная `accentSurface`.
+    accentStrong: palette.accent,
     // Фон выбранной строки: акцент, разбавленный поверхностью, — иначе выделение перекрикивает текст.
     accentSurface: `color-mix(in oklab, ${palette.accent} 16%, ${palette.surface} 84%)`,
     accentBorder: softBorder(palette.accent),
     accentText: readableText(palette.accent),
     controlSurface: palette.surfaceRaised,
     controlSurfaceHover: towardsInk(palette.surfaceRaised, hoverShift),
-    // Кольцо фокуса разбавлено текстом поверх акцента: на тёмной схеме чистый акцент сливается с ней.
-    focusRing: `color-mix(in oklab, ${palette.accent} 72%, ${palette.accentInk} 28%)`,
-    secondary: palette.secondary,
+    // Кольцо сохраняет оттенок акцента, а основной текст даёт ему 3:1 на нейтральных и мягких фонах.
+    focusRing: `color-mix(in oklab, ${palette.accent} 35%, ${palette.ink} 65%)`,
+    secondary,
+    secondaryHover,
+    secondaryStrong,
+    secondarySurface: softSurface(secondary),
+    secondaryBorder: softBorder(secondary),
+    secondaryText: readableText(secondary),
     danger: palette.danger,
     dangerSurface: softSurface(palette.danger),
     dangerBorder: softBorder(palette.danger),

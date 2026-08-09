@@ -1,5 +1,5 @@
 import { convert, resolve } from "@asamuzakjp/css-color";
-import { interfaceScales } from "@sovereign/protocol";
+import { interfaceScales, type ColorSchemeDocument } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { applyRoles, applyScale, scaleAttributeName } from "./apply.ts";
@@ -30,21 +30,56 @@ describe("deriveRoles", () => {
     expect(roles.accentHover).toContain(imperiumScheme.variants.light.accent);
     expect(roles.accentHover).toContain(imperiumScheme.variants.light.ink);
   });
+
+  it("rejects an incomplete derived role family for the secondary action", () => {
+    const roles = deriveRoles(imperiumScheme.variants.dark);
+
+    expect(roles).toMatchObject({
+      secondary: imperiumScheme.variants.dark.secondary,
+      secondaryHover: expect.any(String),
+      secondaryStrong: expect.any(String),
+      secondarySurface: expect.any(String),
+      secondaryBorder: expect.any(String),
+      secondaryText: expect.any(String),
+      textOnSecondary: expect.any(String),
+    });
+  });
 });
 
 describe("imperiumScheme", () => {
-  it("separates the Refined Imperium surfaces", () => {
+  it("rejects the wrong dark Refined Imperium palette", () => {
     expect(imperiumScheme.variants.dark).toMatchObject({
-      surface: "#14100b",
-      surfaceRaised: "#201a13",
-      surfaceSunken: "#100d09",
-      border: "#3b2f21",
+      surface: "#100b09",
+      surfaceRaised: "#1f1814",
+      surfaceSunken: "#130e0c",
+      border: "#2a221e",
+      accent: "#8e44ad",
+      secondary: "#c5a059",
+    });
+    expect(resolveScheme(imperiumScheme, "dark")).toMatchObject({
+      kind: "resolved",
+      roles: {
+        controlSurface: "#261c18",
+        accentSurface: "#3b2256",
+        accentStrong: "#482b68",
+        borderStrong: "#362c27",
+      },
     });
     expect(imperiumScheme.variants.light).toMatchObject({
       surface: "#f3ead8",
       surfaceRaised: "#fffaf0",
       surfaceSunken: "#e7dcc5",
       border: "#d1bea0",
+    });
+  });
+
+  it("keeps built-in role overrides out of the serialized scheme contract", () => {
+    const serialized = JSON.parse(JSON.stringify(imperiumScheme)) as Record<string, unknown>;
+
+    expect(Object.keys(serialized).sort()).toEqual(["id", "tokenContract", "variants"]);
+    expect(resolveScheme({ ...imperiumScheme }, "dark")).toMatchObject({
+      kind: "resolved",
+      roles: { controlSurface: "#261c18" },
     });
   });
 });
@@ -101,6 +136,66 @@ describe("parseColorScheme", () => {
     expect(parsed.kind === "refused" && parsed.reason).toMatch(/no light palette/);
   });
 
+  it.each([
+    ["light", "surface", ""],
+    ["dark", "accent", "not-a-color"],
+  ] as const)("refuses an unresolvable %s palette colour", (variant, role, value) => {
+    const parsed = parseColorScheme("themed.broken", {
+      ...document,
+      variants: {
+        ...document.variants,
+        [variant]: { ...document.variants[variant], [role]: value },
+      },
+    });
+
+    expect(parsed.kind).toBe("refused");
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(
+      new RegExp(`${variant} palette.*${role}`),
+    );
+  });
+
+  it("refuses an unresolvable override of a known role", () => {
+    const parsed = parseColorScheme("themed.broken", {
+      ...document,
+      roleOverrides: { accent: "not-a-color" },
+    });
+
+    expect(parsed.kind).toBe("refused");
+    expect(parsed.kind === "refused" && parsed.reason).toMatch(/role accent/);
+  });
+
+  it("ignores an unresolvable override whose role is unknown", () => {
+    const parsed = parseColorScheme("themed.forward", {
+      ...document,
+      roleOverrides: { neonEdge: "not-a-color" },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(parsed.kind).toBe("parsed");
+    expect(resolved?.kind).toBe("resolved");
+    expect(resolved?.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it.each([
+    ["hex", "#123"],
+    ["modern rgb", "rgb(12 34 56)"],
+    ["legacy rgb", "rgb(12, 34, 56)"],
+    ["hsl", "hsl(120 50% 40%)"],
+    ["oklch", "oklch(60% 0.1 120)"],
+    ["alpha", "rgb(12 34 56 / 0.5)"],
+    ["color-mix", "color-mix(in oklab, red 40%, blue)"],
+  ])("accepts a resolvable %s colour", (_syntax, value) => {
+    const parsed = parseColorScheme("themed.functional", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: { ...document.variants.light, border: value },
+      },
+    });
+
+    expect(parsed.kind).toBe("parsed");
+  });
+
   it("takes a foreign token contract: refusing it is the job of resolveScheme, and only its", () => {
     const parsed = parseColorScheme("themed.ancient", { ...document, tokenContract: 1 });
 
@@ -117,6 +212,144 @@ describe("parseColorScheme", () => {
 
     expect(resolved?.kind === "resolved" && resolved.roles.accent).toBe("#123456");
     expect(resolved?.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it("does not accept built-in role overrides from a plugin scheme document", () => {
+    const parsed = parseColorScheme("themed.midnight", {
+      ...document,
+      builtInRoleOverrides: { dark: { controlSurface: "#261c18" } },
+    } as ColorSchemeDocument);
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "dark") : undefined;
+
+    expect(resolved?.kind === "resolved" && resolved.roles.controlSurface).not.toBe("#261c18");
+  });
+
+  it.each([
+    ["rgb()", "rgb(20 20 20)", "rgb(230 230 230)", "rgb(190 135 30)"],
+    ["hsl()", "hsl(0 0% 8%)", "hsl(0 0% 92%)", "hsl(40 73% 43%)"],
+    ["oklch()", "oklch(20% 0 0)", "oklch(92% 0 0)", "oklch(65% 0.14 75)"],
+  ])("keeps secondary action text legible for plugin %s colors", (_, dark, light, secondary) => {
+    const parsed = parseColorScheme("themed.functional", {
+      ...document,
+      variants: {
+        light: {
+          ...document.variants.light,
+          surface: dark,
+          surfaceRaised: light,
+          surfaceSunken: dark,
+          ink: light,
+          inkMuted: light,
+          accentInk: dark,
+          dangerInk: dark,
+          secondary,
+        },
+        dark: document.variants.dark,
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(parsed.kind).toBe("parsed");
+    expect(resolved?.kind).toBe("resolved");
+
+    if (resolved?.kind !== "resolved") return;
+
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatio(resolved.roles.textOnSecondary, resolved.roles[background]),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("chooses one foreground that survives every opaque secondary action state", () => {
+    const boundaryPalette = {
+      ...document.variants.light,
+      surface: "#ffffff",
+      surfaceRaised: "#ffffff",
+      surfaceSunken: "#f5f5f5",
+      ink: "#000000",
+      inkMuted: "#555555",
+      accentInk: "#ffffff",
+      dangerInk: "#ffffff",
+      secondary: "#767676",
+    };
+    const parsed = parseColorScheme("themed.secondary-boundary", {
+      ...document,
+      variants: { ...document.variants, light: boundaryPalette },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("resolved");
+    if (resolved?.kind !== "resolved") return;
+
+    expect(resolved.roles.textOnSecondary).toBe("#ffffff");
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatioOnSurface(
+          resolved.roles.textOnSecondary,
+          resolved.roles[background],
+          resolved.roles.panelSurface,
+        ),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("rejects a translucent secondary when no foreground survives every rendered state", () => {
+    const parsed = parseColorScheme("themed.secondary-alpha-boundary", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: {
+          ...document.variants.light,
+          surface: "#ffffff",
+          surfaceRaised: "#ffffff",
+          surfaceSunken: "#f5f5f5",
+          ink: "#000000",
+          inkMuted: "#555555",
+          accentInk: "#ffffff",
+          dangerInk: "#ffffff",
+          secondary: "rgb(0 0 0 / 0.5)",
+        },
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("rejected");
+    expect(resolved?.diagnostics.join("\n")).toMatch(/secondary action.*contrast/i);
+  });
+
+  it("composites a translucent secondary before choosing its foreground", () => {
+    const parsed = parseColorScheme("themed.secondary-alpha-valid", {
+      ...document,
+      variants: {
+        ...document.variants,
+        light: {
+          ...document.variants.light,
+          surface: "#ffffff",
+          surfaceRaised: "#ffffff",
+          surfaceSunken: "#f5f5f5",
+          ink: "#000000",
+          inkMuted: "#555555",
+          accentInk: "#ffffff",
+          dangerInk: "#ffffff",
+          secondary: "rgb(0 0 0 / 0.3)",
+        },
+      },
+    });
+    const resolved = parsed.kind === "parsed" ? resolveScheme(parsed.scheme, "light") : undefined;
+
+    expect(resolved?.kind).toBe("resolved");
+    if (resolved?.kind !== "resolved") return;
+
+    expect(resolved.roles.textOnSecondary).toBe("#000000");
+    for (const background of ["secondary", "secondaryHover", "secondaryStrong"] as const) {
+      expect(
+        contrastRatioOnSurface(
+          resolved.roles.textOnSecondary,
+          resolved.roles[background],
+          resolved.roles.panelSurface,
+        ),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
 
@@ -149,6 +382,35 @@ describe("resolveScheme", () => {
 
     expect(outcome.kind).toBe("resolved");
     expect(outcome.diagnostics.join("\n")).toMatch(/unknown role neonEdge/);
+  });
+
+  it("rejects a malformed palette defensively without throwing", () => {
+    const scheme: ColorScheme = {
+      ...imperiumScheme,
+      variants: {
+        ...imperiumScheme.variants,
+        dark: { ...imperiumScheme.variants.dark, surface: "" },
+      },
+    };
+
+    expect(() => resolveScheme(scheme, "dark")).not.toThrow();
+    expect(resolveScheme(scheme, "dark")).toMatchObject({
+      kind: "rejected",
+      diagnostics: [expect.stringMatching(/dark palette.*surface/)],
+    });
+  });
+
+  it("rejects a malformed known role override defensively without throwing", () => {
+    const scheme: ColorScheme = {
+      ...imperiumScheme,
+      roleOverrides: { accent: "not-a-color" },
+    };
+
+    expect(() => resolveScheme(scheme, "light")).not.toThrow();
+    expect(resolveScheme(scheme, "light")).toMatchObject({
+      kind: "rejected",
+      diagnostics: [expect.stringMatching(/role accent/)],
+    });
   });
 
   it("leaves the roles it was not told to override derived from the palette", () => {
@@ -229,6 +491,10 @@ describe("contrast", () => {
     }
   });
 
+  const selectedTabPair = ["accentText", "accentSurface"] as const satisfies readonly [
+    RoleName,
+    RoleName,
+  ];
   const rolePairs = [
     ["text", "pageSurface"],
     ["textMuted", "pageSurface"],
@@ -254,7 +520,7 @@ describe("contrast", () => {
     ["text", "fillSurface"],
     ["textMuted", "fillSurface"],
     ["text", "accentSurface"],
-    ["accentText", "accentSurface"],
+    selectedTabPair,
     ["dangerText", "dangerSurface"],
     ["warningText", "warningSurface"],
     ["successText", "successSurface"],
@@ -262,11 +528,23 @@ describe("contrast", () => {
     ["textOnAccent", "accent"],
     ["textOnAccent", "accentHover"],
     ["textOnAccent", "accentStrong"],
+    ["secondaryText", "pageSurface"],
+    ["secondaryText", "panelSurface"],
+    ["secondaryText", "secondarySurface"],
+    ["textOnSecondary", "secondary"],
+    ["textOnSecondary", "secondaryHover"],
+    ["textOnSecondary", "secondaryStrong"],
     ["textOnDanger", "danger"],
   ] as const satisfies readonly (readonly [RoleName, RoleName])[];
 
-  it("includes warning text rendered inside plugin panels", () => {
-    expect(rolePairs).toContainEqual(["warningText", "panelSurface"]);
+  it("checks secondary action text on every filled secondary state", () => {
+    expect(rolePairs).toEqual(
+      expect.arrayContaining([
+        ["textOnSecondary", "secondary"],
+        ["textOnSecondary", "secondaryHover"],
+        ["textOnSecondary", "secondaryStrong"],
+      ]),
+    );
   });
 
   it("keeps every consumed text role legible on its actual surface", () => {
@@ -274,7 +552,10 @@ describe("contrast", () => {
 
     for (const scheme of shippedSchemes) {
       for (const variant of paletteVariants) {
-        const roles = deriveRoles(scheme.variants[variant]);
+        const resolved = resolveScheme(scheme, variant);
+        expect(resolved.kind, `${scheme.id} ${variant}`).toBe("resolved");
+        const roles =
+          resolved.kind === "resolved" ? resolved.roles : deriveRoles(scheme.variants[variant]);
 
         for (const [text, background] of rolePairs) {
           const ratio = contrastRatio(roles[text], roles[background]);
@@ -282,6 +563,46 @@ describe("contrast", () => {
           if (ratio < 4.5) {
             failures.push(
               `${scheme.id} ${variant}: ${text} on ${background} is ${ratio.toFixed(2)}:1`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
+  const focusAdjacentSurfaces = [
+    "pageSurface",
+    "panelSurface",
+    "sunkenSurface",
+    "fillSurface",
+    "fillSurfaceStrong",
+    "controlSurface",
+    "controlSurfaceHover",
+    "accentSurface",
+    "secondarySurface",
+    "dangerSurface",
+    "warningSurface",
+    "successSurface",
+    "infoSurface",
+  ] as const satisfies readonly RoleName[];
+
+  it("keeps the shared keyboard focus ring distinct from every adjacent surface", () => {
+    const failures: string[] = [];
+
+    for (const scheme of shippedSchemes) {
+      for (const variant of paletteVariants) {
+        const resolved = resolveScheme(scheme, variant);
+        expect(resolved.kind, `${scheme.id} ${variant}`).toBe("resolved");
+        if (resolved.kind !== "resolved") continue;
+
+        for (const background of focusAdjacentSurfaces) {
+          const ratio = contrastRatio(resolved.roles.focusRing, resolved.roles[background]);
+
+          if (ratio < 3) {
+            failures.push(
+              `${scheme.id} ${variant}: focusRing against ${background} is ${ratio.toFixed(2)}:1`,
             );
           }
         }
@@ -321,8 +642,8 @@ describe("contrast", () => {
   });
 
   it("covers the whole palette between the pairs and what is not text", () => {
-    // Второй акцент здесь не проверяется намеренно: он служит смысловым меткам и надзаголовкам, а не
-    // тексту на фоне, поэтому к нему неприменима эта проверка контраста текстовых пар.
+    // Второй акцент проверяется через производные ролевые пары выше: сама палитра не знает, какой
+    // foreground выберет кит для заполненного secondary-действия.
     const checked = new Set<string>([
       ...textPairs.flat(),
       "border",
@@ -351,6 +672,17 @@ function contrastRatio(first: string, second: string): number {
   const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
     (left, right) => right - left,
   );
+
+  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
+}
+
+function contrastRatioOnSurface(foreground: string, background: string, surface: string): number {
+  const renderedBackground = composite(rgbChannels(background), rgbChannels(surface));
+  const renderedForeground = composite(rgbChannels(foreground), renderedBackground);
+  const [lighter, darker] = [
+    relativeLuminance(renderedForeground),
+    relativeLuminance(renderedBackground),
+  ].sort((left, right) => right - left);
 
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }

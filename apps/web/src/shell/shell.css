@@ -1,13 +1,3 @@
-/*
- * Раскладка оболочки. Цвета — только переменные ролей, размеры — только шкалы кита: значения задают
- * цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
- * Здесь лежит геометрия хоста, а не вид примитивов — тот живёт в ките.
- *
- * Базовой типографики здесь больше нет: кегль, семейство и цвет текста переехали в сброс кита
- * (packages/ui-kit/src/styles/reset.css), потому что их обязан получить и браузерный код плагина,
- * который рисует свой DOM (docs/ui-extension-model.md).
- */
-
 :root {
   color-scheme: light dark;
 }
@@ -15,87 +5,116 @@
 .shell {
   display: flex;
   align-items: stretch;
+  width: 100%;
   height: 100vh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.shell-left,
+.shell-right {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
 .shell-left {
-  display: flex;
-  flex-direction: column;
   gap: var(--sovereign-space-2);
   padding: var(--sovereign-space-2);
   background: var(--sovereign-panel-surface);
-  border-right: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  overflow: hidden;
-  min-width: 0;
-  flex: 0 0 auto;
+  border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.shell-left-main {
-  display: flex;
-  flex-direction: column;
+.shell-right {
   gap: var(--sovereign-space-2);
-  min-height: 0;
-  /* Навигация прижата к верху: шапка и основной блок стоят в начале панели, а `shell-left-bottom`
-     (статус демона) оттесняется вниз распором. Так список вью не висит посередине пустой панели. */
-  flex: 1 1 auto;
-  min-width: 0;
+  padding: var(--sovereign-space-3);
+  background: var(--sovereign-sunken-surface);
+  border-inline-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.shell-left-nav-header {
-  flex: 0 0 auto;
-  min-width: 0;
-  padding-block-end: var(--sovereign-space-3);
-  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.shell-left-bottom {
-  flex: 0 0 auto;
-  border-top: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  padding-top: var(--sovereign-space-2);
-  min-width: 0;
-}
-
-/* Шапка панели: единственная кнопка «скрыть», прижатая к правому краю. */
-.shell-left-head {
+.shell-left-head,
+.shell-right-head {
   display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--sovereign-space-2);
+}
+
+.shell-left-head {
   justify-content: flex-end;
 }
 
 .shell-right-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sovereign-space-2);
   justify-content: space-between;
 }
 
-/* Состояние демона и выход стоят в одной колонке: и то и другое про соединение, не про вью. */
-.shell-status {
+.shell-left-main {
   display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-  align-items: stretch;
-}
-
-/* Фоновая заливка страницы остаётся нейтральной, чтобы не конкурировать с содержимым. */
-.shell-page {
   flex: 1 1 auto;
-  position: relative;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
+  gap: var(--sovereign-space-2);
+}
+
+.shell-left-nav-header,
+.shell-nav-header {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--sovereign-space-3);
+}
+
+.shell-left-nav-header {
+  padding-block-end: var(--sovereign-space-3);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+.shell-left-projects {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.shell-left-bottom {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding-block-start: var(--sovereign-space-2);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border);
+}
+
+.shell-home {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--sovereign-space-2);
+}
+
+.shell-page {
+  position: relative;
   display: grid;
+  flex: 1 1 auto;
   grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
   padding: var(--sovereign-space-5);
-  background: var(--sovereign-page-surface);
   overflow: hidden;
+  background: var(--sovereign-page-surface);
 }
 
 .shell-header,
-.shell-body {
-  min-width: 0;
-  min-height: 0;
-}
-
+.shell-body,
 .shell-header > * {
   min-width: 0;
   min-height: 0;
@@ -105,39 +124,44 @@
   overflow: auto;
 }
 
-.shell-page[data-content-mode="contained"] {
-  overflow: hidden;
-}
-
 .shell-page[data-content-mode="contained"] .shell-body {
   display: flex;
   overflow: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-}
-
-.shell-body > :first-child {
-  min-width: 0;
-  min-height: 0;
 }
 
 .shell-page[data-content-mode="contained"] .shell-body > :first-child {
   flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
-/*
- * Кнопку скрытия рисует кит (`Button`), а не этот файл: раньше здесь была её геометрия и цвет, и это
- * дублировало кит. Осталась только раскладка вокруг неё и позиционирование возврата.
- *
- * Возврат скрытой панели — обёртка над китовой `Button`, плавающая над углом страницы абсолютно,
- * прижатая к краю, к которому относится. Кнопка вкладывается внутрь, а не получает класс: имена
- * классов кита хешируются, и позиционировать сам примитив снаружи нельзя.
- */
+.shell-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--sovereign-space-2);
+}
+
+.shell-tab-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.shell-tab-empty {
+  min-width: 0;
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-sm);
+}
+
 .shell-restore {
   position: absolute;
   top: var(--sovereign-space-2);
+  z-index: 1;
   display: inline-flex;
+  min-width: 0;
 }
 
 .shell-restore-left {
@@ -148,43 +172,11 @@
   right: var(--sovereign-space-2);
 }
 
-.shell-right {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-  padding: var(--sovereign-space-3);
-  background: var(--sovereign-sunken-surface);
-  border-left: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-  overflow: hidden auto;
-  flex: 0 0 auto;
-}
-
-.shell-tabs {
-  display: flex;
-  gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
-  /* В шапке правой панели делит ширину с кнопкой «скрыть»: вкладки забирают всё, что не кнопка. */
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.shell-tab-body {
-  min-height: 0;
-  overflow: auto;
-}
-
-/* Вкладок нет: правая панель до среза 12 — место хоста, которое плагин заполнит своими вкладками. */
-.shell-tab-empty {
-  color: var(--sovereign-text-subtle);
-  font-size: var(--sovereign-font-size-sm);
-}
-
-/* Граница панели: тянется мышью, а с клавиатуры — стрелками, поэтому у неё есть фокус. */
 .shell-resizer {
   flex: 0 0 auto;
-  /* Полоса захвата: шкала отступов начинается с более крупного шага, а тут нужен именно тонкий край. */
   width: 5px;
-  border: none;
+  min-width: 5px;
+  border: 0;
   background: var(--sovereign-border);
   cursor: col-resize;
   touch-action: none;
@@ -193,111 +185,42 @@
 .shell-resizer:hover,
 .shell-resizer:focus-visible {
   background: var(--sovereign-accent);
-  outline: none;
-}
-
-.shell-nav,
-.shell-home {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
-}
-
-.shell-nav {
-  min-height: 0;
-  flex: 1;
-  min-width: 0;
-}
-
-.shell-projects {
-  min-height: 0;
-  min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.shell-left-projects {
-  min-height: 0;
-  min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.shell-nav-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-  min-width: 0;
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-accent);
+  outline-offset: -2px;
 }
 
 .sidebar-project-actions,
 .shell-account {
   display: flex;
   align-items: center;
+  min-width: 0;
+  min-height: var(--sovereign-row-height-compact);
   gap: var(--sovereign-space-1);
-}
-
-.sidebar-project-actions {
-  min-height: var(--sovereign-row-height-compact);
-}
-
-.shell-account {
-  min-height: var(--sovereign-row-height-compact);
-}
-
-.shell-account-status {
-  display: inline-flex;
-  flex: none;
-  padding-inline-start: var(--sovereign-space-2);
 }
 
 .shell-account > :last-child {
+  flex: 1 1 auto;
   min-width: 0;
-  flex: 1;
 }
 
-/* Вью плагинов: панель на плагин, в панели — плотные сведения и строки вкладов. */
-.plugins,
-.plugins-plugin {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-2);
+@media (width <= 40rem) {
+  .shell-left,
+  .shell-right {
+    padding-inline: var(--sovereign-space-2);
+  }
+
+  .shell-page {
+    padding-inline: var(--sovereign-space-3);
+  }
+
+  .shell-right-head,
+  .shell-tabs {
+    gap: var(--sovereign-space-1);
+  }
 }
 
-.plugins-plugin-head,
-.plugins-plugin-facts,
-.plugins-contribution {
-  display: flex;
-  align-items: center;
-  gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
-}
-
-/*
- * Переключатель плагина живёт в шапке `Panel`; первая строка тела собирает состояние и путь. Так
- * управление самостоятельным объектом остаётся у его имени, а сведения не образуют вторую панель.
- */
-.plugins-plugin-head {
-  min-height: var(--sovereign-row-height-compact);
-  justify-content: space-between;
-}
-
-.plugins-contributions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-1);
-  padding-block-start: var(--sovereign-space-2);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.plugins-contribution {
-  min-height: var(--sovereign-row-height-compact);
-  padding: var(--sovereign-space-1) var(--sovereign-space-2);
-}
-
-.plugins-reasons {
-  margin: 0;
-  padding-left: var(--sovereign-space-5);
+@media (prefers-reduced-motion: reduce) {
+  .shell-resizer {
+    transition: none;
+  }
 }

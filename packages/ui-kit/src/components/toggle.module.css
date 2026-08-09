@@ -1,14 +1,9 @@
-/*
- * Настоящий `input` остаётся в дереве и только уводится с глаз: он даёт фокус, клавиатуру и роль
- * скринридеру. Соседний трек рисует состояние, а его `::after` — круглый бегунок: обе части читают
- * один и тот же `:checked`, поэтому второго источника истины о значении не появляется.
- */
-
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-2);
   color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
   cursor: pointer;
 }
 
@@ -34,7 +29,6 @@
 
 .input {
   position: absolute;
-  /* Не ноль: элемент нулевого размера часть браузеров исключает из порядка клавиатурного обхода. */
   width: 1px;
   height: 1px;
   padding: var(--sovereign-space-0);
@@ -67,7 +61,9 @@
   background: var(--sovereign-control-surface);
   content: "";
   transform: translateX(0);
-  transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
+  transition:
+    background var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .toggle:hover .box {
@@ -80,10 +76,10 @@
 }
 
 .input:checked + .box::after {
+  background: var(--sovereign-text-on-accent);
   transform: translateX(var(--toggle-thumb-translate));
 }
 
-/* Кольцо фокуса переносится на видимый трек: у настоящего контрола показывать его негде. */
 .input:focus-visible + .box {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
   outline-offset: var(--sovereign-space-1);

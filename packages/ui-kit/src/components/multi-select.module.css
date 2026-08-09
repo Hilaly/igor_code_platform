@@ -3,6 +3,7 @@
   display: inline-flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
 }
 
 .box {
@@ -10,77 +11,104 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sovereign-space-1);
-  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  min-width: 0;
   min-height: var(--sovereign-control-height-md);
-  background: var(--sovereign-sunken-surface);
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-control-surface);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
   cursor: pointer;
 }
 
+.box:hover:not(.disabled) {
+  border-color: var(--sovereign-border-strong);
+  background: var(--sovereign-control-surface-hover);
+}
+
+.box:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-stroke-thin);
+}
+
 .box.invalid {
-  border-color: var(--sovereign-danger);
+  border-color: var(--sovereign-danger-border);
 }
 
 .box.disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-1);
-  padding: 0.1rem 0.4rem;
-  background: var(--sovereign-panel-surface);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-accent-border);
   border-radius: var(--sovereign-radius-sm);
-  font-size: var(--sovereign-font-size-xs);
+  background: var(--sovereign-accent-surface);
   color: var(--sovereign-text);
+  font-size: var(--sovereign-font-size-xs);
+  overflow-wrap: anywhere;
 }
 
 .remove {
-  border: none;
-  background: transparent;
-  cursor: pointer;
+  flex: none;
   padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--sovereign-text-muted);
+  font: inherit;
+  cursor: pointer;
 }
 
 .remove:hover {
-  color: var(--sovereign-danger);
+  color: var(--sovereign-danger-text);
+}
+
+.remove:focus-visible {
+  border-radius: var(--sovereign-radius-xs);
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-stroke-thin);
 }
 
 .placeholder {
+  min-width: 0;
+  padding-inline: var(--sovereign-space-1);
   color: var(--sovereign-text-subtle);
   font-size: var(--sovereign-font-size-sm);
-  padding-left: var(--sovereign-space-1);
 }
 
 .dropdown {
   position: absolute;
-  top: calc(100% + var(--sovereign-space-1));
-  left: 0;
-  right: 0;
   z-index: var(--sovereign-z-overlay);
-  background: var(--sovereign-panel-surface);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  border-radius: var(--sovereign-radius-md);
-  box-shadow: var(--sovereign-elevation-2);
-  max-height: 12rem;
-  overflow-y: auto;
+  inset-block-start: calc(100% + var(--sovereign-space-1));
+  inset-inline: 0;
+  max-height: 16rem;
   padding: var(--sovereign-space-1);
+  overflow-y: auto;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  border-radius: var(--sovereign-radius-md);
+  background: var(--sovereign-panel-surface);
+  box-shadow: var(--sovereign-elevation-2);
 }
 
 .option {
-  padding: var(--sovereign-space-2) var(--sovereign-space-3);
-  border-radius: var(--sovereign-radius-sm);
-  color: var(--sovereign-text);
-  font-size: var(--sovereign-font-size-sm);
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  min-height: var(--sovereign-row-height-compact);
+  padding-inline: var(--sovereign-space-3);
+  border-radius: var(--sovereign-radius-sm);
+  color: var(--sovereign-text);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  cursor: pointer;
 }
 
 .option:hover,
@@ -89,11 +117,13 @@
 }
 
 .option.selected {
-  color: var(--sovereign-accent-text);
+  background: var(--sovereign-accent-surface);
+  color: var(--sovereign-text);
   font-weight: var(--sovereign-font-weight-semibold);
 }
 
 .option.disabled {
-  opacity: 0.5;
+  color: var(--sovereign-text-subtle);
   cursor: not-allowed;
+  opacity: 0.6;
 }

@@ -10,7 +10,6 @@
 
 .row {
   flex-direction: row;
-  /* По верху, а не по центру: под контролом бывает подсказка, и метка не должна от неё съезжать. */
   align-items: flex-start;
   gap: var(--sovereign-space-4);
 }
@@ -19,6 +18,7 @@
   display: grid;
   gap: var(--sovereign-space-1);
   width: 100%;
+  min-width: 0;
 }
 
 .label {
@@ -40,7 +40,6 @@
   color: var(--sovereign-text-muted);
 }
 
-/* Текстовая роль опасности, а не сама опасность: надпись обязана читаться на поверхности панели. */
 .error {
   color: var(--sovereign-danger-text);
 }
