@@ -13,6 +13,11 @@ export type Diagnostic = {
 export type DiagnosticsStore = {
   record: (text: string) => void;
   list: () => Diagnostic[];
+  /**
+   * Подписчик сразу получает то, что уже записано. Иначе всё, что случилось до подписки, теряется
+   * до следующей записи: место жалуется на упавший экземпляр из `componentDidCatch`, а он
+   * случается раньше эффекта, в котором подписка заводится.
+   */
   subscribe: (listener: (list: Diagnostic[]) => void) => () => void;
 };
 
@@ -39,6 +44,7 @@ export function createDiagnosticsStore(): DiagnosticsStore {
     list: () => list,
     subscribe: (listener) => {
       listeners.add(listener);
+      listener(list);
 
       return () => {
         listeners.delete(listener);

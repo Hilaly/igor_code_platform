@@ -15,7 +15,28 @@ describe("createDiagnosticsStore", () => {
       "no translation for state.loading",
       "the stream broke off",
     ]);
-    expect(seen).toHaveLength(2);
+    // Три, а не два: подписка начинается с того, что уже записано, — здесь с пустого списка.
+    expect(seen).toHaveLength(3);
+  });
+
+  /**
+   * Место жалуется на упавший экземпляр из `componentDidCatch`, а он случается раньше эффекта с
+   * подпиской: без выдачи текущего списка первая жалоба пропадала бы до следующей записи.
+   */
+  it("hands the subscriber what has already been recorded", () => {
+    const store = createDiagnosticsStore();
+
+    store.record("the component placed.boom failed while rendering");
+
+    let seen: Diagnostic[] = [];
+
+    store.subscribe((list) => {
+      seen = list;
+    });
+
+    expect(seen.map((entry) => entry.text)).toEqual([
+      "the component placed.boom failed while rendering",
+    ]);
   });
 
   it("keeps two identical messages apart", () => {
@@ -45,10 +66,11 @@ describe("createDiagnosticsStore", () => {
       calls += 1;
     });
 
+    // Первый вызов — сама подписка, второй — запись; после отписки записи больше не будят.
     store.record("first");
     unsubscribe();
     store.record("second");
 
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
   });
 });
