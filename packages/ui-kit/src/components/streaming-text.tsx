@@ -1,12 +1,10 @@
 /**
- * Текст, который ещё едет. Показывает ответ модели плоским — без разбора размётки — и ставит
- * каретку, пока дельты идут.
- *
- * Почему это не проп `Markdown`: дельта приходит на каждый токен, и разбор размётки на каждом кадре
- * не только дорог, но и заставляет ответ прыгать — незакрытый ограждённый блок меняет дерево
- * целиком (docs/ui-kit.md, «Почему так»). Дописанное сообщение показывает `Markdown`.
+ * Текст, который ещё едет. Разбирает Markdown на каждом обновлении и ставит каретку, пока дельты
+ * идут. Незакрытые конструкции могут временно перестраивать дерево; это сознательно включённый
+ * эксперимент для проверки на реальных ответах (docs/ui-kit.md, «Почему так»).
  */
 
+import { Markdown } from "./markdown.tsx";
 import styles from "./streaming-text.module.css";
 
 export type StreamingTextProps = {
@@ -20,7 +18,7 @@ export type StreamingTextProps = {
 export function StreamingText({ text, streaming, label }: StreamingTextProps) {
   return (
     <div className={styles.root} aria-busy={streaming} aria-label={label}>
-      {text}
+      <Markdown text={text} />
       {streaming ? <span className={styles.caret} aria-hidden="true" /> : undefined}
     </div>
   );

@@ -207,6 +207,38 @@ describe("the session message list", () => {
     expect(screen.getByText("pwd")).toBeTruthy();
   });
 
+  it("keeps live tool calls in an agent message and renders live channels as markdown", () => {
+    show(
+      openSession({
+        live: {
+          turnId: "turn-1",
+          order: ["turn-1:message", "turn-1:tool"],
+          items: {
+            "turn-1:message": {
+              kind: "message",
+              messageId: "turn-1:message",
+              role: "agent",
+              text: "**форматируемый ответ**",
+              reasoning: "**форматируемый reasoning**",
+              done: false,
+            },
+            "turn-1:tool": {
+              kind: "tool",
+              toolCallId: "tool-1",
+              toolName: "read_file",
+              input: { path: "README.md" },
+              done: false,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(screen.getByText("форматируемый ответ").tagName).toBe("STRONG");
+    expect(screen.getByText("форматируемый reasoning").tagName).toBe("STRONG");
+    expect(screen.getByText("read_file").closest('[data-role="agent"]')).not.toBeNull();
+  });
+
   it("falls back to an unknown tool name when its input has no supported summary", () => {
     show(
       openSession({
