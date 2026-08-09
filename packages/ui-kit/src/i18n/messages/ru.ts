@@ -264,6 +264,7 @@ export const coreRussian: CatalogRegistration = {
     "providers.auth.unconfigured": "Не настроен",
     "providers.auth.unknown": "Сказать нечем",
     "providers.back": "← Все провайдеры",
+    "providers.open": "Открыть {name}",
     "providers.custom": "от плагина",
     "providers.dynamic": "список из сети",
     "providers.empty": "Провайдеров нет вовсе",

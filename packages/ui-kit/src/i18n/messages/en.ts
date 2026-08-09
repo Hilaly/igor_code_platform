@@ -266,6 +266,7 @@ export const coreEnglish: CatalogRegistration = {
     "providers.auth.unconfigured": "Not configured",
     "providers.auth.unknown": "Nothing to say",
     "providers.back": "← All providers",
+    "providers.open": "Open {name}",
     "providers.custom": "from a plugin",
     "providers.dynamic": "list from the network",
     "providers.empty": "No providers at all",
