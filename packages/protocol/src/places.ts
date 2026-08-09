@@ -61,6 +61,11 @@ export const corePlaces = [
   { id: "core.settings.plugins", cardinality: "single", replaceable: true },
   /** Секции левой панели под деревом проектов. */
   { id: "core.sidebar.sections", cardinality: "collection", replaceable: false },
+  /**
+   * Вкладки правой панели. Полосой и выбором открытой вкладки владеет оболочка, поэтому место
+   * незаменяемо: вклад приносит содержимое вкладки, а не саму панель.
+   */
+  { id: "core.panel.tabs", cardinality: "tabs", replaceable: false },
   /** Действия в шапке центральной колонки, после действий самого вью. */
   { id: "core.view.header.actions", cardinality: "action", replaceable: false },
 ] as const satisfies readonly CorePlace[];

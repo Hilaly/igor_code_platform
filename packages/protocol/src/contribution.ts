@@ -249,10 +249,11 @@ export type LocaleCatalogContributionRegistration = RegistrationCommon & {
  * складываются. Заменяемым бывает только одиночное: у коллекции и действия вклады не спорят, а
  * выстраиваются в ряд.
  *
- * Вкладок здесь пока нет: правой панелью с несколькими открытыми экземплярами никто не владеет, а
- * кардинальность без хоста — обещание, которое нечем сдержать.
+ * Вкладки отделены от коллекции по механической причине: у коллекции отрисованы все экземпляры
+ * сразу, у вкладок — ровно один, а остальные существуют подписями. Оставь такое место коллекцией — и
+ * любой рисующий её честно, по контракту, выложит все вкладки стопкой.
  */
-export const placeCardinalities = ["single", "collection", "action"] as const;
+export const placeCardinalities = ["single", "collection", "action", "tabs"] as const;
 
 export type PlaceCardinality = (typeof placeCardinalities)[number];
 

@@ -5,7 +5,9 @@ import type {
   ComponentContributionRegistration,
   PlaceContributionRegistration,
 } from "./contribution.ts";
+import { isPlaceCardinality } from "./contribution.ts";
 import {
+  corePlace,
   corePlaces,
   orderPlaceContributions,
   resolvePlaceDeclaration,
@@ -64,6 +66,16 @@ describe("corePlaces", () => {
       corePlaces.filter((place) => place.replaceable && place.cardinality !== "single"),
       [],
     );
+  });
+
+  /** Правая панель перестала быть заглушкой: вкладку в неё приносит вклад (docs/ui-kit.md). */
+  it("publishes the right panel as a tabs place owned by the shell", () => {
+    assert.deepEqual(corePlace("core.panel.tabs"), {
+      id: "core.panel.tabs",
+      cardinality: "tabs",
+      replaceable: false,
+    });
+    assert.ok(isPlaceCardinality("tabs"));
   });
 });
 
