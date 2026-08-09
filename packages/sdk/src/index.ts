@@ -27,6 +27,7 @@ import { rememberToolInvoke, type PluginToolInvoke } from "./tools.ts";
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
 export { hookCriticalities, placeCardinalities, thinkingLevels } from "./host.ts";
+export { toolCallPlaceId } from "./places.ts";
 
 export type {
   AgentContribution,
