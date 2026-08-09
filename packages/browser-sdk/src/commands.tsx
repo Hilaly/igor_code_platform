@@ -6,7 +6,11 @@
  * только тот, кто видит кеш модулей, — отсюда хук, а не свободная функция.
  */
 
-import { resolveCommand, type CommandContributionRegistration } from "@sovereign/protocol";
+import {
+  commandsForContext,
+  resolveCommand,
+  type CommandContributionRegistration,
+} from "@sovereign/protocol";
 import { Button } from "@sovereign/ui-kit";
 import { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
@@ -96,6 +100,16 @@ export function useCommands(): CommandInvoker {
   );
 
   return { invoke };
+}
+
+/**
+ * Команды, действующие в этом контексте. Палитра показывает набор целиком, поэтому ей нужен не
+ * адресный поиск, а перечень — с теми же отбором по проекту и разрешением спора.
+ */
+export function useCommandCatalog(context: PlaceContext): CommandContributionRegistration[] {
+  const runtime = useContext(BrowserRuntimeContext);
+
+  return runtime === undefined ? [] : commandsForContext(runtime.contributions, context);
 }
 
 async function runCommand(

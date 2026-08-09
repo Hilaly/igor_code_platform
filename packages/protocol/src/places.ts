@@ -161,14 +161,25 @@ export function resolveCommand(
   contributions: readonly ContributionRegistration[],
   context: PlaceContext,
 ): CommandContributionRegistration | undefined {
+  return commandsForContext(contributions, context).find(
+    (registration) => registration.id === commandId,
+  );
+}
+
+/**
+ * Все команды, действующие в этом контексте, по идентификатору. Нужны палитре: она показывает набор
+ * целиком, а не одну команду по имени.
+ */
+export function commandsForContext(
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): CommandContributionRegistration[] {
   const commands = contributions.filter(
     (registration): registration is CommandContributionRegistration =>
       registration.kind === "command",
   );
 
-  return registrationsForContext(commands, context).find(
-    (registration) => registration.id === commandId,
-  );
+  return registrationsForContext(commands, context).sort(byIdentifier);
 }
 
 export function resolvePlaceProvider(

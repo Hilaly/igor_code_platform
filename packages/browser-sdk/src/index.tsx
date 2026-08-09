@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import {
+  useCommandCatalog,
   useCommands,
   type Command,
   type CommandInvoker,
@@ -12,7 +13,7 @@ import { PluginPlaceTabs } from "./tabs.tsx";
 
 export type { Command, CommandInvoker, CommandOutcome, PlaceContext, PlaceProps };
 
-export { useCommands };
+export { useCommandCatalog, useCommands };
 
 export function Place(props: PlaceProps): ReactNode {
   return <PluginPlace {...props} />;

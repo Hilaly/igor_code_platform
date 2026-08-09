@@ -36,6 +36,7 @@ import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
+import { CommandPalette, useCommandPaletteShortcut } from "./commands/command-palette.tsx";
 import {
   BrowserRuntimeProvider,
   HostPlace,
@@ -124,8 +125,13 @@ export function App() {
   const [loginRefusal, setLoginRefusal] = useState<string | undefined>(undefined);
   const [loginBusy, setLoginBusy] = useState(false);
   const [expired, setExpired] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
 
   const authenticated = access === "authenticated";
+
+  // Аккорд слушается всегда, но палитра сама себя не покажет неаутентифицированному: до входа
+  // оболочки на экране нет вовсе.
+  useCommandPaletteShortcut(useCallback(() => setCommandsOpen(true), []));
 
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
   useEffect(() => navigation.subscribe(setPage), [navigation]);
@@ -577,7 +583,14 @@ export function App() {
           showLeft: translator.t("panel.left.show"),
           showRight: translator.t("panel.right.show"),
         }}
-        headerActions={<HostPlaceCollection id="core.view.header.actions" context={pageContext} />}
+        headerActions={
+          <>
+            <Button size="sm" onClick={() => setCommandsOpen(true)}>
+              {translator.t("commands.open")}
+            </Button>
+            <HostPlaceCollection id="core.view.header.actions" context={pageContext} />
+          </>
+        }
         navigation={
           <>
             <SidebarProjects
@@ -963,6 +976,13 @@ export function App() {
               translator={translator}
             />
           }
+          translator={translator}
+        />
+        <CommandPalette
+          open={commandsOpen}
+          onClose={() => setCommandsOpen(false)}
+          host={{ navigate: navigation.navigate, layout, onLayoutChange: setLayout }}
+          context={pageContext}
           translator={translator}
         />
       </ShellWithPlaceTabs>

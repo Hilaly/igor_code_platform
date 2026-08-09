@@ -14,6 +14,7 @@ it("exports only the public places and the command invoker at runtime", () => {
     "Place",
     "PlaceCollection",
     "PlaceTabs",
+    "useCommandCatalog",
     "useCommands",
   ]);
 });
