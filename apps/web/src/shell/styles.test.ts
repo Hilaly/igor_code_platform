@@ -290,6 +290,18 @@ describe("the style sheets of the application", () => {
     expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*max-width\s*:/s);
   });
 
+  it("centers page route children while contained content remains full width", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*align-items:\s*center;/s);
+    expect(shell).toMatch(
+      /\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+    );
+    expect(shell).toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*align-items:\s*stretch;/s,
+    );
+  });
+
   it("gives page content a definite body height while keeping the body as scroll owner", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
     const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
