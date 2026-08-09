@@ -31,7 +31,7 @@ import {
   type ScopedTranslator,
   type TooltipSide,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 import { ToolCallPlace } from "./tool-call-place.tsx";
@@ -78,7 +78,9 @@ function toolSummary(toolName: string, input: unknown): string | undefined {
   return undefined;
 }
 
-export function SessionMessageList(props: SessionMessageListProps): React.JSX.Element {
+export const SessionMessageList = memo(function SessionMessageList(
+  props: SessionMessageListProps,
+): React.JSX.Element {
   const {
     open,
     busy,
@@ -101,32 +103,38 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
   const [copyRefusal, setCopyRefusal] = useState<string | undefined>(undefined);
   const copyConfirmationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copyRequest = useRef(0);
-  const outcomes = outcomesOf(open.entries);
-  const activeEntries = open.entries.filter(({ id }) => open.branchEntryIds.has(id));
-  const shown = activeEntries.filter(isFeedEntry);
+  const outcomes = useMemo(() => outcomesOf(open.entries), [open.entries]);
+  const activeEntries = useMemo(
+    () => open.entries.filter(({ id }) => open.branchEntryIds.has(id)),
+    [open.branchEntryIds, open.entries],
+  );
+  const shown = useMemo(() => activeEntries.filter(isFeedEntry), [activeEntries]);
   const pending = Object.entries(open.pending);
   const live = open.live;
-  const liveOrder =
-    live?.order.filter((key, index) => {
-      const item = live.items[key];
+  const liveOrder = useMemo(
+    () =>
+      live?.order.filter((key, index) => {
+        const item = live.items[key];
 
-      if (item?.kind !== "message" || item.role !== "user") {
-        return true;
-      }
+        if (item?.kind !== "message" || item.role !== "user") {
+          return true;
+        }
 
-      // Первый prompt уже успевает попасть в дерево к моменту, когда UI видит live-буфер.
-      // Стиринг же может ещё не попасть в дочитанные записи, поэтому глушить все user-дельты нельзя.
-      if (index > 0) {
-        return true;
-      }
+        // Первый prompt уже успевает попасть в дерево к моменту, когда UI видит live-буфер.
+        // Стиринг же может ещё не попасть в дочитанные записи, поэтому глушить все user-дельты нельзя.
+        if (index > 0) {
+          return true;
+        }
 
-      return !shown.some(
-        (entry) =>
-          entry.kind === "message" &&
-          entry.role === "user" &&
-          entry.content.some((block) => block.kind === "text" && block.text === item.text),
-      );
-    }) ?? [];
+        return !shown.some(
+          (entry) =>
+            entry.kind === "message" &&
+            entry.role === "user" &&
+            entry.content.some((block) => block.kind === "text" && block.text === item.text),
+        );
+      }) ?? [],
+    [live, shown],
+  );
   const empty = shown.length === 0 && pending.length === 0 && live === undefined;
 
   const label = async (entryId: string, next: string | null): Promise<void> => {
@@ -323,7 +331,7 @@ export function SessionMessageList(props: SessionMessageListProps): React.JSX.El
       </Dialog>
     </>
   );
-}
+});
 
 function EntryMessage(props: {
   entry: SessionEntry;

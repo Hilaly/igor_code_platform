@@ -18,7 +18,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MessageComposer } from "./message-composer.tsx";
+import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -93,6 +93,7 @@ type ComposerHarnessProps = {
   onSendMessage?: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt?: () => void;
   onError?: (error: unknown) => void;
+  draftReplacement?: ComposerDraftReplacement;
 };
 
 function SwitchingComposerHarness({
@@ -103,14 +104,11 @@ function SwitchingComposerHarness({
   onError?: (error: unknown) => void;
 }) {
   const [sessionId, setSessionId] = useState("session-a");
-  const [draft, setDraft] = useState("");
 
   return (
     <>
       <MessageComposer
         sessionId={sessionId}
-        draft={draft}
-        onDraftChange={setDraft}
         busy={false}
         model="anthropic/claude-opus-4-5"
         modelGroups={modelGroups}
@@ -131,12 +129,10 @@ function SwitchingComposerHarness({
         type="button"
         onClick={() => {
           setSessionId("session-b");
-          setDraft("");
         }}
       >
         Переключить сессию
       </button>
-      <output aria-label="Черновик">{draft}</output>
     </>
   );
 }
@@ -149,8 +145,8 @@ function ComposerHarness({
   onSendMessage = vi.fn(() => Promise.resolve(undefined)),
   onInterrupt = vi.fn(),
   onError,
+  draftReplacement,
 }: ComposerHarnessProps) {
-  const [draft, setDraft] = useState("");
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
 
@@ -158,8 +154,7 @@ function ComposerHarness({
     <>
       <MessageComposer
         sessionId={sessionId}
-        draft={draft}
-        onDraftChange={setDraft}
+        {...(draftReplacement === undefined ? {} : { draftReplacement })}
         busy={busy}
         model={model}
         modelGroups={modelGroups}
@@ -176,7 +171,6 @@ function ComposerHarness({
         stats={sessionStats}
         translator={translator}
       />
-      <output aria-label="Черновик">{draft}</output>
       <output aria-label="Выбранная модель">{model}</output>
       <output aria-label="Выбранный уровень">{thinkingLevel}</output>
     </>
@@ -287,14 +281,42 @@ describe("the session message composer", () => {
     expect(screen.getByRole("tree")).not.toBeNull();
   });
 
-  it("reports draft changes through its controlled interface", () => {
+  it("updates its local draft while typing", () => {
     render(<ComposerHarness />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, {
       target: { value: "новая ветка" },
     });
 
-    expect(screen.getByRole("status", { name: "Черновик" }).textContent).toBe("новая ветка");
+    expect((field as HTMLTextAreaElement).value).toBe("новая ветка");
+  });
+
+  it("accepts current-session draft replacements and ignores another session", () => {
+    const view = render(<ComposerHarness />);
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.change(field, { target: { value: "старый текст" } });
+    view.rerender(
+      <ComposerHarness
+        draftReplacement={{ sessionId: "session-a", sequence: 1, text: "из дерева" }}
+      />,
+    );
+    expect((field as HTMLTextAreaElement).value).toBe("из дерева");
+
+    view.rerender(
+      <ComposerHarness
+        draftReplacement={{ sessionId: "session-a", sequence: 2, text: "из дерева" }}
+      />,
+    );
+    expect((field as HTMLTextAreaElement).value).toBe("из дерева");
+
+    view.rerender(
+      <ComposerHarness
+        draftReplacement={{ sessionId: "session-b", sequence: 3, text: "чужая сессия" }}
+      />,
+    );
+    expect((field as HTMLTextAreaElement).value).toBe("из дерева");
   });
 
   it("keeps next-turn controls editable while the session is busy", () => {
