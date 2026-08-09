@@ -1,6 +1,6 @@
 # Slice 12c-1 Review Fixes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Исправить контрактные дефекты вкладок и команд среза 12c-1 и объединить feature-ветку с
 актуальным `main` без потери поведения обеих веток.
@@ -60,7 +60,7 @@ ESLint 9, Prettier, Make.
 - Invariant: каждый конфликт сохраняет независимые additions обеих веток; код палитры/вкладок не
   заменяет более новые session/UI-kit изменения из `main`.
 
-- [ ] **Step 1: Зафиксировать входное состояние**
+- [x] **Step 1: Зафиксировать входное состояние**
 
 Run:
 
@@ -73,7 +73,7 @@ git merge-base HEAD main
 
 Expected: feature worktree clean; branch is `feat/slice-12c1-tabs-and-commands`.
 
-- [ ] **Step 2: Начать merge и получить точный список конфликтов**
+- [x] **Step 2: Начать merge и получить точный список конфликтов**
 
 Run:
 
@@ -84,7 +84,7 @@ git diff --name-only --diff-filter=U
 
 Expected: merge stops only on files modified by both branches; no unrelated file is deleted.
 
-- [ ] **Step 3: Разрешить конфликты по поведению**
+- [x] **Step 3: Разрешить конфликты по поведению**
 
 Для каждого файла удалить conflict markers и сохранить обе стороны:
 
@@ -105,7 +105,7 @@ git diff --check
 
 Expected: no conflict markers and no whitespace errors.
 
-- [ ] **Step 4: Проверить объединённую базу и завершить merge**
+- [x] **Step 4: Проверить объединённую базу и завершить merge**
 
 Run:
 
@@ -134,7 +134,7 @@ Expected: checks and build exit 0 before merge commit.
 - Consumes: `parsePluginManifest`, `pluginIdPattern`.
 - Produces: `reservedPluginIds` and a refused parse result for id `core`.
 
-- [ ] **Step 1: Write the failing manifest test**
+- [x] **Step 1: Write the failing manifest test**
 
 Добавить в `plugin.test.ts`:
 
@@ -150,7 +150,7 @@ it("reserves the core namespace for the host", () => {
 });
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -160,13 +160,13 @@ pnpm --filter @sovereign/protocol exec node --test src/plugin.test.ts
 
 Expected: FAIL because `core` currently parses successfully.
 
-- [ ] **Step 3: Implement the reservation and document it**
+- [x] **Step 3: Implement the reservation and document it**
 
 В `plugin.ts` после pattern validation отказать идентификаторам из
 `const reservedPluginIds = new Set(["core"])`. В `plugins.md` и `public-contract.md` записать, что
 `core` принадлежит хосту и не является допустимым plugin id.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run:
 
@@ -213,7 +213,7 @@ export type PluginModuleCache = {
 - `peek` returns an existing entry only when its revision matches `status.browser.revision`.
 - `version()` returns the same number until `announce()` publishes a real state change.
 
-- [ ] **Step 1: Write failing passive-read and version tests**
+- [x] **Step 1: Write failing passive-read and version tests**
 
 В `module-cache.test.ts` проверить:
 
@@ -231,7 +231,7 @@ expect(cache.peek(running("r1"))).toEqual({ kind: "loaded", module });
 Добавить проверку, что `retain([])` после существующей записи увеличивает version и уведомляет
 подписчика, а `peek` старой ревизии после удаления возвращает `undefined` и не перезапускает import.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -241,7 +241,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web exec vite
 
 Expected: type/test failure because `peek`, `load` and `version` do not exist.
 
-- [ ] **Step 3: Implement the cache split**
+- [x] **Step 3: Implement the cache split**
 
 Переименовать `moduleOf` в `load`. Добавить чистый `peek`, числовую `version`, increment внутри
 `announce`, и `announce()` после фактического удаления entries в `retain`. Не объявлять изменение,
@@ -249,7 +249,7 @@ Expected: type/test failure because `peek`, `load` and `version` do not exist.
 
 Обновить `PlaceInstance` на `cache.load(status)`, а все test fakes — на полный новый интерфейс.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run:
 
@@ -280,7 +280,7 @@ Commit: `refactor(browser-sdk): separate module cache reads from loads`
 - A waiter subscribes to the current cache, re-subscribes when cache identity changes, and is woken by
   both runtime changes and cache announcements.
 
-- [ ] **Step 1: Write failing revision-transition tests**
+- [x] **Step 1: Write failing revision-transition tests**
 
 Добавить provider probe, который перерисовывается с последовательностью:
 
@@ -292,7 +292,7 @@ r1 loading -> same plugin building without browser -> r2 loading -> r2 loaded
 раз и outcome равен `{ kind: "done" }`. Отдельно проверить, что исчезновение plugin status и
 исчезновение command registration во время ожидания завершают вызов `failed`, а не оставляют Promise.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -302,20 +302,20 @@ pnpm --filter @sovereign/browser-sdk exec vitest run src/commands.test.tsx
 
 Expected: stale-revision test remains pending or invokes r1 under the current captured runtime.
 
-- [ ] **Step 3: Implement latest-runtime waiting**
+- [x] **Step 3: Implement latest-runtime waiting**
 
 Хранить текущий runtime в ref и заменить `waiting` на набор проверяющих функций. Эффект изменения
 runtime будит каждую проверку. Внутри ожидателя заново выполнить `resolveCommand`, найти plugin status,
 переподписаться при смене cache identity и вызвать `cache.load` только для текущего статуса. Статус без
 browser assets продолжает ждать; отсутствующая команда/плагин завершает `failed`.
 
-- [ ] **Step 4: Put `available` and `run` behind one error boundary**
+- [x] **Step 4: Put `available` and `run` behind one error boundary**
 
 После получения текущего loaded module заново взять текущую registration. В одном `try/catch` проверить
 форму export, вызвать `available`, затем `await run`. Любая причина нормализуется через
 `cause instanceof Error ? cause.message : String(cause)`.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run:
 
@@ -357,14 +357,14 @@ export function useHostCommandCatalog(context: PlaceContext): HostCommandCatalog
 
 - `CommandButton` and `useHostCommandCatalog` use the same safe cached-descriptor evaluator.
 
-- [ ] **Step 1: Write failing `available` exception tests**
+- [x] **Step 1: Write failing `available` exception tests**
 
 В `commands.test.tsx` проверить, что `invoke` с `available: () => { throw new Error("availability broke") }`
 возвращает `{ kind: "failed", reason: "availability broke" }`, пишет одну диагностику и не создаёт
 unhandled rejection. Для action strip проверить, что тот же export не ломает render и оставляет кнопку
 disabled.
 
-- [ ] **Step 2: Write failing no-load and palette availability tests**
+- [x] **Step 2: Write failing no-load and palette availability tests**
 
 В browser-sdk проверить, что рендер `CommandButton` вызывает `peek`, но ни разу не вызывает `load`.
 В web palette проверить два состояния:
@@ -376,7 +376,7 @@ peek -> loaded available false: row remains visible but has no selectable button
 
 Добавить случай throwing `available`: палитра остаётся открытой, строка disabled, диагностика записана.
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 Run:
 
@@ -387,7 +387,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web exec vite
 
 Expected: button invokes `load`; palette never disables the plugin row; throwing predicate escapes.
 
-- [ ] **Step 4: Implement one cached availability evaluator**
+- [x] **Step 4: Implement one cached availability evaluator**
 
 В `commands.tsx` безопасно преобразовать `cache.peek(status)` в `{ disabled, complaint? }`. Missing
 module/loading means enabled; missing/malformed export, false or throwing `available` means disabled.
@@ -398,7 +398,7 @@ effect, outside render.
 тем же голосом публикует complaints. Экспортировать hook только через `@sovereign/browser-sdk/host`.
 Палитра использует host catalog вместо registrations-only `useCommandCatalog`.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run:
 
@@ -429,18 +429,18 @@ Commit: `fix(web): share lazy command availability`
 - Core host reads cardinality through `corePlace(id)`; plugin host uses `resolvePlaceDeclaration`.
 - Mixed-row key is `${registration.kind}:${registration.id}`.
 
-- [ ] **Step 1: Write failing cardinality tests**
+- [x] **Step 1: Write failing cardinality tests**
 
 Добавить command contribution с `placeId: "core.sidebar.sections"` и проверить, что
 `HostPlaceCollection` не рисует кнопку в `collection`. Добавить plugin-owned `collection` с командой и
 проверить то же. Контрольный `action` обязан продолжать рисовать кнопку и компонент.
 
-- [ ] **Step 2: Write the failing duplicate-key test**
+- [x] **Step 2: Write the failing duplicate-key test**
 
 Передать component и command с одинаковым namespaced id в action place, перехватить `console.error` и
 проверить, что оба элемента отрисованы без React warning `Encountered two children with the same key`.
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 Run:
 
@@ -450,14 +450,14 @@ pnpm --filter @sovereign/browser-sdk exec vitest run src/host.test.tsx src/comma
 
 Expected: command appears in collection and React reports duplicate key.
 
-- [ ] **Step 4: Implement cardinality-aware rendering and typed keys**
+- [x] **Step 4: Implement cardinality-aware rendering and typed keys**
 
 `HostPlaceCollection` возвращает `null`, если core place не `collection`/`action`. Plugin variant
 сохраняет текущую проверку и передаёт resolved cardinality. В `CollectionPlace` отфильтровать commands
 для `collection`; для `action` сохранить общий `orderPlaceContributions`. Оба вида используют
 `kind:id` key.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run:
 
@@ -486,13 +486,13 @@ Commit: `fix(browser-sdk): render commands only in action places`
 - `PlaceClaimOutcome` adds `incompatible`.
 - `plugins.places.incompatible` exists in both core catalogs.
 
-- [ ] **Step 1: Write the failing detail test**
+- [x] **Step 1: Write the failing detail test**
 
 Показать command с `placeId: "core.sidebar.sections"` и проверить английскую строку
 `not applied: commands require an action place`. Контрольный command в
 `core.view.header.actions` сохраняет `joins the row`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -502,7 +502,7 @@ NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @sovereign/web exec vite
 
 Expected: current view reports `joins the row` for the collection place.
 
-- [ ] **Step 3: Implement and document the incompatible outcome**
+- [x] **Step 3: Implement and document the incompatible outcome**
 
 В `placeClaims`, после получения известной cardinality и до общего `added`, вернуть `incompatible`,
 если registration is command and cardinality is not `action`. Tone is `warning`. Добавить строки:
@@ -515,7 +515,7 @@ Expected: current view reports `joins the row` for the collection place.
 В `plugins.md` описать, что неизвестное место ждёт, а известное место другой кардинальности видно как
 несовместимое и не рисуется.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run:
 
@@ -547,7 +547,7 @@ Commit: `fix(web): report incompatible command placements`
 - Original plan distinguishes completed work from explicitly cancelled history rewrite/runtime check.
 - Backlog records the observed session rename flake as non-blocking evidence, not as a diagnosed cause.
 
-- [ ] **Step 1: Repair the public contract**
+- [x] **Step 1: Repair the public contract**
 
 Change the stale snippet to:
 
@@ -558,20 +558,20 @@ type PlaceCardinality = "single" | "collection" | "action" | "tabs";
 Ensure command prose says passive UI never loads a bundle merely to determine metadata; a loaded
 descriptor may update enabled state.
 
-- [ ] **Step 2: Reconcile the original plan**
+- [x] **Step 2: Reconcile the original plan**
 
 Mark Tasks 1–12 implementation steps `[x]` where the corresponding commit exists. Keep the runtime
 measurement marked cancelled with its reason. Replace Task 13's unperformed rewrite steps with checked
 statements that history was already atomic, therefore no backup ref or rewrite was needed; preserve the
 rule that push/PR were not done.
 
-- [ ] **Step 3: Record the suspected flake without inventing a cause**
+- [x] **Step 3: Record the suspected flake without inventing a cause**
 
 Add a backlog item naming `keeps a session rename dialog open when the write is refused`: one observed
 failure, subsequent repeated passes, exact test path, and requirement to capture output/seed if it
 recurs. State explicitly that it is not attributed to 12c-1.
 
-- [ ] **Step 4: Verify docs and commit**
+- [x] **Step 4: Verify docs and commit**
 
 Run:
 
