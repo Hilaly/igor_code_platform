@@ -39,10 +39,9 @@ export function configRoutes(options: ConfigRouteOptions): Route[] {
           return;
         }
 
-        // Успешный разбор гарантирует объект верхнего уровня. Хранилищу нужен исходный документ,
-        // чтобы не потерять ключи более новой версии; ответ остаётся известным текущему демону
-        // применяемым `Config` (docs/data-directory.md).
-        const written = options.settings.writeConfig(body as Record<string, unknown>);
+        // Успешный разбор оставляет только проверенные известные значения и совместимые неизвестные
+        // поля. Хранилище накладывает его на последний документ, не теряя ключи более новой версии.
+        const written = options.settings.writeConfig(parsed.value);
 
         if (written.kind !== "written") {
           options.logger.error("the daemon config was not written", { reason: written.reason });
@@ -55,7 +54,7 @@ export function configRoutes(options: ConfigRouteOptions): Route[] {
           return;
         }
 
-        respondWithJson(response, 200, parsed.value);
+        respondWithJson(response, 200, options.settings.current().config);
       },
     },
   ];

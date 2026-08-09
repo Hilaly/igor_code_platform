@@ -34,8 +34,10 @@ const state = (overrides: Partial<ConfigState> = {}): ConfigState => ({
   ...overrides,
 });
 
-const show = (current: ConfigState, onSave: (config: Config) => void = () => {}) =>
-  render(<ConfigForm state={current} onSave={onSave} translator={translator} />);
+const show = (
+  current: ConfigState,
+  onChange: (key: keyof Config, value: Config[keyof Config]) => void = () => {},
+) => render(<ConfigForm state={current} onChange={onChange} translator={translator} />);
 
 const field = (name: string): HTMLInputElement =>
   screen.getByRole("textbox", { name }) as HTMLInputElement;
@@ -46,37 +48,77 @@ it("waits for the snapshot instead of showing made-up values", () => {
   expect(screen.getByText("Загрузка…")).toBeTruthy();
 });
 
-it("shows the values of the snapshot and saves the whole document", () => {
-  const onSave = vi.fn();
+it("commits a valid numeric field on blur without a shared Save control", () => {
+  const onChange = vi.fn();
 
-  show(state(), onSave);
+  show(state(), onChange);
 
   expect(field("Одновременных обращений").value).toBe("4");
 
   fireEvent.change(field("Вызовов публичного маршрута в минуту"), { target: { value: "3" } });
-  fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+  fireEvent.blur(field("Вызовов публичного маршрута в минуту"));
 
-  expect(onSave).toHaveBeenCalledWith({ ...defaultConfig, publicRouteRequestsPerMinute: 3 });
+  expect(onChange).toHaveBeenCalledWith("publicRouteRequestsPerMinute", 3);
+  expect(screen.queryByRole("button", { name: "Сохранить" })).toBeNull();
 });
 
-it("does not offer to save what nobody changed", () => {
-  show(state());
+it("commits a valid numeric field when Enter finishes editing", () => {
+  const onChange = vi.fn();
 
-  expect(screen.getByRole("button", { name: "Сохранить" }).hasAttribute("disabled")).toBe(true);
+  show(state(), onChange);
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "8" } });
+  fireEvent.keyDown(field("Одновременных обращений"), { key: "Enter" });
+
+  expect(onChange).toHaveBeenCalledWith("maxConcurrentTurns", 8);
 });
 
-it("names the fields that are not numbers and does not send them", () => {
-  const onSave = vi.fn();
+it("does not commit the same numeric text again when Enter is followed by blur", () => {
+  const onChange = vi.fn();
 
-  show(state(), onSave);
+  show(state(), onChange);
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "8" } });
+  fireEvent.keyDown(field("Одновременных обращений"), { key: "Enter" });
+  fireEvent.blur(field("Одновременных обращений"));
+
+  expect(onChange).toHaveBeenCalledTimes(1);
+  expect(onChange).toHaveBeenCalledWith("maxConcurrentTurns", 8);
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "9" } });
+  fireEvent.blur(field("Одновременных обращений"));
+
+  expect(onChange).toHaveBeenCalledTimes(2);
+  expect(onChange).toHaveBeenLastCalledWith("maxConcurrentTurns", 9);
+});
+
+it("marks an invalid or empty numeric string without sending it", () => {
+  const onChange = vi.fn();
+
+  show(state(), onChange);
 
   fireEvent.change(field("Ожидание хука, мс"), { target: { value: "быстро" } });
 
-  expect(screen.getByText("Это не числа: hookTimeoutMilliseconds")).toBeTruthy();
   expect(field("Ожидание хука, мс").getAttribute("aria-invalid")).toBe("true");
+  fireEvent.blur(field("Ожидание хука, мс"));
 
-  fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.change(field("Ожидание хука, мс"), { target: { value: "" } });
+  expect(field("Ожидание хука, мс").getAttribute("aria-invalid")).toBe("true");
+  fireEvent.keyDown(field("Ожидание хука, мс"), { key: "Enter" });
+
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it("commits a selected log level immediately", () => {
+  const onChange = vi.fn();
+
+  show(state(), onChange);
+
+  const select = screen.getByRole("combobox", { name: "Уровень журнала" });
+  fireEvent.click(select);
+  fireEvent.click(screen.getByRole("option", { name: "warn" }));
+
+  expect(onChange).toHaveBeenCalledWith("logLevel", "warn");
 });
 
 it("shows the refusal of the daemon as it came", () => {
@@ -87,58 +129,79 @@ it("shows the refusal of the daemon as it came", () => {
   ).toBeTruthy();
 });
 
-it("takes the file while the form is untouched", () => {
+it("takes the latest daemon snapshot when no control has a refusal", () => {
   const view = show(state());
 
   view.rerender(
     <ConfigForm
       state={state({ config: { ...defaultConfig, maxConcurrentTurns: 9 } })}
-      onSave={() => {}}
+      onChange={() => {}}
       translator={translator}
     />,
   );
 
   expect(field("Одновременных обращений").value).toBe("9");
-  expect(screen.queryByText("config.json изменился на диске, пока вы его правили")).toBeNull();
 });
 
-it("keeps the edit and says the file changed underneath it", () => {
+it("keeps typed numeric text when an external snapshot arrives before blur", () => {
+  const view = show(state());
+
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "8" } });
+  view.rerender(
+    <ConfigForm
+      state={state({ config: { ...defaultConfig, maxConcurrentTurns: 9 } })}
+      onChange={() => {}}
+      translator={translator}
+    />,
+  );
+
+  expect(field("Одновременных обращений").value).toBe("8");
+});
+
+it("keeps typed text visible after a daemon refusal reloads the snapshot", () => {
   const view = show(state());
 
   fireEvent.change(field("Ожидание хука, мс"), { target: { value: "9000" } });
 
   view.rerender(
     <ConfigForm
-      state={state({ config: { ...defaultConfig, maxConcurrentTurns: 9 } })}
-      onSave={() => {}}
+      state={state({
+        config: { ...defaultConfig, maxConcurrentTurns: 9 },
+        refusal: "config.json: EACCES",
+      })}
+      onChange={() => {}}
       translator={translator}
     />,
   );
 
   expect(field("Ожидание хука, мс").value).toBe("9000");
-  expect(screen.getByText("config.json изменился на диске, пока вы его правили")).toBeTruthy();
-
-  fireEvent.click(screen.getByRole("button", { name: "Взять из файла" }));
-
-  expect(field("Ожидание хука, мс").value).toBe(String(defaultConfig.hookTimeoutMilliseconds));
-  expect(field("Одновременных обращений").value).toBe("9");
-  expect(screen.queryByText("config.json изменился на диске, пока вы его правили")).toBeNull();
+  expect(screen.getByText("config.json: EACCES")).toBeTruthy();
 });
 
-it("says nothing about a collision when the snapshot caught up with the edit", () => {
-  // Собственная запись доехала обратно тем же значением: это не чужая правка файла.
+it("keeps a retry value while its request clears the previous refusal", () => {
   const view = show(state());
+  const reloaded = { ...defaultConfig };
 
-  fireEvent.change(field("Одновременных обращений"), { target: { value: "9" } });
-
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "0" } });
   view.rerender(
     <ConfigForm
-      state={state({ config: { ...defaultConfig, maxConcurrentTurns: 9 } })}
-      onSave={() => {}}
+      state={state({
+        config: reloaded,
+        refusal: "config.json: maxConcurrentTurns must be above zero",
+      })}
+      onChange={() => {}}
       translator={translator}
     />,
   );
 
-  expect(screen.queryByText("config.json изменился на диске, пока вы его правили")).toBeNull();
-  expect(screen.getByRole("button", { name: "Сохранить" }).hasAttribute("disabled")).toBe(true);
+  fireEvent.change(field("Одновременных обращений"), { target: { value: "0.5" } });
+  view.rerender(
+    <ConfigForm
+      state={state({ config: reloaded, refusal: undefined })}
+      onChange={() => {}}
+      translator={translator}
+    />,
+  );
+
+  expect(field("Одновременных обращений").value).toBe("0.5");
 });

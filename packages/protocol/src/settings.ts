@@ -198,29 +198,40 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
 }
 
 /**
- * Тело записи конфига (docs/web-api.md). **Все ключи обязательны**, в отличие от чтения файла:
- * запись заменяет документ целиком, и тело без ключа молча вернуло бы настройку к умолчанию, тогда
- * как в файле у неё стояло другое значение.
+ * Тело записи конфига (docs/web-api.md). Непустой набор полей накладывается на последний документ
+ * на диске: только явно названный ключ меняется, а пропущенный остаётся без решения этого запроса.
  */
-export function parseConfigUpdate(raw: unknown): SettingsParseResult<Config> {
+export function parseConfigUpdate(raw: unknown): SettingsParseResult<Record<string, unknown>> {
   const fields = asObject(raw);
 
   if (fields === undefined) {
     return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
   }
 
-  const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys);
-  const missing = configKeys.filter((key) => fields[key] === undefined);
+  const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys, "is retained");
+  const suppliedKeys = configKeys.filter((key) => Object.hasOwn(fields, key));
 
-  if (missing.length > 0) {
-    diagnostics.push(
-      `${configFileName}: ${missing.join(", ")} is required: the write replaces the whole document`,
-    );
+  if (suppliedKeys.length === 0) {
+    diagnostics.push(`${configFileName}: at least one known key is required for an update`);
 
     return { kind: "rejected", diagnostics };
   }
 
-  return parseConfigFields(fields, diagnostics);
+  const value = { ...fields };
+
+  for (const key of suppliedKeys) {
+    // Правило у значения не расходится с чтением файла: берём результат общей проверки, но только
+    // для поля, которое тело действительно назвало. Неизвестные поля остаются в `value` как есть.
+    const parsed = parseConfigFields({ [key]: fields[key] }, diagnostics);
+
+    if (parsed.kind === "rejected") {
+      return parsed;
+    }
+
+    value[key] = parsed.value[key];
+  }
+
+  return { kind: "parsed", value, diagnostics };
 }
 
 /** Проверка значений, общая для чтения файла и записи через API: правило у ключа одно. */
@@ -595,10 +606,11 @@ function diagnoseUnknownKeys(
   file: string,
   fields: Record<string, unknown>,
   known: string[],
+  outcome = "is ignored",
 ): string[] {
   return Object.keys(fields)
     .filter((key) => !known.includes(key))
-    .map((key) => `${file}: unknown key ${JSON.stringify(key)} is ignored`);
+    .map((key) => `${file}: unknown key ${JSON.stringify(key)} ${outcome}`);
 }
 
 function isAppearanceVariant(value: unknown): value is AppearanceVariant {

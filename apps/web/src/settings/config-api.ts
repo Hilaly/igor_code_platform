@@ -1,5 +1,5 @@
 /**
- * Запросы конфига демона: снимок и запись документа целиком. Источник истины — `config.json` за
+ * Запросы конфига демона: снимок и запись одного или нескольких ключей. Источник истины — `config.json` за
  * демоном (docs/data-directory.md); форма своей копии не держит, а спрашивает и пишет.
  */
 
@@ -16,11 +16,12 @@ export async function fetchConfig(signal?: AbortSignal): Promise<Config> {
 }
 
 /**
- * Записывает конфиг целиком: тело — то же, что лежит в файле (docs/web-api.md). `400` означает
+ * Записывает часть конфига: демон накладывает тело на актуальный файл и отвечает полным снимком
+ * (docs/web-api.md). `400` означает
  * негодное значение, `409` — что файл на диске правил кто-то ещё, `500` — что файловая система
  * отказала в записи; ничто из этого не чинится повтором запроса, поэтому причина уходит наверх.
  */
-export async function writeConfig(config: Config): Promise<Config> {
+export async function writeConfig(config: Partial<Config>): Promise<Config> {
   const response = await fetch(configPath, {
     method: "PUT",
     headers: { "content-type": "application/json" },

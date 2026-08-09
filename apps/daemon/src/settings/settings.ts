@@ -51,9 +51,9 @@ export type SettingsStore = {
   /** Тем же путём и с тем же отказом: внешний вид и локаль лежат в том же файле. */
   writeAppearancePreferences: (preferences: AppearancePreferences) => WriteOutcome;
   /**
-   * Записать `config.json` целиком и сразу перечитать его. Тем же путём и с тем же отказом, но в
-   * другой файл: конфиг пишет человек, и запись поверх негодного файла стёрла бы его правку
-   * (docs/data-directory.md).
+   * Наложить обновление на последний `config.json` и сразу перечитать его. Тем же путём и с тем же
+   * отказом, но в другой файл: конфиг пишет человек, и запись поверх негодного файла стёрла бы его
+   * правку (docs/data-directory.md).
    */
   writeConfig: (document: Record<string, unknown>) => WriteOutcome;
   close: () => void;

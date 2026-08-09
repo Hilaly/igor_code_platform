@@ -1,11 +1,10 @@
 /**
  * Связь формы конфига с демоном: снимок на подъёме соединения, перезапрос по `core.config.changed`
- * и по разрыву потока, запись документа целиком. Своего потока форма не открывает — соединение одно
+ * и по разрыву потока, запись одного ключа. Своего потока форма не открывает — соединение одно
  * на вкладку (docs/web-api.md).
  *
- * Оптимистичного применения здесь нет, в отличие от внешнего вида: показанные значения — это черновик
- * формы, а не снимок, и «применить сразу» было бы применением черновика к самому себе. Снимок держит
- * ровно то, что сказал демон, и по расхождению с ним видно, что файл изменился под открытой формой
+ * Оптимистичного применения здесь нет: показанные значения берутся из последнего ответа демона. Так
+ * после каждого независимого изменения форма показывает ровно авторитетный снимок файла
  * (docs/data-directory.md).
  */
 
@@ -41,7 +40,7 @@ export const initialConfigState: ConfigState = {
 
 export type ConfigController = {
   state: ConfigState;
-  save: (config: Config) => void;
+  update: <K extends keyof Config>(key: K, value: Config[K]) => void;
 };
 
 export type UseConfigOptions = {
@@ -69,17 +68,37 @@ export function useConfig(options: UseConfigOptions): ConfigController {
   // Номер последней отправленной записи: две быстрые записи подряд рвут договор, если ответ на
   // первую приходит последним и возвращает то, что человек уже переписал.
   const writeSeq = useRef(0);
+  // Последняя актуальная запись, на которую уже пришёл ответ. Reload, начатый пока она в пути,
+  // мог быть обработан демоном раньше неё и потому не может стать снимком после её ответа.
+  const settledWriteSeq = useRef(0);
+  // Событие о внешней правке во время своей записи нельзя читать сразу: снимок мог быть сделан до
+  // PUT. Оно сливается в один перезапрос сразу после ответа на актуальную запись.
+  const reloadAfterWrite = useRef(false);
 
   const reload = useCallback(() => {
+    if (settledWriteSeq.current !== writeSeq.current) {
+      reloadAfterWrite.current = true;
+      return;
+    }
+
+    reloadAfterWrite.current = false;
     pending.current?.abort();
 
     const controller = new AbortController();
     pending.current = controller;
+    const seq = writeSeq.current;
+    const writeWasInFlight = settledWriteSeq.current !== seq;
 
     void fetchConfig(controller.signal)
-      .then((config) => apply((current) => ({ ...current, config, failure: undefined })))
+      .then((config) => {
+        if (controller.signal.aborted || writeSeq.current !== seq || writeWasInFlight) {
+          return;
+        }
+
+        apply((current) => ({ ...current, config, failure: undefined }));
+      })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || writeSeq.current !== seq || writeWasInFlight) {
           return;
         }
 
@@ -116,28 +135,34 @@ export function useConfig(options: UseConfigOptions): ConfigController {
 
   useEffect(() => () => pending.current?.abort(), []);
 
-  const save = useCallback(
-    (config: Config) => {
+  const update = useCallback(
+    <K extends keyof Config>(key: K, value: Config[K]) => {
       apply((current) => ({ ...current, refusal: undefined }));
 
       const seq = writeSeq.current + 1;
       writeSeq.current = seq;
 
-      void writeConfig(config)
+      void writeConfig({ [key]: value } as Partial<Config>)
         .then((written) => {
-          // Протухший ответ: после этой записи человек сохранил ещё раз, и снимок обязан
+          // Протухший ответ: после этой записи человек изменил другой контрол, и снимок обязан
           // остаться за последней записью. Своё событие вернёт её и так.
           if (writeSeq.current !== seq) {
             return;
           }
 
+          settledWriteSeq.current = seq;
           apply((current) => ({ ...current, config: written, refusal: undefined }));
+
+          if (reloadAfterWrite.current) {
+            reload();
+          }
         })
         .catch((cause: unknown) => {
           if (writeSeq.current !== seq) {
             return;
           }
 
+          settledWriteSeq.current = seq;
           const reason = reasonOf(cause);
 
           onDiagnostic(`the daemon config was not written: ${reason}`);
@@ -150,5 +175,5 @@ export function useConfig(options: UseConfigOptions): ConfigController {
     [apply, onDiagnostic, reload],
   );
 
-  return { state, save };
+  return { state, update };
 }

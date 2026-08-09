@@ -1,15 +1,10 @@
 /**
- * Форма конфига демона. Значения записываются в `config.json` через API: файл остаётся источником
- * истины (docs/data-directory.md), а форма — вторым способом его изменить.
- *
- * Кнопка сохранения отдельная, в отличие от внешнего вида: там переключатель, и решение человека
- * видно целиком в момент щелчка, — здесь набор чисел, и запись на каждое нажатие клавиши отправила
- * бы демону каждую промежуточную цифру.
+ * Independent daemon configuration controls. Numeric text is held locally until its control is
+ * finished, while selections have one complete value at the moment of interaction.
  */
 
 import { configKeys, logLevels, type Config } from "@sovereign/protocol";
 import {
-  Button,
   Heading,
   Input,
   Notice,
@@ -17,42 +12,58 @@ import {
   SettingsRow,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  draftOf,
-  editDraft,
-  hasUnsavedEdits,
-  readDraft,
-  sameConfig,
-  type ConfigDraft,
-} from "./config-draft.ts";
+import { parseFiniteNumber, textOf, type ConfigText } from "./config-draft.ts";
 import type { ConfigState } from "./use-config.ts";
 
 export type ConfigFormProps = {
   state: ConfigState;
-  onSave: (config: Config) => void;
+  onChange: <K extends keyof Config>(key: K, value: Config[K]) => void;
   translator: ScopedTranslator;
 };
 
-export function ConfigForm({ state, onSave, translator }: ConfigFormProps) {
+export function ConfigForm({ state, onChange, translator }: ConfigFormProps) {
   const { t } = translator;
   const { config, failure, refusal } = state;
-  const [draft, setDraft] = useState<ConfigDraft | undefined>(undefined);
+  const [text, setText] = useState<ConfigText | undefined>(() =>
+    config === undefined ? undefined : textOf(config),
+  );
+  const latestRefusal = useRef(refusal);
+  const dirtyKeys = useRef(new Set<keyof Config>());
+  const committedNumericText = useRef(new Map<Exclude<keyof Config, "logLevel">, string>());
 
-  // Снимок принимается в черновик, пока терять нечего. Правку, набранную руками, снимок не затирает:
-  // файл мог изменить редактор или другая вкладка, и молча выбросить чужую работу нельзя.
+  useEffect(() => {
+    latestRefusal.current = refusal;
+  }, [refusal]);
+
   useEffect(() => {
     if (config === undefined) {
       return;
     }
 
-    setDraft((current) =>
-      current !== undefined && hasUnsavedEdits(current, config) ? current : draftOf(config),
-    );
+    setText((current) => {
+      if (current === undefined) {
+        return textOf(config);
+      }
+
+      // A refusal is followed by a reload, so its text stays beside the daemon reason. Otherwise,
+      // only controls without pending local text accept the new authoritative snapshot.
+      if (latestRefusal.current !== undefined) {
+        return current;
+      }
+
+      const next = textOf(config);
+
+      for (const key of dirtyKeys.current) {
+        next[key] = current[key];
+      }
+
+      return next;
+    });
   }, [config]);
 
-  if (config === undefined || draft === undefined) {
+  if (config === undefined || text === undefined) {
     return (
       <div className="settings-config">
         {failure === undefined ? (
@@ -64,26 +75,33 @@ export function ConfigForm({ state, onSave, translator }: ConfigFormProps) {
     );
   }
 
-  const reading = readDraft(draft);
-  const changed = reading.kind === "read" && !sameConfig(reading.config, config);
-  // Черновик оставили при разошедшемся снимке: файл изменился под открытой формой.
-  const collided = !sameConfig(draft.base, config);
+  const setValue = (key: keyof Config, value: string): void => {
+    dirtyKeys.current.add(key);
+
+    if (key !== "logLevel") {
+      committedNumericText.current.delete(key);
+    }
+
+    setText((current) => (current === undefined ? current : { ...current, [key]: value }));
+  };
+  const commitNumber = (key: Exclude<keyof Config, "logLevel">): void => {
+    if (committedNumericText.current.get(key) === text[key]) {
+      return;
+    }
+
+    const value = parseFiniteNumber(text[key]);
+
+    if (value !== undefined) {
+      dirtyKeys.current.delete(key);
+      committedNumericText.current.set(key, text[key]);
+      onChange(key, value);
+    }
+  };
 
   return (
     <div className="settings-config">
       <Heading level={3}>{t("settings.config.title")}</Heading>
       {refusal === undefined ? undefined : <Notice tone="danger" title={refusal} />}
-      {collided ? (
-        <Notice tone="warning" title={t("settings.config.collision")}>
-          <Button onClick={() => setDraft(draftOf(config))}>{t("settings.config.takeFile")}</Button>
-        </Notice>
-      ) : undefined}
-      {reading.kind === "unreadable" ? (
-        <Notice
-          tone="danger"
-          title={t("settings.config.notNumbers", { keys: reading.unreadable.join(", ") })}
-        />
-      ) : undefined}
       {configKeys.map((key) => (
         <SettingsRow
           key={key}
@@ -94,36 +112,32 @@ export function ConfigForm({ state, onSave, translator }: ConfigFormProps) {
             <Select
               label=""
               ariaLabel={t(`settings.config.key.${key}`)}
-              value={draft.text[key]}
-              // Уровни журнала не переводятся: это те же слова, что стоят в файле и в выводе демона,
-              // и перевод развёл бы список с тем, что человек пишет руками (docs/logging.md).
+              value={text[key]}
               options={logLevels.map((level) => ({ value: level, label: level }))}
-              onChange={(value) => setDraft(editDraft(draft, key, value))}
+              onChange={(value) => {
+                setValue(key, value);
+                dirtyKeys.current.delete(key);
+                onChange(key, value as Config["logLevel"]);
+              }}
               placeholder={t("common.choose")}
             />
           ) : (
             <Input
               aria-label={t(`settings.config.key.${key}`)}
-              value={draft.text[key]}
-              invalid={reading.kind === "unreadable" && reading.unreadable.includes(key)}
-              onChange={(value) => setDraft(editDraft(draft, key, value))}
+              value={text[key]}
+              invalid={parseFiniteNumber(text[key]) === undefined}
+              onChange={(value) => setValue(key, value)}
+              onBlur={() => commitNumber(key)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitNumber(key);
+                }
+              }}
             />
           )}
         </SettingsRow>
       ))}
-      <div className="settings-config-actions">
-        <Button
-          tone="accent"
-          disabled={!changed}
-          onClick={() => {
-            if (reading.kind === "read") {
-              onSave(reading.config);
-            }
-          }}
-        >
-          {t("settings.config.save")}
-        </Button>
-      </div>
     </div>
   );
 }

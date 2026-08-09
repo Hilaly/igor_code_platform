@@ -992,7 +992,7 @@ export function App() {
                       failure={failure}
                       locale={preferences.locale}
                       config={config.state}
-                      onSaveConfig={config.save}
+                      onChangeConfig={config.update}
                       translator={translator}
                     />
                   }

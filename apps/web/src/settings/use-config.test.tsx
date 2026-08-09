@@ -61,7 +61,7 @@ beforeEach(() => {
       return answer(refusal.body, refusal.status);
     }
 
-    stored = JSON.parse(init?.body as string) as typeof defaultConfig;
+    stored = { ...stored, ...(JSON.parse(init?.body as string) as Partial<typeof defaultConfig>) };
 
     return answer(stored);
   });
@@ -156,19 +156,16 @@ describe("useConfig", () => {
     expect(asked()).toHaveLength(1);
   });
 
-  it("writes the whole document and keeps what the daemon answered", async () => {
+  it("writes one changed key and keeps the complete daemon answer", async () => {
     const view = connect();
 
     await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
 
-    act(() => view.result.current.save({ ...defaultConfig, publicRouteRequestsPerMinute: 3 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
 
-    await waitFor(() =>
-      expect(view.result.current.state.config?.publicRouteRequestsPerMinute).toBe(3),
-    );
+    await waitFor(() => expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8));
     expect(JSON.parse(asked("PUT")[0]?.body ?? "{}")).toEqual({
-      ...defaultConfig,
-      publicRouteRequestsPerMinute: 3,
+      maxConcurrentTurns: 8,
     });
   });
 
@@ -178,7 +175,7 @@ describe("useConfig", () => {
     await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
 
     refusal = { status: 409, body: { error: "config.json: EACCES" } };
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 8 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
 
     await waitFor(() => expect(view.result.current.state.refusal).toBe("config.json: EACCES"));
     // Снимок перезапрашивается: отказ как раз о том, что файл живёт своей жизнью.
@@ -206,8 +203,8 @@ describe("useConfig", () => {
       });
     });
 
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 8 }));
-    act(() => view.result.current.save({ ...defaultConfig, maxConcurrentTurns: 2 }));
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
+    act(() => view.result.current.update("maxConcurrentTurns", 2));
 
     await waitFor(() => expect(answers).toHaveLength(2));
 
@@ -216,5 +213,81 @@ describe("useConfig", () => {
     act(() => answers[0]?.({ ...defaultConfig, maxConcurrentTurns: 8 }));
 
     await waitFor(() => expect(view.result.current.state.config?.maxConcurrentTurns).toBe(2));
+  });
+
+  it("drops a reload that started before a newer write", async () => {
+    const view = connect();
+
+    await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
+
+    let answerReload: ((config: unknown) => void) | undefined;
+    let answerWrite: ((config: unknown) => void) | undefined;
+
+    vi.stubGlobal("fetch", (_url: string, init?: RequestInit) => {
+      return new Promise<Response>((resolve) => {
+        const answerLater = (config: unknown): void => {
+          resolve({ ok: true, status: 200, json: () => Promise.resolve(config) } as Response);
+        };
+
+        if ((init?.method ?? "GET") === "GET") {
+          answerReload = answerLater;
+        } else {
+          answerWrite = answerLater;
+        }
+      });
+    });
+
+    act(() => view.bus.publish(configChanged));
+    await waitFor(() => expect(answerReload).toBeDefined());
+
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
+    await waitFor(() => expect(answerWrite).toBeDefined());
+
+    await act(async () => answerWrite?.({ ...defaultConfig, maxConcurrentTurns: 8 }));
+    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
+
+    await act(async () => answerReload?.(defaultConfig));
+
+    expect(view.result.current.state.config?.maxConcurrentTurns).toBe(8);
+  });
+
+  it("reloads an external change deferred until the current write settles", async () => {
+    const view = connect();
+
+    await waitFor(() => expect(view.result.current.state.config).toEqual(defaultConfig));
+
+    let answerWrite: ((config: unknown) => void) | undefined;
+    let reloads = 0;
+
+    vi.stubGlobal("fetch", (_url: string, init?: RequestInit) => {
+      return new Promise<Response>((resolve) => {
+        const answerLater = (config: unknown): void => {
+          resolve({ ok: true, status: 200, json: () => Promise.resolve(config) } as Response);
+        };
+
+        if ((init?.method ?? "GET") === "GET") {
+          reloads += 1;
+          resolve(answer(stored));
+        } else {
+          answerWrite = answerLater;
+        }
+      });
+    });
+
+    act(() => view.result.current.update("maxConcurrentTurns", 8));
+    await waitFor(() => expect(answerWrite).toBeDefined());
+
+    // The daemon has handled our PUT, but the HTTP answer is still in flight.
+    stored = { ...defaultConfig, maxConcurrentTurns: 8 };
+    // Another writer changes the file before its event reaches this tab.
+    stored = { ...stored, maxConcurrentTurns: 9 };
+    act(() => view.bus.publish(configChanged));
+    // The event must be retained, not fetched from a point that could still be before our PUT.
+    expect(reloads).toBe(0);
+
+    await act(async () => answerWrite?.({ ...defaultConfig, maxConcurrentTurns: 8 }));
+
+    await waitFor(() => expect(reloads).toBe(1));
+    await waitFor(() => expect(view.result.current.state.config?.maxConcurrentTurns).toBe(9));
   });
 });

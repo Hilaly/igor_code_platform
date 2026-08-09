@@ -66,7 +66,7 @@ vi.mock("./plugins/use-plugins.ts", () => ({
 vi.mock("./settings/use-config.ts", () => ({
   useConfig: () => ({
     state: { config: undefined, failure: undefined, refusal: undefined },
-    save: vi.fn(),
+    update: vi.fn(),
   }),
 }));
 

@@ -20,7 +20,7 @@ const translator = createTranslator({
 });
 
 const config = { config: defaultConfig, failure: undefined, refusal: undefined };
-const onSaveConfig = () => {};
+const onChangeConfig = () => {};
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -40,7 +40,7 @@ it("lays daemon facts out as compact Appearance-style property rows and ticks up
       failure={undefined}
       locale="en-GB"
       config={config}
-      onSaveConfig={onSaveConfig}
+      onChangeConfig={onChangeConfig}
       translator={translator}
     />,
   );
@@ -78,7 +78,7 @@ it("keeps daemon loading and failure states in the uptime value column", () => {
       failure={undefined}
       locale="en-GB"
       config={config}
-      onSaveConfig={onSaveConfig}
+      onChangeConfig={onChangeConfig}
       translator={translator}
     />,
   );
@@ -94,7 +94,7 @@ it("keeps daemon loading and failure states in the uptime value column", () => {
       failure="connection refused"
       locale="en-GB"
       config={config}
-      onSaveConfig={onSaveConfig}
+      onChangeConfig={onChangeConfig}
       translator={translator}
     />,
   );
@@ -111,7 +111,7 @@ it("keeps every visible uptime unit in the accessible timer name after an hour",
       failure={undefined}
       locale="en-GB"
       config={config}
-      onSaveConfig={onSaveConfig}
+      onChangeConfig={onChangeConfig}
       translator={translator}
     />,
   );

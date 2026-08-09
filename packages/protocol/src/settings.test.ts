@@ -270,7 +270,15 @@ describe("parseConfigUpdate", () => {
     assert.deepEqual([...configKeys].sort(), Object.keys(defaultConfig).sort());
   });
 
-  it("takes a document that names all the keys", () => {
+  it("accepts one known configuration key", () => {
+    assert.deepEqual(parseConfigUpdate({ maxConcurrentTurns: 8 }), {
+      kind: "parsed",
+      value: { maxConcurrentTurns: 8 },
+      diagnostics: [],
+    });
+  });
+
+  it("takes a legacy document that names all the keys", () => {
     const result = parseConfigUpdate({ ...defaultConfig, maxConcurrentTurns: 8 });
 
     assert.equal(result.kind, "parsed");
@@ -280,22 +288,22 @@ describe("parseConfigUpdate", () => {
     });
   });
 
-  it("refuses a document that leaves a key out and names the missing ones", () => {
-    // Умолчание вместо пропущенного ключа откатило бы настройку, стоявшую в файле, — а человек в
-    // этот момент менял соседнюю (docs/web-api.md).
-    const named = Object.fromEntries(
-      Object.entries(defaultConfig).filter(
-        ([key]) => key !== "logLevel" && key !== "maxConcurrentTurns",
-      ),
-    );
-    const result = parseConfigUpdate(named);
+  it("refuses an empty update", () => {
+    const result = parseConfigUpdate({});
 
     assert.equal(result.kind, "rejected");
-    assert.match(result.diagnostics.join("; "), /logLevel, maxConcurrentTurns is required/);
+    assert.match(result.diagnostics.join("; "), /at least one.*key is required/);
+  });
+
+  it("refuses an update that names no known configuration key", () => {
+    const result = parseConfigUpdate({ futureKey: 1 });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join("; "), /at least one known key is required/);
   });
 
   it("refuses a wrong value the same way reading the file does", () => {
-    const result = parseConfigUpdate({ ...defaultConfig, publicRouteRequestsPerMinute: 0 });
+    const result = parseConfigUpdate({ publicRouteRequestsPerMinute: 0 });
 
     assert.equal(result.kind, "rejected");
     assert.match(result.diagnostics.join("; "), /publicRouteRequestsPerMinute must be an integer/);
@@ -303,10 +311,14 @@ describe("parseConfigUpdate", () => {
 
   it("keeps an unknown key as a diagnostic instead of refusing", () => {
     // Тот же довод, что и при чтении файла: понижение версии платформы не обязано ломать форму.
-    const result = parseConfigUpdate({ ...defaultConfig, futureKey: 1 });
+    const result = parseConfigUpdate({ maxConcurrentTurns: 8, futureKey: 1 });
 
     assert.equal(result.kind, "parsed");
-    assert.match(result.diagnostics.join("; "), /unknown key "futureKey" is ignored/);
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      maxConcurrentTurns: 8,
+      futureKey: 1,
+    });
+    assert.match(result.diagnostics.join("; "), /unknown key "futureKey" is retained/);
   });
 
   it("refuses a body that is not an object", () => {

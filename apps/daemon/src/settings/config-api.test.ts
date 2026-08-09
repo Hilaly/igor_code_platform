@@ -122,15 +122,14 @@ describe("configRoutes", () => {
     assert.deepEqual(JSON.parse(answer.body), defaultConfig);
   });
 
-  it("writes the file and answers with what is now in effect", async () => {
+  it("writes a partial config without replacing its neighbors", async () => {
     const { get, put, stored } = await serve();
-    const wanted = { ...defaultConfig, logLevel: "warn", publicRouteRequestsPerMinute: 3 };
-    const answer = await put(wanted);
+    const answer = await put({ maxConcurrentTurns: 8 });
 
     assert.equal(answer.status, 200);
-    assert.deepEqual(JSON.parse(answer.body), wanted);
-    assert.deepEqual(stored(), wanted);
-    assert.deepEqual(JSON.parse((await get()).body), wanted);
+    assert.deepEqual(JSON.parse(answer.body), { ...defaultConfig, maxConcurrentTurns: 8 });
+    assert.deepEqual(stored(), { maxConcurrentTurns: 8 });
+    assert.deepEqual(JSON.parse((await get()).body), { ...defaultConfig, maxConcurrentTurns: 8 });
   });
 
   it("has the new values in the snapshot by the time the answer comes back", async () => {
@@ -140,7 +139,7 @@ describe("configRoutes", () => {
     // наблюдателя за директорией (docs/web-api.md).
     const { put, store } = await serve();
 
-    await put({ ...defaultConfig, pluginRouteBodyLimitBytes: 4096 });
+    await put({ pluginRouteBodyLimitBytes: 4096 });
 
     assert.equal(store.current().config.pluginRouteBodyLimitBytes, 4096);
   });
@@ -157,7 +156,7 @@ describe("configRoutes", () => {
     });
 
     logger.info("before");
-    await put({ ...defaultConfig, logLevel: "error" });
+    await put({ logLevel: "error" });
     logger.info("after");
 
     assert.deepEqual(
@@ -176,7 +175,7 @@ describe("configRoutes", () => {
       `${JSON.stringify({ ...defaultConfig, futureKey: "keep me" })}\n`,
     );
 
-    const answer = await put({ ...defaultConfig, maxConcurrentTurns: 8 });
+    const answer = await put({ maxConcurrentTurns: 8 });
 
     assert.equal(answer.status, 200);
     assert.deepEqual(stored(), { ...defaultConfig, maxConcurrentTurns: 8, futureKey: "keep me" });
@@ -186,33 +185,37 @@ describe("configRoutes", () => {
     // Клиент более новой версии может прислать ключ, которого этот демон ещё не применяет. Запись
     // обязана сохранить его в документе, но ответ описывает только известный применяемый снимок.
     const { put, stored } = await serve();
-    const answer = await put({
-      ...defaultConfig,
-      maxConcurrentTurns: 8,
-      futureKey: "keep me",
-    });
+    const answer = await put({ maxConcurrentTurns: 8, futureKey: "keep me" });
 
     assert.equal(answer.status, 200);
     assert.deepEqual(JSON.parse(answer.body), { ...defaultConfig, maxConcurrentTurns: 8 });
     assert.deepEqual(stored(), {
-      ...defaultConfig,
       maxConcurrentTurns: 8,
       futureKey: "keep me",
     });
   });
 
-  it("refuses a body that leaves a key out and writes nothing", async () => {
+  it("refuses an empty body and writes nothing", async () => {
     const { directory, put } = await serve();
-    const answer = await put({ logLevel: "debug" });
+    const answer = await put({});
 
     assert.equal(answer.status, 400);
-    assert.match(answer.body, /is required/);
+    assert.match(answer.body, /at least one.*key is required/);
+    assert.equal(existsSync(join(directory, configFileName)), false);
+  });
+
+  it("refuses a body that names only unknown fields and writes nothing", async () => {
+    const { directory, put } = await serve();
+    const answer = await put({ futureKey: "keep me" });
+
+    assert.equal(answer.status, 400);
+    assert.match(answer.body, /at least one known key is required/);
     assert.equal(existsSync(join(directory, configFileName)), false);
   });
 
   it("refuses a wrong value and writes nothing", async () => {
     const { directory, put } = await serve();
-    const answer = await put({ ...defaultConfig, hookTimeoutMilliseconds: 0 });
+    const answer = await put({ hookTimeoutMilliseconds: 0 });
 
     assert.equal(answer.status, 400);
     assert.match(answer.body, /hookTimeoutMilliseconds must be an integer above zero/);
@@ -225,7 +228,7 @@ describe("configRoutes", () => {
 
     writeFileSync(join(directory, configFileName), "{ broken");
 
-    const answer = await put({ ...defaultConfig, maxConcurrentTurns: 8 });
+    const answer = await put({ maxConcurrentTurns: 8 });
 
     assert.equal(answer.status, 409);
     assert.equal(readFileSync(join(directory, configFileName), "utf8"), "{ broken");
@@ -242,7 +245,7 @@ describe("configRoutes", () => {
       chmodSync(directory, 0o555);
 
       try {
-        const answer = await put({ ...defaultConfig, maxConcurrentTurns: 8 });
+        const answer = await put({ maxConcurrentTurns: 8 });
 
         // Не `internal error`: причину отказа чинит человек, и без неё он не знает, что чинить.
         assert.equal(answer.status, 500);
@@ -252,6 +255,21 @@ describe("configRoutes", () => {
       }
     },
   );
+
+  it("keeps both changes from two partial writes", async () => {
+    const { put, stored } = await serve();
+
+    assert.equal((await put({ logLevel: "debug" })).status, 200);
+    const answer = await put({ maxConcurrentTurns: 8 });
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(JSON.parse(answer.body), {
+      ...defaultConfig,
+      logLevel: "debug",
+      maxConcurrentTurns: 8,
+    });
+    assert.deepEqual(stored(), { logLevel: "debug", maxConcurrentTurns: 8 });
+  });
 });
 
 describe("publishConfigChanges", () => {
