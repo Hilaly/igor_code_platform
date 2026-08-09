@@ -133,6 +133,26 @@ describe("global shell header", () => {
     });
     expect(screen.getByRole("heading", { name: "Первый" })).toBeDefined();
   });
+
+  /**
+   * Полоса действий шапки — место оболочки. Вклад плагина обязан пережить смену страницы и встать
+   * после действий вью, иначе им владело бы то вью, которое зарегистрировало описание.
+   */
+  it("keeps the shell actions after the actions of the view and across a route change", () => {
+    const view = show({
+      header: { title: "Проекты", actions: <button>Создать</button> },
+      headerActions: <button>Действие плагина</button>,
+    });
+
+    const actions = screen.getAllByRole("button", { name: /Создать|Действие плагина/ });
+
+    expect(actions.map((action) => action.textContent)).toEqual(["Создать", "Действие плагина"]);
+
+    view.again(defaultLayout, { header: { title: "Настройки" } });
+
+    expect(screen.getByRole("button", { name: "Действие плагина" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Создать" })).toBeNull();
+  });
 });
 
 function drag(separator: HTMLElement, startX: number, moves: number[]): void {

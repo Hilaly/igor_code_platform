@@ -107,9 +107,9 @@ IPv4-адрес получит `ECONNREFUSED` ([runtime-checks.md](runtime-check
 
 Полный контракт — в [web-api.md](web-api.md); здесь только как пощупать.
 
-Без cookie отвечают только `GET`/`POST /api/login-session`, `POST /api/account` и `/api/health`; остальное
-даёт `401`. Поэтому сначала вход, дальше — с тем же файлом cookie. Первый вход создаёт учётную
-запись:
+Без cookie отвечают `GET`/`POST /api/login-session`, `POST /api/account`, `/api/health` и публичный
+маршрут включённого плагина, объявленный через `contribute.publicRoute`; остальные защищённые маршруты
+дают `401`. Поэтому сначала вход, дальше — с тем же файлом cookie. Первый вход создаёт учётную запись:
 
 ```bash
 curl -c jar -X POST http://localhost:5273/api/account \
@@ -228,8 +228,9 @@ it` означает, что объявления нет или его выкл�
 ## Браузерная часть плагина живьём
 
 Плагин из `plugins/` директории данных объявляет `sovereign.browser`
-([plugins.md](plugins.md), [ui-extension-model.md](ui-extension-model.md)). Загрузчика мест ещё нет
-(он в срезе 12b-2), поэтому конвейер щупается снимком, `curl`-ом и импортом бандла — не интерфейсом.
+([plugins.md](plugins.md), [ui-extension-model.md](ui-extension-model.md)). Здесь конвейер щупается
+снимком, `curl`-ом и импортом бандла; то, как этот бандл доезжает до интерфейса, — в разделе «Места и
+вклады плагина живьём» ниже.
 
 Минимальный плагин: `package.json` с `sovereign.browser`, воркер, `src/browser.tsx` с импортами
 `react`, `@sovereign/ui-kit` и своего `*.module.css`.
@@ -434,10 +435,9 @@ curl -X POST -H 'content-type: text/plain' -d 'тело' \
 ```
 
 Адрес — под `/api`, а не рядом с ним: корень `/p/` отдан браузерным страницам плагина
-([web-api.md](web-api.md)). Побочный итог переезда стоит проверить отдельно: в dev-режиме прокси Vite
-отправляет демону только `/api`, поэтому раньше маршрут плагина на `:5273` отвечал выдачей
-интерфейса, а не плагином. Те же три команды на порту dev-сервера теперь дают те же коды, что и на
-порту демона.
+([web-api.md](web-api.md)). В dev-режиме прокси Vite отправляет демону и `/api`, и
+`/plugin-assets`, поэтому маршруты и browser assets плагина на `:5273` доходят до того же демона,
+что и на его порту.
 
 Что стоит посмотреть, кроме кодов ответа:
 
@@ -497,6 +497,170 @@ curl -X POST -H 'content-type: text/plain' -d 'тело' \
 
 Все восемь прогонялись на срезе 12a; чем кончились — в [roadmap.md](roadmap.md).
 
+## Места и вклады плагина живьём
+
+Сценарий начинается с tracked-фикстур
+`apps/daemon/src/plugins/fixtures/{placed,rival,browserless}` и не зависит от содержимого
+игнорируемого `apps/daemon/.sovereign-dev`. Из корня репозитория:
+
+```bash
+RUNBOOK_DATA="$(mktemp -d)"
+pnpm --filter @sovereign/daemon run seed-runbook -- "$RUNBOOK_DATA"
+node apps/daemon/src/main.ts "$RUNBOOK_DATA" --port 8787
+pnpm --filter @sovereign/web run dev -- --host localhost --port 5273
+```
+
+Две последние команды долгоживущие: запустите демон и Vite в отдельных терминалах, подставив в
+первую из них путь, который напечатал seed. Следующие команды выполняются с тем же значением
+`RUNBOOK_DATA`. Создайте учётную запись, затем получите обычную login-cookie тем же паролем:
+
+```bash
+RUNBOOK_COOKIE="$RUNBOOK_DATA/runbook-cookie.jar"
+curl -sS -c "$RUNBOOK_COOKIE" -X POST http://localhost:5273/api/account \
+  -H 'content-type: application/json' -d '{"password":"correct horse"}'
+curl -sS -b "$RUNBOOK_COOKIE" -c "$RUNBOOK_COOKIE" \
+  -X POST http://localhost:5273/api/login-session \
+  -H 'content-type: application/json' -d '{"password":"correct horse"}'
+```
+
+Seed оставляет `placed.plugins`, `placed.boom` и все три вклада `rival` выключенными. Поэтому
+`http://localhost:5273/settings/plugins` сначала показывает встроенный список, а переключения ниже
+можно наблюдать без перезагрузки страницы.
+
+1. **Owner `builtIn` рисуется кодом самого плагина.** Включите `placed.plugins`:
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Aplaced/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":["placed.boom"]}'
+   ```
+
+   Панель содержит `Plugins, by the placed plugin`, `view: list` и `the built-in board for the
+window`. Последняя строка важнее снимка реестра: `PluginsPanel` импортировал публичный `Place` из
+   `@sovereign/browser-sdk` и через него отрисовал собственный `placed.board`.
+
+2. **`rival` заменяет board, затем добавляет action в коллекцию владельца:**
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Arival/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":["rival.plugins","rival.board-action"]}'
+   ```
+
+   В той же панели появляется `the rival replacement board for the window`. Теперь включите action:
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Arival/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":["rival.plugins"]}'
+   ```
+
+   Рядом виден `rival board action`.
+
+3. **Равный claim на место ядра возвращает owner fallback.** Включите `rival.plugins`:
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Arival/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":[]}'
+   ```
+
+   `/settings/plugins` снова показывает встроенный список. В `/settings/diagnostics` одна причина:
+   `the place core.settings.plugins is claimed by placed.plugins, rival.plugins of equal rank, so
+none of them takes it`.
+
+4. **Падающий sibling не гасит соседа.** Включите `placed.boom`:
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Aplaced/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":[]}'
+   ```
+
+   Секция `placed section` остаётся в левой панели, оболочка жива, а диагностика содержит
+   `the component placed.boom failed while rendering: the placed plugin cannot render this`.
+
+5. **Component без browser bundle получает локальный отказ.** `browserless` включён seed-командой и
+   остаётся `running`, но его `browserless.panel` помечен `Declared, but not applied` с причиной
+   `the component browserless.panel needs a browser bundle, but the plugin declares no
+sovereign.browser`.
+
+6. **CSS меняет ревизию, не ломая место.** Сначала снова покажите панель `placed` и выключите
+   падающий sibling:
+
+   ```bash
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Arival/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":["rival.plugins"]}'
+   curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+     http://localhost:5273/api/plugins/data%3Aplaced/preferences \
+     -H 'content-type: application/json' \
+     -d '{"enabled":true,"disabledContributions":["placed.boom"]}'
+   printf '\n.panel { border-color: #ff4f81; }\n' >> \
+     "$RUNBOOK_DATA/plugins/placed/src/browser.module.css"
+   ```
+
+   После watcher/rebuild у `data:placed` новая browser revision, в `head` ровно один
+   `link[data-sovereign-plugin^="data:placed@"]`, рамка стала розовой, а replacement и action
+   продолжают работать.
+
+Проектную копию seed намеренно не создаёт: он не угадывает id проекта и не пишет project
+preferences. Создайте настоящий проект, затем отдельно скопируйте и включите `placed`:
+
+```bash
+RUNBOOK_PROJECT_FOLDER="$RUNBOOK_DATA/runbook-project"
+mkdir -p "$RUNBOOK_PROJECT_FOLDER/.sovereign/plugins"
+RUNBOOK_PROJECT_ID="$(
+  curl -sS -b "$RUNBOOK_COOKIE" -X POST http://localhost:5273/api/projects \
+    -H 'content-type: application/json' \
+    -d "{\"folder\":\"$RUNBOOK_PROJECT_FOLDER\",\"name\":\"Runbook project\"}" |
+    python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])'
+)"
+cp -R "$RUNBOOK_DATA/plugins/placed" "$RUNBOOK_PROJECT_FOLDER/.sovereign/plugins/placed"
+RUNBOOK_PROJECT_KEY="$(
+  node -e 'process.stdout.write(encodeURIComponent(`project:${process.argv[1]}:placed`))' \
+    "$RUNBOOK_PROJECT_ID"
+)"
+RUNBOOK_PROJECT_READY=0
+for RUNBOOK_ATTEMPT in $(seq 1 50); do
+  if curl -fsS -b "$RUNBOOK_COOKIE" http://localhost:5273/api/plugins | \
+    python3 -c 'import json, sys; key = sys.argv[1]; raise SystemExit(not any(plugin["key"] == key for plugin in json.load(sys.stdin)["plugins"]))' \
+      "project:$RUNBOOK_PROJECT_ID:placed"; then
+    RUNBOOK_PROJECT_READY=1
+    break
+  fi
+  sleep 0.1
+done
+test "$RUNBOOK_PROJECT_READY" = 1
+curl -sS -b "$RUNBOOK_COOKIE" -X PUT \
+  "http://localhost:5273/api/plugins/$RUNBOOK_PROJECT_KEY/preferences" \
+  -H 'content-type: application/json' \
+  -d '{"enabled":true,"disabledContributions":[]}'
+```
+
+После появления карточки `project:<id>:placed` глобальный `/settings/plugins` по-прежнему
+разрешается только из data-контекста; проектная копия применяется лишь в контексте созданного
+проекта.
+
+В конце сначала остановите `Ctrl-C` оба долгоживущих процесса — демон и Vite. Затем удалите только
+значение `RUNBOOK_DATA`, полученное от `mktemp -d` в начале этого сценария:
+
+```bash
+RUNBOOK_TMP_ROOT="${TMPDIR:-/tmp}"
+RUNBOOK_TMP_ROOT="${RUNBOOK_TMP_ROOT%/}"
+case "$RUNBOOK_DATA" in
+  "$RUNBOOK_TMP_ROOT"/*) rm -rf -- "$RUNBOOK_DATA" ;;
+  *) printf 'refusing to remove non-runbook path: %s\n' "$RUNBOOK_DATA" >&2 ;;
+esac
+unset RUNBOOK_DATA RUNBOOK_COOKIE RUNBOOK_PROJECT_FOLDER RUNBOOK_PROJECT_ID RUNBOOK_PROJECT_KEY
+```
+
 ## Проверка перед коммитом
 
 ```bash
@@ -527,6 +691,6 @@ make check
 - Продакшн-сборки единым приложением: решено, что в артефакт вшиты статика фронтенда и исходники
   встроенных плагинов ([toolchain.md](toolchain.md)), но кода нет — `make build` собирает только
   веб-интерфейс.
-- Из плагинной системы нет браузерной части: демон не собирает браузерный код плагина, поэтому нет ни
-  страниц, ни мест, ни команд. Виды вкладов, которых ещё нет, перечислены в
-  [plugins.md](plugins.md).
+- У UI плагинов ещё нет страниц, вкладок и команд с navigation facade среза 12c. Браузерные бандлы,
+  публичный browser SDK, места ядра и плагинов и component-вклады уже работают
+  ([ui-extension-model.md](ui-extension-model.md)).

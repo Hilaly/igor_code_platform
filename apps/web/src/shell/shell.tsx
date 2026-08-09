@@ -54,6 +54,12 @@ export type ShellProps = {
   rightUnavailable?: boolean;
   contentMode?: "page" | "contained";
   header: ShellHeaderDescription;
+  /**
+   * Действия шапки, принадлежащие оболочке, а не вью. Слот `actions` у описания шапки принадлежит
+   * тому вью, которое его зарегистрировало, и вклады плагинов идут не в него: иначе смена страницы
+   * уносила бы их вместе с описанием.
+   */
+  headerActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -68,6 +74,7 @@ export function Shell({
   rightUnavailable = false,
   contentMode = "page",
   header,
+  headerActions,
   children,
 }: ShellProps) {
   const open = tabs.find((tab) => tab.id === layout.openTab);
@@ -129,7 +136,7 @@ export function Shell({
       )}
       <main className="shell-page" data-content-mode={contentMode}>
         <ShellHeaderProvider description={header}>
-          <ShellHeader />
+          <ShellHeader {...(headerActions === undefined ? {} : { actions: headerActions })} />
           <div className="shell-body" data-content-mode={contentMode}>
             {children}
           </div>
@@ -218,10 +225,23 @@ export function Shell({
   );
 }
 
-function ShellHeader(): React.JSX.Element {
+function ShellHeader({ actions }: { actions?: ReactNode }): React.JSX.Element {
+  const description = useActiveShellHeader();
+  // Действия оболочки идут после действий вью: полосой владеет хост, но первым слово у того, кто
+  // страницу показывает.
+  const composed =
+    actions === undefined ? (
+      description.actions
+    ) : (
+      <>
+        {description.actions}
+        {actions}
+      </>
+    );
+
   return (
     <div className="shell-header">
-      <ViewHeader {...useActiveShellHeader()} />
+      <ViewHeader {...description} {...(composed === undefined ? {} : { actions: composed })} />
     </div>
   );
 }

@@ -9,9 +9,11 @@ import {
   coreCatalogNamespace,
   coreEventNamespace,
   isHookCriticality,
+  isPlaceCardinality,
   isPluginRouteMethod,
   isSubscribablePlatformHook,
   isThinkingLevel,
+  manifestField,
   pluginSourceRank,
   type ColorSchemeDocument,
   type ContributionConflict,
@@ -44,6 +46,13 @@ const toolNamePattern = /^[a-z0-9][a-z0-9-]{0,63}$/;
  */
 const routeSegmentPattern = /^:?[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+/**
+ * Идентификатор места всегда с неймспейсом — `core.` у базовой поставки, идентификатор плагина у
+ * плагина: место, на которое ссылается вклад, чужое, и односегментное имя значило бы, что владелец
+ * места не назван.
+ */
+const placeIdPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/;
+
 export type ContributionApplyOutcome = {
   registered: ContributionRegistration[];
   /** Кривой вклад — событие жизненного цикла плагина, а не исключение (docs/plugins.md). */
@@ -72,6 +81,12 @@ export type PluginContributionSnapshot = {
   contributions: PluginContribution[];
   fileContributions: FileContributionInput[];
   disabledContributions: ReadonlySet<string>;
+  /**
+   * Объявил ли плагин браузерную точку входа. Реестр манифеста не видит и видеть не должен, но
+   * вклад-компонент ссылается на экспорт бандла, которого у такого плагина нет вовсе. Признак
+   * проставляет супервизор — так все отказы по форме объявления остаются в одном месте.
+   */
+  hasBrowserEntry?: boolean;
 };
 
 type StandaloneContributionSnapshotCommon = {
@@ -378,7 +393,12 @@ function buildPluginSnapshot(input: PluginContributionSnapshot): {
   const problems: string[] = [];
 
   input.contributions.forEach((contribution, index) => {
-    const registration = programmaticRegistration(plugin, contribution, problems);
+    const registration = programmaticRegistration(
+      plugin,
+      contribution,
+      problems,
+      input.hasBrowserEntry ?? false,
+    );
     if (registration === undefined) {
       return;
     }
@@ -670,6 +690,7 @@ function programmaticRegistration(
   plugin: ContributingPlugin,
   contribution: PluginContribution,
   problems: string[],
+  hasBrowserEntry: boolean,
 ): PluginContributionRegistration | undefined {
   if (!declaredIdPattern.test(contribution.id)) {
     problems.push(
@@ -821,6 +842,89 @@ function programmaticRegistration(
       namespace: contribution.namespace,
       locale,
       messages,
+    };
+  }
+
+  if (contribution.kind === "place") {
+    if (!isPlaceCardinality(contribution.cardinality)) {
+      problems.push(
+        `the place ${id} names an unknown cardinality ${JSON.stringify(contribution.cardinality)}`,
+      );
+      return undefined;
+    }
+
+    const replaceable = contribution.replaceable === true;
+
+    // Заменяемость у коллекции и полосы действий бессмысленна: вклады там не спорят, а
+    // складываются, и «занять целиком» им нечем.
+    if (replaceable && contribution.cardinality !== "single") {
+      problems.push(`the place ${id} is replaceable, which only a single place can be`);
+      return undefined;
+    }
+
+    const builtIn = typeof contribution.builtIn === "string" ? contribution.builtIn.trim() : "";
+
+    if (replaceable && builtIn === "") {
+      problems.push(
+        `the replaceable place ${id} must name the export of its built-in provider: a replacement that can be switched off needs something underneath`,
+      );
+      return undefined;
+    }
+    if (builtIn !== "" && !hasBrowserEntry) {
+      problems.push(
+        `the place ${id} names the built-in provider ${JSON.stringify(builtIn)}, but the plugin declares no ${manifestField}.browser`,
+      );
+      return undefined;
+    }
+
+    return {
+      ...common,
+      kind: "place",
+      cardinality: contribution.cardinality,
+      replaceable,
+      ...(builtIn === "" ? {} : { builtIn }),
+    };
+  }
+
+  if (contribution.kind === "component") {
+    // Ссылаться экспортом не на что: у плагина без браузерной точки входа бандла нет вовсе.
+    if (!hasBrowserEntry) {
+      problems.push(
+        `the component ${id} needs a browser bundle, but the plugin declares no ${manifestField}.browser`,
+      );
+      return undefined;
+    }
+    if (typeof contribution.placeId !== "string" || !placeIdPattern.test(contribution.placeId)) {
+      problems.push(
+        `the component ${id} must name a place matching ${placeIdPattern.source}, got ${JSON.stringify(contribution.placeId)}`,
+      );
+      return undefined;
+    }
+
+    const exported = typeof contribution.export === "string" ? contribution.export.trim() : "";
+
+    if (exported === "") {
+      problems.push(`the component ${id} must name the export it renders`);
+      return undefined;
+    }
+    if (contribution.group !== undefined && typeof contribution.group !== "string") {
+      problems.push(`the component ${id} must name its group with a string`);
+      return undefined;
+    }
+    if (contribution.order !== undefined && !Number.isFinite(contribution.order)) {
+      problems.push(`the component ${id} must order itself with a finite number`);
+      return undefined;
+    }
+
+    // Существование места не проверяется: порядок подъёма плагинов не определён, и вклад в ещё не
+    // объявленное место ждёт его, а не отвергается (docs/ui-extension-model.md).
+    return {
+      ...common,
+      kind: "component",
+      placeId: contribution.placeId,
+      export: exported,
+      ...(contribution.group === undefined ? {} : { group: contribution.group }),
+      ...(contribution.order === undefined ? {} : { order: contribution.order }),
     };
   }
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { PluginsSnapshot } from "@sovereign/protocol";
+import type { ContributionRegistration, PluginsSnapshot } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -258,4 +258,158 @@ it("names the kind of a public route and shows the address it answers at", () =>
   expect(screen.getByText(/"path": "webhooks\/github"/)).toBeTruthy();
   // Адрес целиком: по нему маршрут зовут снаружи, а объявленный путь без префикса не набрать.
   expect(screen.getByText(/\/p\/example\/webhooks\/github/)).toBeTruthy();
+});
+
+/** Объявленное имя берётся из последнего сегмента места: у плагина вклад на каждое место свой. */
+const component = (
+  pluginId: string,
+  placeId: string,
+  source: "builtin" | "data" = "data",
+): ContributionRegistration => {
+  const declaredId = placeId.split(".").at(-1) ?? "panel";
+
+  return {
+    kind: "component",
+    ownership: "plugin",
+    pluginKey: `${source}:${pluginId}`,
+    pluginId,
+    source,
+    id: `${pluginId}.${declaredId}`,
+    declaredId,
+    title: `${pluginId} ${declaredId}`,
+    placeId,
+    export: "Panel",
+  };
+};
+
+const withPlaces = (contributions: ContributionRegistration[]): PluginsSnapshot => ({
+  ...snapshot,
+  contributions,
+  switchedOffContributions: [],
+});
+
+const place = (
+  pluginId: string,
+  placeId: string,
+  cardinality: "single" | "collection" | "action" = "single",
+): ContributionRegistration => ({
+  kind: "place",
+  ownership: "plugin",
+  pluginKey: `data:${pluginId}`,
+  pluginId,
+  source: "data",
+  id: placeId,
+  declaredId: placeId.split(".").at(-1) ?? "place",
+  title: `${pluginId} ${placeId}`,
+  cardinality,
+  replaceable: cardinality === "single",
+  ...(cardinality === "single" ? { builtIn: "Panel" } : {}),
+});
+
+const showPlaces = (next: PluginsSnapshot): void => {
+  render(
+    <PluginDetailView
+      state={{ snapshot: next, stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+};
+
+it("labels a switched-off core component claim as switched off", () => {
+  const off = component("example", "core.settings.plugins");
+  showPlaces({ ...withPlaces([]), switchedOffContributions: [off] });
+
+  const claim = screen.getByRole("group", { name: "core.settings.plugins" });
+  expect(within(claim).getByText("switched off")).toBeTruthy();
+  expect(
+    within(claim).queryByText("the place is free: the contribution is switched off"),
+  ).toBeNull();
+});
+
+it("uses a switched-off plugin-owned place declaration for collection cardinality", () => {
+  const active = component("example", "placed.board");
+  const offPlace = place("placed", "placed.board", "collection");
+  showPlaces({ ...withPlaces([active]), switchedOffContributions: [offPlace] });
+
+  const claim = screen.getByRole("group", { name: "placed.board" });
+  expect(within(claim).getByText("joins the row")).toBeTruthy();
+  expect(within(claim).queryByText(/nobody has declared that place yet/)).toBeNull();
+});
+
+it("labels a switched-off collection component as switched off", () => {
+  const off = {
+    ...component("example", "example.board"),
+    id: "example.card",
+    declaredId: "card",
+    title: "example card",
+  };
+  const activePlace = place("example", "example.board", "collection");
+  showPlaces({ ...withPlaces([activePlace]), switchedOffContributions: [off] });
+
+  const claim = screen.getByRole("group", { name: "example.board" });
+  expect(within(claim).getByText("switched off")).toBeTruthy();
+  expect(within(claim).queryByText("joins the row")).toBeNull();
+});
+
+/**
+ * Замена вью — самое заметное, что плагин делает с интерфейсом, и человеку нужен ответ не только
+ * «вклад объявлен», но и «применён ли он и почему нет».
+ */
+it("says which places the plugin holds and why a claim did not apply", () => {
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: withPlaces([
+          component("example", "core.settings.plugins"),
+          component("example", "core.sidebar.sections"),
+          component("example", "plugin.somebody.panel"),
+        ]),
+        stale: false,
+      }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByRole("group", { name: "core.settings.plugins" })).toBeTruthy();
+  expect(screen.getByText("provides the place")).toBeTruthy();
+  expect(screen.getByText("joins the row")).toBeTruthy();
+  expect(screen.getByText(/nobody has declared that place yet/)).toBeTruthy();
+});
+
+/** Источник ближе к человеку побеждает: вклад базовой поставки уступает вкладу из папки данных. */
+it("names the plugin that took the place instead", () => {
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: {
+          ...withPlaces([
+            component("example", "core.settings.plugins", "builtin"),
+            component("stronger", "core.settings.plugins", "data"),
+          ]),
+          plugins: [
+            {
+              key: "builtin:example",
+              id: "example",
+              source: "builtin",
+              directory: "/builtin/example",
+              state: "running",
+            },
+          ],
+        },
+        stale: false,
+      }}
+      pluginKey="builtin:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.getByText(/the place is taken by stronger.plugins/)).toBeTruthy();
 });

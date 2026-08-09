@@ -1,0 +1,12 @@
+{
+  "name": "@fixture/placed",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "sovereign": {
+    "id": "placed",
+    "worker": "src/worker.ts",
+    "browser": "src/browser.tsx",
+    "platform": "^0.1.0"
+  }
+}

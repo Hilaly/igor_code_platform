@@ -18,7 +18,8 @@ export const hostModuleRegistryKey = "__sovereignHostModules__";
 
 /**
  * Модули, которые плагин обязан брать у хоста, а не привозить свои. React — потому что два
- * экземпляра ломают хуки; кит — потому что его классы CSS Modules захешированы под сборку хоста, и
+ * экземпляра ломают хуки; SDK — потому что React context требует тот же runtime-экземпляр, который
+ * использует оболочка; кит — потому что его классы CSS Modules захешированы под сборку хоста, и
  * копия кита в бандле плагина осталась бы без стилей.
  */
 export const hostModuleSpecifiers = [
@@ -28,6 +29,7 @@ export const hostModuleSpecifiers = [
   "react/jsx-runtime",
   "react/jsx-dev-runtime",
   "@sovereign/ui-kit",
+  "@sovereign/browser-sdk",
 ] as const;
 
 export type HostModuleSpecifier = (typeof hostModuleSpecifiers)[number];

@@ -6,6 +6,7 @@
 
 import React, { useState } from "react";
 import * as ReactDom from "react-dom";
+import { Place as BrowserPlace } from "@sovereign/browser-sdk";
 import { Badge } from "@sovereign/ui-kit";
 
 import styles from "./badge.module.css";
@@ -15,6 +16,8 @@ export const classNames = styles;
 export const reactVersion = React.version;
 
 export const reactDomKeys = Object.keys(ReactDom);
+
+export const browserPlace = BrowserPlace;
 
 export function View() {
   const [count, setCount] = useState(0);

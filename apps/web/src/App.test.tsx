@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { createElement, useState, type ReactNode } from "react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,6 +11,25 @@ import {
   fetchAppearance,
 } from "./appearance.ts";
 import { App } from "./App.tsx";
+
+const selectProject = vi.fn();
+let lastNewSessionContext: unknown;
+
+const project = {
+  id: "p1",
+  name: "Project one",
+  folder: "/projects/one",
+  folderKey: "/projects/one",
+  archived: false,
+  availability: "available",
+  sessionCount: 0,
+  ephemeral: false,
+  createdAt: "2026-08-09T00:00:00.000Z",
+};
+const pluginsHook = {
+  state: { snapshot: { contributions: [], plugins: [] } },
+  switchPlugin: vi.fn(),
+};
 
 vi.mock("./session.ts", () => ({
   logIn: vi.fn(),
@@ -36,9 +56,138 @@ vi.mock("./appearance.ts", async (importOriginal) => {
   };
 });
 
+vi.mock("./plugins/use-plugins.ts", () => ({
+  usePlugins: () => pluginsHook,
+}));
+
+vi.mock("./settings/use-config.ts", () => ({
+  useConfig: () => ({
+    state: { config: undefined, failure: undefined, refusal: undefined },
+    save: vi.fn(),
+  }),
+}));
+
+vi.mock("./projects/use-projects.ts", () => ({
+  useProjects: () => ({
+    state: { snapshot: { projects: [project], archived: [] }, failure: undefined },
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    dismissComplaints: vi.fn(),
+  }),
+}));
+
+vi.mock("./projects/use-file-resources.ts", () => ({
+  useFileResources: () => ({ stale: false }),
+}));
+
+vi.mock("./providers/use-providers.ts", () => ({
+  useProviders: () => ({
+    state: { snapshot: { providers: [] }, failure: undefined },
+    logIn: vi.fn(),
+    answer: vi.fn(),
+    cancelLogin: vi.fn(),
+    closeLogin: vi.fn(),
+    logOut: vi.fn(),
+    receiveLoginStep: vi.fn(),
+  }),
+}));
+
+vi.mock("./sessions/use-sessions.ts", () => ({
+  useSessions: () => ({
+    state: {
+      sessions: [],
+      projects: [project],
+      providers: [],
+      models: {},
+      open: undefined,
+      failure: undefined,
+    },
+    projectAgents: { loading: false },
+    selectProject,
+    prepareDraft: vi.fn(),
+    prepareModels: vi.fn(),
+    loadModels: vi.fn(),
+    createSession: vi.fn(),
+    submitTurn: vi.fn(),
+    submitTurnToSession: vi.fn(),
+    sendMessage: vi.fn(),
+    interrupt: vi.fn(),
+    compact: vi.fn(),
+    navigate: vi.fn(),
+    setEntryLabel: vi.fn(),
+    updateSession: vi.fn(),
+    removeSession: vi.fn(),
+    forkSession: vi.fn(),
+    setShowArchived: vi.fn(),
+    receiveSessionDelta: vi.fn(),
+  }),
+}));
+
+vi.mock("./places/place-host.tsx", () => ({
+  BrowserRuntimeProvider: (props: { children?: ReactNode }) => props.children,
+  HostPlaceCollection: () => null,
+  HostPlace: (props: { id: string; context: unknown; builtIn?: ReactNode }) => {
+    if (props.id === "core.session.new") {
+      lastNewSessionContext = props.context;
+    }
+
+    return props.builtIn;
+  },
+}));
+
+vi.mock("./projects/project-detail-view.tsx", () => ({
+  ProjectDetailView: (props: { onNewSession: () => void }) =>
+    createElement("button", { onClick: props.onNewSession }, "new in project"),
+}));
+
+vi.mock("./sessions/new-session-view.tsx", () => ({
+  NewSessionView: (props: { initialProjectId?: string; onSelectProject: (id: string) => void }) => {
+    const [projectId, setProjectId] = useState(props.initialProjectId ?? "");
+
+    return createElement(
+      "div",
+      null,
+      createElement("output", { "data-testid": "draft-project" }, projectId || "none"),
+      createElement(
+        "button",
+        {
+          onClick: () => {
+            setProjectId("p2");
+            props.onSelectProject("p2");
+          },
+        },
+        "select p2",
+      ),
+    );
+  },
+}));
+
+vi.mock("./sessions/sidebar-projects.tsx", () => ({
+  SidebarProjects: (props: { onNewSession: (projectId: string) => void }) =>
+    createElement("button", { onClick: () => props.onNewSession("p1") }, "sidebar new"),
+}));
+
+vi.mock("./shell/account-control.tsx", () => ({ AccountControl: () => null }));
+vi.mock("./projects/projects-view.tsx", () => ({ ProjectsView: () => null }));
+vi.mock("./projects/file-resources-panel.tsx", () => ({ FileResourcesPanel: () => null }));
+vi.mock("./providers/providers-view.tsx", () => ({ ProvidersView: () => null }));
+vi.mock("./providers/user-provider-form.tsx", () => ({ UserProviderForm: () => null }));
+vi.mock("./plugins/plugins-view.tsx", () => ({ PluginsView: () => null }));
+vi.mock("./plugins/plugin-detail-view.tsx", () => ({ PluginDetailView: () => null }));
+vi.mock("./sessions/archive-sessions-view.tsx", () => ({ ArchiveSessionsView: () => null }));
+vi.mock("./sessions/session-route-view.tsx", () => ({
+  SessionRouteView: (props: { children: ReactNode }) => props.children,
+}));
+vi.mock("./sessions/chat-view.tsx", () => ({ ChatView: () => null }));
+vi.mock("./settings/daemon-section.tsx", () => ({ DaemonSection: () => null }));
+vi.mock("./settings/diagnostics-section.tsx", () => ({ DiagnosticsSection: () => null }));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  lastNewSessionContext = undefined;
 });
 
 beforeEach(() => {
@@ -105,5 +254,51 @@ describe("App shell composition", () => {
     expect(
       within(screen.getByRole("region", { name: "Usage" })).getByRole("status").textContent,
     ).toBe("Loading usage…");
+  });
+});
+
+describe("new-session route project context", () => {
+  it("keeps project context synchronized for the route lifetime and clears on exit", async () => {
+    history.replaceState(null, "", "/settings/projects/p1");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "new in project" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/sessions/new"));
+    expect(screen.getByTestId("draft-project").textContent).toBe("p1");
+    expect(lastNewSessionContext).toEqual({ project: "p1" });
+
+    fireEvent.click(screen.getByRole("button", { name: "select p2" }));
+    expect(screen.getByTestId("draft-project").textContent).toBe("p2");
+    expect(lastNewSessionContext).toEqual({ project: "p2" });
+    expect(selectProject).toHaveBeenLastCalledWith("p2");
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ .*session/i }));
+    expect(screen.getByTestId("draft-project").textContent).toBe("none");
+    expect(lastNewSessionContext).toEqual({});
+
+    window.history.pushState(undefined, "", "/settings/projects/p1");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await waitFor(() => expect(window.location.pathname).toBe("/settings/projects/p1"));
+    fireEvent.click(screen.getByRole("button", { name: /\+ .*session/i }));
+    await waitFor(() => expect(window.location.pathname).toBe("/sessions/new"));
+    expect(screen.getByTestId("draft-project").textContent).toBe("none");
+    expect(lastNewSessionContext).toEqual({});
+  });
+
+  it("resets the form when the sidebar explicitly opens another project on the same route", async () => {
+    history.replaceState(null, "", "/settings/projects/p1");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "new in project" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/sessions/new"));
+
+    fireEvent.click(screen.getByRole("button", { name: "select p2" }));
+    expect(screen.getByTestId("draft-project").textContent).toBe("p2");
+
+    fireEvent.click(screen.getByRole("button", { name: "sidebar new" }));
+
+    expect(screen.getByTestId("draft-project").textContent).toBe("p1");
+    expect(lastNewSessionContext).toEqual({ project: "p1" });
   });
 });

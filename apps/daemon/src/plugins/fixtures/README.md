@@ -5,5 +5,10 @@
 стык с чужим кодом.
 
 Из проверки типов платформы эта папка исключена намеренно: код плагина живёт по правилам плагина
-(`--experimental-transform-types`, [docs/toolchain.md](../../../../docs/toolchain.md)), и `typescripty` существует ровно затем, чтобы это
-подтверждать.
+(`--experimental-transform-types`, [docs/toolchain.md](../../../../../docs/toolchain.md)), и
+`typescripty` существует ровно затем, чтобы это подтверждать.
+
+`placed`, `rival` и `browserless` — канонические исходники живого сценария мест и браузерного SDK.
+Команда `pnpm --filter @sovereign/daemon run seed-runbook -- <директория>` копирует их в свежую
+директорию данных, добавляет каждому локальную ссылку на серверный SDK и записывает начальные
+предпочтения. Игнорируемый `apps/daemon/.sovereign-dev` не является источником фикстур.

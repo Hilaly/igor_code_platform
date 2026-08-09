@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sovereign/browser-sdk": "workspace:*",
     "@sovereign/protocol": "workspace:*",
     "@sovereign/ui-kit": "workspace:*",
     "react": "^19.0.0",

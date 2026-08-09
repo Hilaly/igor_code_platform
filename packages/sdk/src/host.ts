@@ -189,6 +189,52 @@ export type LocaleCatalogContribution = {
   messages: Record<string, string>;
 };
 
+/**
+ * Кардинальность места (docs/ui-extension-model.md). Копия списка из протокола, как и остальные
+ * типы здесь: внутренние пакеты в папку внешнего плагина не тянутся.
+ */
+export const placeCardinalities = ["single", "collection", "action"] as const;
+
+export type PlaceCardinality = (typeof placeCardinalities)[number];
+
+/**
+ * Объявление места, куда другие плагины кладут свои компоненты (docs/ui-extension-model.md). Ядро
+ * объявляет свои места ровно этой же формой — иначе «плагин расширяет интерфейс другого плагина»
+ * осталось бы словами.
+ *
+ * `builtIn` — имя экспорта в браузерном бандле **самого объявляющего**: это то вью, которое стоит в
+ * месте, пока его никто не занял. У заменяемого места оно обязательно, потому что заменять нечего,
+ * если под заменой ничего нет.
+ */
+export type PlaceContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  cardinality: PlaceCardinality;
+  /** Только у `single`: коллекцию и полосу действий занять целиком нельзя. */
+  replaceable?: boolean;
+  builtIn?: string;
+};
+
+/**
+ * Заявка на место (docs/ui-extension-model.md): какой экспорт браузерного бандла плагина туда
+ * встанет. Место может ещё не существовать — вклад в него не ошибка, он ждёт.
+ *
+ * Условия видимости у вклада нет: компонент решает это сам, вернув `null`. Предикат не пережил бы
+ * границу воркера — она переносит данные, а не функции.
+ */
+export type ComponentContribution = {
+  id: string;
+  title?: string;
+  description?: string;
+  /** Идентификатор места с неймспейсом: место чужое, значит и неймспейс в нём чужой. */
+  placeId: string;
+  export: string;
+  /** Порядок в коллекции: сперва группа, затем `order`, затем идентификатор вклада. */
+  group?: string;
+  order?: number;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
@@ -199,7 +245,9 @@ export type PluginContribution =
   | ({ kind: "route" } & RouteContribution)
   | ({ kind: "public-route" } & RouteContribution)
   | ({ kind: "color-scheme" } & ColorSchemeContribution)
-  | ({ kind: "locale-catalog" } & LocaleCatalogContribution);
+  | ({ kind: "locale-catalog" } & LocaleCatalogContribution)
+  | ({ kind: "place" } & PlaceContribution)
+  | ({ kind: "component" } & ComponentContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;

@@ -15,6 +15,8 @@ import {
 
 const fixtures = join(import.meta.dirname, "fixtures");
 const browsered = join(fixtures, "browsered");
+const placed = join(fixtures, "placed");
+const rival = join(fixtures, "rival");
 const workspace = mkdtempSync(join(tmpdir(), "sovereign-plugin-browser-"));
 
 after(() => {
@@ -45,6 +47,22 @@ function textOf(bundle: PluginBrowserBundle, file: string): string {
 async function buildBrowsered(
   pluginKey = "data:browsered",
   directory = browsered,
+): Promise<PluginBrowserBundle> {
+  const outcome = await buildPluginBrowser({
+    pluginKey,
+    directory,
+    browserEntry: "src/browser.tsx",
+  });
+
+  assert.equal(outcome.kind, "built", outcome.kind === "failed" ? outcome.reason : "");
+  assert.ok(outcome.kind === "built");
+
+  return outcome.bundle;
+}
+
+async function buildTrackedBrowser(
+  pluginKey: "data:placed" | "data:rival",
+  directory: string,
 ): Promise<PluginBrowserBundle> {
   const outcome = await buildPluginBrowser({
     pluginKey,
@@ -115,12 +133,14 @@ describe("buildPluginBrowser", () => {
       const bundle = await buildBrowsered();
       const registry = globalThis as unknown as Record<string, unknown>;
       const previous = registry[hostModuleRegistryKey];
+      const browserPlace = () => null;
 
       registry[hostModuleRegistryKey] = {
         react: { version: "19.2.8", useState: () => [0, () => {}] },
         "react-dom": { createPortal: () => null, flushSync: () => {} },
         "react/jsx-runtime": { jsx: () => null, jsxs: () => null, Fragment: Symbol("Fragment") },
         "@sovereign/ui-kit": { Badge: () => null },
+        "@sovereign/browser-sdk": { Place: browserPlace, PlaceCollection: () => null },
       };
 
       try {
@@ -128,12 +148,80 @@ describe("buildPluginBrowser", () => {
           reactVersion: string;
           reactDomKeys: string[];
           classNames: Record<string, string>;
+          browserPlace: unknown;
           View: unknown;
         };
 
         assert.equal(loaded.reactVersion, "19.2.8");
         assert.deepEqual(loaded.reactDomKeys.sort(), ["createPortal", "default", "flushSync"]);
+        assert.equal(loaded.browserPlace, browserPlace);
         assert.equal(typeof loaded.View, "function");
+      } finally {
+        registry[hostModuleRegistryKey] = previous;
+      }
+    });
+
+    it("executes the tracked owner and rival places through the public browser SDK", async () => {
+      type Element = { type: unknown; props: Record<string, unknown> };
+
+      const registry = globalThis as unknown as Record<string, unknown>;
+      const previous = registry[hostModuleRegistryKey];
+      const place = () => null;
+      const placeCollection = () => null;
+      const Badge = () => null;
+      const Heading = () => null;
+      const Text = () => null;
+      const element = (type: unknown, props: Record<string, unknown>): Element => ({ type, props });
+
+      registry[hostModuleRegistryKey] = {
+        react: { useState: () => [0, () => {}] },
+        "react/jsx-runtime": {
+          jsx: element,
+          jsxs: element,
+          Fragment: Symbol("Fragment"),
+        },
+        "@sovereign/ui-kit": { Badge, Heading, Text },
+        "@sovereign/browser-sdk": { Place: place, PlaceCollection: placeCollection },
+      };
+
+      try {
+        const placedModule = (await importBuiltBundle(
+          writeBundle(await buildTrackedBrowser("data:placed", placed)),
+        )) as {
+          PluginsPanel: (properties: { context: Record<string, unknown> }) => Element;
+          Board: (properties: { context: Record<string, unknown> }) => Element;
+          SidebarSection: () => Element;
+          HeaderAction: () => Element;
+          Boom: () => never;
+        };
+        const rivalModule = (await importBuiltBundle(
+          writeBundle(await buildTrackedBrowser("data:rival", rival)),
+        )) as {
+          PluginsPanel: () => Element;
+          Board: (properties: { context: Record<string, unknown> }) => Element;
+          BoardAction: () => Element;
+        };
+        const context = { project: "the test project", subject: { view: "plugins" } };
+        const panel = placedModule.PluginsPanel({ context });
+        const children = panel.props["children"] as Element[];
+        const ownerPlace = children.find((child) => child.type === place);
+        const ownerActions = children.find((child) => child.type === placeCollection);
+
+        assert.deepEqual(ownerPlace?.props, { id: "placed.board", context });
+        assert.deepEqual(ownerActions?.props, { id: "placed.board-actions", context });
+        assert.deepEqual(placedModule.Board({ context }).props["children"], [
+          "the built-in board for ",
+          "the test project",
+        ]);
+        assert.equal(typeof placedModule.SidebarSection, "function");
+        assert.equal(typeof placedModule.HeaderAction, "function");
+        assert.throws(() => placedModule.Boom(), /the placed plugin cannot render this/);
+        assert.equal(typeof rivalModule.PluginsPanel, "function");
+        assert.deepEqual(rivalModule.Board({ context }).props["children"], [
+          "the rival replacement board for ",
+          "the test project",
+        ]);
+        assert.equal(rivalModule.BoardAction().props["children"], "rival board action");
       } finally {
         registry[hostModuleRegistryKey] = previous;
       }

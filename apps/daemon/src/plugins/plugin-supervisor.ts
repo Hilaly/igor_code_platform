@@ -302,6 +302,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         contributions: entry.contributed,
         fileContributions: fileContributions(entry.plugin, entry.fileResources),
         disabledContributions: entry.disabledContributions,
+        hasBrowserEntry: entry.plugin.manifest.browser !== undefined,
       },
       { resourceChanged: entry.resourceChanged },
     );

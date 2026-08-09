@@ -1,9 +1,14 @@
-import type {
-  ContributionRegistration,
-  PluginLifecycleState,
-  PluginPreferences,
-  PluginsSnapshot,
-  PluginStatus,
+import {
+  corePlace,
+  projectOfContribution,
+  resolvePlaceProvider,
+  type ComponentContributionRegistration,
+  type ContributionRegistration,
+  type PlaceCardinality,
+  type PluginLifecycleState,
+  type PluginPreferences,
+  type PluginsSnapshot,
+  type PluginStatus,
 } from "@sovereign/protocol";
 import {
   Badge,
@@ -47,6 +52,31 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
 };
 
 type ContributionEntry = { registration: ContributionRegistration; off: boolean };
+
+/**
+ * Чем кончилась заявка компонента на место. Человек, поставивший плагин ради замены вью, обязан
+ * увидеть, применён вклад или нет, а если нет — по какой причине: молчаливый отказ выглядит как
+ * сломанный плагин.
+ */
+type PlaceClaimOutcome =
+  "switchedOff" | "taken" | "free" | "overridden" | "disputed" | "added" | "waiting" | "project";
+
+type PlaceClaim = {
+  registration: ComponentContributionRegistration;
+  outcome: PlaceClaimOutcome;
+  holder?: string;
+};
+
+const claimTones: Record<PlaceClaimOutcome, "success" | "muted" | "warning"> = {
+  switchedOff: "muted",
+  taken: "success",
+  free: "muted",
+  overridden: "warning",
+  disputed: "warning",
+  added: "success",
+  waiting: "muted",
+  project: "muted",
+};
 
 export function PluginDetailView({
   state,
@@ -102,6 +132,10 @@ export function PluginDetailView({
 
   const preferences = snapshot.enablement[status.key];
   const declared = contributionsFor(snapshot, status);
+  const claims = placeClaims(declared, snapshot.contributions, [
+    ...snapshot.contributions,
+    ...snapshot.switchedOffContributions,
+  ]);
   const forgotten = (preferences?.disabledContributions ?? []).filter(
     (id) => !declared.some((entry) => entry.registration.id === id),
   );
@@ -230,6 +264,26 @@ export function PluginDetailView({
         )}
       </section>
 
+      {claims.length === 0 ? undefined : (
+        <section className="plugin-detail-section">
+          <Heading level={3}>{t("plugins.places.title")}</Heading>
+          <div className="plugin-detail-rows" role="list">
+            {claims.map(({ registration, outcome, holder }) => (
+              <div role="listitem" key={registration.id}>
+                <SettingsRow
+                  label={registration.placeId}
+                  description={<Code>{registration.id}</Code>}
+                >
+                  <Text tone={claimTones[outcome]}>
+                    {t(`plugins.places.${outcome}`, holder === undefined ? undefined : { holder })}
+                  </Text>
+                </SettingsRow>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {forgotten.length === 0 ? undefined : (
         <Notice tone="info" title={t("plugins.forgotten.title")}>
           <ul className="plugins-reasons">
@@ -244,6 +298,74 @@ export function PluginDetailView({
       )}
     </div>
   );
+}
+
+/**
+ * Кардинальность места: у мест ядра она в таблице протокола, у места плагина — в его объявлении.
+ * Места нет вовсе — вклад ждёт, и это не ошибка (docs/ui-extension-model.md).
+ */
+function cardinalityOf(
+  placeId: string,
+  contributions: readonly ContributionRegistration[],
+): PlaceCardinality | undefined {
+  const declared = contributions.find(
+    (registration) => registration.kind === "place" && registration.id === placeId,
+  );
+
+  return declared?.kind === "place" ? declared.cardinality : corePlace(placeId)?.cardinality;
+}
+
+/**
+ * Разрешение считается в оконном контексте: он единственный, который вью настроек про себя знает.
+ * Вклад из папки проекта поэтому не судится вовсе — про его место здесь честнее сказать, что оно
+ * действует только внутри своего проекта, чем судить его чужой меркой.
+ */
+function placeClaims(
+  declared: ContributionEntry[],
+  active: readonly ContributionRegistration[],
+  known: readonly ContributionRegistration[],
+): PlaceClaim[] {
+  return declared
+    .filter(
+      (
+        entry,
+      ): entry is ContributionEntry & {
+        registration: ComponentContributionRegistration;
+      } => entry.registration.kind === "component",
+    )
+    .map(({ registration, off }): PlaceClaim => {
+      if (off) {
+        return { registration, outcome: "switchedOff" };
+      }
+
+      if (projectOfContribution(registration) !== undefined) {
+        return { registration, outcome: "project" };
+      }
+
+      const cardinality = cardinalityOf(registration.placeId, known);
+
+      if (cardinality === undefined) {
+        return { registration, outcome: "waiting" };
+      }
+
+      if (cardinality !== "single") {
+        return { registration, outcome: "added" };
+      }
+
+      const resolution = resolvePlaceProvider(registration.placeId, active, {});
+
+      if (resolution.kind === "disputed") {
+        return { registration, outcome: "disputed" };
+      }
+
+      if (resolution.kind === "built-in") {
+        return { registration, outcome: "free" };
+      }
+
+      return resolution.contribution.id === registration.id
+        ? { registration, outcome: "taken" }
+        : { registration, outcome: "overridden", holder: resolution.contribution.id };
+    });
 }
 
 function contributionsFor(snapshot: PluginsSnapshot, status: PluginStatus): ContributionEntry[] {
@@ -296,12 +418,25 @@ function TechnicalData({
                         locale: registration.locale,
                         messages: Object.keys(registration.messages).length,
                       }
-                    : {
-                        model: registration.model,
-                        thinkingLevel: registration.thinkingLevel,
-                        tools: registration.tools,
-                        skills: registration.skills,
-                      };
+                    : registration.kind === "place"
+                      ? {
+                          cardinality: registration.cardinality,
+                          replaceable: registration.replaceable,
+                          builtIn: registration.builtIn,
+                        }
+                      : registration.kind === "component"
+                        ? {
+                            placeId: registration.placeId,
+                            export: registration.export,
+                            group: registration.group,
+                            order: registration.order,
+                          }
+                        : {
+                            model: registration.model,
+                            thinkingLevel: registration.thinkingLevel,
+                            tools: registration.tools,
+                            skills: registration.skills,
+                          };
   if (data === undefined) return undefined;
   return (
     <Disclosure
