@@ -49,6 +49,7 @@ import {
   SettingsNavigationItem,
   SettingsPage,
   SettingsRow,
+  SettingsEntityRow,
   SettingsView,
 } from "./settings-frame.tsx";
 import { Select } from "./select.tsx";
@@ -200,6 +201,29 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('<button type="button"');
     expect(markup).toContain('aria-label="Open Plugin"');
     expect(markup).toContain("Running");
+  });
+
+  it("renders an entity row with copy, metadata, and independent actions", () => {
+    const markup = renderToStaticMarkup(
+      <SettingsEntityRow
+        label="Example"
+        description="data:example"
+        meta={<span>Running</span>}
+        actions={<button type="button">Switch</button>}
+        onSelect={() => {}}
+        selectLabel="Open Example"
+        describedBy="entity-description"
+      />,
+    );
+
+    expect(markup).toContain('role="group"');
+    expect(markup).toContain('aria-label="Example"');
+    expect(markup).toContain('aria-label="Open Example"');
+    expect(markup).toContain('aria-describedby="entity-description"');
+    expect(markup).toContain("data:example");
+    expect(markup).toContain("Running");
+    expect(markup).toContain("Switch");
+    expect(markup).not.toContain("undefined");
   });
 
   it("can demote an embedded settings page heading below the shell heading", () => {
@@ -748,11 +772,14 @@ describe("text that is still arriving", () => {
     expect(finished).not.toContain("aria-hidden");
   });
 
-  it("keeps the line breaks the model sent", () => {
-    // Разметки здесь нет вовсе, и переводы строк — единственное, чем текст структурирован.
-    const markup = renderToStaticMarkup(<StreamingText text={"первая\nвторая"} streaming />);
+  it("renders markdown while the model is still sending text", () => {
+    const markup = renderToStaticMarkup(
+      <StreamingText text={"**жирный**\n\n- первый\n- второй"} streaming />,
+    );
 
-    expect(markup).toContain("первая\nвторая");
+    expect(markup).toContain("<strong>жирный</strong>");
+    expect(markup).toContain("<ul>");
+    expect(markup).toContain("<li>первый</li>");
   });
 });
 

@@ -15,13 +15,10 @@ describe("provider layout styles", () => {
     );
   });
 
-  it("keeps provider facts readable in wide and narrow containers", () => {
-    expect(styles).toMatch(
-      /\.providers-row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;[^}]*min-width:\s*0;/s,
-    );
-    expect(styles).toMatch(
-      /@container\s*\(width\s*<=\s*42rem\)[\s\S]*\.providers-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
-    );
+  it("leaves provider row geometry to the UI kit", () => {
+    expect(styles).not.toMatch(/\.providers-row\s*\{/s);
+    expect(styles).not.toMatch(/\.providers-row-facts\s*\{/s);
+    expect(styles).not.toMatch(/\.providers-row-marks\s*\{/s);
     expect(styles).toMatch(/\.providers-model-facts\s*\{[^}]*overflow-wrap:\s*anywhere;/s);
   });
 });

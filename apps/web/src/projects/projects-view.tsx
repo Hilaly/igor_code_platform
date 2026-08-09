@@ -18,10 +18,10 @@ import {
   FilePicker,
   Form,
   Input,
-  ListRow,
   Menu,
   MoreIcon,
   Notice,
+  SettingsEntityRow,
   Spinner,
   SettingsRow,
   Text,
@@ -344,6 +344,7 @@ function ProjectRow({
   const [dialog, setDialog] = useState<OpenDialog>(undefined);
   const [name, setName] = useState(project.name);
   const folderTooltipId = useId();
+  const displayName = project.ephemeral ? t("projects.ephemeral") : project.name;
 
   // Эфемерный проект не переименовывается, не архивируется и не удаляется
   // (docs/sessions-and-projects.md), поэтому действий у него нет ни одного — не выключенных, а
@@ -372,38 +373,46 @@ function ProjectRow({
         },
       ];
 
+  const description = (
+    <span className="projects-row-folder">
+      <Tooltip id={folderTooltipId} content={project.folder} side="bottom">
+        <Code>{shortenPath(project.folder)}</Code>
+      </Tooltip>
+    </span>
+  );
+  const marks = (
+    <>
+      {project.availability === "missing" ? (
+        <Badge tone="warning">{t("projects.availability.missing")}</Badge>
+      ) : undefined}
+      {project.ephemeral ? <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge> : undefined}
+      {conflicting ? <Badge tone="warning">{t("projects.conflict.mark")}</Badge> : undefined}
+    </>
+  );
+  const hasMarks = project.availability === "missing" || project.ephemeral || conflicting;
+
   return (
     <>
-      <ListRow
-        onSelect={onOpen}
-        describedBy={onOpen === undefined ? undefined : folderTooltipId}
-        actions={onOpen === undefined || actions.length === 0 ? undefined : <ProjectMenu />}
-      >
-        <div className="projects-row">
-          <div className="projects-row-facts">
-            <Text>{project.ephemeral ? t("projects.ephemeral") : project.name}</Text>
-            {/*
-              Длинный путь режется (`shortenPath`), а полный живёт в тултипе: папка бывает глубокой,
-              и строка без усечения растягивала бы карточку или ломалась посимвольно. Тултип снизу,
-              чтобы не перекрывать само имя проекта и пометки справа.
-            */}
-            <Tooltip id={folderTooltipId} content={project.folder} side="bottom">
-              <Code>{shortenPath(project.folder)}</Code>
-            </Tooltip>
-          </div>
-
-          <div className="projects-row-marks">
-            {project.availability === "missing" ? (
-              <Badge tone="warning">{t("projects.availability.missing")}</Badge>
-            ) : undefined}
-            {project.ephemeral ? (
-              <Badge tone="neutral">{t("projects.ephemeral.mark")}</Badge>
-            ) : undefined}
-            {conflicting ? <Badge tone="warning">{t("projects.conflict.mark")}</Badge> : undefined}
-            {onOpen === undefined && actions.length > 0 ? <ProjectMenu /> : undefined}
-          </div>
-        </div>
-      </ListRow>
+      <li>
+        {onOpen === undefined ? (
+          <SettingsRow label={displayName} description={description}>
+            <div className="projects-row-marks">
+              {marks}
+              {actions.length > 0 ? <ProjectMenu /> : undefined}
+            </div>
+          </SettingsRow>
+        ) : (
+          <SettingsEntityRow
+            label={displayName}
+            description={description}
+            meta={hasMarks ? marks : undefined}
+            actions={actions.length === 0 ? undefined : <ProjectMenu />}
+            onSelect={onOpen}
+            selectLabel={t("projects.open", { name: displayName })}
+            describedBy={folderTooltipId}
+          />
+        )}
+      </li>
 
       <ConfirmDialog
         open={dialog === "rename"}

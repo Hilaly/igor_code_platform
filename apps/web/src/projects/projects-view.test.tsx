@@ -132,7 +132,8 @@ describe("ProjectsView", () => {
         .find((button) => button !== actions);
 
       expect(selectable).toBeDefined();
-      expect(selectable?.parentElement).toBe(row);
+      expect(selectable?.parentElement?.getAttribute("role")).toBe("group");
+      expect(selectable?.parentElement?.parentElement).toBe(row);
       expect(actions.closest("li")).toBe(row);
       expect(selectable?.contains(actions)).toBe(false);
     }

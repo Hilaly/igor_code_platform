@@ -16,6 +16,7 @@ import {
   providers,
   sessions,
   storage,
+  toolCallPlaceId,
   z,
 } from "./index.ts";
 import type {
@@ -52,6 +53,13 @@ describe("the zod re-exported by the sdk", () => {
     // Схема сама по себе не клонируется — в ней функции. Уезжает описание, и оно обязано пережить
     // структурное клонирование, иначе объявление вклада не дойдёт до демона (docs/event-bus.md).
     assert.deepEqual(structuredClone(description), description);
+  });
+});
+
+describe("tool call place names", () => {
+  it("matches the public dynamic place contract without importing the internal protocol", () => {
+    assert.equal(toolCallPlaceId("spawn_agent"), "core.session.tool-call.t-737061776e5f6167656e74");
+    assert.notEqual(toolCallPlaceId("write_file"), toolCallPlaceId("write-file"));
   });
 });
 

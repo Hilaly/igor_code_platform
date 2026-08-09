@@ -29,7 +29,8 @@ Ladle, Vite, pnpm 11, Node 24.
   Reasoning 2, Tabs 8, Appearance fallback 2, Plugin Detail stale/failure 2 и Settings app hierarchy 2. Переполнения документа нет; минимальный contrast выбранной вкладки — `7.038:1`.
 - Повторные `make check`, `make build`, production-сборка Ladle, scoped ESLint и `git diff --check`
   завершены успешно. `make check` подтвердил UI Kit 286/286, web 725/725 и daemon 687/687.
-- Task 9 не начат: маршрут и точные определения аналитики требуют явного решения владельца продукта.
+- Task 9 выполнен отдельно: `/settings/usage` агрегирует точные списки и статистику сессий без нового
+  API и показывает неполноту данных явно.
 
 ## Global Constraints
 
@@ -469,7 +470,7 @@ Ladle, Vite, pnpm 11, Node 24.
   git commit -m "style(web): rebuild projects and providers"
   ```
 
-### Task 9: Usage analytics screen (blocked on owner decision)
+### Task 9: Usage analytics screen
 
 **Files:**
 
@@ -483,18 +484,18 @@ Ladle, Vite, pnpm 11, Node 24.
 - Must not produce: guessed request counts, guessed coverage, fake daily buckets, or a new daemon/API
   contract without explicit owner approval.
 
-- [ ] **Step 1: Record the owner's placement/data decision**
+- [x] **Step 1: Record the owner's placement/data decision**
 
   Recommended: `/settings/usage`, client aggregation of exact existing data. If exact daily/request/
   coverage definitions need unavailable data, stop and present the minimal protocol/API alternatives.
 
-- [ ] **Step 2: Write failing route/state/view tests from the approved definitions**
+- [x] **Step 2: Write failing route/state/view tests from the approved definitions**
 
-- [ ] **Step 3: Implement the smallest exact data path and screen**
+- [x] **Step 3: Implement the smallest exact data path and screen**
 
-- [ ] **Step 4: Verify route, state, accessibility, loading/failure/empty and chart/table rendering**
+- [x] **Step 4: Verify route, state, accessibility, loading/failure/empty and chart/table rendering**
 
-- [ ] **Step 5: Commit analytics separately**
+- [x] **Step 5: Commit analytics separately**
 
 ### Task 10: Full browser QA, documentation, and independent review
 

@@ -226,6 +226,28 @@
   pointer-events: auto;
 }
 
+.entityControl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.entityMeta,
+.entityActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.entityMeta {
+  font-size: var(--sovereign-font-size-xs);
+}
+
 @container (width < 40rem) {
   .body {
     grid-template-columns: minmax(0, 1fr);
@@ -266,6 +288,15 @@
   }
 
   .rowControl {
+    justify-content: flex-start;
+  }
+
+  .entityControl {
+    align-items: flex-start;
+  }
+
+  .entityMeta,
+  .entityActions {
     justify-content: flex-start;
   }
 }

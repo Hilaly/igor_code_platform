@@ -61,31 +61,21 @@
   list-style: none;
 }
 
-.projects-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sovereign-space-3);
+.projects-row-folder {
+  display: block;
   width: 100%;
   min-width: 0;
-}
-
-.projects-row-facts {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sovereign-space-1);
-  min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
 }
 
-.projects-row-facts > span {
+.projects-row-folder > span {
   width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
-.projects-row-facts code {
+.projects-row-folder code {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -96,8 +86,8 @@
 :root[data-sovereign-input-modality="keyboard"]
   .projects-list
   > li
-  > button:focus
-  .projects-row-facts
+  > [role="group"]:has(> button:focus)
+  .projects-row-folder
   [role="tooltip"] {
   display: block;
   opacity: 1;
@@ -168,19 +158,13 @@
 
 @container (width <= 42rem) {
   .projects-toolbar,
-  .projects-folder-control,
-  .projects-row {
+  .projects-folder-control {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .projects-toolbar > :last-child,
   .projects-folder-control > :last-child {
     justify-self: start;
-  }
-
-  .projects-row {
-    align-items: start;
-    gap: var(--sovereign-space-2);
   }
 
   .projects-row-marks {

@@ -64,6 +64,12 @@
   дизайн лёгкой кнопки `…` для контекстных меню.
 - [Компоненты ленты и композера сессии](superpowers/specs/2026-08-02-session-chat-components-design.md) —
   согласованные границы декомпозиции `ChatView` без изменения поведения экрана.
+- [Динамическая подмена визуала вызовов инструментов](superpowers/specs/2026-08-09-dynamic-tool-call-visual-replacements-design.md) —
+  обычные component-вклады в динамические места по точному имени инструмента с текущими правилами
+  разрешения, конфликтов и fallback.
+- [План динамической подмены визуала вызовов инструментов](superpowers/plans/2026-08-09-dynamic-tool-call-visual-replacements.md) —
+  TDD-срезы для канонического динамического place-id, общего HostPlace-адаптера и публичного
+  контракта без нового вида вклада.
 - [Действия, дата и время реплики в ленте сессии](superpowers/specs/2026-08-05-session-message-actions-design.md) —
   утверждённая единая hover/focus-панель icon-only действий, копирование текста, компактные дата и
   время записи и библиотека иконок через UI-кит.
@@ -165,6 +171,10 @@
   для публичных примитивов UI kit, всех вложенных экранов и визуальной сверки с мокапом.
 - [План Projects внутри Settings](superpowers/plans/2026-08-05-settings-projects-section.md) —
   TDD-перенос маршрутов, обоих Projects-вью и полной композиции в единое окно настроек.
+- [Кликабельная строка сущности в Settings](superpowers/specs/2026-08-09-settings-entity-row-design.md) —
+  общий UI-kit паттерн для строк проектов и плагинов с независимыми действиями справа.
+- [План кликабельной строки сущности](superpowers/plans/2026-08-09-settings-entity-row.md) —
+  TDD-срезы для UI-kit компонента, миграции Plugins и Projects и полной проверки.
 - [Исправления UI polish по повторному ревью](superpowers/specs/2026-08-05-ui-polish-review-fixes-design.md) —
   переносимое усечение пути, доступная подсказка, контрастный бренд-блок и чистая история ветки.
 - [План исправлений UI polish](superpowers/plans/2026-08-05-ui-polish-review-fixes.md) —
@@ -199,10 +209,10 @@
   switch-примитива, tooltip-подписей в Settings и полной визуальной проверки.
 - [Полный clean-slate редизайн Sovereign](superpowers/specs/2026-08-08-sovereign-clean-slate-redesign-design.md) —
   реализованная полная замена всех CSS приложения и UI Kit в визуальном языке Refined Imperium с
-  сохранением поведения и доступности; размещение нового экрана аналитики по-прежнему обсуждается.
+  сохранением поведения и доступности; экран точной аналитики размещён в `/settings/usage`.
 - [План полного clean-slate редизайна](superpowers/plans/2026-08-08-sovereign-clean-slate-redesign.md) —
-  выполненные TDD-срезы полной замены 59 CSS-файлов, структурных хуков и браузерной матрицы;
-  отдельный срез аналитики ожидает решения владельца продукта.
+  выполненные TDD-срезы полной замены 59 CSS-файлов, структурных хуков, Usage Analytics и браузерной
+  матрицы.
 - [Живой таймер времени работы демона](superpowers/specs/2026-08-07-daemon-uptime-timer-design.md) —
   компактный жирный цифровой таймер UI Kit и ежесекундное обновление на странице Daemon.
 - [План живого таймера демона](superpowers/plans/2026-08-07-daemon-uptime-timer.md) — TDD-срезы
@@ -211,6 +221,15 @@
   единый портал и viewport-safe позиционирование для всех popup-компонентов UI Kit.
 - [План портальных всплывающих слоёв UI Kit](superpowers/plans/2026-08-09-ui-kit-portal-overlays.md) —
   последовательные TDD-задачи для общего слоя и миграции всех popup-компонентов.
+- [Заменяемые страницы ядра](superpowers/specs/2026-08-09-replaceable-core-pages-design.md) —
+  обязательный контракт route-level рабочих страниц и перенос всех разделов Settings на
+  replaceable core places.
+- [План заменяемых страниц ядра](superpowers/plans/2026-08-09-replaceable-core-pages.md) —
+  TDD-шаги для публичного реестра мест, HostPlace-композиции и полной проверки.
+- [Live-рендеринг сессии и Markdown](superpowers/specs/2026-08-09-session-live-markdown-rendering-design.md) —
+  ограниченная колонка live tool call и немедленный Markdown для reasoning и ответа агента.
+- [План live-рендеринга сессии](superpowers/plans/2026-08-09-session-live-markdown-rendering.md) —
+  TDD-срез для live tool call, reasoning и стримингового Markdown.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 

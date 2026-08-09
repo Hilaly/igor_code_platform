@@ -30,6 +30,7 @@ import {
   List,
   ListRow,
   Notice,
+  SettingsEntityRow,
   SettingsRow,
   Spinner,
   Text,
@@ -262,22 +263,23 @@ function ConflictingUserProviderRow({
   const [confirming, setConfirming] = useState(false);
   return (
     <>
-      <ListRow
-        actions={
+      <li>
+        <SettingsRow
+          label={details.definition.name}
+          description={
+            <>
+              <Code>{details.definition.id}</Code>
+              <br />
+              <Text tone="muted">{details.conflict}</Text>{" "}
+              <Badge tone="warning">{translator.t("providers.user.conflict")}</Badge>
+            </>
+          }
+        >
           <Button tone="danger" disabled={busy} onClick={() => setConfirming(true)}>
             {translator.t("providers.user.delete")}
           </Button>
-        }
-      >
-        <span className="providers-row">
-          <span className="providers-row-facts">
-            <Text>{details.definition.name}</Text>
-            <Code>{details.definition.id}</Code>
-            <Text tone="muted">{details.conflict}</Text>
-          </span>
-          <Badge tone="warning">{translator.t("providers.user.conflict")}</Badge>
-        </span>
-      </ListRow>
+        </SettingsRow>
+      </li>
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
@@ -476,31 +478,35 @@ type ProviderRowProps = {
 function ProviderRow({ provider, onSelect, translator }: ProviderRowProps) {
   const { t } = translator;
 
-  // Строка внутри выбираемой строки — это содержимое кнопки, поэтому здесь только `span`:
-  // блочные элементы кнопке не принадлежат.
   return (
-    <ListRow onSelect={onSelect}>
-      <span className="providers-row">
-        <span className="providers-row-facts">
-          <Text>{provider.name}</Text>
-          <Code>{provider.id}</Code>
-          <Text tone="muted">
-            {provider.logins.length === 0
-              ? t("providers.logins.none")
-              : t("providers.logins", {
-                  methods: provider.logins.map((login) => login.label).join(", "),
-                })}
-          </Text>
-        </span>
-
-        <span className="providers-row-marks">
-          <AuthMark auth={provider.auth} translator={translator} />
-          <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
-          {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
-          {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
-        </span>
-      </span>
-    </ListRow>
+    <li>
+      <SettingsEntityRow
+        label={provider.name}
+        description={
+          <>
+            <Code>{provider.id}</Code>
+            <br />
+            <Text tone="muted">
+              {provider.logins.length === 0
+                ? t("providers.logins.none")
+                : t("providers.logins", {
+                    methods: provider.logins.map((login) => login.label).join(", "),
+                  })}
+            </Text>
+          </>
+        }
+        meta={
+          <>
+            <AuthMark auth={provider.auth} translator={translator} />
+            <Text tone="muted">{t("providers.models.count", { count: provider.modelCount })}</Text>
+            {provider.dynamic ? <Badge tone="neutral">{t("providers.dynamic")}</Badge> : undefined}
+            {provider.custom ? <Badge tone="neutral">{t("providers.custom")}</Badge> : undefined}
+          </>
+        }
+        onSelect={onSelect}
+        selectLabel={t("providers.open", { name: provider.name })}
+      />
+    </li>
   );
 }
 

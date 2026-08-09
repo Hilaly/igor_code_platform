@@ -6,6 +6,11 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.root > div {
+  white-space: normal;
+}
+
 .caret {
   display: inline-block;
   width: var(--sovereign-space-2);

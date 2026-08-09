@@ -10,17 +10,13 @@ describe("project layout styles", () => {
     expect(styles).toMatch(
       /\.project-detail-rows\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*min-width:\s*0;/s,
     );
-    expect(styles).toMatch(
-      /@container\s*\(width\s*<=\s*42rem\)[\s\S]*\.projects-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
-    );
+    expect(styles).toMatch(/@container\s*\(width\s*<=\s*42rem\)/s);
   });
 
-  it("keeps selectable rows dense while allowing long paths to shrink", () => {
+  it("leaves row geometry to the UI kit while allowing long paths to shrink", () => {
+    expect(styles).not.toMatch(/\.projects-row\s*\{/s);
     expect(styles).toMatch(
-      /\.projects-row\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;[^}]*min-width:\s*0;/s,
-    );
-    expect(styles).toMatch(
-      /\.projects-row-facts\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s,
+      /\.projects-row-folder\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s,
     );
   });
 });

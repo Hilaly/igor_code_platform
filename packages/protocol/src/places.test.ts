@@ -15,6 +15,7 @@ import {
   orderPlaceContributions,
   resolvePlaceDeclaration,
   resolvePlaceProvider,
+  toolCallPlaceId,
   type PlaceContext,
 } from "./places.ts";
 import type { PluginSource } from "./plugin.ts";
@@ -70,6 +71,23 @@ const place = (declaredId: string, source: PluginSource): PlaceContributionRegis
 const windowWide: PlaceContext = {};
 const inProject: PlaceContext = { project: "work" };
 
+describe("toolCallPlaceId", () => {
+  it("encodes an arbitrary tool name as one valid dynamic core place", () => {
+    assert.equal(toolCallPlaceId("spawn_agent"), "core.session.tool-call.t-737061776e5f6167656e74");
+    assert.match(
+      toolCallPlaceId("mcp__github.create/issue"),
+      /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/,
+    );
+  });
+
+  it("does not collapse distinct exact tool names", () => {
+    const names = ["write_file", "write-file", "é", "e\u0301", "工具"];
+    const ids = names.map(toolCallPlaceId);
+
+    assert.equal(new Set(ids).size, names.length);
+  });
+});
+
 describe("corePlaces", () => {
   it("names every place in the namespace of the core and only once", () => {
     const ids = corePlaces.map((place) => place.id);
@@ -97,6 +115,25 @@ describe("corePlaces", () => {
       replaceable: false,
     });
     assert.ok(isPlaceCardinality("tabs"));
+  });
+
+  it("publishes every Settings section as a replaceable single place", () => {
+    const expected = [
+      "core.settings.projects",
+      "core.settings.appearance",
+      "core.settings.usage",
+      "core.settings.providers",
+      "core.settings.plugins",
+      "core.settings.daemon",
+      "core.settings.diagnostics",
+    ];
+
+    assert.deepEqual(
+      corePlaces
+        .filter(({ id }) => id.startsWith("core.settings."))
+        .map(({ id, cardinality, replaceable }) => ({ id, cardinality, replaceable })),
+      expected.map((id) => ({ id, cardinality: "single", replaceable: true })),
+    );
   });
 });
 

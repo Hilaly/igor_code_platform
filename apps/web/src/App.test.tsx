@@ -16,6 +16,7 @@ const selectProject = vi.fn();
 let lastNewSessionContext: unknown;
 let lastTabsRequest: { id: string; context: unknown } | undefined;
 let placeTabs: { id: string; label: string; content: ReactNode }[] = [];
+let lastUsagePlace: { context: unknown; builtIn?: ReactNode } | undefined;
 
 const project = {
   id: "p1",
@@ -139,6 +140,10 @@ vi.mock("./places/place-host.tsx", () => ({
       lastNewSessionContext = props.context;
     }
 
+    if (props.id === "core.settings.usage") {
+      lastUsagePlace = { context: props.context, builtIn: props.builtIn };
+    }
+
     return props.builtIn;
   },
 }));
@@ -197,6 +202,7 @@ afterEach(() => {
   lastNewSessionContext = undefined;
   lastTabsRequest = undefined;
   placeTabs = [];
+  lastUsagePlace = undefined;
 });
 
 beforeEach(() => {
@@ -274,6 +280,20 @@ describe("App shell composition", () => {
       };
       expect(cached.appearance?.colorScheme).toBe("themed.missing");
     });
+  });
+
+  it("wires the canonical usage route into Settings without requesting before the stream opens", async () => {
+    history.replaceState(null, "", "/settings/usage");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Usage" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Usage" }).getAttribute("aria-current")).toBe("page");
+    expect(
+      within(screen.getByRole("region", { name: "Usage" })).getByRole("status").textContent,
+    ).toBe("Loading usage…");
+    expect(lastUsagePlace?.context).toEqual({});
+    expect(lastUsagePlace?.builtIn).toBeDefined();
   });
 });
 

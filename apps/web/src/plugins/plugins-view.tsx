@@ -17,6 +17,7 @@ import {
   Badge,
   EmptyState,
   Notice,
+  SettingsEntityRow,
   SettingsRow,
   Spinner,
   Text,
@@ -223,14 +224,11 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
   const contributions = [...snapshot.contributions, ...snapshot.switchedOffContributions].filter(
     (registration) => registration.ownership === "plugin" && registration.pluginKey === status.key,
   ).length;
-  const rowContents = (
-    <div className="plugins-row-controls">
-      <div className="plugins-row-meta">
-        <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
-        <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
-      </div>
-      {pluginToggle}
-    </div>
+  const rowMeta = (
+    <>
+      <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+      <Text tone="muted">{t("plugins.contributions.count", { count: contributions })}</Text>
+    </>
   );
   return (
     <div role="listitem">
@@ -239,17 +237,20 @@ function PluginRow({ status, snapshot, onSwitch, onOpen, translator }: PluginRow
           label={status.id ?? status.key}
           description={<Text tone="muted">{status.key}</Text>}
         >
-          {rowContents}
+          <div className="plugins-row-meta">
+            {rowMeta}
+            {pluginToggle}
+          </div>
         </SettingsRow>
       ) : (
-        <SettingsRow
+        <SettingsEntityRow
           label={status.id ?? status.key}
           description={<Text tone="muted">{status.key}</Text>}
           onSelect={() => onOpen(status.key)}
           selectLabel={`${t("plugins.detail.open")} ${status.id ?? status.key}`}
-        >
-          {rowContents}
-        </SettingsRow>
+          meta={rowMeta}
+          actions={pluginToggle}
+        />
       )}
     </div>
   );
