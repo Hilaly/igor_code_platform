@@ -19,13 +19,16 @@ Ladle, Vite, pnpm 11, Node 24.
 
 ## Статус на 2026-08-09
 
-- Tasks 1–8 выполнены и разбиты на атомарные коммиты.
+- Tasks 1–8 и Task 10 выполнены и разбиты на атомарные коммиты.
 - Все 59 исходных CSS-файлов отличаются от baseline `b9146f8`; текущий шестидесятый файл принадлежит
   новому публичному `AppearancePreview`.
-- `make check`, `make build`, production-сборка Ladle и репрезентативная browser QA wide/narrow
-  завершены. Независимое итоговое ревью на `5e00d87` нашло 1 Critical, 9 Important и 3 Minor;
-  единая волна исправлений реализована. Scoped re-review и повтор полной controller-owned проверки
-  ещё не завершены, поэтому Step 6 и Step 7 ниже остаются открытыми.
+- Независимое итоговое ревью на `5e00d87` нашло 1 Critical, 9 Important и 3 Minor. Единая волна
+  исправлений завершена на `5deca7b`; scoped re-review пометило C1, I1–I9 и M1–M3 как `ADDRESSED`
+  без новых Critical/Important проблем.
+- Targeted browser re-QA на `5deca7b` прошла 32/32 состояния: NextTurn 6, Toast 6, Settings Ladle 4,
+  Reasoning 2, Tabs 8, Appearance fallback 2, Plugin Detail stale/failure 2 и Settings app hierarchy 2. Переполнения документа нет; минимальный contrast выбранной вкладки — `7.038:1`.
+- Повторные `make check`, `make build`, production-сборка Ladle, scoped ESLint и `git diff --check`
+  завершены успешно. `make check` подтвердил UI Kit 286/286, web 725/725 и daemon 687/687.
 - Task 9 не начат: маршрут и точные определения аналитики требуют явного решения владельца продукта.
 
 ## Global Constraints
@@ -543,11 +546,11 @@ Ladle, Vite, pnpm 11, Node 24.
   Rewrite obsolete visual descriptions in `docs/ui-kit.md`, update the spec/plan status and index,
   and record only real deliberate deferrals in `docs/backlog.md`.
 
-- [ ] **Step 6: Request independent whole-branch review**
+- [x] **Step 6: Request independent whole-branch review**
 
   Give the reviewer the design, this plan, merge-base and HEAD. Fix every Critical/Important finding
   in one wave, run a scoped re-review, then repeat the full verification commands.
 
-- [ ] **Step 7: Finalize the branch**
+- [x] **Step 7: Finalize the branch**
 
   Confirm `git status`, atomic Conventional Commits, current docs, and no untracked build artifacts.
