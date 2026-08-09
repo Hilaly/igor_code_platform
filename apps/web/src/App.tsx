@@ -17,7 +17,7 @@ import {
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
 import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyAppearance,
@@ -112,6 +112,7 @@ export function App() {
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [page, setPage] = useState<Page>(() => navigation.current());
   const [draftProjectId, setDraftProjectId] = useState<string | undefined>(undefined);
+  const [newSessionResetKey, setNewSessionResetKey] = useState(0);
   const [layout, setLayout] = useState<ShellLayout>(() => readLayout(localStorage));
   const [access, setAccess] = useState<Access>("asking");
   const [loginRefusal, setLoginRefusal] = useState<string | undefined>(undefined);
@@ -123,13 +124,13 @@ export function App() {
   useEffect(() => diagnostics.subscribe(setReported), [diagnostics]);
   useEffect(() => navigation.subscribe(setPage), [navigation]);
 
-  // Предвыбор живёт ровно один вход на экран. После mount локальное состояние формы уже его
-  // приняло, а следующий общий переход не должен унаследовать проект из прошлого маршрута.
+  // Выбранный проект живёт всё время маршрута новой сессии, чтобы место, форма и контроллер
+  // видели один контекст. Уход с маршрута очищает его перед следующим открытием.
   useEffect(() => {
-    if (page.kind === "new-session" && draftProjectId !== undefined) {
+    if (page.kind !== "new-session") {
       setDraftProjectId(undefined);
     }
-  }, [draftProjectId, page.kind]);
+  }, [page.kind]);
 
   // Состояние входа спрашивается до всего остального: почти все маршруты защищены (docs/web-api.md),
   // и открывать поток без сессии значит получить отказ и разбирать его вместо ответа.
@@ -428,6 +429,22 @@ export function App() {
     [preferences.locale, catalogs, diagnostics],
   );
 
+  const selectDraftProject = useCallback(
+    (projectId: string): void => {
+      setDraftProjectId(projectId === "" ? undefined : projectId);
+      sessions.selectProject(projectId);
+    },
+    [sessions.selectProject],
+  );
+  const openNewSession = useCallback(
+    (projectId?: string): void => {
+      setDraftProjectId(projectId);
+      setNewSessionResetKey((key) => key + 1);
+      navigation.navigate({ kind: "new-session" });
+    },
+    [navigation],
+  );
+
   const pageHeader = describePage(page, translator, {
     session: sessions.state.open?.summary,
     project:
@@ -566,10 +583,7 @@ export function App() {
               selectedSessionId={page.kind === "session" ? page.sessionId : undefined}
               storage={localStorage}
               onOpenSession={(sessionId) => navigation.navigate({ kind: "session", sessionId })}
-              onNewSession={(projectId) => {
-                setDraftProjectId(projectId);
-                navigation.navigate({ kind: "new-session" });
-              }}
+              onNewSession={openNewSession}
               onUpdateProject={projects.update}
               onRemoveProject={projects.remove}
               onUpdateSession={sessions.updateSession}
@@ -582,14 +596,7 @@ export function App() {
         navigationHeader={
           <div className="shell-nav-header">
             <Heading level={3}>Sovereign</Heading>
-            <Button
-              onClick={() => {
-                setDraftProjectId(undefined);
-                navigation.navigate({ kind: "new-session" });
-              }}
-            >
-              + {translator.t("sessions.new")}
-            </Button>
+            <Button onClick={() => openNewSession()}>+ {translator.t("sessions.new")}</Button>
           </div>
         }
         status={
@@ -684,6 +691,7 @@ export function App() {
               builtIn={
                 <NewSessionView
                   {...(draftProjectId === undefined ? {} : { initialProjectId: draftProjectId })}
+                  key={newSessionResetKey}
                   {...(sessions.state.projects === undefined
                     ? {}
                     : { projects: sessions.state.projects })}
@@ -693,7 +701,7 @@ export function App() {
                     : { providers: sessions.state.providers })}
                   models={sessions.state.models}
                   onPrepareDraft={sessions.prepareDraft}
-                  onSelectProject={sessions.selectProject}
+                  onSelectProject={selectDraftProject}
                   onPickProvider={sessions.loadModels}
                   onCreate={async (draft) => {
                     const outcome = await sessions.createSession(draft);
@@ -815,10 +823,7 @@ export function App() {
                           onBack={() =>
                             navigation.navigate({ kind: "settings", section: "projects" })
                           }
-                          onNewSession={() => {
-                            setDraftProjectId(page.projectId);
-                            navigation.navigate({ kind: "new-session" });
-                          }}
+                          onNewSession={() => openNewSession(page.projectId)}
                           translator={translator}
                         />
                       ) : (

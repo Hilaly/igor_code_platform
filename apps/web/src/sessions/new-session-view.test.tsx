@@ -225,6 +225,35 @@ describe("the screen that creates a session", () => {
     expect(view.onSelectProject).toHaveBeenCalledWith("b7Kq");
   });
 
+  it("keeps a manually selected project when the parent rerenders with that same initial id", () => {
+    const other = { ...project, id: "p2", name: "Другой" };
+    const view = show({ projects: [project, other], initialProjectId: "b7Kq" });
+
+    pick("Проект", "Другой — /code/platform");
+    expect(view.onSelectProject).toHaveBeenLastCalledWith("p2");
+    view.onSelectProject.mockClear();
+
+    view.rerender(
+      <NewSessionView
+        projects={[project, other]}
+        initialProjectId="p2"
+        projectAgents={{ projectId: "p2", agents: [], loading: false }}
+        providers={[provider]}
+        models={{}}
+        onPrepareDraft={vi.fn()}
+        onSelectProject={view.onSelectProject}
+        onPickProvider={view.onPickProvider}
+        onCreate={view.onCreate}
+        onSubmit={view.onSubmit}
+        onNavigate={view.onNavigate}
+        translator={translator}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Проект" }).textContent).toContain("Другой");
+    expect(view.onSelectProject).not.toHaveBeenCalled();
+  });
+
   it("resets the agent, model, and thinking defaults before loading another project", () => {
     const agentWithDefaults: AgentSummary = {
       ...baseAgent,
