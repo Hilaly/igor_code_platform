@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { ContributionRegistration, FileResourceDiagnostic } from "@sovereign/protocol";
+import { placeCardinalities } from "@sovereign/protocol";
 import type { PluginContribution } from "@sovereign/sdk";
+import { placeCardinalities as declaredCardinalities } from "@sovereign/sdk";
 
 import {
   createContributionRegistry,
@@ -1016,5 +1018,119 @@ describe("the place and the component, the two contributions that reach the inte
 
     assert.deepEqual(ids(outcome.registered), []);
     assert.match(outcome.problems[0] ?? "", /the place hello\.panel names the built-in provider/);
+  });
+
+  /**
+   * Перечень кардинальностей продублирован в SDK: внутренние пакеты в папку внешнего плагина не
+   * тянутся. Расхождение копий ловится здесь — реестр как раз и переводит объявленное SDK в запись
+   * протокола, и здесь оба пакета уже под рукой.
+   */
+  it("keeps the cardinalities of the sdk and the protocol identical", () => {
+    assert.deepEqual([...declaredCardinalities], [...placeCardinalities]);
+  });
+
+  /** Полоса вкладок правой панели: заменять её целиком нельзя, как коллекцию и полосу действий. */
+  it("takes a tabs place and still refuses to make it replaceable", () => {
+    const outcome = withBrowser([
+      { ...board, id: "tabs", cardinality: "tabs" },
+      { ...board, id: "owned", cardinality: "tabs", replaceable: true, builtIn: "Tabs" },
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), ["hello.tabs"]);
+    assert.match(outcome.problems[0] ?? "", /the place hello\.owned is replaceable/);
+  });
+});
+
+describe("the command, a contribution that has no content of its own", () => {
+  const run: PluginContribution = {
+    kind: "command",
+    id: "run",
+    title: "Run the board",
+    export: "RunCommand",
+    placeId: "core.view.header.actions",
+  };
+
+  const withBrowser = (contributions: PluginContribution[], hasBrowserEntry = true) =>
+    createContributionRegistry().applyPlugin({
+      plugin: dataHello,
+      contributions,
+      fileContributions: [],
+      disabledContributions: nothingDisabled,
+      hasBrowserEntry,
+    });
+
+  it("registers a command of a plugin that has a browser bundle", () => {
+    const outcome = withBrowser([run]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(outcome.registered, [
+      {
+        ownership: "plugin",
+        kind: "command",
+        id: "hello.run",
+        declaredId: "run",
+        pluginKey: dataHello.key,
+        pluginId: dataHello.id,
+        source: dataHello.source,
+        title: "Run the board",
+        export: "RunCommand",
+        placeId: "core.view.header.actions",
+      },
+    ]);
+  });
+
+  /** Команда без места живёт в палитре и зовётся по идентификатору — кнопки у неё просто нет. */
+  it("takes a command that asks for no place at all", () => {
+    const placeless = { kind: "command", id: "run", title: "Run the board", export: "RunCommand" };
+    const outcome = withBrowser([placeless as PluginContribution]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.equal(
+      outcome.registered[0]?.kind === "command" ? outcome.registered[0].placeId : "set",
+      undefined,
+    );
+  });
+
+  it("takes a command addressed to a place that does not exist yet", () => {
+    const outcome = withBrowser([{ ...run, placeId: "someone.else" }]);
+
+    assert.deepEqual(outcome.problems, []);
+    assert.deepEqual(ids(outcome.registered), ["hello.run"]);
+  });
+
+  it("refuses a command from a plugin without a browser bundle: there is no handler to name", () => {
+    const outcome = withBrowser([run], false);
+
+    assert.deepEqual(ids(outcome.registered), []);
+    assert.match(outcome.problems[0] ?? "", /the command hello\.run needs a browser bundle/);
+  });
+
+  it("refuses a broken command and keeps its valid siblings", () => {
+    const broken = (id: string, fields: Record<string, unknown>): PluginContribution =>
+      ({ ...run, id, ...fields }) as unknown as PluginContribution;
+
+    const outcome = withBrowser([
+      run,
+      // Заголовок несущий: команду не показать ни кнопкой, ни строкой палитры без него.
+      broken("nameless", { title: "  " }),
+      broken("numbered", { title: 42 }),
+      broken("handlerless", { export: "" }),
+      broken("homeless", { placeId: "actions" }),
+      broken("grouped", { group: 3 }),
+      broken("infinite", { order: Number.NaN }),
+    ]);
+
+    assert.deepEqual(ids(outcome.registered), ["hello.run"]);
+    assert.deepEqual(
+      outcome.problems.map((problem) => problem.split(" ")[2]),
+      [
+        "hello.nameless",
+        "hello.numbered",
+        "hello.handlerless",
+        "hello.homeless",
+        "hello.grouped",
+        "hello.infinite",
+      ],
+    );
   });
 });

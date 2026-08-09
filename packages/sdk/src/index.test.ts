@@ -521,6 +521,27 @@ describe("the testing seam", () => {
     ]);
   });
 
+  it("records a command the way the plugin declared it", async () => {
+    const host = installTestHost();
+
+    await contribute.command({
+      id: "run",
+      title: "Run the board",
+      export: "RunCommand",
+      placeId: "core.view.header.actions",
+    });
+
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "command",
+        id: "run",
+        title: "Run the board",
+        export: "RunCommand",
+        placeId: "core.view.header.actions",
+      },
+    ]);
+  });
+
   it("tells the plugin who it is", () => {
     installTestHost({ id: "hello", source: "builtin" });
 

@@ -193,7 +193,7 @@ export type LocaleCatalogContribution = {
  * Кардинальность места (docs/ui-extension-model.md). Копия списка из протокола, как и остальные
  * типы здесь: внутренние пакеты в папку внешнего плагина не тянутся.
  */
-export const placeCardinalities = ["single", "collection", "action"] as const;
+export const placeCardinalities = ["single", "collection", "action", "tabs"] as const;
 
 export type PlaceCardinality = (typeof placeCardinalities)[number];
 
@@ -235,6 +235,26 @@ export type ComponentContribution = {
   order?: number;
 };
 
+/**
+ * Именованное действие плагина (docs/ui-extension-model.md). У команды нет содержимого — только
+ * исполнение, поэтому одну и ту же команду зовут и кнопкой в месте «действие», и палитрой, и чужой
+ * плагин по идентификатору.
+ *
+ * Заголовок обязателен, в отличие от общего: команда представлена в интерфейсе только им, и рисуется
+ * она до загрузки бандла.
+ */
+export type CommandContribution = {
+  id: string;
+  title: string;
+  description?: string;
+  /** Имя экспорта в браузерном бандле плагина: дескриптор команды. */
+  export: string;
+  /** Место кардинальности «действие», куда хост поставит кнопку. Не сказано — кнопки нет. */
+  placeId?: string;
+  group?: string;
+  order?: number;
+};
+
 /** То, что уходит хосту: вид проставляет SDK, а не автор плагина. */
 export type PluginContribution =
   | ({ kind: "custom" } & CustomContribution)
@@ -247,7 +267,8 @@ export type PluginContribution =
   | ({ kind: "color-scheme" } & ColorSchemeContribution)
   | ({ kind: "locale-catalog" } & LocaleCatalogContribution)
   | ({ kind: "place" } & PlaceContribution)
-  | ({ kind: "component" } & ComponentContribution);
+  | ({ kind: "component" } & ComponentContribution)
+  | ({ kind: "command" } & CommandContribution);
 
 export type PluginHost = {
   identity: PluginIdentity;
