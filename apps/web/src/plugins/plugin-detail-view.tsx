@@ -2,7 +2,7 @@ import {
   corePlace,
   projectOfContribution,
   resolvePlaceProvider,
-  type ComponentContributionRegistration,
+  type PlacedContributionRegistration,
   type ContributionRegistration,
   type PlaceCardinality,
   type PluginLifecycleState,
@@ -62,7 +62,7 @@ type PlaceClaimOutcome =
   "switchedOff" | "taken" | "free" | "overridden" | "disputed" | "added" | "waiting" | "project";
 
 type PlaceClaim = {
-  registration: ComponentContributionRegistration;
+  registration: PlacedContributionRegistration & { placeId: string };
   outcome: PlaceClaimOutcome;
   holder?: string;
 };
@@ -330,8 +330,11 @@ function placeClaims(
       (
         entry,
       ): entry is ContributionEntry & {
-        registration: ComponentContributionRegistration;
-      } => entry.registration.kind === "component",
+        registration: PlacedContributionRegistration & { placeId: string };
+      } =>
+        entry.registration.kind === "component" ||
+        // Команда без места кнопки не просит: показывать её среди занятых мест нечего.
+        (entry.registration.kind === "command" && entry.registration.placeId !== undefined),
     )
     .map(({ registration, off }): PlaceClaim => {
       if (off) {
@@ -348,7 +351,9 @@ function placeClaims(
         return { registration, outcome: "waiting" };
       }
 
-      if (cardinality !== "single") {
+      // Команда одиночное место занять не может: у неё нет содержимого, и в полосу действий она
+      // становится в ряд наравне с компонентами.
+      if (cardinality !== "single" || registration.kind === "command") {
         return { registration, outcome: "added" };
       }
 

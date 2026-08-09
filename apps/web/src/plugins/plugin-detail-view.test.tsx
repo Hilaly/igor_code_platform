@@ -413,3 +413,46 @@ it("names the plugin that took the place instead", () => {
 
   expect(screen.getByText(/the place is taken by stronger.plugins/)).toBeTruthy();
 });
+
+const runCommand: ContributionRegistration = {
+  kind: "command",
+  ownership: "plugin",
+  pluginKey: "data:example",
+  pluginId: "example",
+  source: "data",
+  id: "example.run",
+  declaredId: "run",
+  title: "Run the board",
+  export: "RunCommand",
+  placeId: "core.view.header.actions",
+};
+
+it("shows a command by its kind and by its technical data", () => {
+  showPlaces(withPlaces([runCommand]));
+
+  expect(screen.getByText("command")).toBeTruthy();
+  expect(screen.getByText(/"export": "RunCommand"/)).toBeTruthy();
+  expect(screen.getByText(/"placeId": "core.view.header.actions"/)).toBeTruthy();
+});
+
+/** Команда одиночное место занять не может: в полосу действий она встаёт в ряд с компонентами. */
+it("reports the placement of a command as joining the row", () => {
+  showPlaces(withPlaces([runCommand]));
+
+  const claim = screen.getByRole("group", { name: "core.view.header.actions" });
+
+  expect(within(claim).getByText("joins the row")).toBeTruthy();
+});
+
+/** Команда без места кнопки не просит, и в разделе занятых мест ей делать нечего. */
+it("leaves a command without a place out of the places section", () => {
+  const placeless: ContributionRegistration = {
+    ...runCommand,
+    ...(runCommand.kind === "command" ? { placeId: undefined } : {}),
+  };
+
+  showPlaces(withPlaces([placeless]));
+
+  expect(screen.queryByRole("group", { name: "core.view.header.actions" })).toBeNull();
+  expect(screen.getByText("command")).toBeTruthy();
+});
