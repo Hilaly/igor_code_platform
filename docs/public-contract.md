@@ -31,31 +31,31 @@
 **Публичность объявляется в документе, который описывает интерфейс.** Правило применяется к тому, что
 названо публичным явно; «видно из кода» публичным не делает.
 
-| Поверхность                                    | Где описана                                          |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| `@sovereign/sdk` и `@sovereign/sdk/testing`    | [plugins.md](plugins.md)                             |
-| Основной entrypoint `@sovereign/browser-sdk`   | [ui-extension-model.md](ui-extension-model.md)       |
-| Поверхность `providers.*` и её типы в SDK      | [models-and-providers.md](models-and-providers.md)   |
-| Отбор инструментов и скилов агента             | [plugins.md](plugins.md)                             |
-| Манифест: поле `sovereign` и состав его полей  | [plugins.md](plugins.md)                             |
-| Виды вкладов и состав каждого                  | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
-| Имена мест и правила разрешения провайдеров    | [ui-extension-model.md](ui-extension-model.md)       |
-| Реестр модулей хоста: ключ и состав            | [ui-extension-model.md](ui-extension-model.md)       |
-| Адрес браузерных ассетов плагина и заголовки   | [web-api.md](web-api.md)                             |
-| Контракт CSS Modules браузерной части плагина  | [ui-extension-model.md](ui-extension-model.md)       |
-| UI-кит: компоненты и их свойства               | [ui-kit.md](ui-kit.md)                               |
-| Семантические токены и политика устаревания    | [ui-kit.md](ui-kit.md)                               |
-| Палитра, форма схемы и `tokenContractMajor`    | [ui-kit.md](ui-kit.md)                               |
-| HTTP API ядра и форма SSE-потока               | [web-api.md](web-api.md)                             |
-| Проектные каталоги агентов и файловых ресурсов | [plugins.md](plugins.md)                             |
-| Схемы событий ядра                             | [event-bus.md](event-bus.md)                         |
-| Хуки: перечень, виды, слияние, форма отказа    | [hooks.md](hooks.md)                                 |
-| Типы событий Pi, реэкспортированные из `sdk`   | [hooks.md](hooks.md)                                 |
-| Поверхность `sessions.*` и её типы в SDK       | [sessions-and-projects.md](sessions-and-projects.md) |
-| Хранилище плагина: ключ и папка                | [plugins.md](plugins.md)                             |
-| Поверхность `storage.*` и её типы в SDK        | [plugins.md](plugins.md)                             |
-| Маршруты плагина: адрес, форма запроса, ответ  | [web-api.md](web-api.md)                             |
-| Снимок конфликтов адресов маршрутов            | [web-api.md](web-api.md)                             |
+| Поверхность                                                                                                 | Где описана                                          |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `@sovereign/sdk` и `@sovereign/sdk/testing`                                                                 | [plugins.md](plugins.md)                             |
+| Основной entrypoint `@sovereign/browser-sdk`: `Place`, `PlaceCollection`; типы `PlaceContext`, `PlaceProps` | [ui-extension-model.md](ui-extension-model.md)       |
+| Поверхность `providers.*` и её типы в SDK                                                                   | [models-and-providers.md](models-and-providers.md)   |
+| Отбор инструментов и скилов агента                                                                          | [plugins.md](plugins.md)                             |
+| Манифест: поле `sovereign` и состав его полей                                                               | [plugins.md](plugins.md)                             |
+| Виды вкладов и состав каждого                                                                               | [plugins.md](plugins.md), [web-api.md](web-api.md)   |
+| Имена мест и правила разрешения провайдеров                                                                 | [ui-extension-model.md](ui-extension-model.md)       |
+| Реестр модулей хоста: ключ и состав                                                                         | [ui-extension-model.md](ui-extension-model.md)       |
+| Адрес браузерных ассетов плагина и заголовки                                                                | [web-api.md](web-api.md)                             |
+| Контракт CSS Modules браузерной части плагина                                                               | [ui-extension-model.md](ui-extension-model.md)       |
+| UI-кит: компоненты и их свойства                                                                            | [ui-kit.md](ui-kit.md)                               |
+| Семантические токены и политика устаревания                                                                 | [ui-kit.md](ui-kit.md)                               |
+| Палитра, форма схемы и `tokenContractMajor`                                                                 | [ui-kit.md](ui-kit.md)                               |
+| HTTP API ядра и форма SSE-потока                                                                            | [web-api.md](web-api.md)                             |
+| Проектные каталоги агентов и файловых ресурсов                                                              | [plugins.md](plugins.md)                             |
+| Схемы событий ядра                                                                                          | [event-bus.md](event-bus.md)                         |
+| Хуки: перечень, виды, слияние, форма отказа                                                                 | [hooks.md](hooks.md)                                 |
+| Типы событий Pi, реэкспортированные из `sdk`                                                                | [hooks.md](hooks.md)                                 |
+| Поверхность `sessions.*` и её типы в SDK                                                                    | [sessions-and-projects.md](sessions-and-projects.md) |
+| Хранилище плагина: ключ и папка                                                                             | [plugins.md](plugins.md)                             |
+| Поверхность `storage.*` и её типы в SDK                                                                     | [plugins.md](plugins.md)                             |
+| Маршруты плагина: адрес, форма запроса, ответ                                                               | [web-api.md](web-api.md)                             |
+| Снимок конфликтов адресов маршрутов                                                                         | [web-api.md](web-api.md)                             |
 
 Публичная поверхность кита — это ровно то, что он экспортирует из `src/index.ts`: примитивы,
 токены (палитра, роли, объявление схемы, `applyRoles` и `applyScale`), список схем поставки

@@ -7,6 +7,7 @@
  * жила бы отдельно для dev и прода, а тут одна и та же строка работает в обоих режимах.
  */
 
+import * as browserSdk from "@sovereign/browser-sdk";
 import * as uiKit from "@sovereign/ui-kit";
 import * as react from "react";
 import * as reactJsxRuntime from "react/jsx-runtime";
@@ -27,6 +28,7 @@ const hostModules: Record<(typeof hostModuleSpecifiers)[number], unknown> = {
   "react/jsx-runtime": reactJsxRuntime,
   "react/jsx-dev-runtime": reactJsxRuntime,
   "@sovereign/ui-kit": uiKit,
+  "@sovereign/browser-sdk": browserSdk,
 };
 
 /**

@@ -1,25 +1,14 @@
-import { useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { BrowserRuntimeContext } from "./runtime-context.tsx";
+import { PluginPlace, PluginPlaceCollection } from "./host.tsx";
+import type { PlaceContext, PlaceProps } from "./runtime-context.tsx";
 
-export type PlaceContext = {
-  project?: string;
-  subject?: Readonly<Record<string, string>>;
-};
-
-export type PlaceProps = {
-  id: string;
-  context: PlaceContext;
-};
+export type { PlaceContext, PlaceProps };
 
 export function Place(props: PlaceProps): ReactNode {
-  const runtime = useContext(BrowserRuntimeContext);
-
-  return runtime === undefined ? null : <runtime.Place {...props} />;
+  return <PluginPlace {...props} />;
 }
 
 export function PlaceCollection(props: PlaceProps): ReactNode {
-  const runtime = useContext(BrowserRuntimeContext);
-
-  return runtime === undefined ? null : <runtime.PlaceCollection {...props} />;
+  return <PluginPlaceCollection {...props} />;
 }

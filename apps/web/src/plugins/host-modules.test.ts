@@ -24,6 +24,12 @@ describe("registerHostModules", () => {
     expect(registry().react).toBe(react);
   });
 
+  it("gives plugins the same browser SDK module the shell uses", async () => {
+    const browserSdk = await import("@sovereign/browser-sdk");
+
+    expect(registry()["@sovereign/browser-sdk"]).toBe(browserSdk);
+  });
+
   it("gives a module with exports for every specifier", () => {
     // Заглушка в бандле отдаёт значение реестра целиком, поэтому пустой объект здесь превратился бы
     // в `undefined` на первом же обращении к экспорту — уже внутри чужого кода.

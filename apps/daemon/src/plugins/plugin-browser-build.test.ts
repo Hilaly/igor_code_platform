@@ -115,12 +115,14 @@ describe("buildPluginBrowser", () => {
       const bundle = await buildBrowsered();
       const registry = globalThis as unknown as Record<string, unknown>;
       const previous = registry[hostModuleRegistryKey];
+      const browserPlace = () => null;
 
       registry[hostModuleRegistryKey] = {
         react: { version: "19.2.8", useState: () => [0, () => {}] },
         "react-dom": { createPortal: () => null, flushSync: () => {} },
         "react/jsx-runtime": { jsx: () => null, jsxs: () => null, Fragment: Symbol("Fragment") },
         "@sovereign/ui-kit": { Badge: () => null },
+        "@sovereign/browser-sdk": { Place: browserPlace, PlaceCollection: () => null },
       };
 
       try {
@@ -128,11 +130,13 @@ describe("buildPluginBrowser", () => {
           reactVersion: string;
           reactDomKeys: string[];
           classNames: Record<string, string>;
+          browserPlace: unknown;
           View: unknown;
         };
 
         assert.equal(loaded.reactVersion, "19.2.8");
         assert.deepEqual(loaded.reactDomKeys.sort(), ["createPortal", "default", "flushSync"]);
+        assert.equal(loaded.browserPlace, browserPlace);
         assert.equal(typeof loaded.View, "function");
       } finally {
         registry[hostModuleRegistryKey] = previous;
