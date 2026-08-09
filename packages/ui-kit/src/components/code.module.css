@@ -1,8 +1,3 @@
-/*
- * Стиль моноширинного блока и строчного кода. Единственный источник цвета — переменные ролей
- * (docs/ui-kit.md, «Чем держится дисциплина цвета»).
- */
-
 .block {
   padding: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
@@ -10,14 +5,9 @@
   background: var(--sovereign-sunken-surface);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
-  font-weight: 400;
   font-size: var(--sovereign-font-size-xs);
+  font-weight: 400;
   line-height: var(--sovereign-line-height-snug);
-  /*
-   * Длинная строка ломается и прокручивается внутри блока, а не растягивает страницу
-   * (docs/ui-kit.md). Переносы строк сохраняет сам элемент — это `pre`, — поэтому здесь добавляется
-   * только разрешение переносить длинную строку; вместе это даёт поведение `pre-wrap`.
-   */
   text-wrap: wrap;
   overflow-wrap: anywhere;
   overflow-x: auto;
@@ -29,12 +19,7 @@
   background: var(--sovereign-sunken-surface);
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
-  font-weight: 400;
-  /*
-   * Кегль в `em`, а не по шкале: строчный код стоит внутри чужого текста и обязан следовать его
-   * размеру, иначе в подписи он оказывается крупнее самой подписи. Моноширинный шрифт при равном
-   * кегле выглядит крупнее, поэтому чуть меньше единицы.
-   */
   font-size: 0.9em;
+  font-weight: 400;
   overflow-wrap: anywhere;
 }

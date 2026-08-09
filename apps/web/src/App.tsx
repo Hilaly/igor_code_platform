@@ -15,7 +15,7 @@ import {
   type LoginStepFrame,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
-import { Button, coreNamespace, createTranslator, Heading, Spinner } from "@sovereign/ui-kit";
+import { BrandLockup, Button, coreNamespace, createTranslator, Spinner } from "@sovereign/ui-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -26,6 +26,7 @@ import {
   fetchAppearance,
   pluginColorSchemes,
   readCachedAppearance,
+  resolveEffectiveAppearance,
   shippedSchemes,
   writeAppearance,
 } from "./appearance.ts";
@@ -263,6 +264,10 @@ export function App() {
   const windowWide = useMemo(() => windowWideContributions(contributions ?? []), [contributions]);
   const declaredSchemes = useMemo(() => pluginColorSchemes(windowWide), [windowWide]);
   const schemes = useMemo(() => [...shippedSchemes, ...declaredSchemes.schemes], [declaredSchemes]);
+  const effectiveScheme = useMemo(
+    () => resolveEffectiveAppearance(preferences, prefersDark, schemes).scheme.id,
+    [preferences, prefersDark, schemes],
+  );
   // Отвергнутая схема называется один раз, а не на каждый снимок плагинов: снимок приезжает на любое
   // изменение любого плагина, а сломанная схема остаётся той же самой.
   const namedRefusals = useRef(new Set<string>());
@@ -515,7 +520,7 @@ export function App() {
       }
       navigationHeader={
         <div className="shell-nav-header">
-          <Heading level={3}>Sovereign</Heading>
+          <BrandLockup name={translator.t("product.name")} />
           <Button
             onClick={() => {
               setDraftProjectId(undefined);
@@ -754,6 +759,7 @@ export function App() {
             appearance={
               <AppearanceSection
                 preferences={preferences}
+                effectiveScheme={effectiveScheme}
                 schemes={describeSchemes(schemes, windowWide, translator)}
                 locales={locales}
                 onChange={change}

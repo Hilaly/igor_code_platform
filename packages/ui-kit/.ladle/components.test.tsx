@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { GlobalState } from "@ladle/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,11 +20,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
 });
 
 describe("catalogue appearance controls", () => {
-  it("renders scheme and scale selects with the catalogue control style", () => {
+  it("renders named scheme and scale controls in the catalogue appearance group", () => {
     render(
       <Provider
         globalState={{ theme: "dark" } as GlobalState}
@@ -35,9 +36,27 @@ describe("catalogue appearance controls", () => {
       </Provider>,
     );
 
-    for (const select of screen.getAllByRole("combobox")) {
-      expect(select.className).toMatch(/control/);
-    }
+    const appearance = screen.getByRole("group", { name: "Catalogue appearance" });
+    expect(within(appearance).getByRole("combobox", { name: "scheme" })).toBeTruthy();
+    expect(within(appearance).getByRole("combobox", { name: "scale" })).toBeTruthy();
+  });
+
+  it("persists valid appearance choices through the native controls", () => {
+    render(
+      <Provider
+        globalState={{ theme: "dark" } as GlobalState}
+        dispatch={() => {}}
+        config={{} as never}
+      >
+        <p>story</p>
+      </Provider>,
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "scale" }), {
+      target: { value: "larger" },
+    });
+
+    expect(globalThis.localStorage.getItem("sovereign.catalogue.scale")).toBe("larger");
   });
 
   it("uses semantic surfaces, text, border, and focus roles", () => {

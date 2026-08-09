@@ -1,83 +1,53 @@
-/*
- * Раскладка вью проектов. Цвета — только переменные ролей, размеры — только шкалы кита: значения
- * задают цветовая схема и ось масштаба интерфейса (дисциплина цвета — в docs/ui-kit.md).
- *
- * Своим файлом, а не строками в `shell.css`: вью проектов — не оболочка, и раскладка формы создания
- * ничего общего с раскладкой панелей вокруг не имеет.
- */
-
-.projects,
-.projects-new {
+.projects {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--sovereign-space-3);
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
 }
 
-.projects-new {
-  gap: var(--sovereign-space-2);
-}
-
+.projects-new,
 .projects-new-surface {
   display: flex;
   flex-direction: column;
-  gap: var(--sovereign-space-3);
-  padding-block: var(--sovereign-space-3);
-  border-block: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+.projects-new-surface {
+  padding-block: var(--sovereign-space-2) var(--sovereign-space-3);
 }
 
 .projects-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .projects-toolbar > :first-child {
-  flex: 1;
   min-width: 0;
-}
-
-.project-detail,
-.project-detail-topbar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-3);
-}
-
-.project-detail {
-  min-width: 0;
-}
-
-.project-detail-topbar {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .projects-folder-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--sovereign-space-2);
   width: 100%;
   min-width: 0;
 }
 
 .projects-folder-control > :first-child {
-  flex: 1;
   min-width: 0;
 }
 
 .projects-form-actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.project-resources,
-.project-resources-problems,
-.project-resource-problem {
-  display: flex;
-  flex-direction: column;
   gap: var(--sovereign-space-2);
   min-width: 0;
 }
@@ -85,61 +55,34 @@
 .projects-list {
   display: flex;
   flex-direction: column;
-  padding: var(--sovereign-space-0);
+  min-width: 0;
   margin: var(--sovereign-space-0);
+  padding: var(--sovereign-space-0);
   list-style: none;
 }
 
-.project-resources-counts,
-.project-resource-problem-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sovereign-space-2);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.project-resource-problem-head code {
-  overflow-wrap: anywhere;
-}
-
-/*
- * В строке ровно двое: сведения о проекте и его пометки с действиями. Действия держатся правого
- * края распором между ними, а не селектором по классу примитива: имена классов кита хешируются
- * модулями, и цепляться за его внутренности снаружи нельзя (docs/ui-extension-model.md).
- *
- * Внутренняя строка остаётся компактной: внешний `ListRow` уже владеет интерактивным отступом и
- * разделителем, прикладной CSS только раскладывает факты и пометки.
- */
 .projects-row {
-  display: flex;
-  padding: var(--sovereign-space-1) var(--sovereign-space-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sovereign-space-3);
-  flex-wrap: wrap;
-  min-height: var(--sovereign-row-height-compact);
+  width: 100%;
+  min-width: 0;
 }
 
 .projects-row-facts {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--sovereign-space-1);
-  /*
-   * Длинный путь режется (`shortenPath` в коде + многоточие здесь), а не растягивает строку и не
-   * ломается посимвольно: папка бывает глубокой, а полный путь живёт в тултипе на наведении.
-   * `min-width: 0` разрешает flex-потомку сжиматься ниже содержимого, иначе путь толкает строку.
-   */
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-/*
- * Путь режется до ширины строки. `Tooltip` оборачивает триггер в inline-flex span — ему нужен
- * `min-width: 0`, чтобы сжаться, а `Code` внутри становится блоком, чтобы `text-overflow` сработал.
- * Переносить моноширинный путь не нужно: многоточие с тултипом читаемее вертикального столбца.
- */
 .projects-row-facts > span {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .projects-row-facts code {
@@ -150,7 +93,6 @@
   white-space: nowrap;
 }
 
-/* Фокус живёт на кнопке строки, а не на вложенном `Code`; reveal разрешён только с клавиатуры. */
 :root[data-sovereign-input-modality="keyboard"]
   .projects-list
   > li
@@ -164,6 +106,84 @@
 .projects-row-marks {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sovereign-space-2);
+  min-width: 0;
   flex-wrap: wrap;
+}
+
+.project-detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.project-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.project-detail-rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.project-resources,
+.project-resources-problems,
+.project-resource-problem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+.project-resources-counts,
+.project-resource-problem-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.project-resource-problem {
+  width: 100%;
+  padding-block: var(--sovereign-space-1);
+}
+
+.project-resource-problem-head code {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@container (width <= 42rem) {
+  .projects-toolbar,
+  .projects-folder-control,
+  .projects-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .projects-toolbar > :last-child,
+  .projects-folder-control > :last-child {
+    justify-self: start;
+  }
+
+  .projects-row {
+    align-items: start;
+    gap: var(--sovereign-space-2);
+  }
+
+  .projects-row-marks {
+    justify-content: flex-start;
+  }
 }

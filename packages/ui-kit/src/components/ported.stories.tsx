@@ -276,6 +276,10 @@ export const Waiting = () => (
 const selectionOptions = [
   { value: "imperium", label: "Империум" },
   { value: "nord", label: "Норд" },
+  {
+    value: "long",
+    label: "Схема с очень длинным названием, которое не должно расширять каталог",
+  },
   { value: "legacy", label: "Устаревшая", disabled: true },
 ];
 
@@ -300,6 +304,23 @@ export const Selectors = () => {
         value={visibleColumns}
         onChange={setVisibleColumns}
         placeholder="Выберите столбцы"
+      />
+      <Combobox
+        label="Недоступный поиск"
+        options={selectionOptions}
+        value="legacy"
+        onChange={() => {}}
+        placeholder="Недоступно"
+        emptyText="Ничего не найдено"
+        disabled
+      />
+      <MultiSelect
+        label="Некорректный обязательный выбор"
+        options={selectionOptions}
+        value={[]}
+        onChange={() => {}}
+        placeholder="Выберите хотя бы один столбец"
+        invalid
       />
       <SegmentedControl
         label="Плотность списка"

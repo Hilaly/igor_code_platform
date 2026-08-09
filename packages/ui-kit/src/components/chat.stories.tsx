@@ -7,8 +7,13 @@
  * поставляется пользователю (docs/ui-kit.md).
  */
 
+import { useState } from "react";
+
+import type { ThinkingLevel } from "@sovereign/protocol";
+
 import { Markdown } from "./markdown.tsx";
 import { Message, MessageFeed } from "./message-feed.tsx";
+import { NextTurnPicker } from "./next-turn-picker.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { ToolCall } from "./tool-call.tsx";
 
@@ -115,3 +120,67 @@ export const Feed = () => (
     </MessageFeed>
   </div>
 );
+
+const nextTurnGroups = [
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    options: [
+      {
+        value: "anthropic/claude-opus-4-5-with-a-deliberately-long-model-identifier",
+        label: "anthropic/claude-opus-4-5-with-a-deliberately-long-model-identifier",
+      },
+      { value: "anthropic/claude-sonnet-4-5", label: "anthropic/claude-sonnet-4-5" },
+    ],
+  },
+  { id: "loading", label: "Loading catalogue", options: [], loading: true },
+  { id: "failed", label: "Failed catalogue", options: [], failureReason: "Catalogue unavailable" },
+  { id: "empty", label: "Empty catalogue", options: [] },
+];
+
+const nextTurnTranslations: Record<string, string> = {
+  "thinking.off": "Off",
+  "thinking.minimal": "Minimal",
+  "thinking.low": "Low",
+  "thinking.medium": "Medium",
+  "thinking.high": "High",
+  "thinking.xhigh": "Very high",
+  "thinking.max": "Maximum",
+};
+
+export const NextTurn = () => {
+  const [model, setModel] = useState(nextTurnGroups[0]!.options[0]!.value);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
+  const [reasoningSupported, setReasoningSupported] = useState(true);
+
+  return (
+    <div style={{ ...column, maxWidth: "24rem", minHeight: "34rem", justifyContent: "flex-end" }}>
+      <label>
+        <input
+          type="checkbox"
+          checked={reasoningSupported}
+          onChange={(event) => setReasoningSupported(event.target.checked)}
+        />{" "}
+        Reasoning supported
+      </label>
+      <NextTurnPicker
+        model={model}
+        modelGroups={nextTurnGroups}
+        onModelChange={setModel}
+        onExpandModelGroup={() => {}}
+        thinkingLevel={thinkingLevel}
+        reasoningSupported={reasoningSupported}
+        onThinkingLevelChange={setThinkingLevel}
+        modelLabel="Model"
+        reasoningLabel="Reasoning"
+        triggerLabel="Next-turn settings"
+        placeholder="Choose model"
+        emptyText="No models"
+        translator={{
+          t: (key) => nextTurnTranslations[key] ?? key,
+          optional: (key) => nextTurnTranslations[key],
+        }}
+      />
+    </div>
+  );
+};

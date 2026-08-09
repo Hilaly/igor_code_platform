@@ -1,48 +1,36 @@
-/*
- * Стиль врезки. Единственный источник цвета — переменные ролей (docs/ui-kit.md, «Чем держится
- * дисциплина цвета»).
- *
- * Тон собран из своего семейства целиком — заливка, граница и текст: врезку читают потому, что она
- * выделяется, а полоса слева на плотном экране теряется среди границ соседей.
- */
-
 .notice {
   display: flex;
   flex-direction: column;
   gap: var(--sovereign-space-1);
   padding: var(--sovereign-space-3) var(--sovereign-space-4);
-  border: var(--sovereign-stroke-thin) solid transparent;
-  border-radius: var(--sovereign-radius-sm);
+  color: var(--sovereign-text);
   font-size: var(--sovereign-font-size-sm);
+  border: var(--sovereign-stroke-thin) solid transparent;
+  border-left: var(--sovereign-stroke-emphasis) solid transparent;
+  border-radius: var(--sovereign-radius-sm);
 }
-
 .info {
-  border-color: var(--sovereign-info-border);
-  background: var(--sovereign-info-surface);
   color: var(--sovereign-info-text);
+  background: var(--sovereign-info-surface);
+  border-color: var(--sovereign-info-border);
+  border-left-color: var(--sovereign-accent);
 }
-
 .warning {
-  border-color: var(--sovereign-warning-border);
-  background: var(--sovereign-warning-surface);
   color: var(--sovereign-warning-text);
+  background: var(--sovereign-warning-surface);
+  border-color: var(--sovereign-warning-border);
+  border-left-color: var(--sovereign-warning);
 }
-
 .danger {
-  border-color: var(--sovereign-danger-border);
-  background: var(--sovereign-danger-surface);
   color: var(--sovereign-danger-text);
+  background: var(--sovereign-danger-surface);
+  border-color: var(--sovereign-danger-border);
+  border-left-color: var(--sovereign-danger);
 }
-
 .title {
   font-weight: var(--sovereign-font-weight-semibold);
   line-height: var(--sovereign-line-height-snug);
 }
-
-/*
- * Подробности приглушены прозрачностью от цвета тона, а не ролью второстепенного текста: нейтральный
- * серый внутри цветной врезки читается как чужая вставка.
- */
 .body {
   color: color-mix(in srgb, currentColor 82%, transparent);
 }

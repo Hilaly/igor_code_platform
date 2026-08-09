@@ -220,6 +220,15 @@
 
 ## Интерфейс
 
+- **Экран аналитики использования ждёт решения владельца.** Clean-slate спецификация резервирует
+  Requests, Tokens, Coverage, daily activity и таблицу моделей, но размещение и точные определения
+  метрик влияют на архитектуру. Рекомендуемый вариант — `/settings/usage` и клиентская агрегация
+  только точных данных существующих session list/per-session stats API. Если для Requests, Coverage
+  или дневных корзин текущего контракта недостаточно, отдельно согласуется минимальное расширение
+  protocol/API. До явного решения владельца маршрут, новый API и приближённые метрики не добавлены
+  ([спецификация](superpowers/specs/2026-08-08-sovereign-clean-slate-redesign-design.md),
+  [план](superpowers/plans/2026-08-08-sovereign-clean-slate-redesign.md)).
+
 - **`applyRoles` не снимает устаревшие CSS-переменные.** `packages/ui-kit/src/tokens/apply.ts`
   только ставит роли текущей схемы. Сегодня каждый `resolveScheme` возвращает полный набор
   `roleNames` ([scheme.ts](../packages/ui-kit/src/tokens/scheme.ts)), поэтому перекрытие полное и ничего

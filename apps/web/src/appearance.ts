@@ -95,6 +95,54 @@ export type ApplyAppearanceOptions = {
   onDiagnostic: (diagnostic: string) => void;
 };
 
+export type EffectiveAppearance = {
+  scheme: ColorScheme;
+  variant: PaletteVariant;
+  resolution: ReturnType<typeof resolveScheme>;
+  diagnostics: string[];
+};
+
+/**
+ * Разделяет сохранённое пожелание и реально применимую схему. Пожелание не переписывается: если
+ * плагин вернётся, его id снова начнёт работать; результат нужен и применению ролей, и live preview.
+ */
+export function resolveEffectiveAppearance(
+  preferences: AppearancePreferences,
+  prefersDark: boolean,
+  schemes: readonly ColorScheme[] = shippedSchemes,
+): EffectiveAppearance {
+  const wanted = preferences.appearance.colorScheme;
+  const variant = resolveVariant(preferences.appearance.variant, prefersDark);
+  const found = schemes.find((scheme) => scheme.id === wanted);
+  const diagnostics: string[] = [];
+
+  if (found === undefined) {
+    diagnostics.push(`there is no colour scheme ${wanted}, the built-in one is in effect`);
+  } else {
+    const resolution = resolveScheme(found, variant);
+
+    if (resolution.kind === "resolved") {
+      return {
+        scheme: found,
+        variant,
+        resolution,
+        diagnostics: [...diagnostics, ...resolution.diagnostics],
+      };
+    }
+
+    diagnostics.push(...resolution.diagnostics);
+  }
+
+  const fallback = resolveScheme(imperiumScheme, variant);
+
+  return {
+    scheme: imperiumScheme,
+    variant,
+    resolution: fallback,
+    diagnostics: [...diagnostics, ...fallback.diagnostics],
+  };
+}
+
 /**
  * Применяет схему записью CSS-переменных и масштаб — атрибутом. Названная схема может отсутствовать —
  * её приносил плагин, которого выключили (docs/plugins.md), — и тогда работает встроенная: интерфейс
@@ -104,37 +152,19 @@ export function applyAppearance(options: ApplyAppearanceOptions): void {
   // Масштаб применяется первым и независимо от схемы: отказ схемы не повод оставить кегль чужим.
   applyScale(options.preferences.appearance.scale, options.root);
 
-  const schemes = options.schemes ?? shippedSchemes;
-  const wanted = options.preferences.appearance.colorScheme;
-  const found = schemes.find((scheme) => scheme.id === wanted);
+  const effective = resolveEffectiveAppearance(
+    options.preferences,
+    options.prefersDark,
+    options.schemes,
+  );
 
-  if (found === undefined) {
-    options.onDiagnostic(`there is no colour scheme ${wanted}, the built-in one is in effect`);
-  }
-
-  const variant = resolveVariant(options.preferences.appearance.variant, options.prefersDark);
-  const resolved = resolveScheme(found ?? imperiumScheme, variant);
-
-  if (resolved.kind === "rejected") {
-    for (const diagnostic of resolved.diagnostics) {
-      options.onDiagnostic(diagnostic);
-    }
-
-    // Отказ схемы не оставляет интерфейс без цветов: встроенная схема всегда совпадает с китом.
-    const fallback = resolveScheme(imperiumScheme, variant);
-
-    if (fallback.kind === "resolved") {
-      applyRoles(fallback.roles, options.target);
-    }
-
-    return;
-  }
-
-  for (const diagnostic of resolved.diagnostics) {
+  for (const diagnostic of effective.diagnostics) {
     options.onDiagnostic(diagnostic);
   }
 
-  applyRoles(resolved.roles, options.target);
+  if (effective.resolution.kind === "resolved") {
+    applyRoles(effective.resolution.roles, options.target);
+  }
 }
 
 type ColorSchemeRegistration = Extract<ContributionRegistration, { kind: "color-scheme" }>;
@@ -176,11 +206,19 @@ export function pluginColorSchemes(contributions: readonly ContributionRegistrat
       continue;
     }
 
-    const resolved = resolveScheme(parsed.scheme, "light");
+    let rejected = false;
 
-    if (resolved.kind === "rejected") {
-      refusals.push(...resolved.diagnostics);
+    for (const variant of ["light", "dark"] as const) {
+      const resolved = resolveScheme(parsed.scheme, variant);
 
+      if (resolved.kind === "rejected") {
+        refusals.push(...resolved.diagnostics);
+        rejected = true;
+        break;
+      }
+    }
+
+    if (rejected) {
       continue;
     }
 

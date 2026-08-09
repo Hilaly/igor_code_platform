@@ -1,72 +1,59 @@
 .root {
   display: flex;
   flex-direction: column;
+  gap: var(--sovereign-space-1);
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
-  gap: var(--sovereign-space-1);
+  color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-sm);
   user-select: none;
 }
-
 .item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
-  min-width: 0;
   width: 100%;
+  min-width: 0;
 }
-
 .node {
   display: contents;
 }
-
 .row {
   display: flex;
-  grid-column: 1 / -1;
+  grid-column: 1/-1;
   grid-row: 1;
-  min-height: var(--sovereign-row-height-compact);
   align-items: center;
   gap: var(--sovereign-space-2);
+  width: 100%;
+  min-height: var(--sovereign-row-height-compact);
   padding-inline: var(--sovereign-space-2);
-  /* Рельс действий рисуется поверх строки отдельной колонкой. Запас не даёт длинной подписи
-     залезть под кнопки, а фон и hover при этом доходят до общего правого края. */
   padding-inline-end: calc(
     var(--sovereign-space-2) + var(--sovereign-row-height-compact) * 2 + var(--sovereign-space-1)
   );
   padding-block: var(--sovereign-space-1);
-  width: 100%;
   box-sizing: border-box;
-  border-radius: var(--sovereign-radius-xs);
-  color: var(--sovereign-text);
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   background: transparent;
-  border: none;
-  text-align: left;
+  border: 0;
+  border-radius: var(--sovereign-radius-xs);
   font: inherit;
-  transition: background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
-
-/*
- * Кольцо показывает настоящий фокус, а не право на `Tab`: узел, помнящий, куда вернётся `Tab`, есть
- * всегда, и подсвеченным он выглядел бы фокусом в дереве, из которого человек давно ушёл.
- */
 .node:focus-visible > .row {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
   outline-offset: -1px;
 }
-
 .row:hover {
   background: var(--sovereign-control-surface-hover);
 }
-
 .row.selected {
-  background: var(--sovereign-accent-surface);
   color: var(--sovereign-text);
   font-weight: var(--sovereign-font-weight-medium);
+  background: var(--sovereign-accent-surface);
 }
-
 .toggle,
 .togglePlaceholder {
   display: inline-flex;
@@ -76,79 +63,66 @@
   width: 1rem;
   height: 1rem;
 }
-
 .indent {
   flex: 0 0 var(--sovereign-space-4);
 }
-
 .root[data-disclosure-alignment="label"] .togglePlaceholder {
   width: 0;
   overflow: hidden;
 }
-
 .root[data-disclosure-alignment="label"] .indent {
   flex-basis: 1rem;
 }
-
 .content {
   display: flex;
   flex: 1;
-  min-width: 0;
   align-items: center;
   gap: var(--sovereign-space-2);
+  min-width: 0;
 }
-
 .content > .label {
   flex: 1;
   min-width: 0;
   padding-inline-end: var(--sovereign-space-1);
 }
-
 .toggle {
   padding: 0;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 0.7rem;
-  line-height: 1;
   color: var(--sovereign-text-muted);
+  font: inherit;
+  line-height: 1;
   cursor: pointer;
+  background: transparent;
+  border: 0;
   transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
-
 .toggle.expanded {
   transform: rotate(90deg);
 }
-
 .icon {
   display: inline-flex;
   align-items: center;
 }
-
 .label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .actions {
   display: inline-flex;
   grid-column: 2;
   grid-row: 1;
   align-items: center;
-  gap: var(--sovereign-space-1);
-  flex: none;
   justify-self: end;
+  gap: var(--sovereign-space-1);
   z-index: 1;
+  flex: none;
 }
-
 .root[data-actions-visibility="interaction"] .actions {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
-
 .root[data-actions-visibility="interaction"] .item:hover > .actions,
 :root[data-sovereign-input-modality="keyboard"]
   .root[data-actions-visibility="interaction"]
@@ -158,15 +132,19 @@
   opacity: 1;
   pointer-events: auto;
 }
-
 .context {
   position: fixed;
   z-index: var(--sovereign-z-overlay);
 }
-
 .children {
   display: flex;
-  grid-column: 1 / -1;
+  grid-column: 1/-1;
   grid-row: 2;
   flex-direction: column;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toggle,
+  .actions {
+    transition: none;
+  }
 }

@@ -55,6 +55,7 @@ describe("UserProviderForm", () => {
       expectTooltipToggles(name, 1);
     }
     fireEvent.click(screen.getByRole("button", { name: /Добавить ручную модель/ }));
+    expect(screen.getByRole("region", { name: "Модели вручную" })).toBeDefined();
     expectTooltipToggles("Модели поддерживают reasoning", 2);
     expectTooltipToggles("Модели принимают изображения", 2);
     expect(document.querySelector("[class*='panel']")).toBeNull();

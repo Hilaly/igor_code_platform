@@ -1,11 +1,3 @@
-/*
- * Стиль кнопки. Единственный источник цвета — переменные ролей: значения приходят из цветовой
- * схемы, а не отсюда (docs/ui-kit.md, «Чем держится дисциплина цвета»).
- *
- * Геометрия одна на все тоны, различаются только заливка и возвышение: кнопки одного размера в
- * ряду обязаны стоять по одной линии, чем бы они ни отличались по смыслу.
- */
-
 .button {
   display: inline-flex;
   align-items: center;
@@ -21,7 +13,7 @@
   font-size: var(--sovereign-font-size-sm);
   font-weight: var(--sovereign-font-weight-medium);
   letter-spacing: var(--sovereign-letter-spacing-normal);
-  /* Подпись не переносится: кнопка фиксированной высоты от переноса теряет вторую строку. */
+  line-height: var(--sovereign-line-height-none);
   text-wrap: nowrap;
   cursor: pointer;
   transition:
@@ -31,37 +23,18 @@
     transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
-/* Меньший размер — для тесных мест: шапка панели, строка действий. Шкала та же, что у вкладок и меню. */
-.sm {
-  position: relative;
-  height: var(--sovereign-row-height-compact);
-  padding-inline: var(--sovereign-space-2);
-  font-size: var(--sovereign-font-size-xs);
+.button:focus-visible {
+  outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
+  outline-offset: var(--sovereign-space-1);
 }
 
-/* Компактный вид не уменьшает область указателя ниже доступной: прозрачная часть едет с масштабом. */
-.sm::before {
-  position: absolute;
-  inset-block: calc(var(--sovereign-space-1) * -1);
-  inset-inline: calc(var(--sovereign-space-1) * -1);
-  content: "";
+.button:active:not(:disabled) {
+  transform: translateY(var(--sovereign-stroke-thin));
 }
 
-/*
- * Только значок: квадратная кнопка без боковых отступов, контент отцентрирован. Сторона квадрата
- * совпадает с высотой выбранного размера — отдельно на md и на sm. Видимого текста нет, значит имя
- * даёт `aria-label`, а подсказку — `title`; подпись в `children` — это сам значок.
- */
-.iconOnly {
-  width: var(--sovereign-control-height-sm);
-  min-width: 1.75rem;
-  padding: 0;
-  font-size: var(--sovereign-font-size-md);
-  line-height: 1;
-}
-
-.sm.iconOnly {
-  width: var(--sovereign-row-height-compact);
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .normal {
@@ -74,7 +47,19 @@
   background: var(--sovereign-control-surface-hover);
 }
 
+.secondary {
+  border-color: var(--sovereign-secondary-border);
+  background: var(--sovereign-secondary);
+  color: var(--sovereign-text-on-secondary);
+  box-shadow: var(--sovereign-elevation-1);
+}
+
+.secondary:hover:not(:disabled, [aria-pressed="true"]) {
+  background: var(--sovereign-secondary-hover);
+}
+
 .accent {
+  border-color: var(--sovereign-accent-border);
   background: var(--sovereign-accent);
   color: var(--sovereign-text-on-accent);
   box-shadow: var(--sovereign-elevation-1);
@@ -85,36 +70,45 @@
 }
 
 .danger {
+  border-color: var(--sovereign-danger-border);
   background: var(--sovereign-danger);
   color: var(--sovereign-text-on-danger);
   box-shadow: var(--sovereign-elevation-1);
 }
 
 .danger:hover:not(:disabled, [aria-pressed="true"]) {
-  background: color-mix(in srgb, var(--sovereign-danger) 88%, var(--sovereign-text));
+  border-color: var(--sovereign-danger);
 }
 
-/*
- * Нажатие: сдвиг на пиксель вниз. Шкалой отступов он не выражается — это оптическая поправка
- * размером в толщину линии, а не отступ.
- */
-.button:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/*
- * Выбранная кнопка (`aria-pressed`) — утопленная: акцентная заливка вполсилы и тень внутрь вместо
- * возвышения. Правило идёт после тонов, потому что гасит их возвышение, а не дополняет его.
- */
 .button[aria-pressed="true"] {
   border-color: var(--sovereign-accent-border);
   background: var(--sovereign-accent-surface);
   color: var(--sovereign-accent-text);
   box-shadow: inset 0 var(--sovereign-stroke-thin) var(--sovereign-space-1)
     color-mix(in srgb, var(--sovereign-shadow) 40%, transparent);
+}
+
+.sm {
+  position: relative;
+  height: var(--sovereign-row-height-compact);
+  padding-inline: var(--sovereign-space-2);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.sm::before {
+  position: absolute;
+  inset-block: calc(var(--sovereign-space-1) * -1);
+  inset-inline: calc(var(--sovereign-space-1) * -1);
+  content: "";
+}
+
+.iconOnly {
+  width: var(--sovereign-control-height-sm);
+  min-width: 1.75rem;
+  padding: var(--sovereign-space-0);
+  font-size: var(--sovereign-font-size-md);
+}
+
+.sm.iconOnly {
+  width: var(--sovereign-row-height-compact);
 }

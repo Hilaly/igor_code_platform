@@ -1,0 +1,31 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const styles = readFileSync(new URL("./settings.css", import.meta.url), "utf8");
+
+describe("settings and plugin layout styles", () => {
+  it("keeps Appearance responsive while UI Kit owns its preview surface", () => {
+    expect(styles).toMatch(
+      /\.settings-appearance\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*min-width:\s*0;[^}]*container-type:\s*inline-size;/s,
+    );
+    expect(styles).not.toMatch(/\.settings-appearance-buttons/);
+    expect(styles).not.toMatch(/\.settings-appearance-preview/);
+  });
+
+  it("uses clean plugin containers without historical selector compensation", () => {
+    expect(styles).toMatch(
+      /\.plugins,\s*\.plugin-detail\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;[^}]*container-type:\s*inline-size;/s,
+    );
+    expect(styles).toMatch(
+      /\.plugin-detail-header-card\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);[^}]*border:/s,
+    );
+    expect(styles).toMatch(
+      /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.plugin-detail-contribution-controls\s*\{[^}]*align-items:\s*flex-start;/s,
+    );
+    expect(styles).not.toMatch(/\.project-detail-surface|\.plugin-detail-(?:surface|hero|facts)/);
+    expect(styles).not.toMatch(
+      /\[role="listitem"\]\s*\+\s*\[role="listitem"\][^{]*border-block-start:\s*0/s,
+    );
+  });
+});

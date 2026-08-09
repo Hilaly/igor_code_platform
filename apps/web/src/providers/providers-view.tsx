@@ -423,7 +423,10 @@ function ProviderAccess({
   const { t } = translator;
 
   return (
-    <section className="providers-detail-rows">
+    <section
+      className="providers-detail-rows"
+      aria-label={t("providers.access.title", { name: provider.name })}
+    >
       <SettingsRow label={t("providers.access.title", { name: provider.name })}>
         <div className="providers-access">
           {provider.logins.length === 0 ? (
@@ -543,7 +546,10 @@ function ProviderModels({ provider, entry, translator }: ProviderModelsProps) {
   const { t } = translator;
 
   return (
-    <section className="providers-detail-rows">
+    <section
+      className="providers-detail-rows"
+      aria-label={t("providers.models.title", { name: provider.name })}
+    >
       <SettingsRow label={t("providers.models.title", { name: provider.name })}>
         <div className="providers-models-control">
           {entry === undefined || entry.kind === "loading" ? (

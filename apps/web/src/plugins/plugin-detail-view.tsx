@@ -62,6 +62,11 @@ export function PluginDetailView({
     return (
       <div className="plugin-detail">
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
         {state.failure === undefined ? (
           <Spinner label={t("state.loading")} />
         ) : (
@@ -73,10 +78,24 @@ export function PluginDetailView({
 
   const status = snapshot.plugins.find((plugin) => plugin.key === pluginKey);
   if (status === undefined) {
+    const authoritative = !state.stale && state.failure === undefined;
+
     return (
       <div className="plugin-detail">
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
-        <EmptyState title={t("plugins.detail.notfound", { key: pluginKey })} />
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
+        {state.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("plugins.failed", { reason: state.failure })} />
+        )}
+        {authoritative ? (
+          <EmptyState title={t("plugins.detail.notfound", { key: pluginKey })} />
+        ) : state.failure === undefined ? (
+          <Spinner label={t("state.loading")} />
+        ) : undefined}
       </div>
     );
   }
@@ -102,7 +121,18 @@ export function PluginDetailView({
         <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
       </div>
 
-      <div className="plugin-detail-rows">
+      <div className="plugins-notices">
+        {state.stale ? (
+          <Notice tone="warning" title={t("plugins.stale.title")}>
+            {t("plugins.stale.hint")}
+          </Notice>
+        ) : undefined}
+        {state.failure === undefined ? undefined : (
+          <Notice tone="danger" title={t("plugins.write.failed", { reason: state.failure })} />
+        )}
+      </div>
+
+      <section className="plugin-detail-header-card" aria-label={status.id ?? status.key}>
         <SettingsRow label={status.id ?? status.key} description={<Code>{status.key}</Code>}>
           <Toggle
             checked={preferences?.enabled ?? false}
@@ -117,11 +147,11 @@ export function PluginDetailView({
             {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
           />
         </SettingsRow>
-      </div>
+      </section>
 
-      <section className="plugin-detail-section" aria-labelledby="plugin-detail-plugin">
+      <section className="plugin-detail-section" aria-label={t("plugins.detail.plugin")}>
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
-        <div className="plugin-detail-rows" id="plugin-detail-plugin">
+        <div className="plugin-detail-rows">
           <SettingsRow label={t("plugins.detail.lifecycle")}>
             <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
           </SettingsRow>
@@ -158,8 +188,13 @@ export function PluginDetailView({
         </Notice>
       )}
 
-      <section className="plugin-detail-section">
-        <Heading level={3}>{t("plugins.detail.contributions")}</Heading>
+      <section
+        className="plugin-detail-section"
+        aria-label={`${t("plugins.detail.contributions")} · ${declared.length}`}
+      >
+        <Heading level={3}>
+          {t("plugins.detail.contributions")} · {declared.length}
+        </Heading>
         {declared.length === 0 ? (
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (

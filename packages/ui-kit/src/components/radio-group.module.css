@@ -8,11 +8,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sovereign-space-3);
-  cursor: pointer;
-  user-select: none;
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-body);
-  font-size: var(--sovereign-font-size-md);
+  font-size: var(--sovereign-font-size-sm);
+  cursor: pointer;
+  user-select: none;
 }
 
 .item.disabled {
@@ -21,34 +21,34 @@
 }
 
 .radio {
-  appearance: none;
-  margin: 0;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: var(--sovereign-radius-full);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
-  background: var(--sovereign-sunken-surface);
   display: grid;
   place-content: center;
+  width: var(--sovereign-icon-md);
+  height: var(--sovereign-icon-md);
+  margin: var(--sovereign-space-0);
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-strong);
+  border-radius: var(--sovereign-radius-full);
+  appearance: none;
+  background: var(--sovereign-sunken-surface);
   cursor: pointer;
   transition:
-    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out),
-    background-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+    background var(--sovereign-duration-fast) var(--sovereign-ease-out),
+    border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
 }
 
 .radio::before {
-  content: "";
-  width: 0.55rem;
-  height: 0.55rem;
+  width: var(--sovereign-space-2);
+  height: var(--sovereign-space-2);
   border-radius: var(--sovereign-radius-full);
+  background: var(--sovereign-text-on-accent);
+  content: "";
   transform: scale(0);
   transition: transform var(--sovereign-duration-fast) var(--sovereign-ease-out);
-  background: var(--sovereign-text-on-accent);
 }
 
 .radio:checked {
-  background: var(--sovereign-accent);
   border-color: var(--sovereign-accent);
+  background: var(--sovereign-accent);
 }
 
 .radio:checked::before {
@@ -57,5 +57,16 @@
 
 .radio:focus-visible {
   outline: var(--sovereign-stroke-emphasis) solid var(--sovereign-focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--sovereign-space-1);
+}
+
+.radio:disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radio,
+  .radio::before {
+    transition: none;
+  }
 }

@@ -1,20 +1,11 @@
-/*
- * Лента переписки. Ответ агента остаётся открытым редакционным текстом, реплика человека — компактной
- * поднятой поверхностью, служебная строка — интерфейсным текстом; аватаров нет.
- */
-
 .feed {
   display: flex;
-  flex-direction: column;
-  gap: var(--sovereign-space-4);
-  padding: var(--sovereign-space-4);
-  overflow-y: auto;
-  /*
-   * Лента забирает всю высоту, которую ей дали, и прокручивается внутри себя. `min-height: 0`
-   * обязателен: без него flex-элемент не сжимается ниже содержимого, и прокрутка уезжает на страницу.
-   */
   flex: 1;
+  flex-direction: column;
+  gap: var(--sovereign-space-5);
   min-height: 0;
+  padding: var(--sovereign-space-5) var(--sovereign-space-4);
+  overflow-y: auto;
 }
 
 .message {
@@ -23,6 +14,7 @@
   gap: var(--sovereign-space-1);
   width: 100%;
   max-width: var(--sovereign-reading-width);
+  min-width: 0;
   margin-inline: auto;
 }
 
@@ -33,23 +25,23 @@
 }
 
 .body {
+  min-width: 0;
   color: var(--sovereign-text);
   font-size: var(--sovereign-font-size-sm);
   line-height: var(--sovereign-line-height-normal);
 }
 
-/* Реплика человека — единственное, что в ленте прижато к концу строки: так видно, кто говорит. */
 .message[data-role="human"] {
   align-self: flex-end;
   align-items: flex-end;
 }
 
 .message[data-role="human"] .body {
+  max-width: min(86%, var(--sovereign-reading-width));
   padding: var(--sovereign-space-2) var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
   border-radius: var(--sovereign-radius-md);
   background: var(--sovereign-panel-surface);
-  box-shadow: var(--sovereign-elevation-1);
   font-family: var(--sovereign-font-family-body);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -64,10 +56,6 @@
   line-height: var(--sovereign-line-height-reading);
 }
 
-/*
- * Служебная строка — смена модели или уровня размышлений. Это не реплика, и выглядеть как реплика
- * она не должна: узкая полоса по центру, второстепенным цветом.
- */
 .message[data-role="service"] {
   align-self: center;
   align-items: center;
@@ -75,8 +63,7 @@
 
 .message[data-role="service"] .body {
   padding: var(--sovereign-space-1) var(--sovereign-space-3);
-  border-radius: var(--sovereign-radius-full);
-  background: var(--sovereign-fill-surface);
+  border-inline-start: var(--sovereign-stroke-emphasis) solid var(--sovereign-border-strong);
   color: var(--sovereign-text-muted);
   font-family: var(--sovereign-font-family-body);
   font-size: var(--sovereign-font-size-xs);
