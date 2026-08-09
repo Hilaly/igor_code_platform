@@ -198,11 +198,10 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
 }
 
 /**
- * Тело записи конфига (docs/web-api.md). **Все ключи обязательны**, в отличие от чтения файла:
- * запись заменяет документ целиком, и тело без ключа молча вернуло бы настройку к умолчанию, тогда
- * как в файле у неё стояло другое значение.
+ * Тело записи конфига (docs/web-api.md). Непустой набор полей накладывается на последний документ
+ * на диске: только явно названный ключ меняется, а пропущенный остаётся без решения этого запроса.
  */
-export function parseConfigUpdate(raw: unknown): SettingsParseResult<Config> {
+export function parseConfigUpdate(raw: unknown): SettingsParseResult<Record<string, unknown>> {
   const fields = asObject(raw);
 
   if (fields === undefined) {
@@ -210,17 +209,32 @@ export function parseConfigUpdate(raw: unknown): SettingsParseResult<Config> {
   }
 
   const diagnostics = diagnoseUnknownKeys(configFileName, fields, configKeys);
-  const missing = configKeys.filter((key) => fields[key] === undefined);
 
-  if (missing.length > 0) {
-    diagnostics.push(
-      `${configFileName}: ${missing.join(", ")} is required: the write replaces the whole document`,
-    );
+  if (Object.keys(fields).length === 0) {
+    diagnostics.push(`${configFileName}: at least one key is required for an update`);
 
     return { kind: "rejected", diagnostics };
   }
 
-  return parseConfigFields(fields, diagnostics);
+  const value = { ...fields };
+
+  for (const key of configKeys) {
+    if (!Object.hasOwn(fields, key)) {
+      continue;
+    }
+
+    // Правило у значения не расходится с чтением файла: берём результат общей проверки, но только
+    // для поля, которое тело действительно назвало. Неизвестные поля остаются в `value` как есть.
+    const parsed = parseConfigFields({ [key]: fields[key] }, diagnostics);
+
+    if (parsed.kind === "rejected") {
+      return parsed;
+    }
+
+    value[key] = parsed.value[key];
+  }
+
+  return { kind: "parsed", value, diagnostics };
 }
 
 /** Проверка значений, общая для чтения файла и записи через API: правило у ключа одно. */

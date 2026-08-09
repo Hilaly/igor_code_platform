@@ -238,6 +238,24 @@ test("a written preference is in the snapshot when the call returns", () => {
   });
 });
 
+test("two config updates preserve both supplied fields", () => {
+  const directory = freshDirectory();
+  const { store } = startedStore(directory);
+
+  assert.deepEqual(store.writeConfig({ logLevel: "debug" }), { kind: "written" });
+  assert.deepEqual(store.writeConfig({ maxConcurrentTurns: 8 }), { kind: "written" });
+
+  assert.deepEqual(store.current().config, {
+    ...defaultConfig,
+    logLevel: "debug",
+    maxConcurrentTurns: 8,
+  });
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, configFileName), "utf8")), {
+    logLevel: "debug",
+    maxConcurrentTurns: 8,
+  });
+});
+
 test("writing one plugin keeps what the file says about the others", () => {
   const directory = freshDirectory();
 
