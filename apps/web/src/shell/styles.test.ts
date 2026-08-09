@@ -290,12 +290,24 @@ describe("the style sheets of the application", () => {
     expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*max-width\s*:/s);
   });
 
+  it("gives page content a definite body height while keeping the body as scroll owner", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(shell).toMatch(
+      /\.shell-body\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*overflow:\s*auto;/s,
+    );
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s);
+    expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*overflow(?:-x|-y)?\s*:/s);
+    expect(sessions).toMatch(
+      /\.new-session\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-height:\s*100%;[^}]*margin:\s*auto;/s,
+    );
+  });
+
   it("lets the contained content frame fill the body without owning a second scroll", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
-    expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s,
-    );
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s);
     expect(shell).not.toMatch(
       /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*overflow(?:-x|-y)?\s*:/s,
     );

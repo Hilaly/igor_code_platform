@@ -227,6 +227,23 @@ describe("the screen that creates a session", () => {
     expect(sendButton.hasAttribute("disabled")).toBe(false);
   });
 
+  it("keeps Send as the sole composer action without an empty alternatives menu", () => {
+    show();
+
+    const composer = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    const composerSurface = composer.closest<HTMLDivElement>(".new-session-composer");
+
+    expect(composerSurface).not.toBeNull();
+    expect(within(composerSurface!).getAllByRole("button")).toHaveLength(2);
+    expect(within(composerSurface!).getByRole("button", { name: "Отправить" })).not.toBeNull();
+    expect(
+      within(composerSurface!).getByRole("button", { name: "Выберите… · Средний" }),
+    ).not.toBeNull();
+    expect(
+      within(composerSurface!).queryByRole("button", { name: "Варианты отправки" }),
+    ).toBeNull();
+  });
+
   it("disables agent selection until a project is chosen", () => {
     const view = show();
 

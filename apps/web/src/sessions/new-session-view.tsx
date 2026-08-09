@@ -19,6 +19,7 @@ import {
   type TurnRequest,
 } from "@sovereign/protocol";
 import {
+  Button,
   Link,
   NextTurnPicker,
   Notice,
@@ -26,7 +27,6 @@ import {
   Select,
   SendIcon,
   Spinner,
-  SplitButton,
   Text,
   Textarea,
   type ScopedTranslator,
@@ -325,17 +325,15 @@ export function NewSessionView(props: NewSessionViewProps) {
                   translator={translator}
                   disabled={busy}
                 />
-                <SplitButton
-                  action={<SendIcon />}
-                  actionLabel={t("chat.send")}
-                  onAction={create}
-                  menuLabel={t("chat.send.options")}
-                  menuTriggerLabel={t("chat.send.options")}
-                  items={[]}
-                  placement="above"
+                <Button
+                  iconOnly
+                  aria-label={t("chat.send")}
+                  onClick={create}
                   tone="secondary"
                   disabled={!ready || busy}
-                />
+                >
+                  <SendIcon />
+                </Button>
               </div>
             </div>
           </div>

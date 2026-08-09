@@ -121,11 +121,14 @@
 }
 
 .shell-body {
+  display: flex;
+  flex-direction: column;
   overflow: auto;
 }
 
 .shell-content-frame {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   width: 100%;
   min-width: 0;
@@ -134,12 +137,7 @@
 }
 
 .shell-page[data-content-mode="contained"] .shell-body {
-  display: flex;
   overflow: hidden;
-}
-
-.shell-page[data-content-mode="contained"] .shell-content-frame {
-  flex: 1 1 auto;
 }
 
 .shell-page[data-content-mode="contained"] .shell-content-frame > :first-child {
