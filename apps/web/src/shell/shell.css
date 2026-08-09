@@ -138,6 +138,7 @@
 }
 
 .shell-content-frame > :first-child {
+  align-self: stretch;
   min-width: 0;
   max-width: 100%;
 }

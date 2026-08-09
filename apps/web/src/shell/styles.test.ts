@@ -295,7 +295,7 @@ describe("the style sheets of the application", () => {
 
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*align-items:\s*center;/s);
     expect(shell).toMatch(
-      /\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+      /\.shell-content-frame\s*>\s*:first-child\s*\{[^}]*align-self:\s*stretch;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
     );
     expect(shell).toMatch(
       /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*align-items:\s*stretch;/s,
