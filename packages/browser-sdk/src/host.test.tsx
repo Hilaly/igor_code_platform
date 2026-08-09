@@ -464,6 +464,7 @@ describe("core places", () => {
   });
 
   it("orders a collection and isolates a failing instance", () => {
+    const collectionId = "core.sidebar.sections";
     const plugins = [status("late", "data"), status("early", "data"), status("broken", "data")];
     const onDiagnostic = vi.fn();
     const { cache } = fakeCache({
@@ -478,11 +479,11 @@ describe("core places", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
-      provider(<HostPlaceCollection id={placeId} context={context} />, {
+      provider(<HostPlaceCollection id={collectionId} context={context} />, {
         contributions: [
-          component("late", "data", placeId, { order: 2 }),
-          component("early", "data", placeId, { order: 1 }),
-          component("broken", "data", placeId, { order: 3 }),
+          component("late", "data", collectionId, { order: 2 }),
+          component("early", "data", collectionId, { order: 1 }),
+          component("broken", "data", collectionId, { order: 3 }),
         ],
         plugins,
         onDiagnostic,
@@ -792,6 +793,93 @@ describe.each(["collection", "action"] as const)("plugin-owned %s places", (card
     expect(document.body.textContent).toBe("");
     expect(cache.load).not.toHaveBeenCalled();
   });
+
+  it(`renders an assigned command only when the place is action`, () => {
+    const alpha = status("alpha", "data");
+    const { cache } = fakeCache();
+
+    render(
+      provider(<PlaceCollection id={placeId} context={{}} />, {
+        contributions: [
+          declaration,
+          {
+            ownership: "plugin",
+            pluginKey: alpha.key,
+            pluginId: "alpha",
+            source: "data",
+            kind: "command",
+            id: "alpha.run",
+            declaredId: "run",
+            title: "Run alpha",
+            export: "RunCommand",
+            placeId,
+          },
+        ],
+        plugins: [alpha],
+        cache,
+      }),
+    );
+
+    const button = screen.queryByRole("button", { name: "Run alpha" });
+
+    if (cardinality === "action") {
+      expect(button).toBeTruthy();
+    } else {
+      expect(button).toBeNull();
+    }
+  });
+});
+
+it("uses distinct React keys for a component and command with the same id", () => {
+  const alpha = status("alpha", "data");
+  const action = board({
+    id: "placed.action",
+    declaredId: "action",
+    cardinality: "action",
+    replaceable: false,
+    builtIn: undefined,
+  });
+  const { cache } = fakeCache({
+    "data:alpha@r1": loaded({
+      Item: () => <button type="button">Component alpha</button>,
+      RunCommand: { run: () => {} },
+    }),
+  });
+  const onError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  render(
+    provider(<PlaceCollection id={action.id} context={{}} />, {
+      contributions: [
+        action,
+        component("alpha", "data", action.id, {
+          id: "alpha.shared",
+          export: "Item",
+        }),
+        {
+          ownership: "plugin",
+          pluginKey: alpha.key,
+          pluginId: "alpha",
+          source: "data",
+          kind: "command",
+          id: "alpha.shared",
+          declaredId: "shared",
+          title: "Command alpha",
+          export: "RunCommand",
+          placeId: action.id,
+        },
+      ],
+      plugins: [alpha],
+      cache,
+    }),
+  );
+
+  expect(screen.getByRole("button", { name: "Component alpha" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Command alpha" })).toBeTruthy();
+  expect(
+    onError.mock.calls.some(([message]) =>
+      String(message).includes("Encountered two children with the same key"),
+    ),
+  ).toBe(false);
 });
 
 it("does not render a single declaration through PlaceCollection", () => {

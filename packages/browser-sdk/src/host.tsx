@@ -1,4 +1,5 @@
 import {
+  corePlace,
   orderPlaceContributions,
   resolvePlaceDeclaration,
   resolvePlaceProvider,
@@ -133,9 +134,16 @@ export function HostPlace({ id, context, builtIn }: HostPlaceProps): ReactNode {
 
 export function HostPlaceCollection({ id, context }: PlaceProps): ReactNode {
   const runtime = useContext(BrowserRuntimeContext);
+  const declaration = corePlace(id);
 
-  return runtime === undefined ? null : (
-    <CollectionPlace id={id} context={context} runtime={runtime} />
+  return runtime === undefined ||
+    (declaration?.cardinality !== "collection" && declaration?.cardinality !== "action") ? null : (
+    <CollectionPlace
+      id={id}
+      context={context}
+      runtime={runtime}
+      cardinality={declaration.cardinality}
+    />
   );
 }
 
@@ -178,7 +186,14 @@ export function PluginPlaceCollection({ id, context }: PlaceProps): ReactNode {
     return null;
   }
 
-  return <CollectionPlace id={id} context={context} runtime={runtime} />;
+  return (
+    <CollectionPlace
+      id={id}
+      context={context}
+      runtime={runtime}
+      cardinality={declaration.cardinality}
+    />
+  );
 }
 
 function ownerBuiltIn(
@@ -247,14 +262,26 @@ function CollectionPlace({
   id,
   context,
   runtime,
-}: PlaceProps & { runtime: BrowserRuntime }): ReactNode {
+  cardinality,
+}: PlaceProps & {
+  runtime: BrowserRuntime;
+  cardinality: "collection" | "action";
+}): ReactNode {
+  const registrations = orderPlaceContributions(id, runtime.contributions, context).filter(
+    (registration) => cardinality === "action" || registration.kind !== "command",
+  );
+
   return (
     <>
-      {orderPlaceContributions(id, runtime.contributions, context).map((registration) => {
+      {registrations.map((registration) => {
         // Команда содержимого не даёт: за неё в полосе стоит кнопка с заголовком из снимка.
         if (registration.kind === "command") {
           return (
-            <CommandButton key={registration.id} registration={registration} context={context} />
+            <CommandButton
+              key={`${registration.kind}:${registration.id}`}
+              registration={registration}
+              context={context}
+            />
           );
         }
 
@@ -262,7 +289,7 @@ function CollectionPlace({
 
         return reference === undefined ? null : (
           <PlaceInstance
-            key={registration.id}
+            key={`${registration.kind}:${registration.id}`}
             reference={reference}
             context={context}
             fallback={null}

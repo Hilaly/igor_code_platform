@@ -454,6 +454,17 @@ describe("the command button in an action place", () => {
     expect(screen.getByRole("button", { name: "Run the board" })).toBeTruthy();
   });
 
+  it("does not draw a command assigned to a core collection place", () => {
+    render(
+      provider(<HostPlaceCollection id="core.sidebar.sections" context={{}} />, {
+        contributions: [command({ placeId: "core.sidebar.sections" })],
+        cache: controllableCache().cache,
+      }),
+    );
+
+    expect(screen.queryByRole("button", { name: "Run the board" })).toBeNull();
+  });
+
   it("reads cached availability without starting a bundle load", () => {
     const load = vi.fn(() => pending);
     const peek = vi.fn(() => undefined);
