@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type {
   CommandContributionRegistration,
   ComponentContributionRegistration,
+  PageContributionRegistration,
   PlaceContributionRegistration,
 } from "./contribution.ts";
 import { isPlaceCardinality } from "./contribution.ts";
@@ -15,6 +16,7 @@ import {
   orderPlaceContributions,
   resolvePlaceDeclaration,
   resolvePlaceProvider,
+  resolvePluginPage,
   toolCallPlaceId,
   type PlaceContext,
 } from "./places.ts";
@@ -53,6 +55,22 @@ const command = (
   placeId: "core.view.header.actions",
   export: "RunCommand",
   ...extra,
+});
+
+const page = (
+  pluginId: string,
+  source: PluginSource,
+  declaredId = "log",
+): PageContributionRegistration => ({
+  ownership: "plugin",
+  pluginKey: `${source}:${pluginId}`,
+  pluginId,
+  source,
+  id: `${pluginId}.${declaredId}`,
+  declaredId,
+  kind: "page",
+  title: "Log",
+  export: "LogPage",
 });
 
 const place = (declaredId: string, source: PluginSource): PlaceContributionRegistration => ({
@@ -367,5 +385,44 @@ describe("orderPlaceContributions", () => {
     );
     assert.deepEqual(resolvePlaceDeclaration(data.id, [data, spare], { project: "work" }), data);
     assert.deepEqual(resolvePlaceDeclaration(data.id, [data, project], {}), data);
+  });
+});
+
+describe("resolvePluginPage", () => {
+  /** Адрес `/p/<pluginId>/<pageId>` читается по паре, а не по идентификатору с неймспейсом. */
+  it("addresses a page by the plugin id and the declared id", () => {
+    const log = page("placed", "data");
+
+    assert.deepEqual(resolvePluginPage("placed", "log", [log], windowWide), log);
+    assert.equal(resolvePluginPage("placed", "placed.log", [log], windowWide), undefined);
+    assert.equal(resolvePluginPage("rival", "log", [log], windowWide), undefined);
+  });
+
+  it("ignores contributions of every other kind", () => {
+    assert.equal(
+      resolvePluginPage("placed", "panel", [component("placed", "data")], windowWide),
+      undefined,
+    );
+  });
+
+  /** Копия из директории данных перекрывает встроенную — то же правило, что у команд и мест. */
+  it("prefers the more specific source and drops a tie", () => {
+    const builtIn = page("placed", "builtin");
+    const data = page("placed", "data");
+    const rivalRoot = { ...data, pluginKey: "data:placed-copy" };
+
+    assert.deepEqual(resolvePluginPage("placed", "log", [builtIn, data], windowWide), data);
+    assert.equal(resolvePluginPage("placed", "log", [data, rivalRoot], windowWide), undefined);
+  });
+
+  /**
+   * Адрес страницы один на всё окно, поэтому вклад из папки проекта его не занимает: контекст
+   * страницы оконный, а проектный вклад в нём неприменим.
+   */
+  it("does not let a project plugin take the window-wide address", () => {
+    const project = { ...page("placed", "project:work"), pluginKey: "project:work:placed" };
+
+    assert.equal(resolvePluginPage("placed", "log", [project], windowWide), undefined);
+    assert.deepEqual(resolvePluginPage("placed", "log", [project], inProject), project);
   });
 });

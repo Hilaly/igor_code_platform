@@ -326,6 +326,26 @@ export type CommandContributionRegistration = RegistrationCommon & {
   order?: number;
 };
 
+/**
+ * Вклад-страница: плагин занимает целую страницу на своём адресе `/p/<pluginId>/<pageId>/*`
+ * (docs/ui-extension-model.md). Полей `path` и `route` у объявления нет намеренно: адрес выведен из
+ * идентификаторов, которые уже есть, а право назвать путь самому было бы вторым способом занять
+ * чужой адрес — со своим спором и своей диагностикой.
+ *
+ * Адресом служит `declaredId`, а не `id` с неймспейсом: `pluginId` в адресе уже стоит отдельным
+ * сегментом, и неймспейс дал бы `/p/placed/placed.log`. Спор об идентификаторе и перекрытие копии
+ * по рангу источника при этом считаются по `id`, как у всех вкладов.
+ *
+ * Заголовок обязателен по той же причине, что у команды: страница представлена ссылкой и шапкой
+ * **до** загрузки бандла.
+ */
+export type PageContributionRegistration = RegistrationCommon & {
+  kind: "page";
+  title: string;
+  /** Имя экспорта в браузерном бандле плагина. */
+  export: string;
+};
+
 export type ContributionRegistration =
   | CustomContributionRegistration
   | EventContributionRegistration
@@ -339,7 +359,8 @@ export type ContributionRegistration =
   | LocaleCatalogContributionRegistration
   | PlaceContributionRegistration
   | ComponentContributionRegistration
-  | CommandContributionRegistration;
+  | CommandContributionRegistration
+  | PageContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 
@@ -369,6 +390,7 @@ const everyKind = {
   place: true,
   component: true,
   command: true,
+  page: true,
 } satisfies Record<ContributionKind, true>;
 
 /**

@@ -15,6 +15,7 @@ import {
   type CommandContributionRegistration,
   type ComponentContributionRegistration,
   type ContributionRegistration,
+  type PageContributionRegistration,
   type PlacedContributionRegistration,
   type PlaceContributionRegistration,
   type PlaceCardinality,
@@ -196,6 +197,34 @@ export function commandsForContext(
   return registrationsForContext(commands, context).sort(byIdentifier);
 }
 
+/**
+ * Страница плагина по адресу `/p/<pluginId>/<pageId>/*` (docs/ui-extension-model.md). Живёт рядом с
+ * разрешением команд и мест по той же причине: правила контекста и ранга источника одни, и второй их
+ * набор разошёлся бы с первым при первой же правке.
+ *
+ * Контекст здесь оконный — у адреса страницы нет проекта, — поэтому вклад из папки проекта его не
+ * занимает: тот же довод, по которому проектный вклад не заменяет оконное вью.
+ */
+export function resolvePluginPage(
+  pluginId: string,
+  pageId: string,
+  contributions: readonly ContributionRegistration[],
+  context: PlaceContext,
+): PageContributionRegistration | undefined {
+  const pages = contributions.filter(
+    (registration): registration is PageContributionRegistration => registration.kind === "page",
+  );
+
+  // Страницу объявляют только программно, то есть всегда плагином: у standalone-корня нет ни
+  // браузерного бандла, ни идентификатора плагина, из которого сложен адрес.
+  return registrationsForContext(pages, context).find(
+    (registration) =>
+      registration.ownership === "plugin" &&
+      registration.pluginId === pluginId &&
+      registration.declaredId === pageId,
+  );
+}
+
 export function resolvePlaceProvider(
   placeId: string,
   contributions: readonly ContributionRegistration[],
@@ -250,7 +279,8 @@ function byIdentifier(
 }
 
 function registrationsForContext<
-  T extends PlaceContributionRegistration | PlacedContributionRegistration,
+  T extends
+    PlaceContributionRegistration | PlacedContributionRegistration | PageContributionRegistration,
 >(registrations: readonly T[], context: PlaceContext): T[] {
   // Спор равного ранга снимает всех претендентов на идентификатор — то же правило, что у вкладов в
   // реестре: молча выбранный победитель зависел бы от порядка обхода.
@@ -279,7 +309,8 @@ function registrationsForContext<
  * declarations have no source specificity and therefore share the base rank.
  */
 function registrationRank(
-  registration: PlaceContributionRegistration | PlacedContributionRegistration,
+  registration:
+    PlaceContributionRegistration | PlacedContributionRegistration | PageContributionRegistration,
 ): number {
   return registration.ownership === "plugin" ? pluginSourceRank(registration.source) : 0;
 }

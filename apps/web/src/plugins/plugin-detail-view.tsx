@@ -456,12 +456,14 @@ function TechnicalData({
                               group: registration.group,
                               order: registration.order,
                             }
-                          : {
-                              model: registration.model,
-                              thinkingLevel: registration.thinkingLevel,
-                              tools: registration.tools,
-                              skills: registration.skills,
-                            };
+                          : registration.kind === "page"
+                            ? { export: registration.export }
+                            : {
+                                model: registration.model,
+                                thinkingLevel: registration.thinkingLevel,
+                                tools: registration.tools,
+                                skills: registration.skills,
+                              };
   if (data === undefined) return undefined;
   return (
     <Disclosure

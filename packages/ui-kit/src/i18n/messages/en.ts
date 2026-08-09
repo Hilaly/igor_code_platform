@@ -416,6 +416,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.kind.agent": "agent",
     "plugins.kind.color-scheme": "colour scheme",
     "plugins.kind.command": "command",
+    "plugins.kind.page": "page",
     "plugins.kind.component": "component",
     "plugins.kind.custom": "contribution",
     "plugins.kind.event": "event",

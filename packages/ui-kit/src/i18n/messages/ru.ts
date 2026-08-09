@@ -415,6 +415,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.kind.agent": "агент",
     "plugins.kind.color-scheme": "цветовая схема",
     "plugins.kind.command": "команда",
+    "plugins.kind.page": "страница",
     "plugins.kind.component": "компонент",
     "plugins.kind.custom": "вклад",
     "plugins.kind.event": "событие",
