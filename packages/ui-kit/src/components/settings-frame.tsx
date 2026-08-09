@@ -151,3 +151,36 @@ export function SettingsRow({
     </div>
   );
 }
+
+export type SettingsEntityRowProps = {
+  label: ReactNode;
+  description?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  onSelect: () => void;
+  selectLabel: string;
+};
+
+/** A selectable Settings entity with independent metadata and action controls. */
+export function SettingsEntityRow({
+  label,
+  description,
+  meta,
+  actions,
+  onSelect,
+  selectLabel,
+}: SettingsEntityRowProps) {
+  return (
+    <SettingsRow
+      label={label}
+      description={description}
+      onSelect={onSelect}
+      selectLabel={selectLabel}
+    >
+      <div className={styles.entityControl}>
+        {meta === undefined ? undefined : <div className={styles.entityMeta}>{meta}</div>}
+        {actions === undefined ? undefined : <div className={styles.entityActions}>{actions}</div>}
+      </div>
+    </SettingsRow>
+  );
+}

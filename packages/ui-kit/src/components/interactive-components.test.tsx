@@ -14,7 +14,12 @@ import { Popover } from "./popover.tsx";
 import { RadioGroup } from "./radio-group.tsx";
 import { SegmentedControl } from "./segmented-control.tsx";
 import { Select } from "./select.tsx";
-import { SettingsNavigationItem, SettingsPage, SettingsView } from "./settings-frame.tsx";
+import {
+  SettingsEntityRow,
+  SettingsNavigationItem,
+  SettingsPage,
+  SettingsView,
+} from "./settings-frame.tsx";
 import { Slider } from "./slider.tsx";
 import { StatusDot } from "./status-dot.tsx";
 import { ToolCall } from "./tool-call.tsx";
@@ -1199,6 +1204,32 @@ describe("tool call", () => {
 });
 
 describe("settings frame", () => {
+  it("opens an entity row from its target but leaves its action independent", () => {
+    const onSelect = vi.fn();
+    const onAction = vi.fn();
+
+    render(
+      <SettingsEntityRow
+        label="Example"
+        meta={<span>Running</span>}
+        actions={
+          <button type="button" onClick={onAction}>
+            Switch
+          </button>
+        }
+        onSelect={onSelect}
+        selectLabel="Open Example"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Example" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("shows its navigation heading inside the named settings navigation", () => {
     render(
       <SettingsView
