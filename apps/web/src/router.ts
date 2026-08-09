@@ -5,7 +5,17 @@
  * маршрутами; до тех пор она была бы зависимостью ради `history.pushState`.
  */
 
-import { isSessionId } from "@sovereign/protocol";
+import {
+  isSessionId,
+  isSettingsSection,
+  settingsSections,
+  type SettingsSection,
+} from "@sovereign/protocol";
+
+// Перечень разделов переехал в протокол: он и так публичен именами мест `core.settings.<section>`.
+// Реэкспорт оставлен, чтобы потребители внутри `apps/web` продолжали брать его у маршрутизатора —
+// раздел для них это прежде всего адрес.
+export { settingsSections, type SettingsSection };
 
 export const pluginPagePrefix = "p";
 
@@ -14,19 +24,6 @@ export const pluginsPagePath = "/plugins";
 export const providersPagePath = "/providers";
 export const sessionsPagePath = "/sessions";
 export const settingsPagePath = "/settings";
-
-/** Разделы вью настроек. Список закрыт: раздел, который ядро не знает, не превращается в запрос. */
-export const settingsSections = [
-  "projects",
-  "appearance",
-  "usage",
-  "providers",
-  "plugins",
-  "daemon",
-  "diagnostics",
-] as const;
-
-export type SettingsSection = (typeof settingsSections)[number];
 
 export type Page =
   | { kind: "home" }
@@ -204,14 +201,14 @@ export function matchPage(path: string): Page {
       return { kind: "settings", section: "appearance" };
     }
 
-    if (!settingsSections.includes(section as SettingsSection)) {
+    if (!isSettingsSection(section)) {
       return { kind: "unknown", path };
     }
 
     const providerSegment = segments[2];
 
     if (providerSegment === undefined) {
-      return { kind: "settings", section: section as SettingsSection };
+      return { kind: "settings", section };
     }
 
     if (section !== "providers") {
