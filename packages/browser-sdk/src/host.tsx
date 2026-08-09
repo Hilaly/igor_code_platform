@@ -67,6 +67,8 @@ type PlaceInstanceProps = {
   reference: BrowserExportReference;
   context: PlaceContext;
   fallback: ReactNode;
+  /** Как называть вклад в диагностике: страница — не компонент, и человек читает про то, что открыл. */
+  subject?: "component" | "page";
 };
 
 type PlaceComponent = ComponentType<{ context: PlaceContext }>;
@@ -314,7 +316,12 @@ function referenceOf(
   };
 }
 
-export function PlaceInstance({ reference, context, fallback }: PlaceInstanceProps): ReactNode {
+export function PlaceInstance({
+  reference,
+  context,
+  fallback,
+  subject = "component",
+}: PlaceInstanceProps): ReactNode {
   const runtime = useContext(BrowserRuntimeContext);
   const say = useDiagnosticVoice(runtime);
   const status = runtime?.plugins.find((plugin) => plugin.key === reference.pluginKey);
@@ -326,11 +333,11 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
     runtime === undefined
       ? undefined
       : status === undefined
-        ? `the component ${reference.contributionId} names the plugin ${reference.pluginKey}, which is not in the snapshot`
+        ? `the ${subject} ${reference.contributionId} names the plugin ${reference.pluginKey}, which is not in the snapshot`
         : load?.kind === "failed"
-          ? `the component ${reference.contributionId} could not be loaded: ${load.reason}`
+          ? `the ${subject} ${reference.contributionId} could not be loaded: ${load.reason}`
           : load?.kind === "loaded" && typeof exported !== "function"
-            ? `the plugin ${status.key} exports no ${reference.exportName} for the component ${reference.contributionId}`
+            ? `the plugin ${status.key} exports no ${reference.exportName} for the ${subject} ${reference.contributionId}`
             : undefined;
 
   useEffect(() => {
@@ -355,7 +362,7 @@ export function PlaceInstance({ reference, context, fallback }: PlaceInstancePro
       )}
       fallback={fallback}
       onFailure={(reason) => {
-        say(`the component ${reference.contributionId} failed while rendering: ${reason}`);
+        say(`the ${subject} ${reference.contributionId} failed while rendering: ${reason}`);
       }}
     >
       <Instance context={context} />

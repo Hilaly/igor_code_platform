@@ -210,20 +210,27 @@ export function resolvePluginPage(
   pageId: string,
   contributions: readonly ContributionRegistration[],
   context: PlaceContext,
-): PageContributionRegistration | undefined {
+): PluginOwnedPageRegistration | undefined {
   const pages = contributions.filter(
     (registration): registration is PageContributionRegistration => registration.kind === "page",
   );
 
   // Страницу объявляют только программно, то есть всегда плагином: у standalone-корня нет ни
-  // браузерного бандла, ни идентификатора плагина, из которого сложен адрес.
+  // браузерного бандла, ни идентификатора плагина, из которого сложен адрес. Сужение — часть
+  // ответа: тот, кто открывает страницу, обязан знать, чей бандл ему грузить.
   return registrationsForContext(pages, context).find(
-    (registration) =>
+    (registration): registration is PluginOwnedPageRegistration =>
       registration.ownership === "plugin" &&
       registration.pluginId === pluginId &&
       registration.declaredId === pageId,
   );
 }
+
+/** Страница с известным плагином-владельцем: единственная форма, которую отдаёт разрешение. */
+export type PluginOwnedPageRegistration = Extract<
+  PageContributionRegistration,
+  { ownership: "plugin" }
+>;
 
 export function resolvePlaceProvider(
   placeId: string,
