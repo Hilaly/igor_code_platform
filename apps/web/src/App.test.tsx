@@ -94,4 +94,16 @@ describe("App shell composition", () => {
       expect(cached.appearance?.colorScheme).toBe("themed.missing");
     });
   });
+
+  it("wires the canonical usage route into Settings without requesting before the stream opens", async () => {
+    history.replaceState(null, "", "/settings/usage");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Usage" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Usage" }).getAttribute("aria-current")).toBe("page");
+    expect(
+      within(screen.getByRole("region", { name: "Usage" })).getByRole("status").textContent,
+    ).toBe("Loading usage…");
+  });
 });

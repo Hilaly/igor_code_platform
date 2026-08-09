@@ -19,6 +19,7 @@ export const settingsPagePath = "/settings";
 export const settingsSections = [
   "projects",
   "appearance",
+  "usage",
   "providers",
   "plugins",
   "daemon",

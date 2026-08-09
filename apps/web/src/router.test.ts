@@ -148,6 +148,11 @@ describe("matchPage", () => {
     });
   });
 
+  it("addresses exact usage analytics as a settings section", () => {
+    expect(matchPage("/settings/usage")).toEqual({ kind: "settings", section: "usage" });
+    expect(pathOf({ kind: "settings", section: "usage" })).toBe("/settings/usage");
+  });
+
   it("takes an unknown settings section for an unknown address", () => {
     // Список разделов закрыт: раздел, которого ядро не знает, не превращается в запрос.
     expect(matchPage("/settings/нет-такого")).toEqual({
@@ -191,6 +196,7 @@ describe("pathOf", () => {
       "/sessions/archive",
       "/sessions/0199abcd-ef01",
       "/settings/appearance",
+      "/settings/usage",
       "/settings/providers",
       "/settings/providers/anthropic",
       "/settings/plugins",
