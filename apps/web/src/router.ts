@@ -320,10 +320,15 @@ function parseQuery(search: string): Readonly<Record<string, string>> {
   return query;
 }
 
+export type NavigateOptions = {
+  /** Замена записи истории вместо новой: фильтр страницы не обязан наполнять кнопку «назад». */
+  replace?: boolean;
+};
+
 export type Navigation = {
   current: () => Location;
   /** Голый `Page` значит «без параметров»: маршруты ядра о них не знают. */
-  navigate: (target: Location | Page) => void;
+  navigate: (target: Location | Page, options?: NavigateOptions) => void;
   /** Возвращает функцию отписки. Кнопка «назад» браузера — такое же событие, как наш переход. */
   subscribe: (listener: (location: Location) => void) => () => void;
   /** Снимает слушателя истории: брошенный экземпляр иначе канонизирует адрес за спиной живого. */
@@ -361,7 +366,7 @@ export function createNavigation(target: Window = window): Navigation {
 
   return {
     current: readCurrent,
-    navigate: (destination) => {
+    navigate: (destination, options) => {
       const location =
         "page" in destination ? destination : { page: destination, query: withoutParameters };
       const url = urlOf(location);
@@ -372,7 +377,12 @@ export function createNavigation(target: Window = window): Navigation {
         return;
       }
 
-      target.history.pushState(undefined, "", url);
+      if (options?.replace === true) {
+        target.history.replaceState(undefined, "", url);
+      } else {
+        target.history.pushState(undefined, "", url);
+      }
+
       announce();
     },
     subscribe: (listener) => {

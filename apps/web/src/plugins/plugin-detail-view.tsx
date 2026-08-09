@@ -6,6 +6,7 @@ import {
   type ContributionRegistration,
   type PlaceCardinality,
   type PluginLifecycleState,
+  type PluginOwnedPageRegistration,
   type PluginPreferences,
   type PluginsSnapshot,
   type PluginStatus,
@@ -27,7 +28,7 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
-import { routeAddress, type PluginsState } from "./state.ts";
+import { pluginPageAddress, routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
   headingLevel?: 1 | 2;
@@ -35,6 +36,8 @@ export type PluginDetailViewProps = {
   pluginKey: string;
   onBack: () => void;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
+  /** Открыть страницу плагина. Адрес строит маршрутизатор, а не эта разметка. */
+  onOpenPage: (pluginId: string, pageId: string) => void;
   translator: ScopedTranslator;
 };
 
@@ -92,6 +95,7 @@ export function PluginDetailView({
   pluginKey,
   onBack,
   onSwitch,
+  onOpenPage,
   translator,
 }: PluginDetailViewProps) {
   const { t } = translator;
@@ -147,6 +151,10 @@ export function PluginDetailView({
   ]);
   const forgotten = (preferences?.disabledContributions ?? []).filter(
     (id) => !declared.some((entry) => entry.registration.id === id),
+  );
+  const pages = declared.filter(
+    (entry): entry is { registration: PluginOwnedPageRegistration; off: boolean } =>
+      entry.registration.kind === "page" && entry.registration.ownership === "plugin",
   );
 
   const switchContribution = (id: string, on: boolean): void => {
@@ -272,6 +280,37 @@ export function PluginDetailView({
           </div>
         )}
       </section>
+
+      {pages.length === 0 ? undefined : (
+        <section className="plugin-detail-section" aria-label={t("plugins.pages.title")}>
+          <Heading level={3}>{t("plugins.pages.title")}</Heading>
+          {/*
+            Автоматической записи в левой панели у страницы нет: её кладёт туда сам плагин. Здесь —
+            гарантия, что объявленная страница видна и достижима, а не только заявлена.
+          */}
+          <div className="plugin-detail-rows" role="list">
+            {pages.map(({ registration, off }) => (
+              <div role="listitem" key={registration.id}>
+                <SettingsRow
+                  label={registration.title}
+                  description={<Code>{pluginPageAddress(registration)}</Code>}
+                >
+                  {off ? (
+                    <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                  ) : (
+                    <Button
+                      tone="secondary"
+                      onClick={() => onOpenPage(registration.pluginId, registration.declaredId)}
+                    >
+                      {t("plugins.pages.open")}
+                    </Button>
+                  )}
+                </SettingsRow>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {claims.length === 0 ? undefined : (
         <section className="plugin-detail-section">

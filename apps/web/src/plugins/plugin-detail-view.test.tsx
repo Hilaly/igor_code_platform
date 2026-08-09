@@ -67,12 +67,14 @@ const snapshot: PluginsSnapshot = {
 it("shows plugin facts, controls each contribution, and exposes technical data", () => {
   const onSwitch = vi.fn();
   const onBack = vi.fn();
+  const onOpenPage = vi.fn();
   const { container } = render(
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
       onBack={onBack}
       onSwitch={onSwitch}
+      onOpenPage={onOpenPage}
       translator={translator}
     />,
   );
@@ -125,6 +127,7 @@ it("does not add a nested page heading when embedded under Settings", () => {
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -139,6 +142,7 @@ it("shows a not-found state for an unknown plugin key", () => {
       pluginKey="data:nope"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -152,6 +156,7 @@ it("does not claim a stale missing plugin is authoritatively absent", () => {
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -170,6 +175,7 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -184,6 +190,7 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -199,6 +206,7 @@ it("keeps stale and write-failure notices visible on the detail route", () => {
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -215,6 +223,7 @@ it("shows a stale warning while the first detail snapshot is still loading", () 
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -250,6 +259,7 @@ it("names the kind of a public route and shows the address it answers at", () =>
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -313,6 +323,7 @@ const showPlaces = (next: PluginsSnapshot): void => {
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -372,6 +383,7 @@ it("says which places the plugin holds and why a claim did not apply", () => {
       pluginKey="data:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -407,6 +419,7 @@ it("names the plugin that took the place instead", () => {
       pluginKey="builtin:example"
       onBack={vi.fn()}
       onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
@@ -469,4 +482,63 @@ it("leaves a command without a place out of the places section", () => {
 
   expect(screen.queryByRole("group", { name: "core.view.header.actions" })).toBeNull();
   expect(screen.getByText("command")).toBeTruthy();
+});
+
+const page = (declaredId: string): ContributionRegistration => ({
+  kind: "page",
+  ownership: "plugin",
+  pluginKey: "data:example",
+  pluginId: "example",
+  source: "data",
+  id: `example.${declaredId}`,
+  declaredId,
+  title: "Log",
+  export: "LogPage",
+});
+
+/**
+ * Автоматической записи в левой панели у страницы нет, поэтому список страниц здесь — гарантия,
+ * что объявленная страница видна и достижима, а не только заявлена.
+ */
+it("lists a declared page with its address and opens it", () => {
+  const onOpenPage = vi.fn();
+
+  render(
+    <PluginDetailView
+      state={{ snapshot: withPlaces([page("log")]), stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      onOpenPage={onOpenPage}
+      translator={translator}
+    />,
+  );
+
+  const section = screen.getByRole("region", { name: "Pages" });
+
+  expect(within(section).getByText("/p/example/log")).toBeTruthy();
+  fireEvent.click(within(section).getByRole("button", { name: "Open" }));
+
+  expect(onOpenPage).toHaveBeenCalledWith("example", "log");
+});
+
+it("shows a switched-off page as switched off instead of offering to open it", () => {
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: { ...snapshot, contributions: [], switchedOffContributions: [page("log")] },
+        stale: false,
+      }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const section = screen.getByRole("region", { name: "Pages" });
+
+  expect(within(section).getByText("switched off")).toBeTruthy();
+  expect(within(section).queryByRole("button", { name: "Open" })).toBeNull();
 });

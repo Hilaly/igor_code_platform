@@ -46,3 +46,7 @@
     animation: none;
   }
 }
+.action {
+  display: inline-flex;
+  margin-top: var(--sovereign-space-2);
+}

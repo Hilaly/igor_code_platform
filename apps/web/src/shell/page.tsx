@@ -1,10 +1,16 @@
 /**
  * Центральная страница: разводит адреса по вью. Проекты, провайдеры и управление плагинами
- * собраны внутри единого Settings; страницы плагинов появятся вместе с браузерным кодом, который собирает демон
+ * собраны внутри единого Settings; страница плагина приходит собранной, как и остальные вью
  * (docs/ui-extension-model.md).
  */
 
-import type { PluginStatus, Project, ProviderSummary, Session } from "@sovereign/protocol";
+import type {
+  PluginOwnedPageRegistration,
+  PluginStatus,
+  Project,
+  ProviderSummary,
+  Session,
+} from "@sovereign/protocol";
 import { EmptyState, type ScopedTranslator } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
@@ -16,6 +22,8 @@ export type PageHeaderData = {
   project?: Project;
   provider?: ProviderSummary;
   plugin?: PluginStatus;
+  /** Заголовок страницы плагина известен из снимка — до того, как загружен её код. */
+  pluginPage?: PluginOwnedPageRegistration;
 };
 
 /** Stable route-level title/context. Missing remote data is intentionally not guessed. */
@@ -61,7 +69,10 @@ export function describePage(
         context: data.plugin?.key,
       };
     case "plugin":
-      return { title: t("page.plugin.title"), context: `${page.pluginId}/${page.pageId}` };
+      return {
+        title: data.pluginPage?.title ?? t("page.plugin.title"),
+        context: `${page.pluginId}/${page.pageId}`,
+      };
     case "unknown":
       return { title: t("page.unknown.title") };
   }
@@ -77,6 +88,8 @@ export type PageViewProps = {
   newProvider: ReactNode;
   editProvider: ReactNode;
   settings: ReactNode;
+  /** Страница плагина: маршрут ядра, содержимое чужое. */
+  pluginPage: ReactNode;
   translator: ScopedTranslator;
 };
 
@@ -88,6 +101,7 @@ export function PageView({
   newProvider,
   editProvider,
   settings,
+  pluginPage,
   translator,
 }: PageViewProps) {
   const { t } = translator;
@@ -117,12 +131,7 @@ export function PageView({
   }
 
   if (page.kind === "plugin") {
-    return (
-      <EmptyState
-        title={t("page.plugin.title")}
-        hint={`${t("page.plugin.hint")} (${page.pluginId}/${page.pageId})`}
-      />
-    );
+    return pluginPage;
   }
 
   if (page.kind === "unknown") {

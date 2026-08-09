@@ -3,18 +3,26 @@
  * неймспейсе они лежат.
  */
 
+import type { ReactNode } from "react";
+
 import styles from "./state.module.css";
 
 export type EmptyStateProps = {
   title: string;
   hint?: string;
+  /**
+   * Выход из состояния: кнопка или ссылка. Пустое состояние, из которого некуда деться, — тупик, а
+   * первым его настоящим потребителем стала заглушка страницы плагина, которой возврат обязателен.
+   */
+  action?: ReactNode;
 };
 
-export function EmptyState({ title, hint }: EmptyStateProps) {
+export function EmptyState({ title, hint, action }: EmptyStateProps) {
   return (
     <div className={styles.empty}>
       <span className={styles.title}>{title}</span>
       {hint === undefined ? undefined : <span className={styles.hint}>{hint}</span>}
+      {action === undefined ? undefined : <span className={styles.action}>{action}</span>}
     </div>
   );
 }

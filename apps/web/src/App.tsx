@@ -11,6 +11,7 @@ import {
   streamGapType,
   type AppearancePreferences,
   type AuthenticationState,
+  type CoreDestination,
   type Health,
   type LoginStepFrame,
   type PlaceContext,
@@ -37,12 +38,15 @@ import { createFrontendBus } from "./events/bus.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
 import { CommandPalette, useCommandPaletteShortcut } from "./commands/command-palette.tsx";
+import { locationOfDestination } from "./navigation/core-destination.ts";
 import {
   BrowserRuntimeProvider,
   HostPlace,
   HostPlaceCollection,
   useHostPlaceTabs,
 } from "./places/place-host.tsx";
+import { PluginPageView } from "./places/plugin-page-view.tsx";
+import { resolvePluginPageState } from "./places/plugin-page.ts";
 import { PluginsView } from "./plugins/plugins-view.tsx";
 import { PluginDetailView } from "./plugins/plugin-detail-view.tsx";
 import { usePlugins } from "./plugins/use-plugins.ts";
@@ -481,6 +485,35 @@ export function App() {
     [navigation],
   );
 
+  // Переход внутри страницы плагина: путь уже приведён фасадом к виду «от базы страницы».
+  const navigateInPluginPage = useCallback(
+    (path: string, query: Readonly<Record<string, string>>, replace: boolean): void => {
+      if (page.kind !== "plugin") {
+        return;
+      }
+
+      navigation.navigate(
+        { page: { ...page, rest: path.split("/").filter(Boolean).join("/") }, query },
+        { replace },
+      );
+    },
+    [navigation, page],
+  );
+  const leavePluginPage = useCallback(
+    (destination: CoreDestination): void => {
+      navigation.navigate(locationOfDestination(destination));
+    },
+    [navigation],
+  );
+  // Страница резолвится один раз: шапке нужен её заголовок, вью — сама страница, и два разбора
+  // одного адреса разошлись бы при первой правке правил.
+  const pluginPageState =
+    page.kind === "plugin"
+      ? resolvePluginPageState(plugins.state.snapshot, page.pluginId, page.pageId)
+      : undefined;
+  const openPluginPage =
+    pluginPageState?.kind === "open" ? pluginPageState.registration : undefined;
+
   const pageHeader = describePage(page, translator, {
     session: sessions.state.open?.summary,
     project:
@@ -498,6 +531,7 @@ export function App() {
       page.kind === "settings-plugin"
         ? plugins.state.snapshot?.plugins.find(({ key }) => key === page.pluginKey)
         : undefined,
+    pluginPage: openPluginPage,
   });
 
   // Номер последней отправленной записи внешнего вида. Два быстрых переключения рвут договор:
@@ -663,6 +697,18 @@ export function App() {
       >
         <PageView
           page={page}
+          pluginPage={
+            page.kind === "plugin" && pluginPageState !== undefined ? (
+              <PluginPageView
+                page={page}
+                query={location.query}
+                state={pluginPageState}
+                onNavigate={navigateInPluginPage}
+                onNavigateCore={leavePluginPage}
+                translator={translator}
+              />
+            ) : null
+          }
           session={
             <SessionRouteView
               sessionId={page.kind === "session" ? page.sessionId : ""}
@@ -973,6 +1019,11 @@ export function App() {
                             navigation.navigate({ kind: "settings", section: "plugins" })
                           }
                           onSwitch={plugins.switchPlugin}
+                          onOpenPage={(pluginId, pageId) =>
+                            navigation.navigate(
+                              locationOfDestination({ kind: "plugin-page", pluginId, pageId }),
+                            )
+                          }
                           translator={translator}
                         />
                       ) : (

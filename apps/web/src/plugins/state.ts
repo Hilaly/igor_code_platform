@@ -14,10 +14,13 @@ import {
   pluginRouteAddress,
   streamGapType,
   type ContributionRegistration,
+  type PluginOwnedPageRegistration,
   type PluginPreferences,
   type PluginsSnapshot,
   type BusStreamEvent,
 } from "@sovereign/protocol";
+
+import { pluginPagePrefix } from "../router.ts";
 
 /**
  * Адрес маршрута плагина по его записи в реестре (docs/web-api.md). Сам адрес строит протокол — тот
@@ -32,6 +35,15 @@ export function routeAddress(
     registration.ownership === "plugin" ? registration.pluginId : registration.source;
 
   return pluginRouteAddress(pluginId, registration.path);
+}
+
+/**
+ * Адрес страницы плагина (docs/ui-extension-model.md). Складывается из идентификатора плагина и
+ * объявленного идентификатора страницы — тех же двух сегментов, по которым её разбирает
+ * маршрутизатор.
+ */
+export function pluginPageAddress(registration: PluginOwnedPageRegistration): string {
+  return `/${pluginPagePrefix}/${registration.pluginId}/${registration.declaredId}`;
 }
 
 export type PluginsState = {
