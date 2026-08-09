@@ -254,6 +254,9 @@
   ограниченная колонка live tool call и немедленный Markdown для reasoning и ответа агента.
 - [План live-рендеринга сессии](superpowers/plans/2026-08-09-session-live-markdown-rendering.md) —
   TDD-срез для live tool call, reasoning и стримингового Markdown.
+- [Срез 14a: пользовательские изображения в чате](superpowers/specs/2026-08-09-slice-14-chat-attachments-design.md) —
+  единый image payload для пяти режимов сообщения, inline Pi JSONL, лимиты, model capability,
+  picker/paste/drop и просмотр оригинала в истории.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 
