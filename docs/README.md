@@ -168,6 +168,9 @@
   состав команд ядра.
 - [План дополнительных исправлений среза 12c-1](superpowers/plans/2026-08-09-slice-12c1-final-review-fixes.md) —
   четыре TDD-этапа для доступности команд, точного shortcut, семантики `ListRow` и полной проверки.
+- [Срез 12c-2: страницы плагина](superpowers/specs/2026-08-09-slice-12c2-plugin-pages-design.md) —
+  вид вклада «страница», маршрутизатор на полном адресе, фасад навигации хуком и публичные адреса
+  ядра; почему страница не стала местом, а роутер — библиотекой.
 - [Projects как раздел Settings](superpowers/specs/2026-08-05-settings-projects-section-design.md) —
   утверждённый перенос списка и детали проекта в общий SettingsView с удалением старых маршрутов.
 - [Базовое вью Settings в UI kit](superpowers/specs/2026-08-05-settings-ui-kit-view-design.md) —
