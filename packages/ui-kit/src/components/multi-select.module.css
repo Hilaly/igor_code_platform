@@ -84,10 +84,6 @@
 }
 
 .dropdown {
-  position: absolute;
-  z-index: var(--sovereign-z-overlay);
-  inset-block-start: calc(100% + var(--sovereign-space-1));
-  inset-inline: 0;
   max-height: 16rem;
   padding: var(--sovereign-space-1);
   overflow-y: auto;

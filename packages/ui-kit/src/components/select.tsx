@@ -5,6 +5,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./select.module.css";
 
 export type SelectOption = {
@@ -40,6 +41,7 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   const safeListId = `select-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
@@ -56,7 +58,11 @@ export function Select({
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(event.target as Node) &&
+        !popupRef.current?.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -153,14 +159,16 @@ export function Select({
         <span className={styles.valueText}>{selectedOption?.label || placeholder}</span>
         <span className={`${styles.arrow}${open ? ` ${styles.open}` : ""}`}>▼</span>
       </div>
-      {open ? (
-        <div
-          id={listId}
-          className={styles.dropdown}
-          role="listbox"
-          aria-label={ariaLabel ?? label}
-          tabIndex={-1}
-        >
+      <FloatingLayer
+        open={open}
+        anchorRef={rootRef}
+        layerRef={popupRef}
+        matchAnchorWidth
+        id={listId}
+        className={styles.dropdown}
+        role="listbox"
+        ariaLabel={ariaLabel ?? label}
+      >
           {options.map((option, index) => {
             const isSelected = option.value === value && !option.disabled;
             const isActive = index === activeIndex;
@@ -192,8 +200,7 @@ export function Select({
               </div>
             );
           })}
-        </div>
-      ) : null}
+      </FloatingLayer>
     </div>
   );
 }

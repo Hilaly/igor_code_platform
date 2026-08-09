@@ -491,6 +491,7 @@ describe("interactive components", () => {
     fireEvent.click(input);
 
     const enabledOption = screen.getByRole("option", { name: "Второй" });
+    expect(screen.getByRole("listbox", { name: "Выбор" }).parentElement).toBe(document.body);
     expect(input.getAttribute("aria-haspopup")).toBe("listbox");
     expect(input.getAttribute("aria-activedescendant")).toBe(enabledOption.id);
 
@@ -579,6 +580,7 @@ describe("interactive components", () => {
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
 
     const listbox = screen.getByRole("listbox");
+    expect(listbox.parentElement).toBe(document.body);
     expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
     expect(trigger.getAttribute("aria-activedescendant")).toBe(
       screen.getByRole("option", { name: "Второй" }).id,
@@ -878,7 +880,7 @@ describe("interactive components", () => {
     );
 
     fireEvent.click(screen.getByRole("combobox", { name: "Scheme" }));
-    expect(screen.getByRole("listbox", { name: "Scheme" })).toBeTruthy();
+    expect(screen.getByRole("listbox", { name: "Scheme" }).parentElement).toBe(document.body);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
     expect(screen.queryByRole("listbox", { name: "Scheme" })).toBeNull();
   });

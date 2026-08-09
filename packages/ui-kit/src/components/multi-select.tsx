@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+import { FloatingLayer } from "./floating-layer.tsx";
 import styles from "./multi-select.module.css";
 
 export type MultiSelectOption<T extends string> = {
@@ -33,6 +34,7 @@ export function MultiSelect<T extends string>({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   const safeListId = `multi-select-${listId.replace(/[^A-Za-z0-9_-]/g, "") || "list"}`;
 
@@ -42,7 +44,11 @@ export function MultiSelect<T extends string>({
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(event.target as Node) &&
+        !popupRef.current?.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -167,15 +173,17 @@ export function MultiSelect<T extends string>({
           <span className={styles.placeholder}>{placeholder}</span>
         )}
       </div>
-      {open ? (
-        <div
-          id={listId}
-          className={styles.dropdown}
-          role="listbox"
-          aria-label={label}
-          aria-multiselectable="true"
-          tabIndex={-1}
-        >
+      <FloatingLayer
+        open={open}
+        anchorRef={rootRef}
+        layerRef={popupRef}
+        matchAnchorWidth
+        id={listId}
+        className={styles.dropdown}
+        role="listbox"
+        ariaLabel={label}
+        ariaMultiselectable
+      >
           {options.map((option, index) => {
             const isSelected = value.includes(option.value) && !option.disabled;
             const isActive = index === activeIndex;
@@ -206,8 +214,7 @@ export function MultiSelect<T extends string>({
               </div>
             );
           })}
-        </div>
-      ) : null}
+      </FloatingLayer>
     </div>
   );
 }
