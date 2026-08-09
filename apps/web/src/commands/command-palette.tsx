@@ -40,7 +40,14 @@ type PaletteEntry = {
 export function useCommandPaletteShortcut(onOpen: () => void): void {
   useEffect(() => {
     const listen = (event: KeyboardEvent): void => {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) {
+      const platformModifier = event.metaKey !== event.ctrlKey;
+
+      if (
+        event.key.toLowerCase() !== "k" ||
+        !platformModifier ||
+        event.shiftKey ||
+        event.altKey
+      ) {
         return;
       }
 

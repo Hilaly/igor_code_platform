@@ -286,4 +286,24 @@ describe("the command palette shortcut", () => {
 
     expect(screen.getByText("opened 0")).toBeDefined();
   });
+
+  it.each([
+    { ctrlKey: true, shiftKey: true },
+    { ctrlKey: true, altKey: true },
+    { metaKey: true, shiftKey: true },
+    { metaKey: true, altKey: true },
+    { metaKey: true, ctrlKey: true },
+  ])("leaves modified Cmd or Ctrl+K chords alone", (modifiers) => {
+    render(<Probe />);
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      cancelable: true,
+      ...modifiers,
+    });
+
+    act(() => window.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.getByText("opened 0")).toBeDefined();
+  });
 });
