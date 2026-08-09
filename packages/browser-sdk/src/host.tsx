@@ -29,6 +29,7 @@ import {
 } from "./runtime-context.tsx";
 
 export { useHostCommandCatalog, type HostCommandCatalogEntry } from "./commands.tsx";
+export { normalizePagePath } from "./page-path.ts";
 export { HostPluginPage, type HostPageNavigation, type HostPluginPageProps } from "./page.tsx";
 
 export type LoadedPluginModule = Record<string, unknown>;

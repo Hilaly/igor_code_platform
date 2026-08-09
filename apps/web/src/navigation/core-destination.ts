@@ -7,6 +7,7 @@
  */
 
 import type { CoreDestination } from "@sovereign/protocol";
+import { normalizePagePath } from "@sovereign/browser-sdk/host";
 
 import type { Location } from "../router.ts";
 
@@ -29,7 +30,7 @@ export function locationOfDestination(destination: CoreDestination): Location {
           pluginId: destination.pluginId,
           pageId: destination.pageId,
           // Хвост хранится без ведущего слэша: `pathOf` приклеивает его сам.
-          rest: (destination.path ?? "").split("/").filter(Boolean).join("/"),
+          rest: normalizePagePath(destination.path ?? "").slice(1),
         },
         query: destination.query ?? {},
       };

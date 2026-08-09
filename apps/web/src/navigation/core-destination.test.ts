@@ -29,4 +29,20 @@ describe("locationOfDestination", () => {
 
     expect(url).toBe("/p/rival/board/entry/3?filter=warn");
   });
+
+  it.each(["../../../settings/plugins", "/%2e%2e/%2e%2e/settings/plugins"])(
+    "keeps another plugin page path inside its page for %s",
+    (path) => {
+      const url = urlOf(
+        locationOfDestination({
+          kind: "plugin-page",
+          pluginId: "rival",
+          pageId: "board",
+          path,
+        }),
+      );
+
+      expect(url).toBe("/p/rival/board/settings/plugins");
+    },
+  );
 });

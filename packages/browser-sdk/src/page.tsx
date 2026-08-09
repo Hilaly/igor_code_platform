@@ -13,6 +13,7 @@ import type { CoreDestination, PluginOwnedPageRegistration } from "@sovereign/pr
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import { PlaceInstance } from "./host.tsx";
+import { normalizePagePath } from "./page-path.ts";
 import type { PlaceContext } from "./runtime-context.tsx";
 
 export type PageNavigateOptions = {
@@ -84,10 +85,14 @@ export function HostPluginPage({
   const facade = useMemo<PageNavigation>(
     () => ({
       basePath,
-      path: pagePath(rest),
+      path: normalizePagePath(rest),
       query,
       navigate: (path, options) =>
-        onNavigate(pagePath(path), options?.query ?? withoutParameters, options?.replace ?? false),
+        onNavigate(
+          normalizePagePath(path),
+          options?.query ?? withoutParameters,
+          options?.replace ?? false,
+        ),
       navigateCore: onNavigateCore,
     }),
     [basePath, rest, query, onNavigate, onNavigateCore],
@@ -107,28 +112,4 @@ export function HostPluginPage({
       />
     </PageNavigationContext>
   );
-}
-
-/**
- * Приводит путь к виду «от базы страницы»: с ведущим слэшем, без пустых и точечных сегментов.
- * `..` выше базы упирается в неё, как в корень файловой системы, — уйти переходом из своего
- * поддерева страница не может, как не может занять чужой адрес объявлением.
- */
-function pagePath(path: string): string {
-  const segments: string[] = [];
-
-  for (const segment of path.split("/")) {
-    if (segment === "" || segment === ".") {
-      continue;
-    }
-
-    if (segment === "..") {
-      segments.pop();
-      continue;
-    }
-
-    segments.push(segment);
-  }
-
-  return segments.length === 0 ? "/" : `/${segments.join("/")}`;
 }
