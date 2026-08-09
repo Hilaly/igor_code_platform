@@ -6,6 +6,8 @@
  * инструментов, очередь походов к модели и поток дельт.
  */
 
+import { dirname } from "node:path";
+
 import {
   agentsPath,
   coreEventTypes,
@@ -64,6 +66,7 @@ import {
   type TurnRequest,
 } from "@sovereign/protocol";
 import type {
+  AgentDefinition,
   AgentSession,
   AgentSessionStore,
   AgentSessionSummary,
@@ -265,6 +268,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   const emptySelection = { include: [], exclude: [] };
 
+  const agentDefinition = (agent: AgentContributionRegistration): AgentDefinition => ({
+    id: agent.id,
+    instructions: agent.instructions,
+    ...(agent.location === undefined ? {} : { directory: dirname(agent.location) }),
+  });
+
   const skillsFor = (
     contributions: ContributionRegistration[],
     agent: AgentContributionRegistration,
@@ -401,10 +410,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         return { kind: "unknown" } as const;
       }
 
-      const activated = persisted.activate({
-        id: agent.id,
-        instructions: agent.instructions,
-      });
+      const activated = persisted.activate(agentDefinition(agent));
 
       if ("kind" in activated) {
         return {
@@ -499,7 +505,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       active,
     );
     activeTools.set(sessionId, active);
-    session.setInstructions(agent.instructions);
+    const definition = agentDefinition(agent);
+
+    session.setInstructions(definition.instructions);
+    session.setAgentDirectory(definition.directory);
     session.setSkills(skillsFor(contributions, agent));
 
     // Первый турн сравнивать не с чем: до него у сессии не было набора, а не «был и опустел».
@@ -627,7 +636,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         folderKey: project.folderKey,
         model,
         thinkingLevel: draft.thinkingLevel ?? agent.thinkingLevel ?? "off",
-        agent: { id: agent.id, instructions: agent.instructions },
+        agent: agentDefinition(agent),
       });
 
       if ("kind" in created) {

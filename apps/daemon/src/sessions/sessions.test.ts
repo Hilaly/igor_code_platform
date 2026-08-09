@@ -8,7 +8,12 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { scriptedSessionStore, type ScriptedTurn } from "@sovereign/agent-runtime-pi/testing";
-import type { AgentSession, AgentSessionStore, AgentSkill } from "@sovereign/agent-runtime-pi";
+import type {
+  AgentDefinition,
+  AgentSession,
+  AgentSessionStore,
+  AgentSkill,
+} from "@sovereign/agent-runtime-pi";
 import {
   agentsPath,
   coreEventTypes,
@@ -183,7 +188,9 @@ async function serve(
   }
 
   let openCalls = 0;
+  const initialAgentDefinitions: AgentDefinition[] = [];
   const appliedInstructions: string[] = [];
+  const appliedAgentDirectories: (string | undefined)[] = [];
   const appliedSkills: AgentSkill[][] = [];
   const appliedToolNames: string[][] = [];
   const harnessCalls: string[] = [];
@@ -202,6 +209,11 @@ async function serve(
       harnessCalls.push("set-instructions");
       appliedInstructions.push(instructions);
       session.setInstructions(instructions);
+    },
+    setAgentDirectory: (directory) => {
+      harnessCalls.push("set-agent-directory");
+      appliedAgentDirectories.push(directory);
+      session.setAgentDirectory(directory);
     },
     setSkills: (skills) => {
       harnessCalls.push("set-skills");
@@ -255,6 +267,7 @@ async function serve(
   const store: AgentSessionStore = {
     ...sessionStore,
     create: async (input) => {
+      initialAgentDefinitions.push({ ...input.agent });
       options.createGate?.entered();
       await options.createGate?.wait;
       const createdSession = await sessionStore.create(input);
@@ -274,6 +287,7 @@ async function serve(
       return {
         ...openedSession,
         activate: (agent) => {
+          initialAgentDefinitions.push({ ...agent });
           const activated = openedSession.activate(agent);
 
           return "kind" in activated ? activated : decorate(activated);
@@ -387,7 +401,9 @@ async function serve(
     coldSessionId,
     openCalls: () => openCalls,
     directory,
+    initialAgentDefinitions,
     appliedInstructions,
+    appliedAgentDirectories,
     appliedSkills,
     appliedToolNames,
     harnessCalls,
@@ -485,7 +501,13 @@ describe("GET /api/agents", () => {
 
 describe("POST /api/sessions", () => {
   it("creates a session and tells the bus", async () => {
-    const { start, events, folder, projectId } = await serve();
+    const agent = {
+      ...baseAgent,
+      location: "/plugins/base-agent/agents/agent/AGENT.md",
+    };
+    const { start, events, folder, projectId, initialAgentDefinitions } = await serve({
+      contributions: { base: () => [agent], forProject: () => [agent] },
+    });
 
     const answer = await start();
 
@@ -497,6 +519,13 @@ describe("POST /api/sessions", () => {
       events.some((event) => event.type === coreEventTypes.sessionsChanged),
       "создание сессии обязано быть видно тому, кто её не создавал",
     );
+    assert.deepEqual(initialAgentDefinitions, [
+      {
+        id: baseAgent.id,
+        instructions: baseAgent.instructions,
+        directory: "/plugins/base-agent/agents/agent",
+      },
+    ]);
   });
 
   it("refuses an agent nobody enabled", async () => {
@@ -587,6 +616,7 @@ describe("POST /api/sessions", () => {
     let agent: AgentContributionRegistration = {
       ...baseAgent,
       instructions: "first instructions",
+      location: "/agents/first/AGENT.md",
       tools: { include: ["read"], exclude: [] },
       skills: { include: ["review*", "hidden"], exclude: ["*-unsafe"] },
     };
@@ -595,6 +625,7 @@ describe("POST /api/sessions", () => {
       call,
       start,
       appliedInstructions,
+      appliedAgentDirectories,
       appliedSkills,
       appliedToolNames,
       toolContexts,
@@ -610,6 +641,7 @@ describe("POST /api/sessions", () => {
     await untilIdle(call, sessionId);
 
     assert.equal(appliedInstructions.at(-1), "first instructions");
+    assert.equal(appliedAgentDirectories.at(-1), "/agents/first");
     assert.deepEqual(appliedToolNames.at(-1), ["read"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
@@ -620,6 +652,7 @@ describe("POST /api/sessions", () => {
     agent = {
       ...agent,
       instructions: "second instructions",
+      location: undefined,
       tools: { include: ["bash", "write"], exclude: ["write"] },
       skills: { include: ["deploy"], exclude: [] },
     };
@@ -629,6 +662,7 @@ describe("POST /api/sessions", () => {
     await untilIdle(call, sessionId);
 
     assert.equal(appliedInstructions.at(-1), "second instructions");
+    assert.deepEqual(appliedAgentDirectories, ["/agents/first", undefined]);
     assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
@@ -750,6 +784,31 @@ describe("running a turn over http", () => {
     assert.equal(openCalls(), 1);
     assert.equal((await call("GET", sessionPath(coldSessionId))).body["thinkingLevel"], "high");
     await untilIdle(call, coldSessionId);
+  });
+
+  it("opens a cold session with the current agent directory", async () => {
+    const agent = {
+      ...baseAgent,
+      instructions: "current instructions",
+      location: "/plugins/current-agent/agents/current/AGENT.md",
+    };
+    const { call, coldSessionId, initialAgentDefinitions } = await serve({
+      coldSession: true,
+      contributions: { base: () => [agent], forProject: () => [agent] },
+    });
+
+    assert.ok(coldSessionId);
+
+    await call("POST", sessionTurnsPath(coldSessionId), { text: "продолжи" });
+    await untilIdle(call, coldSessionId);
+
+    assert.deepEqual(initialAgentDefinitions, [
+      {
+        id: baseAgent.id,
+        instructions: "current instructions",
+        directory: "/plugins/current-agent/agents/current",
+      },
+    ]);
   });
 
   it("refuses a cold session archived while its harness opens", async () => {
@@ -936,18 +995,27 @@ describe("running a turn over http", () => {
       {
         ...baseAgent,
         instructions: "admission instructions",
+        location: "/agents/admission/AGENT.md",
         tools: { include: ["read"], exclude: [] },
         skills: { include: ["admission-skill"], exclude: [] },
       },
       skill("admission-skill"),
     ];
-    const { call, start, appliedInstructions, appliedSkills, appliedToolNames, harnessCalls } =
-      await serve({
-        limit: 1,
-        turns: [{ text: "занял" }, { text: "исполнил" }],
-        contributions: { base: () => [baseAgent], forProject: () => contributions },
-        operationGate: () => currentOperationGate,
-      });
+    const {
+      call,
+      start,
+      initialAgentDefinitions,
+      appliedInstructions,
+      appliedAgentDirectories,
+      appliedSkills,
+      appliedToolNames,
+      harnessCalls,
+    } = await serve({
+      limit: 1,
+      turns: [{ text: "занял" }, { text: "исполнил" }],
+      contributions: { base: () => [baseAgent], forProject: () => contributions },
+      operationGate: () => currentOperationGate,
+    });
     const occupyingSessionId = String((await start()).body["id"]);
     const queuedSessionId = String((await start()).body["id"]);
     const occupying = call("POST", sessionTurnsPath(occupyingSessionId), { text: "займи слот" });
@@ -963,6 +1031,7 @@ describe("running a turn over http", () => {
       {
         ...baseAgent,
         instructions: "execution instructions",
+        location: undefined,
         tools: { include: ["bash", "write"], exclude: ["write"] },
         skills: { include: ["execution-skill"], exclude: [] },
       },
@@ -974,13 +1043,27 @@ describe("running a turn over http", () => {
     await occupying;
     await untilIdle(call, queuedSessionId);
 
-    assert.deepEqual(harnessCalls.slice(-4), [
+    assert.deepEqual(initialAgentDefinitions, [
+      {
+        id: baseAgent.id,
+        instructions: "admission instructions",
+        directory: "/agents/admission",
+      },
+      {
+        id: baseAgent.id,
+        instructions: "admission instructions",
+        directory: "/agents/admission",
+      },
+    ]);
+    assert.deepEqual(harnessCalls.slice(-5), [
       "set-tools",
       "set-instructions",
+      "set-agent-directory",
       "set-skills",
       "prompt",
     ]);
     assert.equal(appliedInstructions.at(-1), "execution instructions");
+    assert.deepEqual(appliedAgentDirectories.slice(-2), ["/agents/admission", undefined]);
     assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
@@ -1191,9 +1274,10 @@ describe("reading sessions", () => {
       });
 
       assert.equal(answer.status, status);
-      assert.deepEqual(harnessCalls.slice(-4), [
+      assert.deepEqual(harnessCalls.slice(-5), [
         "set-tools",
         "set-instructions",
+        "set-agent-directory",
         "set-skills",
         `message:${mode}`,
       ]);
@@ -1695,9 +1779,10 @@ describe("compacting a session over http", () => {
     await occupying;
     await untilIdle(call, compactingSessionId);
 
-    assert.deepEqual(harnessCalls.slice(-4), [
+    assert.deepEqual(harnessCalls.slice(-5), [
       "set-tools",
       "set-instructions",
+      "set-agent-directory",
       "set-skills",
       "compact",
     ]);
@@ -1818,9 +1903,10 @@ describe("navigating the tree over http", () => {
     await occupying;
     assert.equal((await moving).status, 200);
 
-    assert.deepEqual(harnessCalls.slice(-4), [
+    assert.deepEqual(harnessCalls.slice(-5), [
       "set-tools",
       "set-instructions",
+      "set-agent-directory",
       "set-skills",
       "navigate",
     ]);
