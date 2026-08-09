@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import type { SessionMessage, ThinkingLevel, TurnRequest } from "@sovereign/protocol";
+import type {
+  SessionContextUsage,
+  SessionMessage,
+  SessionStats,
+  ThinkingLevel,
+  TurnRequest,
+} from "@sovereign/protocol";
 import {
   coreEnglish,
   coreNamespace,
@@ -53,6 +59,22 @@ const modelGroups: ModelPickerGroup[] = [
   },
 ];
 
+const contextUsage: SessionContextUsage = {
+  sessionId: "session-a",
+  tokens: 190,
+  contextWindow: 1000,
+  threshold: 0.8,
+};
+
+const sessionStats: SessionStats = {
+  sessionId: "session-a",
+  messageCount: 3,
+  cachedTokens: 120,
+  uncachedTokens: 580,
+  totalTokens: 700,
+  costTotal: 0.1234,
+};
+
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -101,6 +123,8 @@ function SwitchingComposerHarness({
         onSendMessage={vi.fn(() => Promise.resolve(undefined))}
         onInterrupt={vi.fn()}
         onError={onError}
+        context={contextUsage}
+        stats={sessionStats}
         translator={translator}
       />
       <button
@@ -148,6 +172,8 @@ function ComposerHarness({
         onSendMessage={onSendMessage}
         onInterrupt={onInterrupt}
         onError={onError ?? vi.fn()}
+        context={contextUsage}
+        stats={sessionStats}
         translator={translator}
       />
       <output aria-label="Черновик">{draft}</output>
@@ -176,6 +202,15 @@ describe("the session message composer", () => {
     expect(composer?.querySelector(".sessions-composer-toolbar")).not.toBeNull();
     expect(composer?.querySelectorAll(".sessions-composer-options")).toHaveLength(0);
     expect(composer?.querySelectorAll("button")).toHaveLength(3);
+  });
+
+  it("keeps the circular context indicator inside the composer action row", () => {
+    const { container } = render(<ComposerHarness />);
+    const actions = container.querySelector(".sessions-composer-actions");
+    const progress = screen.getByRole("progressbar", { name: "Заполнение контекста" });
+
+    expect(actions?.contains(progress)).toBe(true);
+    expect(progress.tagName).toBe("svg");
   });
 
   it("keeps the idle action set named and leaves planning controls out of the composer", () => {

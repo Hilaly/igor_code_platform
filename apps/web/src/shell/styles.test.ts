@@ -229,6 +229,16 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(/\.new-session-form-region\s*\{[^}]*min-width:\s*0;/s);
   });
 
+  it("keeps usage inside the composer instead of restoring a full-width register", () => {
+    const sessions = sheets.find((sheet) => sheet.name === "sessions.css")?.styles ?? "";
+
+    expect(sessions).toMatch(/\.sessions-usage-tooltip\s*\{[^}]*display:\s*grid;/s);
+    expect(sessions).toMatch(
+      /\.sessions-usage-tooltip\s*>\s*hr\s*\{[^}]*border-block-start:\s*var\(--sovereign-stroke-thin\)\s+solid\s+currentColor;/s,
+    );
+    expect(sessions).not.toMatch(/\.sessions-usage(?:-context|-stat)?\s*\{/s);
+  });
+
   it("keeps the central page in a permanent header and body grid", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 

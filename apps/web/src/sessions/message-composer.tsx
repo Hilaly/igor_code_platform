@@ -1,6 +1,8 @@
 import {
+  type SessionContextUsage,
   type SessionMessage,
   type SessionMessageMode,
+  type SessionStats,
   type ThinkingLevel,
   type TurnRequest,
 } from "@sovereign/protocol";
@@ -19,6 +21,8 @@ import {
 } from "@sovereign/ui-kit";
 import { useEffect, useRef, useState } from "react";
 
+import { SessionUsage } from "./session-usage.tsx";
+
 export type MessageComposerProps = {
   sessionId: string;
   draft: string;
@@ -36,6 +40,8 @@ export type MessageComposerProps = {
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   onError: (error: unknown) => void;
+  context: SessionContextUsage | undefined;
+  stats: SessionStats | undefined;
   translator: ScopedTranslator;
 };
 
@@ -63,6 +69,8 @@ export function MessageComposer({
   onSendMessage,
   onInterrupt,
   onError,
+  context,
+  stats,
   translator,
 }: MessageComposerProps): React.JSX.Element {
   const { t } = translator;
@@ -204,6 +212,7 @@ export function MessageComposer({
             <div className="sessions-composer-toolbar">
               <div className="sessions-composer-future-slot" aria-hidden="true" />
               <div className="sessions-composer-actions">
+                <SessionUsage stats={stats} context={context} translator={translator} />
                 {!busy ? (
                   <Tooltip content={t("chat.append")}>
                     <Button

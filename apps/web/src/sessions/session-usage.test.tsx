@@ -55,32 +55,38 @@ describe("contextTone", () => {
 });
 
 describe("SessionUsage", () => {
-  it("keeps context, session tokens, and cost as independent metric groups", () => {
+  it("keeps context and session statistics in two tooltip sections", () => {
     render(
-      <SessionUsage context={context({ tokens: 800 })} stats={stats()} translator={translator} />,
+      <SessionUsage context={context({ tokens: 190 })} stats={stats()} translator={translator} />,
     );
 
-    const contextGroup = screen.getByRole("group", { name: "Контекст" });
-    const tokensGroup = screen.getByRole("group", { name: "Токены сессии" });
-    const costGroup = screen.getByRole("group", { name: "Стоимость" });
-
-    expect(within(contextGroup).getByText("800 / 1000 · 80%")).toBeTruthy();
-    expect(within(contextGroup).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("80");
-    expect(within(tokensGroup).getByText("700")).toBeTruthy();
-    expect(within(costGroup).getByText("$0.1234")).toBeTruthy();
+    const progress = screen.getByRole("progressbar", { name: "Заполнение контекста" });
+    const tooltip = screen.getByRole("tooltip");
+    expect(progress.tagName).toBe("svg");
+    expect(progress.getAttribute("aria-valuenow")).toBe("19");
+    expect(progress.getAttribute("tabindex")).toBe("0");
+    expect(progress.getAttribute("aria-describedby")).toBe(tooltip.id);
+    expect(within(tooltip).getByText("Контекстное окно")).toBeTruthy();
+    expect(within(tooltip).getByText("19% использовано · 81% осталось")).toBeTruthy();
+    expect(within(tooltip).getByText("190 / 1000 токенов")).toBeTruthy();
+    expect(within(tooltip).getByText("Статистика сессии")).toBeTruthy();
+    expect(within(tooltip).getByText("Токенов: 700")).toBeTruthy();
+    expect(within(tooltip).getByText("Стоимость: $0.1234")).toBeTruthy();
+    expect(tooltip.querySelector("hr")).not.toBeNull();
   });
 
-  it("shows unavailable values as a dash", () => {
+  it("keeps the compact indicator present when usage is unavailable", () => {
     render(<SessionUsage context={undefined} stats={undefined} translator={translator} />);
 
-    expect(within(screen.getByRole("group", { name: "Контекст" })).getByText("—")).toBeTruthy();
-    expect(
-      within(screen.getByRole("group", { name: "Токены сессии" })).getByText("—"),
-    ).toBeTruthy();
-    expect(within(screen.getByRole("group", { name: "Стоимость" })).getByText("—")).toBeTruthy();
+    const progress = screen.getByRole("progressbar", { name: "Заполнение контекста" });
+    const tooltip = screen.getByRole("tooltip");
+    expect(progress.hasAttribute("aria-valuenow")).toBe(false);
+    expect(tooltip.textContent).toContain("Контекстное окно");
+    expect(tooltip.textContent).toContain("Токенов: —");
+    expect(tooltip.textContent).toContain("Стоимость: —");
   });
 
-  it("does not invent a progress bar or percentage for an unknown context window", () => {
+  it("does not invent a percentage for an unknown context window", () => {
     render(
       <SessionUsage
         context={context({ contextWindow: undefined })}
@@ -89,10 +95,10 @@ describe("SessionUsage", () => {
       />,
     );
 
-    const contextGroup = screen.getByRole("group", { name: "Контекст" });
-
-    expect(within(contextGroup).getByText("700 / окно неизвестно")).toBeTruthy();
-    expect(within(contextGroup).queryByRole("progressbar")).toBeNull();
-    expect(contextGroup.textContent).not.toContain("%");
+    const progress = screen.getByRole("progressbar", { name: "Заполнение контекста" });
+    const tooltip = screen.getByRole("tooltip");
+    expect(progress.hasAttribute("aria-valuenow")).toBe(false);
+    expect(within(tooltip).getByText("700 / окно неизвестно")).toBeTruthy();
+    expect(tooltip.textContent).not.toContain("%");
   });
 });

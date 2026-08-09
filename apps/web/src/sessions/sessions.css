@@ -191,7 +191,7 @@
   }
 }
 
-/* Queue and usage register --------------------------------------------- */
+/* Queue register and usage tooltip ------------------------------------- */
 
 .sessions-queues,
 .sessions-modes {
@@ -205,43 +205,27 @@
   border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.sessions-usage {
+.sessions-usage-tooltip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--sovereign-space-2);
-  min-width: 0;
-  padding-block: var(--sovereign-space-1);
-  padding-inline: var(--sovereign-space-3);
-  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
-}
-
-.sessions-usage-context,
-.sessions-usage-stat {
-  display: flex;
-  align-items: center;
   gap: var(--sovereign-space-1);
-  min-width: 0;
+  min-width: 12rem;
 }
 
-.sessions-usage-context > :last-child {
-  min-width: 0;
-  flex: 1 1 auto;
+.sessions-usage-tooltip-section {
+  display: grid;
+  gap: var(--sovereign-space-1);
 }
 
-.sessions-usage-stat {
-  justify-content: flex-end;
-  white-space: nowrap;
+.sessions-usage-tooltip-title {
+  font-weight: var(--sovereign-font-weight-medium);
 }
 
-@container (width < 40rem) {
-  .sessions-usage {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .sessions-usage-context {
-    grid-column: 1 / -1;
-  }
+.sessions-usage-tooltip > hr {
+  width: 100%;
+  margin: var(--sovereign-space-1) 0;
+  border: none;
+  border-block-start: var(--sovereign-stroke-thin) solid currentColor;
+  opacity: 0.35;
 }
 
 /* New and archived session management --------------------------------- */
@@ -347,16 +331,6 @@
 
   .sessions-composer-actions {
     width: 100%;
-    justify-content: flex-start;
-  }
-
-  .sessions-usage {
-    grid-template-columns: 1fr;
-  }
-
-  .sessions-usage-context,
-  .sessions-usage-stat {
-    grid-column: 1;
     justify-content: flex-start;
   }
 }

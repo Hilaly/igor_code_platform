@@ -20,6 +20,8 @@ export type ProgressProps = {
   label: string;
   /** Делает компактное кольцо доступным trigger-элементом для описывающего Tooltip. */
   tabIndex?: number;
+  /** Связь с подробным описанием, в том числе добавленная общим Tooltip. */
+  "aria-describedby"?: string;
 };
 
 /**
@@ -47,6 +49,7 @@ export function Progress({
   variant = "linear",
   label,
   tabIndex,
+  "aria-describedby": ariaDescribedBy,
 }: ProgressProps) {
   if (variant === "circular") {
     const percent = value === undefined ? undefined : progressPercent(value);
@@ -60,6 +63,7 @@ export function Progress({
         style={fill}
         role="progressbar"
         aria-label={label}
+        aria-describedby={ariaDescribedBy}
         {...(percent === undefined
           ? {}
           : { "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": percent })}
@@ -77,6 +81,7 @@ export function Progress({
         className={`${styles.track} ${styles.indeterminate} ${styles[tone]}`}
         role="progressbar"
         aria-label={label}
+        aria-describedby={ariaDescribedBy}
       >
         <div className={styles.bar} />
       </div>
@@ -95,6 +100,7 @@ export function Progress({
       style={fill}
       role="progressbar"
       aria-label={label}
+      aria-describedby={ariaDescribedBy}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
