@@ -34,6 +34,7 @@
 | Поверхность                                    | Где описана                                          |
 | ---------------------------------------------- | ---------------------------------------------------- |
 | `@sovereign/sdk` и `@sovereign/sdk/testing`    | [plugins.md](plugins.md)                             |
+| Основной entrypoint `@sovereign/browser-sdk`   | [ui-extension-model.md](ui-extension-model.md)       |
 | Поверхность `providers.*` и её типы в SDK      | [models-and-providers.md](models-and-providers.md)   |
 | Отбор инструментов и скилов агента             | [plugins.md](plugins.md)                             |
 | Манифест: поле `sovereign` и состав его полей  | [plugins.md](plugins.md)                             |
@@ -62,6 +63,12 @@
 фокус-трап диалога (`hooks/use-focus-trap.ts`) и счёт перемещения фокуса по кругу
 (`components/roving-focus.ts`): это внутренности двух конкретных примитивов, а не то, из чего строят
 интерфейс.
+
+Основной entrypoint `@sovereign/browser-sdk` стабилен и сейчас отдаёт на исполнении ровно `Place` и
+`PlaceCollection`, а типами — `PlaceContext` и `PlaceProps`. Подпуть
+`@sovereign/browser-sdk/host` предназначен только для `apps/web` и публичным контрактом автора
+плагина не является. Browser SDK не реэкспортирует UI-кит: первый отвечает за взаимодействие
+браузерного UI плагина с платформой, второй — за его вид.
 
 **Мажорная версия React — часть контракта, хотя своей строки в таблице у неё нет.** Браузерная часть
 плагина получает React из реестра модулей хоста, а не привозит свой
