@@ -275,6 +275,17 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  it("keeps SplitButton actions together without owning their visual surfaces", () => {
+    const splitButton = withoutComments(
+      readFileSync(join(kitRoot, "components", "split-button.module.css"), "utf8"),
+    );
+
+    expect(splitButton).toMatch(
+      /\.root\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*min-width:\s*0;/s,
+    );
+    expect(splitButton).not.toMatch(/(?:background|border|box-shadow)\s*:/);
+  });
+
   it("shows compact Toggle labels only on hover without removing focus tooltips elsewhere", () => {
     const tooltipCss = withoutComments(
       readFileSync(join(kitRoot, "components", "tooltip.module.css"), "utf8"),

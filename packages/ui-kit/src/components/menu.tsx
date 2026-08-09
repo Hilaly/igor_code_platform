@@ -47,6 +47,8 @@ export type MenuProps = {
   compact?: boolean;
   /** Открывает компактное меню наведением, сохраняя клик и клавиатуру как полные альтернативы. */
   openOnHover?: boolean;
+  /** Оставляет trigger в раскладке, но запрещает открыть меню. */
+  disabled?: boolean;
   items: MenuItemDescription[];
 };
 
@@ -58,6 +60,7 @@ export function Menu({
   block = false,
   compact = false,
   openOnHover = false,
+  disabled = false,
   items,
 }: MenuProps) {
   const menuId = useId();
@@ -74,6 +77,11 @@ export function Menu({
   latestItems.current = items;
 
   useEffect(() => {
+    if (disabled && open) {
+      setOpen(false);
+      return;
+    }
+
     const container = rootRef.current;
 
     if (!open || container === null) {
@@ -143,7 +151,7 @@ export function Menu({
       ownerDocument.removeEventListener("pointerdown", handlePointerDown);
       ownerDocument.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [disabled, open]);
 
   useEffect(
     () => () => {
@@ -198,7 +206,7 @@ export function Menu({
       className={`${styles.root}${block ? ` ${styles.block}` : ""}`}
       ref={rootRef}
       onPointerEnter={() => {
-        if (!openOnHover) return;
+        if (!openOnHover || disabled) return;
         if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current);
         openedByPointer.current = true;
         setOpen(true);
@@ -212,11 +220,13 @@ export function Menu({
         type="button"
         className={`${styles.trigger}${block ? ` ${styles.block}` : ""}${compact ? ` ${styles.compact}` : ""}`}
         ref={triggerRef}
+        disabled={disabled}
         aria-haspopup="menu"
         aria-label={triggerLabel}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => {
+          if (disabled) return;
           openedByPointer.current = false;
           setOpen((current) => !current);
         }}

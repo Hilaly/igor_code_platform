@@ -45,6 +45,7 @@ import { Progress } from "./progress.tsx";
 import { RaisedSurface } from "./raised-surface.tsx";
 import { StreamingText } from "./streaming-text.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import { SplitButton } from "./split-button.tsx";
 import {
   SettingsNavigationItem,
   SettingsPage,
@@ -652,6 +653,24 @@ describe("markup of the ported primitives", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).not.toContain('role="menu"');
+  });
+
+  it("renders a split action as two named buttons", () => {
+    const markup = renderToStaticMarkup(
+      <SplitButton
+        action={<SendIcon />}
+        actionLabel="Send"
+        onAction={() => {}}
+        menuLabel="Send options"
+        menuTriggerLabel="Open send options"
+        items={[{ id: "append", label: "Append", onSelect: () => {} }]}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Send"');
+    expect(markup).toContain('aria-label="Open send options"');
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).not.toContain("undefined");
   });
 
   it("marks a menu trigger compact when requested", () => {

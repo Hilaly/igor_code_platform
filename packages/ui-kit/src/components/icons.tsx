@@ -2,6 +2,7 @@
 
 import {
   ChevronRight,
+  ChevronDown,
   Copy,
   Folder,
   FolderOpen,
@@ -51,6 +52,7 @@ export const FolderIcon = actionIcon(Folder);
 export const FolderOpenIcon = actionIcon(FolderOpen);
 export const UserIcon = actionIcon(UserRound);
 export const ChevronRightIcon = actionIcon(ChevronRight);
+export const ChevronDownIcon = actionIcon(ChevronDown);
 export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);
 export const PanelLeftOpenIcon = actionIcon(PanelLeftOpen);
 export const PanelRightCloseIcon = actionIcon(PanelRightClose);
