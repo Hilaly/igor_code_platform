@@ -196,6 +196,8 @@
 - [Немедленное применение настроек Daemon](superpowers/specs/2026-08-09-settings-immediate-apply-design.md) —
   утверждённый partial-контракт конфига, независимая запись одного параметра и поведение полей
   без общей кнопки Save.
+- [План немедленного применения настроек Daemon](superpowers/plans/2026-08-09-settings-immediate-apply.md) —
+  TDD-срезы partial API, независимых контролов и полной проверки с код-ревью.
 - [Анимированный тумблер UI Kit](superpowers/specs/2026-08-07-animated-toggle-design.md) — единый
   switch-контрол, режимы видимой подписи и tooltip для плотных строк Settings.
 - [План выравнивания содержимого Settings](superpowers/plans/2026-08-07-settings-content-alignment.md) —
