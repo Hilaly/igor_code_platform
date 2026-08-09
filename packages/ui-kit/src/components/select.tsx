@@ -169,37 +169,37 @@ export function Select({
         role="listbox"
         ariaLabel={ariaLabel ?? label}
       >
-          {options.map((option, index) => {
-            const isSelected = option.value === value && !option.disabled;
-            const isActive = index === activeIndex;
-            const optionId = `${safeListId}-opt-${index}`;
+        {options.map((option, index) => {
+          const isSelected = option.value === value && !option.disabled;
+          const isActive = index === activeIndex;
+          const optionId = `${safeListId}-opt-${index}`;
 
-            return (
-              <div
-                key={option.value}
-                id={optionId}
-                role="option"
-                aria-selected={isSelected}
-                aria-disabled={option.disabled}
-                className={`${styles.option}${isSelected ? ` ${styles.selected}` : ""}${
-                  isActive ? ` ${styles.active}` : ""
-                }${option.disabled ? ` ${styles.disabled}` : ""}`}
-                onMouseEnter={() => {
-                  if (!option.disabled) setActiveIndex(index);
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!option.disabled) {
-                    onChange(option.value);
-                    setOpen(false);
-                  }
-                }}
-              >
-                <span>{option.label}</span>
-                {isSelected ? <span>✓</span> : null}
-              </div>
-            );
-          })}
+          return (
+            <div
+              key={option.value}
+              id={optionId}
+              role="option"
+              aria-selected={isSelected}
+              aria-disabled={option.disabled}
+              className={`${styles.option}${isSelected ? ` ${styles.selected}` : ""}${
+                isActive ? ` ${styles.active}` : ""
+              }${option.disabled ? ` ${styles.disabled}` : ""}`}
+              onMouseEnter={() => {
+                if (!option.disabled) setActiveIndex(index);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!option.disabled) {
+                  onChange(option.value);
+                  setOpen(false);
+                }
+              }}
+            >
+              <span>{option.label}</span>
+              {isSelected ? <span>✓</span> : null}
+            </div>
+          );
+        })}
       </FloatingLayer>
     </div>
   );

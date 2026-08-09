@@ -22,12 +22,14 @@
 ### Task 1: Общий FloatingLayer
 
 **Files:**
+
 - Create: `packages/ui-kit/src/components/floating-layer.tsx`
 - Create: `packages/ui-kit/src/components/floating-layer.module.css`
 - Create: `packages/ui-kit/src/components/floating-layer.test.tsx`
 - Modify: `packages/ui-kit/src/index.ts`
 
 **Interfaces:**
+
 - Produces `FloatingLayerProps`: `open`, `anchorRef`, `children`, `side?: "top" | "bottom" | "left" | "right"`, `matchAnchorWidth?: boolean`, `minWidth?: number`, `offset?: number`, `role?: string`, `ariaLabel?: string`, `className?: string`, `onPointerDownOutside?: (event: PointerEvent) => void`.
 - Produces a portal root with `data-side`, fixed `style.left/top/maxWidth/maxHeight/minWidth`, and the supplied role/label.
 
@@ -38,10 +40,21 @@ it("renders open content in document.body and aligns it to the anchor", () => {
   const anchorRef = { current: document.createElement("button") };
   document.body.append(anchorRef.current);
   vi.spyOn(anchorRef.current, "getBoundingClientRect").mockReturnValue({
-    left: 100, right: 300, top: 200, bottom: 240, width: 200, height: 40,
-    x: 100, y: 200, toJSON: () => {},
+    left: 100,
+    right: 300,
+    top: 200,
+    bottom: 240,
+    width: 200,
+    height: 40,
+    x: 100,
+    y: 200,
+    toJSON: () => {},
   });
-  render(<FloatingLayer open anchorRef={anchorRef}><div role="listbox">items</div></FloatingLayer>);
+  render(
+    <FloatingLayer open anchorRef={anchorRef}>
+      <div role="listbox">items</div>
+    </FloatingLayer>,
+  );
   expect(screen.getByRole("listbox").parentElement).toBe(document.body);
   expect(screen.getByRole("listbox").parentElement?.getAttribute("data-side")).toBe("bottom");
 });
@@ -80,6 +93,7 @@ git commit -m "feat(ui-kit): add shared portal floating layer"
 ### Task 2: Перевод списков выбора
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/select.tsx`
 - Modify: `packages/ui-kit/src/components/select.module.css`
 - Modify: `packages/ui-kit/src/components/combobox.tsx`
@@ -89,6 +103,7 @@ git commit -m "feat(ui-kit): add shared portal floating layer"
 - Modify: `packages/ui-kit/src/components/interactive-components.test.tsx`
 
 **Interfaces:**
+
 - Consumes `FloatingLayer` from Task 1 with each component's existing `rootRef`, `listId` and listbox markup.
 - Produces unchanged `SelectProps`, `ComboboxProps<T>` and `MultiSelectProps<T>` behavior.
 
@@ -127,6 +142,7 @@ git commit -m "fix(ui-kit): portal selection popups"
 ### Task 3: Перевод Popover, Menu, ModelPicker и Tree
 
 **Files:**
+
 - Modify: `packages/ui-kit/src/components/popover.tsx`
 - Modify: `packages/ui-kit/src/components/popover.module.css`
 - Modify: `packages/ui-kit/src/components/menu.tsx`
@@ -138,6 +154,7 @@ git commit -m "fix(ui-kit): portal selection popups"
 - Modify: `packages/ui-kit/src/components/next-turn-picker.test.tsx`
 
 **Interfaces:**
+
 - Consumes `FloatingLayer` from Task 1.
 - Produces unchanged public props and existing `ModelPicker` behavior through `Popover`.
 
@@ -177,6 +194,7 @@ git commit -m "refactor(ui-kit): share portal geometry across popups"
 ### Task 4: Appearance regression, catalog and documentation
 
 **Files:**
+
 - Modify: `apps/web/src/settings/appearance-section.test.tsx`
 - Modify: `packages/ui-kit/src/components/ported.stories.tsx`
 - Modify: `docs/ui-kit.md`
