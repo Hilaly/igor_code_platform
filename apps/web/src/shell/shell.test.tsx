@@ -63,6 +63,28 @@ function show(overrides: Partial<ShellProps> = {}) {
 }
 
 describe("global shell header", () => {
+  it.each(["page", "contained"] as const)(
+    "places route content in the sole frame for %s mode",
+    (contentMode) => {
+      show({
+        contentMode,
+        children: <div data-testid="route-content">страница</div>,
+      });
+
+      const frames = screen.getAllByTestId("shell-content-frame");
+      const routeContent = screen.getByTestId("route-content");
+
+      expect(frames).toHaveLength(1);
+      const frame = frames[0];
+      if (frame === undefined) {
+        throw new Error("The shell content frame is missing");
+      }
+
+      expect(frame.contains(routeContent)).toBe(true);
+      expect(frame.getAttribute("data-content-mode")).toBe(contentMode);
+    },
+  );
+
   it("renders the route header before page content and updates it with the route", () => {
     const view = show({
       header: {

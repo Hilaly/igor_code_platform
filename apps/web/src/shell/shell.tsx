@@ -138,7 +138,13 @@ export function Shell({
         <ShellHeaderProvider description={header}>
           <ShellHeader {...(headerActions === undefined ? {} : { actions: headerActions })} />
           <div className="shell-body" data-content-mode={contentMode}>
-            {children}
+            <div
+              className="shell-content-frame"
+              data-testid="shell-content-frame"
+              data-content-mode={contentMode}
+            >
+              {children}
+            </div>
           </div>
         </ShellHeaderProvider>
         {/* Возврат скрытой панели — кнопка поверх угла страницы, а не постоянный рельс: рельс

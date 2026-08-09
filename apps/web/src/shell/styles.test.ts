@@ -259,11 +259,25 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("lets contained content fill the shell body", () => {
+  it("keeps one full-width content frame without imposing a reading width", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*display:\s*flex;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*width:\s*100%;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*margin-inline:\s*auto;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-width:\s*0;/s);
+    expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-height:\s*0;/s);
+    expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*max-width\s*:/s);
+  });
+
+  it("lets the contained content frame fill the body without owning a second scroll", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
     expect(shell).toMatch(
-      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-body\s*>\s*:first-child\s*\{[^}]*flex:\s*1 1 auto;/s,
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*flex:\s*1 1 auto;/s,
+    );
+    expect(shell).not.toMatch(
+      /\.shell-page\[data-content-mode="contained"\]\s+\.shell-content-frame\s*\{[^}]*overflow(?:-x|-y)?\s*:/s,
     );
   });
 
