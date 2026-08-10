@@ -27,35 +27,34 @@
 
 **Files:**
 
-- Create: `plugins/starter/src/skills.test.ts`
-- Modify: `plugins/starter/package.json`
+- Create: `apps/daemon/src/plugins/starter-skills.test.ts`
 
 **Interfaces:**
 
 - Consumes: `parseSkillFile(FileResourceInput)` из daemon parser и TypeScript `transpileModule`.
 - Produces: статический quality gate для четырёх `SKILL.md`.
 
-- [ ] **Step 1: Написать тесты текущих дефектов**
+- [x] **Step 1: Написать тесты текущих дефектов**
 
 Добавить проверки parser diagnostics, trigger descriptions, локальных ссылок, code fences,
 `code-review`, `Command`, порядка публикации события и `invalid-model`.
 
-- [ ] **Step 2: Запустить тест и подтвердить RED**
+- [x] **Step 2: Запустить тест и подтвердить RED**
 
 Run: `pnpm --filter @sovereign/plugin-starter test`
 
 Expected: FAIL на текущих descriptions, имени `code_review`, форме `ClearLogCommand`, публикации
 события, отсутствующей ссылке `docs/ui-kit.md` и пропущенном `invalid-model`.
 
-- [ ] **Step 3: Оставить минимальные тестовые helpers**
+- [x] **Step 3: Оставить минимальные тестовые helpers**
 
 Helpers читают skill directories, разбирают frontmatter, собирают локальные ссылки и fenced code.
 Тест не содержит копию production-текста кроме обязательных контрактных маркеров.
 
-- [ ] **Step 4: Зафиксировать RED-коммит**
+- [x] **Step 4: Зафиксировать RED-коммит**
 
 ```bash
-git add plugins/starter/src/skills.test.ts plugins/starter/package.json
+git add apps/daemon/src/plugins/starter-skills.test.ts
 git commit -m "test(starter): guard built-in skill quality"
 ```
 
@@ -73,17 +72,17 @@ git commit -m "test(starter): guard built-in skill quality"
 - Consumes: действующие форматы `SKILL.md` и `AGENT.md`.
 - Produces: workflow авторинга и полные reference-файлы.
 
-- [ ] **Step 1: Переписать descriptions как условия применения**
-- [ ] **Step 2: Добавить workflow, степень свободы, least privilege и verification**
-- [ ] **Step 3: Перенести поля, roots, ограничения и диагностику в references**
-- [ ] **Step 4: Исправить пример на `code-review` и добавить `invalid-model`**
-- [ ] **Step 5: Запустить starter tests**
+- [x] **Step 1: Переписать descriptions как условия применения**
+- [x] **Step 2: Добавить workflow, степень свободы, least privilege и verification**
+- [x] **Step 3: Перенести поля, roots, ограничения и диагностику в references**
+- [x] **Step 4: Исправить пример на `code-review` и добавить `invalid-model`**
+- [x] **Step 5: Запустить starter tests**
 
 Run: `pnpm --filter @sovereign/plugin-starter test`
 
 Expected: связанные проверки PASS; plugin-скилы ещё могут оставлять общий набор красным.
 
-- [ ] **Step 6: Закоммитить результат**
+- [x] **Step 6: Закоммитить результат**
 
 ```bash
 git add plugins/starter/skills/creating-agents plugins/starter/skills/creating-skills
@@ -104,12 +103,12 @@ git commit -m "docs(starter): teach effective skill and agent authoring"
 - Consumes: действующие SDK contributions и browser `Command`.
 - Produces: короткие plugin workflows и точные reference-контракты.
 
-- [ ] **Step 1: Сократить main skills до рабочего процесса и минимального примера**
-- [ ] **Step 2: Перенести полный SDK и core places в references**
-- [ ] **Step 3: Публиковать событие только из обработчика после activation**
-- [ ] **Step 4: Экспортировать browser command как `Command` с `run`**
-- [ ] **Step 5: Заменить псевдокод `items: [...]` валидным TypeScript**
-- [ ] **Step 6: Запустить starter tests и typecheck**
+- [x] **Step 1: Сократить main skills до рабочего процесса и минимального примера**
+- [x] **Step 2: Перенести полный SDK и core places в references**
+- [x] **Step 3: Публиковать событие только из обработчика после activation**
+- [x] **Step 4: Экспортировать browser command как `Command` с `run`**
+- [x] **Step 5: Заменить псевдокод `items: [...]` валидным TypeScript**
+- [x] **Step 6: Запустить starter tests и typecheck**
 
 Run:
 
@@ -120,7 +119,7 @@ pnpm --filter @sovereign/plugin-starter typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Закоммитить результат**
+- [x] **Step 7: Закоммитить результат**
 
 ```bash
 git add plugins/starter/skills/plugin-backend plugins/starter/skills/plugin-frontend
@@ -141,8 +140,8 @@ git commit -m "docs(starter): make plugin skills executable and progressive"
 - Consumes: окончательная структура starter-скилов.
 - Produces: долговременное описание решения и актуальный индекс документации.
 
-- [ ] **Step 1: Обновить описание starter-плагина и индекс docs**
-- [ ] **Step 2: Запустить format, lint, tests и typecheck**
+- [x] **Step 1: Обновить описание starter-плагина и индекс docs**
+- [x] **Step 2: Запустить format, lint, tests и typecheck**
 
 Run:
 
@@ -158,8 +157,8 @@ git diff --check
 
 Expected: все команды завершаются с кодом 0.
 
-- [ ] **Step 3: Проверить diff и отсутствие незапланированных изменений**
-- [ ] **Step 4: Закоммитить документацию**
+- [x] **Step 3: Проверить diff и отсутствие незапланированных изменений**
+- [x] **Step 4: Закоммитить документацию**
 
 ```bash
 git add docs plugins/README.md
