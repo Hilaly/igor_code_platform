@@ -28,4 +28,5 @@
 | `plugin-frontend` | browser entry, places, components, commands, pages и навигация                   |
 
 Тест демона проверяет parser diagnostics, локальные reference-ссылки, синтаксис TypeScript-примеров
-и найденные ранее ошибки контрактов event activation и browser commands.
+и найденные ранее ошибки контрактов event activation, browser commands и hidden skills. UI kit
+отдельно прогоняет пример цветовой схемы через действующие browser validators.

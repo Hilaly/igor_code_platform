@@ -41,7 +41,11 @@
 
 - [x] **Step 2: Запустить тест и подтвердить RED**
 
-Run: `pnpm --filter @sovereign/plugin-starter test`
+Run:
+
+```bash
+pnpm --filter @sovereign/daemon exec node --test src/plugins/starter-skills.test.ts
+```
 
 Expected: FAIL на текущих descriptions, имени `code_review`, форме `ClearLogCommand`, публикации
 события, отсутствующей ссылке `docs/ui-kit.md` и пропущенном `invalid-model`.
@@ -78,7 +82,11 @@ git commit -m "test(starter): guard built-in skill quality"
 - [x] **Step 4: Исправить пример на `code-review` и добавить `invalid-model`**
 - [x] **Step 5: Запустить starter tests**
 
-Run: `pnpm --filter @sovereign/plugin-starter test`
+Run:
+
+```bash
+pnpm --filter @sovereign/daemon exec node --test src/plugins/starter-skills.test.ts
+```
 
 Expected: связанные проверки PASS; plugin-скилы ещё могут оставлять общий набор красным.
 
@@ -115,6 +123,7 @@ Run:
 ```bash
 pnpm --filter @sovereign/plugin-starter test
 pnpm --filter @sovereign/plugin-starter typecheck
+pnpm --filter @sovereign/daemon exec node --test src/plugins/starter-skills.test.ts
 ```
 
 Expected: PASS.
@@ -146,11 +155,22 @@ git commit -m "docs(starter): make plugin skills executable and progressive"
 Run:
 
 ```bash
-pnpm exec prettier --check plugins/starter docs plugins/README.md
-pnpm exec eslint plugins/starter
+pnpm exec prettier --check \
+  apps/daemon/src/plugins/starter-skills.test.ts \
+  packages/ui-kit/src/tokens/starter-skill.test.ts \
+  plugins/starter docs plugins/README.md
+pnpm exec eslint \
+  apps/daemon/src/plugins/starter-skills.test.ts \
+  packages/ui-kit/src/tokens/starter-skill.test.ts \
+  plugins/starter
 pnpm --filter @sovereign/plugin-starter test
 pnpm --filter @sovereign/plugin-starter typecheck
-pnpm exec node --test apps/daemon/src/plugins/file-resource-parser.test.ts
+pnpm --filter @sovereign/daemon exec node --test \
+  src/plugins/file-resource-parser.test.ts \
+  src/plugins/starter-skills.test.ts
+pnpm --filter @sovereign/daemon typecheck
+pnpm --filter @sovereign/ui-kit exec vitest run src/tokens/starter-skill.test.ts
+pnpm --filter @sovereign/ui-kit typecheck
 pnpm exec node --test packages/agent-runtime-pi/src/skills.test.ts
 git diff --check
 ```

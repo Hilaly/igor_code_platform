@@ -73,6 +73,7 @@ import {
   contribute,
   defineEvent,
   events,
+  identity,
   log,
   providers,
   sessions,
@@ -80,6 +81,16 @@ import {
   z,
 } from "@sovereign/sdk";
 ```
+
+### `identity`
+
+```ts
+const self = identity();
+await log.info("plugin identity", self);
+```
+
+Синхронно возвращает `{ id, source }` текущего плагина. Значение задаёт host; не собирай identity из
+package name или пути самостоятельно.
 
 ### `log`
 
@@ -108,6 +119,7 @@ const models = await providers.models("anthropic");
 const status = await providers.status("anthropic");
 const report = await providers.refresh();
 await providers.logout("anthropic");
+await providers.unregister("vendor-local");
 ```
 
 Свой provider регистрируется в `activate`:
@@ -122,6 +134,10 @@ await providers.register({
   models: [{ id: "vendor-large", name: "Vendor Large", contextWindow: 32_000, maxTokens: 4_096 }],
 });
 ```
+
+Интерактивный вход выполняет `providers.login({ providerId, method, dialogue })`: `dialogue.ask`
+возвращает ответ на prompt, а необязательный `dialogue.tell` принимает промежуточные сообщения.
+`unregister` может удалить только provider текущего плагина.
 
 `api`:
 
@@ -255,8 +271,40 @@ await contribute.colorScheme({
   scheme: {
     tokenContract: 2,
     variants: {
-      light: { surface: "#f7f8fa" },
-      dark: { surface: "#101218" },
+      light: {
+        surface: "#eceff4",
+        surfaceRaised: "#f8fafc",
+        surfaceSunken: "#e1e4e9",
+        border: "#d8dee9",
+        ink: "#2e3440",
+        inkMuted: "#4c566a",
+        accent: "#496c97",
+        accentInk: "#eceff4",
+        secondary: "#88c0d0",
+        danger: "#aa4c55",
+        dangerInk: "#eceff4",
+        warning: "#856525",
+        success: "#587341",
+        overlay: "#2e344080",
+        shadow: "#2e34401f",
+      },
+      dark: {
+        surface: "#2e3440",
+        surfaceRaised: "#3b4252",
+        surfaceSunken: "#393f4b",
+        border: "#4c566a",
+        ink: "#eceff4",
+        inkMuted: "#d8dee9",
+        accent: "#81a1c1",
+        accentInk: "#2e3440",
+        secondary: "#88c0d0",
+        danger: "#e0828b",
+        dangerInk: "#2e3440",
+        warning: "#ebcb8b",
+        success: "#a3be8c",
+        overlay: "#00000099",
+        shadow: "#00000080",
+      },
     },
     roleOverrides: { accentHover: "#123456" },
   },
@@ -264,7 +312,8 @@ await contribute.colorScheme({
 ```
 
 Форма scheme — публичный `ColorSchemeDocument`: `tokenContract`, `variants`,
-опциональный `roleOverrides`.
+опциональный `roleOverrides`. Обе палитры обязательны и должны содержать весь набор ключей текущего
+token contract; browser runtime отвергает неполную схему целиком.
 
 ### Locale catalog
 

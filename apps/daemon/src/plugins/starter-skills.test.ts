@@ -131,6 +131,13 @@ describe("the built-in starter skills", () => {
       /await contribute\.event\(taskCreated\);\s*await taskCreated\.publish/u,
     );
   });
+
+  it("does not claim that an agent selector can restore a hidden skill", () => {
+    const reference = markdownFile(byName("creating-skills"), "references/file-format.md");
+
+    assert.match(reference, /Селекторы агента[^.]+не возвращают/u);
+    assert.doesNotMatch(reference, /выбирает другой\s+(?:код или\s+)?агент/u);
+  });
 });
 
 function loadSkill(name: (typeof skillNames)[number]): SkillArtifact {
@@ -179,4 +186,13 @@ function byName(name: (typeof skillNames)[number]): SkillArtifact {
     throw new Error(`the starter skill ${name} is missing`);
   }
   return artifact;
+}
+
+function markdownFile(artifact: SkillArtifact, path: string): string {
+  const expected = join(artifact.directory, path);
+  const file = artifact.markdown.find((candidate) => candidate.path === expected);
+  if (file === undefined) {
+    throw new Error(`${artifact.name} has no ${path}`);
+  }
+  return file.text;
 }
