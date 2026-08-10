@@ -259,6 +259,11 @@
   ограниченная колонка live tool call и немедленный Markdown для reasoning и ответа агента.
 - [План live-рендеринга сессии](superpowers/plans/2026-08-09-session-live-markdown-rendering.md) —
   TDD-срез для live tool call, reasoning и стримингового Markdown.
+- [Качество встроенных starter-скилов](superpowers/specs/2026-08-10-starter-skills-quality-design.md) —
+  структура workflow/reference, правила корректных примеров и автоматическая проверка четырёх
+  скилов плагина `starter`.
+- [План качества starter-скилов](superpowers/plans/2026-08-10-starter-skills-quality.md) —
+  TDD-шаги для регрессионных тестов, progressive disclosure и проверки plugin-примеров.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 
