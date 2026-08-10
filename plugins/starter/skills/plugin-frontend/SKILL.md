@@ -1,22 +1,48 @@
 ---
 name: plugin-frontend
-description: Build a Sovereign plugin with a browser bundle — sovereign.browser entry, browser SDK, and UI contributions (place, component, command, page)
+description: Use when a Sovereign plugin needs browser UI, a browser entry, page, place, component, command, core-place integration, browser SDK context, or navigation inside its own route.
 ---
 
-# Фронтенд плагина: браузерный бандл и вклады с интерфейсом
+# Фронтенд плагина
 
-Когда плагин приносит интерфейс, он объявляет точку входа `sovereign.browser`. Демон собирает
-браузерный бандл и отдаёт его по адресу с ревизией. Этот скил описывает вклады, требующие браузерного
-бандла: `place`, `component`, `command`, `page`. Вклады без интерфейса — в скиле `plugin-backend`.
+Browser-часть дополняет worker: manifest объявляет `sovereign.browser`, worker регистрирует
+serializable contribution, а browser bundle экспортирует названный React-компонент или descriptor
+команды.
 
-## Точка входа и сборка
+**Главный принцип:** worker объявляет данные и имена exports; browser entry реализует exports в
+том же runtime-экземпляре `@sovereign/browser-sdk`, который использует host.
 
-`sovereign.browser` — путь к браузерной точке входа в `package.json`:
+Сначала примени `starter.plugin-backend`: browser entry не заменяет обязательные manifest,
+worker и lifecycle.
+
+## Рабочий процесс
+
+1. **Добавь `sovereign.browser`.** Укажи путь к TypeScript/TSX entry в том же manifest, где уже есть
+   worker.
+2. **Выбери contribution.**
+   - `component` занимает существующее place.
+   - `place` публикует новую точку расширения.
+   - `command` объявляет именованное действие.
+   - `page` создаёт экран `/p/<plugin-id>/<page-id>/*`.
+3. **Зарегистрируй contribution в `activate`.** `export` — точное имя browser export.
+4. **Реализуй export правильной формы.**
+   - Component/page/built-in place — React component.
+   - Command — объект `Command` с методом `run`, не React component.
+5. **Передай context.** Компоненты places получают `PlaceContext`; вложенные places вызывай с тем
+   же релевантным context.
+6. **Используй browser SDK.** `Place`, `PlaceCollection`, `PlaceTabs`, `useCommands`,
+   `usePageNavigation` импортируются из `@sovereign/browser-sdk`.
+7. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
+   отображаться как diagnostics/outcome, а не маскироваться пустым UI.
+8. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
+   вызови каждую command минимум один раз.
+
+## Manifest
 
 ```json
 {
   "sovereign": {
-    "id": "my-plugin",
+    "id": "task-plugin",
     "worker": "src/worker.ts",
     "browser": "src/browser.tsx",
     "platform": "^0.1.0"
@@ -24,123 +50,7 @@ description: Build a Sovereign plugin with a browser bundle — sovereign.browse
 }
 ```
 
-Сборку и выдачу ассетов делает демон; автор пишет исходники, как и для worker-части. Плагин без
-`sovereign.browser` не может предложить компонент, команду или страницу.
-
-## Browser SDK
-
-Импорт из `@sovereign/browser-sdk`:
-
-```tsx
-import {
-  Place,
-  PlaceCollection,
-  PlaceTabs,
-  settingsSections,
-  usePageNavigation,
-} from "@sovereign/browser-sdk";
-```
-
-Корневой `@sovereign/browser-sdk` — синглтон страницы из реестра модулей хоста. Оболочка и плагин
-получают exports из одного runtime-экземпляра SDK, поэтому React context общий для provider оболочки
-и компонентов плагина. Передавать идентичность плагина аргументом не нужно.
-
-## Core places
-
-Места ядра, куда плагин может положить вклад (адресуются по `placeId`):
-
-| Place                       | Кардинальность | Заменяемо | Контекст             |
-| --------------------------- | -------------- | --------- | -------------------- |
-| `core.session.chat`         | single         | да        | `sessionId`          |
-| `core.session.new`          | single         | да        | —                    |
-| `core.settings.projects`    | single         | да        | `view`, `projectId`  |
-| `core.settings.appearance`  | single         | да        | —                    |
-| `core.settings.usage`       | single         | да        | —                    |
-| `core.settings.providers`   | single         | да        | `view`, `providerId` |
-| `core.settings.plugins`     | single         | да        | `view`, `pluginKey`  |
-| `core.settings.daemon`      | single         | да        | —                    |
-| `core.settings.diagnostics` | single         | да        | —                    |
-| `core.sidebar.sections`     | collection     | нет       | `page`               |
-| `core.panel.tabs`           | tabs           | нет       | `page`               |
-| `core.view.header.actions`  | action         | нет       | `page`               |
-
-Динамическое семейство `core.session.tool-call.t-<hex-имя-инструмента>` — отдельное заменяемое место
-на каждый вызов инструмента, образуется из имени инструмента; оно не входит в список core places.
-
-Кардинальности: `single` (одно вью), `collection` (полоса строк), `action` (полоса кнопок), `tabs`
-(полоса вкладок, отрисован один).
-
-## `contribute.place`
-
-Опубликовать своё место расширения. У заменяемого места обязателен встроенный провайдер (`builtIn`):
-
-```ts
-await contribute.place({
-  id: "board",
-  title: "Board",
-  cardinality: "single", // single | collection | action | tabs
-  replaceable: true,
-  builtIn: "Board", // имя экспорта в браузерном бандле владельца места
-});
-```
-
-Заменяемым бывает только одиночное место. Места однородны: плагин расширяется другим плагином через
-то же место.
-
-## `contribute.component`
-
-Занять место компонентом. `placeId` указывает, куда; `export` — имя экспорта в браузерном бандле.
-Существование места при регистрации не проверяется — вклад ждёт, если место ещё не появилось.
-
-```ts
-await contribute.component({
-  id: "plugins-panel",
-  title: "Plugins panel",
-  placeId: "core.settings.plugins",
-  export: "PluginsPanel",
-  group: "tools", // необязательно: порядок — group, затем order, затем id
-  order: 1,
-});
-```
-
-Займёт компонент место или встанет рядом — решает кардинальность места, а не намерение вклада.
-
-## `contribute.command`
-
-Именованное действие. Обязателен `title` — команда рисуется кнопкой и строкой палитры до загрузки
-бандла, иначе полоса действий прыгала бы по мере подъёма плагинов.
-
-```ts
-await contribute.command({
-  id: "run",
-  title: "Run the board",
-  export: "RunCommand", // имя экспорта в браузерном бандле
-  placeId: "core.view.header.actions", // необязательно; если есть — обязано быть action
-  group: "tools",
-  order: 1,
-});
-```
-
-Без `placeId` команда живёт в палитре и вызывается по идентификатору, в том числе чужим плагином.
-
-## `contribute.page`
-
-Целый экран плагина на собственном адресе `/p/<pluginId>/<pageId>/*`:
-
-```ts
-await contribute.page({
-  id: "log", // он же сегмент адреса: /p/<pluginId>/log
-  title: "Log", // обязательно: страница представлена ссылкой и шапкой до загрузки кода
-  export: "LogPage", // имя экспорта в браузерном бандле
-});
-```
-
-Пути в объявлении нет — адрес выводится из идентификаторов. Для навигации внутри страницы — хук
-`usePageNavigation` из browser SDK (базовый путь, относительный путь, параметры, переходы).
-
-## Рабочий пример
-
-### `src/worker.ts`
+## Worker
 
 ```ts
 import { contribute, type PluginModule } from "@sovereign/sdk";
@@ -148,52 +58,79 @@ import { contribute, type PluginModule } from "@sovereign/sdk";
 export const activate: PluginModule["activate"] = async () => {
   await contribute.page({
     id: "log",
-    title: "Log",
+    title: "Task log",
     export: "LogPage",
   });
 
   await contribute.command({
     id: "clear-log",
-    title: "Clear log",
+    title: "Clear task log",
     export: "ClearLogCommand",
     placeId: "core.view.header.actions",
   });
 
-  await contribute.component({
-    id: "sidebar-shortcut",
-    title: "Log shortcut",
-    placeId: "core.sidebar.sections",
-    export: "LogShortcut",
+  await contribute.route({
+    id: "clear-log-data",
+    method: "DELETE",
+    path: "log",
+    handle: async () => ({ status: 204 }),
   });
 };
 ```
 
-### `src/browser.tsx`
+## Browser entry
 
 ```tsx
+import { usePageNavigation, type Command, type PlaceContext } from "@sovereign/browser-sdk";
 import type { ReactNode } from "react";
-import { usePageNavigation } from "@sovereign/browser-sdk";
 
-export function LogPage(): ReactNode {
-  const { path } = usePageNavigation();
-  return <section>log at {path}</section>;
+export function LogPage({ context }: { context: PlaceContext }): ReactNode {
+  const navigation = usePageNavigation();
+
+  return (
+    <section>
+      project: {context.project ?? "none"}, path: {navigation.path}
+    </section>
+  );
 }
 
-export function ClearLogCommand(): ReactNode {
-  return null; // команда отрисуется оболочкой; обработчик — по имени экспорта
-}
-
-export function LogShortcut(): ReactNode {
-  return <a href="/p/my-plugin/log">Open log</a>;
-}
+export const ClearLogCommand: Command = {
+  run: async (context) => {
+    const project = context.project ?? "work";
+    await fetch(`/api/p/task-plugin/log?project=${encodeURIComponent(project)}`, {
+      method: "DELETE",
+    });
+  },
+};
 ```
 
-## Чек-лист фронтенд-плагина
+Host рисует кнопку команды по contribution metadata, загружает export и вызывает
+`ClearLogCommand.run(context)`. Возвращать JSX из command export не нужно.
 
-1. `sovereign.browser` в манифесте — путь к браузерной точке входа.
-2. `src/browser.tsx` с именованными экспортами под каждый `export`, указанный в вкладах.
-3. Вклады `place`/`component`/`command`/`page` — в `activate`, через `contribute.*`.
-4. Компоненты используют `@sovereign/browser-sdk` (`Place`, `PlaceCollection`, `PlaceTabs`,
-   `usePageNavigation`, `settingsSections`).
-5. Для страницы — `contribute.page` с обязательными `id`, `title`, `export`.
-6. Команды с `placeId` — только в место кардинальности `action`.
+## Проверка перед завершением
+
+- browser path существует и собирается;
+- каждый contribution `export` совпадает с именованным browser export;
+- command export соответствует `Command`;
+- component и page принимают ожидаемый context;
+- command с `placeId` указывает только на action place;
+- replaceable place имеет cardinality `single` и `builtIn`;
+- page использует `usePageNavigation`, а не собирает base path вручную;
+- loading, missing export и thrown command видны пользователю;
+- tests/typecheck и фактический browser smoke test проходят.
+
+## Частые ошибки
+
+- **Command экспортируется функцией-компонентом.** Runtime ищет `{ run, available? }` и сообщит,
+  что command export отсутствует.
+- **Worker и browser используют разные имена export.** Contribution зарегистрируется, но host не
+  найдёт реализацию.
+- **Компонент объявлен без browser entry.** Worker contribution не переносит React-код.
+- **`placeId` команды указывает на collection/single/tabs.** Команда с местом допустима только в
+  cardinality `action`.
+- **Plugin page получает произвольный path из manifest.** Адрес выводится из plugin id и page id.
+- **Core places копируются по памяти.** Сверяй id и cardinality со справочником.
+- **Browser SDK бандлится второй копией.** Импортируй публичный root; host предоставляет singleton.
+
+Core places, cardinality и точные browser contracts:
+[справочник browser SDK](references/browser-reference.md).

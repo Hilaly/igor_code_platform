@@ -128,7 +128,7 @@ describe("the built-in starter skills", () => {
 
     assert.doesNotMatch(
       backend,
-      /await contribute\.event\(taskCreated\);[\s\S]{0,200}?await taskCreated\.publish/u,
+      /await contribute\.event\(taskCreated\);\s*await taskCreated\.publish/u,
     );
   });
 });
