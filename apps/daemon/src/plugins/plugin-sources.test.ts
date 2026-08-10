@@ -213,7 +213,7 @@ describe("discoverPlugins", () => {
 describe("defaultPluginRoots", () => {
   it("finds the starter plugin shipped with the platform", () => {
     // Встроенный корень — каталог `plugins/` репозитория, и путь до него считается от исходников:
-    // разъедься он с раскладкой, единственный агент поставки исчез бы молча.
+    // разъедься он с раскладкой, агент и скилы поставки исчезли бы молча.
     const discovery = discoverPlugins([defaultPluginRoots(freshRoot())[0] as PluginRoot]);
 
     assert.deepEqual(
@@ -225,7 +225,13 @@ describe("defaultPluginRoots", () => {
         definition.kind,
         definition.name,
       ]),
-      [["agent", "generic"]],
+      [
+        ["agent", "generic"],
+        ["skill", "creating-agents"],
+        ["skill", "creating-skills"],
+        ["skill", "plugin-backend"],
+        ["skill", "plugin-frontend"],
+      ],
     );
     assert.deepEqual(discovery.refused, []);
   });

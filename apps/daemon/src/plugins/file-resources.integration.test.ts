@@ -348,7 +348,13 @@ describe("file resources end to end", () => {
       await changeAndWait(bus, registry.revision(), () => writeFileSync(skillPath, validSkill()));
       assert.deepEqual(
         registry.resolvedForProject(project.id, "skill").map((skill) => skill.id),
-        ["review"],
+        [
+          "review",
+          "starter.creating-agents",
+          "starter.creating-skills",
+          "starter.plugin-backend",
+          "starter.plugin-frontend",
+        ],
       );
       assert.equal(
         (await requestJson(port, "GET", projectFileResourcesPath(project.id))).status,
