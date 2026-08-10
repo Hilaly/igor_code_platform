@@ -189,8 +189,8 @@ await events.subscribe("tracker.task.created", (payload, origin) => {
 
 ### `contribute.agent`
 
-Программный агент. Поля: `id`, `instructions` (обязательные), `tools`/`skills` (селекторы), `model`,
-`thinkingLevel`. Умолчаний SDK не подставляет.
+Программный агент. Обязательные поля: `id`, `instructions`. Необязательные: `title`, `description`,
+`tools`/`skills` (селекторы), `model`, `thinkingLevel`. Умолчаний SDK не подставляет.
 
 ```ts
 await contribute.agent({
@@ -216,7 +216,8 @@ await contribute.tool({
 });
 ```
 
-Результат `invoke` — строка или `{ content: string }`.
+Результат `invoke` — строка или `{ content: string; isError?: boolean }`. Поле `isError: true`
+подсказывает модели, что ответ инструмента — ошибка, а не успешный результат.
 
 ### `contribute.hook`
 

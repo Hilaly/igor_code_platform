@@ -319,7 +319,7 @@ data: {"index":73,"time":"2026-07-27T08:12:08.713Z","type":"tracker.task.created
 
 ```bash
 curl -b jar localhost:5273/api/agents
-# {"agents":[{"id":"starter.generic","title":"Base agent","ownership":"plugin","pluginKey":"builtin:starter","source":"builtin","skills":{"include":[],"exclude":[]}}]}
+# {"agents":[{"id":"starter.generic","ownership":"plugin","pluginKey":"builtin:starter","source":"builtin","skills":{"include":["starter.*"],"exclude":[]}}]}
 
 curl -b jar localhost:5273/api/projects/b7Kq3xv9pQdT/agents
 # {"agents":[{"id":"review","description":"Reviews changes","ownership":"standalone","source":"project:b7Kq3xv9pQdT","scope":"project","projectId":"b7Kq3xv9pQdT","skills":{"include":[],"exclude":[]}}]}
