@@ -107,7 +107,12 @@ describe("the built-in starter skills", () => {
   });
 
   it("documents every agent parser diagnostic, including invalid-model", () => {
-    assert.match(byName("creating-agents").entry, /`invalid-model`/u);
+    const agent = byName("creating-agents");
+
+    assert.equal(
+      agent.markdown.some((file) => /`invalid-model`/u.test(file.text)),
+      true,
+    );
   });
 
   it("exports browser commands as Command descriptors", () => {
