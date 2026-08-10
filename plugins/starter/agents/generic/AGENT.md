@@ -1,5 +1,5 @@
 ---
-name: agent
+name: generic
 description: Reads and changes files in the project folder, and runs shell commands
 tools:
   include: ["*"]

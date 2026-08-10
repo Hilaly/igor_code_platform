@@ -81,7 +81,7 @@ describe("Session", () => {
       id: "0199",
       projectId: "p1",
       folder: "/tmp/demo",
-      agentId: "base-agent.agent",
+      agentId: "starter.generic",
       agentAvailable: false,
       model: "scripted/one",
       thinkingLevel: "off",
@@ -96,19 +96,19 @@ describe("Session", () => {
 
 describe("parseSessionDraft", () => {
   it("reads a project and an agent", () => {
-    const result = parseSessionDraft({ projectId: "work", agentId: "base-agent.agent" });
+    const result = parseSessionDraft({ projectId: "work", agentId: "starter.generic" });
 
     assert.equal(result.kind, "parsed");
     assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
       projectId: "work",
-      agentId: "base-agent.agent",
+      agentId: "starter.generic",
     });
   });
 
   it("keeps the model and the reasoning level when they are named", () => {
     const result = parseSessionDraft({
       projectId: "work",
-      agentId: "base-agent.agent",
+      agentId: "starter.generic",
       model: "anthropic/claude",
       thinkingLevel: "high",
     });

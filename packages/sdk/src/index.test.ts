@@ -169,9 +169,9 @@ describe("the session surface", () => {
   it("asks the platform for the agents and hands them over as they came", async () => {
     const host = installTestHost({ id: "tracker" });
     const agent = {
-      id: "base-agent.agent",
+      id: "starter.generic",
       ownership: "plugin" as const,
-      pluginKey: "builtin:base-agent",
+      pluginKey: "builtin:starter",
       source: "builtin" as const,
       skills: { include: [], exclude: [] },
     };
@@ -188,7 +188,7 @@ describe("the session surface", () => {
       id: "0199",
       projectId: "p1",
       folder: "/tmp/demo",
-      agentId: "base-agent.agent",
+      agentId: "starter.generic",
       agentAvailable: true,
       model: "scripted/one",
       thinkingLevel: "off" as const,
@@ -203,7 +203,7 @@ describe("the session surface", () => {
         : { kind: "session-prompt", accepted: { sessionId: "0199", turnId: "t1", phase: "turn" } },
     );
 
-    assert.deepEqual(await sessions.create({ projectId: "p1", agentId: "base-agent.agent" }), {
+    assert.deepEqual(await sessions.create({ projectId: "p1", agentId: "starter.generic" }), {
       kind: "created",
       session: created,
     });

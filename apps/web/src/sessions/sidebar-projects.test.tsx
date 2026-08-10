@@ -34,7 +34,7 @@ const session: Session = {
   id: "0199",
   projectId: "alpha",
   folder: "/code/alpha",
-  agentId: "base-agent.agent",
+  agentId: "starter.generic",
   agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "medium",

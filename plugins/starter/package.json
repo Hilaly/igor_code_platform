@@ -1,5 +1,5 @@
 {
-  "name": "@sovereign/plugin-base-agent",
+  "name": "@sovereign/plugin-starter",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "eslint": "^9.0.0"
   },
   "sovereign": {
-    "id": "base-agent",
+    "id": "starter",
     "worker": "src/worker.ts",
     "platform": "^0.1.0"
   }

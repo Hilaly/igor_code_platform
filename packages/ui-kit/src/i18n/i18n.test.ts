@@ -122,11 +122,11 @@ describe("createTranslator", () => {
   });
 
   it("names the unavailable saved agent in both shipped locales", () => {
-    expect(translator("ru").t("chat.agent.missing", { agent: "base-agent.agent" })).toContain(
-      "base-agent.agent",
+    expect(translator("ru").t("chat.agent.missing", { agent: "starter.generic" })).toContain(
+      "starter.generic",
     );
-    expect(translator("en").t("chat.agent.missing", { agent: "base-agent.agent" })).toContain(
-      "base-agent.agent",
+    expect(translator("en").t("chat.agent.missing", { agent: "starter.generic" })).toContain(
+      "starter.generic",
     );
   });
 

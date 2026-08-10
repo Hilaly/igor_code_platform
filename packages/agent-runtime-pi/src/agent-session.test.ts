@@ -40,7 +40,7 @@ async function freshFolder(name: string): Promise<string> {
   return folder;
 }
 
-const agent = { id: "base-agent.agent", instructions: "ты двойник" };
+const agent = { id: "starter.generic", instructions: "ты двойник" };
 
 /**
  * Параметры компакции в тестах те же, что зашиты в Pi: своя компакция заведена ради управляемости,

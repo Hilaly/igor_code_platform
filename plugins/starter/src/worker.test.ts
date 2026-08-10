@@ -3,9 +3,9 @@ import { describe, it } from "node:test";
 
 import { installTestHost } from "@sovereign/sdk/testing";
 
-describe("the base agent plugin", () => {
+describe("the starter plugin", () => {
   it("keeps activation as a lifecycle point without contributing programmatically", async () => {
-    const host = installTestHost({ id: "base-agent", source: "builtin" });
+    const host = installTestHost({ id: "starter", source: "builtin" });
 
     // Порядок обязателен: сначала шов, потом импорт воркера (docs/plugins.md).
     const { activate } = await import("./worker.ts");

@@ -217,7 +217,7 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jsdom@30.0.0)(msw@2.15.0(@types/node@24.13.3)(typescript@5.9.3))(supports-color@7.2.0)(yaml@2.9.0)
 
-  plugins/base-agent:
+  plugins/starter:
     dependencies:
       '@sovereign/sdk':
         specifier: workspace:*

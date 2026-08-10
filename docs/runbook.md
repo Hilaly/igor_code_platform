@@ -340,7 +340,7 @@ Slash-команды для управления файлами и редакт�
 Плагинские ресурсы лежат внутри каталога самого плагина: `<plugin-directory>/agents/<name>/AGENT.md`
 и `<plugin-directory>/skills/<name>/SKILL.md`. Такой плагин всё равно обязан иметь `package.json`
 с блоком `sovereign` и worker-файл; Markdown-вклады становятся видимыми только после успешного
-`activate()`. Встроенный плагин находится в репозитории `plugins/base-agent/`, внешний — в
+`activate()`. Встроенный плагин находится в репозитории `plugins/starter/`, внешний — в
 `<data-directory>/plugins/<name>/`, а проектный — в `<project>/.sovereign/plugins/<name>/`.
 Редактирование этих файлов на работающем демоне вызывает тот же hot reload, но при неуспешной
 активации плагина его ресурсы не публикуются.

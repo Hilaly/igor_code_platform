@@ -187,13 +187,13 @@ describe("changing sessions", () => {
     const calls = daemon({ status: 201, body: { id: "0199", projectId: "b7Kq" } });
 
     await expect(
-      createSession({ projectId: "b7Kq", agentId: "base-agent.agent" }),
+      createSession({ projectId: "b7Kq", agentId: "starter.generic" }),
     ).resolves.toEqual({
       kind: "created",
       session: { id: "0199", projectId: "b7Kq" },
     });
     expect(calls[0]?.init?.method).toBe("POST");
-    expect(calls[0]?.init?.body).toBe('{"projectId":"b7Kq","agentId":"base-agent.agent"}');
+    expect(calls[0]?.init?.body).toBe('{"projectId":"b7Kq","agentId":"starter.generic"}');
   });
 
   it("turns a refusal into an outcome, not into an exception", async () => {

@@ -211,21 +211,21 @@ describe("discoverPlugins", () => {
 });
 
 describe("defaultPluginRoots", () => {
-  it("finds the base agent shipped with the platform", () => {
+  it("finds the starter plugin shipped with the platform", () => {
     // Встроенный корень — каталог `plugins/` репозитория, и путь до него считается от исходников:
     // разъедься он с раскладкой, единственный агент поставки исчез бы молча.
     const discovery = discoverPlugins([defaultPluginRoots(freshRoot())[0] as PluginRoot]);
 
     assert.deepEqual(
       discovery.plugins.map((plugin) => plugin.key),
-      ["builtin:base-agent"],
+      ["builtin:starter"],
     );
     assert.deepEqual(
       discovery.plugins[0]?.fileResources.definitions.map((definition) => [
         definition.kind,
         definition.name,
       ]),
-      [["agent", "agent"]],
+      [["agent", "generic"]],
     );
     assert.deepEqual(discovery.refused, []);
   });

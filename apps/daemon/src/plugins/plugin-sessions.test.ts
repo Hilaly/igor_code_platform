@@ -10,7 +10,7 @@ const session: Session = {
   id: "0199",
   projectId: "p1",
   folder: "/tmp/demo",
-  agentId: "base-agent.agent",
+  agentId: "starter.generic",
   agentAvailable: true,
   model: "scripted/one",
   thinkingLevel: "off",
@@ -155,7 +155,7 @@ describe("createPluginSessions", () => {
 
   it("creates a session through the same service the web api uses", async () => {
     const { sessions, calls } = bridge();
-    const draft = { projectId: "p1", agentId: "base-agent.agent" };
+    const draft = { projectId: "p1", agentId: "starter.generic" };
 
     assert.deepEqual(await sessions.answer({ kind: "session-create", draft }), {
       kind: "session-create",

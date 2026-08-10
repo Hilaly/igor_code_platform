@@ -25,10 +25,10 @@
     protocol/              схемы и типы API, общие для демона и веба
     agent-runtime-pi/      реализация агентного рантайма на Pi
   plugins/                 то, что демон загружает в рантайме
-    base-agent/            агент по умолчанию, первый встроенный плагин
+    starter/               стартовый плагин: агент по умолчанию и скилы платформы
       package.json         манифест плагина
       src/worker.ts        lifecycle-точка worker
-      agents/agent/AGENT.md файловое определение base-agent.agent
+      agents/generic/AGENT.md файловое определение starter.generic
   ```
 
   Направление зависимостей: `apps` зависят от `packages`, обратно — никогда. `plugins` зависят от

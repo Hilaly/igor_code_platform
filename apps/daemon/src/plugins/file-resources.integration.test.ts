@@ -159,7 +159,7 @@ function waitForPluginRunning(bus: ReturnType<typeof createEventBus>): Promise<v
     const unsubscribe = bus.subscribe((event: BusEvent) => {
       if (isPluginBusEvent(event) || event.type !== coreEventTypes.pluginLifecycle) return;
       const payload = event.payload as PluginStatus;
-      if (payload.key !== "builtin:base-agent") return;
+      if (payload.key !== "builtin:starter") return;
       if (payload.state === "running") {
         clearTimeout(timer);
         unsubscribe();
@@ -328,14 +328,14 @@ describe("file resources end to end", () => {
 
       await eventually(
         () => registry.resolvedForProject(project.id, "agent").map((agent) => agent.id),
-        (ids) => ids.includes("base-agent.agent"),
-        "built-in base agent",
+        (ids) => ids.includes("starter.generic"),
+        "built-in starter generic agent",
       );
       const initialAgents = (await requestJson(port, "GET", projectAgentsPath(project.id))).body
         .agents as Array<{ id: string }>;
       assert.deepEqual(
         initialAgents.map((agent) => agent.id),
-        ["base-agent.agent"],
+        ["starter.generic"],
       );
       const initialResources = (
         await requestJson(port, "GET", projectFileResourcesPath(project.id))
@@ -359,7 +359,7 @@ describe("file resources end to end", () => {
       await changeAndWait(bus, agentRevision, () => writeFileSync(agentPath, validAgent()));
       assert.deepEqual(
         registry.resolvedForProject(project.id, "agent").map((agent) => agent.id),
-        ["base-agent.agent", "project-agent"],
+        ["project-agent", "starter.generic"],
       );
       const projectAgentsResponse = (await requestJson(port, "GET", projectAgentsPath(project.id)))
         .body.agents as Array<{ id: string; description?: string }>;
@@ -496,7 +496,7 @@ describe("file resources end to end", () => {
 
       assert.deepEqual(
         registry.resolvedForProject(other.id, "agent").map((agent) => agent.id),
-        ["base-agent.agent", "project-agent"],
+        ["project-agent", "starter.generic"],
       );
       assert.equal(
         registry.resolvedForProject(other.id, "agent").find((agent) => agent.id === "project-agent")

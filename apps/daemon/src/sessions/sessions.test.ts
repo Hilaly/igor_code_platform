@@ -72,12 +72,12 @@ const quietLogger = (): Logger =>
 const baseAgent: AgentContributionRegistration = {
   kind: "agent",
   ownership: "plugin",
-  id: "base-agent.agent",
-  declaredId: "agent",
-  pluginKey: "builtin:base-agent",
-  pluginId: "base-agent",
+  id: "starter.generic",
+  declaredId: "generic",
+  pluginKey: "builtin:starter",
+  pluginId: "starter",
   source: "builtin",
-  title: "Base agent",
+  title: "Generic",
   instructions: "ты двойник",
   tools: { include: ["*"], exclude: [] },
   skills: { include: [], exclude: [] },
@@ -443,7 +443,7 @@ describe("GET /api/agents", () => {
     assert.equal(answer.status, 200);
     assert.deepEqual(
       snapshot.agents.map((agent) => [agent.id, agent.ownership, agent.source, agent.skills]),
-      [["base-agent.agent", "plugin", "builtin", { include: [], exclude: [] }]],
+      [["starter.generic", "plugin", "builtin", { include: [], exclude: [] }]],
     );
   });
 

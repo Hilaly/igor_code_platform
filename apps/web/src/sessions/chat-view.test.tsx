@@ -28,7 +28,7 @@ const summary: Session = {
   id: "0199",
   projectId: "project-1",
   folder: "/code/platform",
-  agentId: "base-agent.agent",
+  agentId: "starter.generic",
   agentAvailable: true,
   model: "anthropic/claude-opus-4-5",
   thinkingLevel: "high",

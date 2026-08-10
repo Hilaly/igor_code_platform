@@ -47,10 +47,10 @@ const project: Project = {
 };
 
 const baseAgent: AgentSummary = {
-  id: "base-agent.agent",
+  id: "starter.generic",
   title: "Базовый агент",
   ownership: "plugin",
-  pluginKey: "builtin:base-agent",
+  pluginKey: "builtin:starter",
   source: "builtin",
   skills: { include: [], exclude: [] },
 };
@@ -470,7 +470,7 @@ describe("the screen that creates a session", () => {
     await waitFor(() => expect(view.onCreate).toHaveBeenCalledTimes(1));
     expect(view.onCreate).toHaveBeenCalledWith({
       projectId: "b7Kq",
-      agentId: "base-agent.agent",
+      agentId: "starter.generic",
       model: "anthropic/claude-opus-4-5",
       thinkingLevel: "medium",
     });

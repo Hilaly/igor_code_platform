@@ -319,13 +319,13 @@ data: {"index":73,"time":"2026-07-27T08:12:08.713Z","type":"tracker.task.created
 
 ```bash
 curl -b jar localhost:5273/api/agents
-# {"agents":[{"id":"base-agent.agent","title":"Base agent","ownership":"plugin","pluginKey":"builtin:base-agent","source":"builtin","skills":{"include":[],"exclude":[]}}]}
+# {"agents":[{"id":"starter.generic","title":"Base agent","ownership":"plugin","pluginKey":"builtin:starter","source":"builtin","skills":{"include":[],"exclude":[]}}]}
 
 curl -b jar localhost:5273/api/projects/b7Kq3xv9pQdT/agents
 # {"agents":[{"id":"review","description":"Reviews changes","ownership":"standalone","source":"project:b7Kq3xv9pQdT","scope":"project","projectId":"b7Kq3xv9pQdT","skills":{"include":[],"exclude":[]}}]}
 
 curl -b jar -X POST localhost:5273/api/sessions -H 'content-type: application/json' \
-  -d '{"projectId":"b7Kq3xv9pQdT","agentId":"base-agent.agent","model":"anthropic/claude-opus-4-5"}'
+  -d '{"projectId":"b7Kq3xv9pQdT","agentId":"starter.generic","model":"anthropic/claude-opus-4-5"}'
 # {"id":"0199…","projectId":"b7Kq…","folder":"/Users/me/code/demo","phase":"idle", …}
 
 curl -b jar -X POST localhost:5273/api/sessions/0199…/turns -H 'content-type: application/json' \

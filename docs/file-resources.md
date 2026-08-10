@@ -18,7 +18,7 @@ Frontmatter разбирается как YAML 1.2. Повтор ключа и �
 `<plugin-directory>/skills`. Loader всегда считает их от обнаруженной директории конкретной копии
 плагина — встроенной, пользовательской или проектной. Отдельного общего built-in-корня для агентов
 и скилов нет. Файловый агент получает полное имя `<plugin-id>.<name>`; например,
-`plugins/base-agent/agents/agent/AGENT.md` регистрирует `base-agent.agent`.
+`plugins/starter/agents/generic/AGENT.md` регистрирует `starter.generic`.
 
 Standalone-определения не принадлежат плагину, не запускают worker и сохраняют короткий
 идентификатор `<name>`. Корни обходятся в таком порядке; числовой precedence определяет победителя
