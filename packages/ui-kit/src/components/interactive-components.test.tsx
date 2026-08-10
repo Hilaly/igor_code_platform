@@ -503,6 +503,35 @@ describe("interactive components", () => {
     expect(menu.style.left).toBe("220px");
   });
 
+  it("places a hover-opened compact menu directly against its trigger", () => {
+    render(
+      <Menu
+        label="Действия"
+        trigger="…"
+        triggerLabel="Действия проекта"
+        compact
+        openOnHover
+        items={[{ id: "rename", label: "Переименовать проект", onSelect: () => {} }]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Действия проекта" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 220,
+      y: 100,
+      top: 100,
+      right: 244,
+      bottom: 124,
+      left: 220,
+      width: 24,
+      height: 24,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerEnter(trigger);
+
+    expect(screen.getByRole("menu", { name: "Действия" }).style.top).toBe("124px");
+  });
+
   it("keeps a hover-opened compact menu available while the pointer crosses into it", () => {
     vi.useFakeTimers();
     try {

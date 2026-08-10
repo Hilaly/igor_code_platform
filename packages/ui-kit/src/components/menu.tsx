@@ -167,6 +167,7 @@ export function Menu({
       layerRef={popupRef}
       side={placement === "above" ? "top" : "bottom"}
       matchAnchorWidth={!compact}
+      offset={openOnHover ? 0 : undefined}
       className={`${styles.menu}${compact ? ` ${styles.compactMenu}` : ""}`}
       id={menuId}
       role="menu"
