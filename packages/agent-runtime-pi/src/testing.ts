@@ -358,6 +358,8 @@ export function scriptedSessionStore(options: {
   turns?: ScriptedTurn[];
   /** Параметры компакции. Не названы — те же, что зашиты в Pi (docs/data-directory.md). */
   compactionSettings?: () => CompactionTuning;
+  /** Что двойник модели принимает на вход. По умолчанию только текст. */
+  input?: ("text" | "image")[];
 }): {
   store: AgentSessionStore;
   model: string;
@@ -368,7 +370,10 @@ export function scriptedSessionStore(options: {
   /** Контексты, отправленные двойнику модели; интеграционные тесты проверяют реальный prompt/tool flow. */
   requests: Context[];
 } {
-  const scripted = scriptedModelProvider({ turns: options.turns ?? [] });
+  const scripted = scriptedModelProvider({
+    turns: options.turns ?? [],
+    ...(options.input === undefined ? {} : { input: options.input }),
+  });
   const models = createModels();
 
   models.setProvider(scripted.provider);

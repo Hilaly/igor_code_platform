@@ -11,6 +11,7 @@ import { dirname } from "node:path";
 import {
   agentsPath,
   coreEventTypes,
+  defaultConfig,
   isSessionId,
   parseSessionCompactRequest,
   parseSessionDraft,
@@ -53,6 +54,7 @@ import {
   type SessionEntryLabelled,
   type SessionForkRequest,
   type SessionLabelUpdate,
+  type SessionImage,
   type SessionMessage,
   type SessionMessageAccepted,
   type SessionNavigated,
@@ -81,6 +83,14 @@ import type { ProjectStore, StoredProject } from "../projects/public.ts";
 import type { ProjectLifecycle } from "../projects/public.ts";
 import { describeRefusals } from "./hook-dispatch.ts";
 import type { HookDispatcher } from "./hook-dispatch.ts";
+import {
+  bodyLimitFor,
+  entriesImageBytes,
+  imagesBytes,
+  refuseMessageImages,
+  refuseSessionImageBudget,
+  type ImageLimits,
+} from "./image-limits.ts";
 import type { ToolCollector } from "./tool-collection.ts";
 import type { TurnQueue } from "./turn-queue.ts";
 
@@ -112,6 +122,12 @@ export type SessionServiceOptions = {
    */
   compactionThreshold?: () => number;
   /**
+   * Пределы на изображения в сообщениях. Спрашиваются функцией по той же причине, что и остальные
+   * значения конфига: `config.json` применяется живьём, и сессия, открытая до правки, обязана
+   * увидеть новое число (docs/data-directory.md).
+   */
+  imageLimits?: () => ImageLimits;
+  /**
    * Хуки платформы (docs/hooks.md). Необязательны: без подписчиков служба работает как раньше, а
    * тесты сессий о плагинах не знают вовсе.
    */
@@ -134,7 +150,12 @@ export type PromptRequest = TurnRequest & { sessionId: string };
 export type PromptOutcome =
   | { kind: "accepted"; turn: TurnAccepted }
   | { kind: "unknown" }
-  | { kind: "refused"; reason: string };
+  /**
+   * `status` называет код, если он не обычный `409`. Отдельного исхода на каждый код нет: отказ
+   * остаётся одним понятием домена, а маршрут переводит его в HTTP — слишком велика нагрузка это
+   * `413`, а «в сессии больше нет места» — состояние сессии, то есть `409` (docs/web-api.md).
+   */
+  | { kind: "refused"; reason: string; status?: 413 | 409 };
 
 /** Исход операции, отдающей изменённую или новую сессию: форк и запись изменений. */
 export type SessionOutcome =
@@ -146,7 +167,7 @@ export type SessionRemoveOutcome =
 export type SessionMessageOutcome =
   | { kind: "accepted"; accepted: SessionMessageAccepted }
   | { kind: "unknown" }
-  | { kind: "refused"; reason: string };
+  | { kind: "refused"; reason: string; status?: 413 | 409 };
 
 /**
  * Исход запуска компакции. Как у турна: возврат значит «принята», а не «свёрнут контекст» —
@@ -718,6 +739,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   };
 
   const thresholdOf = (): number => options.compactionThreshold?.() ?? 0;
+  const imageLimits = (): ImageLimits => options.imageLimits?.() ?? defaultConfig;
+
+  /** Отказ модели одной формулировкой: демон говорит о ней одинаково на всех путях. */
+  const textOnlyModelReason = (model: string): string => `the model ${model} does not read images`;
 
   const contextUsage = async (sessionId: string): Promise<SessionContextUsage | undefined> => {
     const persisted = await record(sessionId);
@@ -1191,6 +1216,45 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return { kind: "removed" };
   };
 
+  /**
+   * Влезают ли приложенные изображения в пределы и в остаток бюджета сессии.
+   *
+   * Записи сессии читаются только тогда, когда картинки есть: сообщение без них ничего не добавляет
+   * к бюджету, и платить за чтение всего файла на каждом обычном турне незачем.
+   */
+  const refuseImages = async (
+    sessionId: string,
+    images: SessionImage[] | undefined,
+  ): Promise<{ kind: "refused"; reason: string; status: 413 | 409 } | undefined> => {
+    const limits = imageLimits();
+    const oversized = refuseMessageImages(images, limits);
+
+    if (oversized !== undefined) {
+      return { kind: "refused", ...oversized };
+    }
+
+    const added = imagesBytes(images);
+
+    if (added === 0) {
+      return undefined;
+    }
+
+    const page = await entries(sessionId, 0);
+    const stored = page === undefined ? 0 : entriesImageBytes(page.entries);
+    const overBudget = refuseSessionImageBudget(stored, added, limits);
+
+    // В журнал уезжает счёт, но не содержимое: base64 в логе бесполезен и делает журнал нечитаемым.
+    options.logger.debug("images checked", {
+      session: sessionId,
+      images: (images ?? []).length,
+      bytes: added,
+      stored,
+      accepted: overBudget === undefined,
+    });
+
+    return overBudget === undefined ? undefined : { kind: "refused", ...overBudget };
+  };
+
   const message = async (
     sessionId: string,
     wanted: SessionMessage,
@@ -1207,6 +1271,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     if (!agentsFor(summary.projectId).some((agent) => agent.id === summary.agentId)) {
       return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
+    }
+
+    const oversized = await refuseImages(sessionId, wanted.images);
+
+    if (oversized !== undefined) {
+      return oversized;
     }
 
     // Стиринг и догоняющее требуют идущего турна, а идущий турн бывает только у поднятой сессии:
@@ -1234,7 +1304,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: `the agent ${prepared.agentId} is not available` };
     }
 
-    const outcome = await opened.session.message(wanted.text, wanted.mode);
+    const outcome = await opened.session.message(wanted.text, wanted.mode, wanted.images);
 
     if (outcome.kind === "idle") {
       return { kind: "refused", reason: "the session is idle" };
@@ -1242,6 +1312,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     if (outcome.kind === "busy") {
       return { kind: "refused", reason: "the session is busy" };
+    }
+
+    if (outcome.kind === "text-only-model") {
+      return { kind: "refused", reason: textOnlyModelReason(summary.model) };
     }
 
     return { kind: "accepted", accepted: { sessionId, mode: wanted.mode } };
@@ -1257,6 +1331,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const session = ready.session;
     const summary = session.summary();
+
+    // Проверка до `queue.reserve`: отказ по пределу не имеет права занимать слот очереди — он не
+    // пойдёт к модели вовсе, а слот тем временем не достанется тому, кто пойдёт.
+    const oversized = await refuseImages(sessionId, request.images);
+
+    if (oversized !== undefined) {
+      return oversized;
+    }
 
     const project = options.projects.find(summary.projectId);
 
@@ -1355,7 +1437,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             }
           }
 
-          const outcome = await session.prompt(request.text, turnId);
+          const outcome = await session.prompt(request.text, turnId, request.images);
 
           if (outcome.kind === "failed") {
             options.logger.warn("a turn failed", { session: sessionId, reason: outcome.reason });
@@ -1634,6 +1716,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       {
         method: "POST",
         path: sessionMessagesPathPattern,
+        // Свой предел тела: общий рассчитан на короткий json ядра, а сюда приезжает base64
+        // изображений. Считается из предела сообщения, чтобы два числа не разошлись.
+        bodyLimitBytes: () => bodyLimitFor(imageLimits()),
         handle: async ({ response, parameters, body }) => {
           const parsed = parseSessionMessage(body);
 
@@ -1652,7 +1737,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
 
           if (accepted.kind === "refused") {
-            respondWithError(response, 409, accepted.reason);
+            respondWithError(response, accepted.status ?? 409, accepted.reason);
 
             return;
           }
@@ -1818,6 +1903,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       {
         method: "POST",
         path: sessionTurnsPathPattern,
+        // Свой предел тела: общий рассчитан на короткий json ядра, а сюда приезжает base64
+        // изображений. Считается из предела сообщения, чтобы два числа не разошлись.
+        bodyLimitBytes: () => bodyLimitFor(imageLimits()),
         handle: async ({ response, parameters, body }) => {
           const parsed = parseTurnRequest(body);
 
@@ -1839,7 +1927,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
 
           if (started.kind === "refused") {
-            respondWithError(response, 409, started.reason);
+            respondWithError(response, started.status ?? 409, started.reason);
 
             return;
           }

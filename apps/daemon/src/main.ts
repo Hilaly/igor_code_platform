@@ -416,6 +416,8 @@ const sessions = createSessionService({
   availability: (project) => projectAvailability.of(project.id),
   // Автопорог тоже живой: `0` выключает его, и это умолчание (docs/sessions-and-projects.md).
   compactionThreshold: () => settings.current().config.compactionThreshold,
+  // И пределы изображений: правка `config.json` применяется к следующей отправке без перезапуска.
+  imageLimits: () => settings.current().config,
   // Хуки платформы: жизненный цикл сессии, решение до её старта и трата турна. Тот же диспетчер, что
   // у шва рантайма, — иначе подписка попадала бы то в один список, то в другой (docs/hooks.md).
   hooks: hookDispatcher,

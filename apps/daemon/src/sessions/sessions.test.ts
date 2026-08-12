@@ -55,6 +55,7 @@ import { createLogger, type Logger } from "../platform/public.ts";
 import { createProjectStore, type ProjectStore } from "../projects/public.ts";
 import { createProjectLifecycle } from "../projects/public.ts";
 import { projectsRoutes } from "../projects/public.ts";
+import type { ImageLimits } from "./image-limits.ts";
 import { createSessionService, type SessionDeltaSink } from "./sessions.ts";
 import { createToolCollector } from "./tool-collection.ts";
 import { createTurnQueue } from "./turn-queue.ts";
@@ -145,6 +146,9 @@ async function serve(
     operationGate?: ReturnType<typeof gate> | (() => ReturnType<typeof gate> | undefined);
     coldSession?: boolean;
     compactionThreshold?: number;
+    imageLimits?: ImageLimits;
+    /** Что двойник модели принимает на вход. По умолчанию только текст. */
+    input?: ("text" | "image")[];
     hooks?: Pick<HookDispatcher, "observe" | "decide">;
   } = {},
 ) {
@@ -167,6 +171,7 @@ async function serve(
     directory: join(directory, "sessions"),
     archivedDirectory: join(directory, "sessions-archived"),
     turns: options.turns ?? [{ text: "готово" }],
+    ...(options.input === undefined ? {} : { input: options.input }),
   });
   const coldSession =
     options.coldSession === true
@@ -225,19 +230,19 @@ async function serve(
       appliedToolNames.push(activeToolNames);
       await session.setTools(tools, activeToolNames);
     },
-    message: async (text, mode) => {
+    message: async (text, mode, images) => {
       harnessCalls.push(`message:${mode}`);
 
-      return session.message(text, mode);
+      return session.message(text, mode, images);
     },
     ...(options.operationGate === undefined
       ? {}
       : {
-          prompt: async (text: string, turnId: string) => {
+          prompt: async (...given: Parameters<AgentSession["prompt"]>) => {
             harnessCalls.push("prompt");
             await waitForOperation();
 
-            return session.prompt(text, turnId);
+            return session.prompt(...given);
           },
           compact: async (instructions?: string) => {
             harnessCalls.push("compact");
@@ -328,6 +333,9 @@ async function serve(
     contributions: options.contributions ?? defaultContributions,
     tools: collector,
     queue: createTurnQueue({ limit: () => options.limit ?? 4 }),
+    ...(options.imageLimits === undefined
+      ? {}
+      : { imageLimits: () => options.imageLimits as ImageLimits }),
     bus,
     emitDelta: (frame) => deltas.push(frame),
     logger,
@@ -2054,6 +2062,161 @@ describe("labelling an entry over http", () => {
       (await call("PUT", sessionEntryLabelPath("00000000", "e-1"), { label: "и" })).status,
       404,
     );
+  });
+});
+
+describe("images over http", () => {
+  /** Картинка ровно на столько декодированных байт, сколько просят. */
+  const sized = (bytes: number): { mimeType: string; data: string } => {
+    const payload = Buffer.alloc(bytes);
+
+    payload.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    return { mimeType: "image/png", data: payload.toString("base64") };
+  };
+  const seeing = { input: ["text", "image"] as ("text" | "image")[] };
+
+  it("keeps the image in the tree and gives it back with the entries", async () => {
+    const { call, start } = await serve(seeing);
+    const sessionId = String((await start()).body["id"]);
+    const image = sized(64);
+
+    const accepted = await call("POST", sessionTurnsPath(sessionId), {
+      text: "что тут",
+      images: [image],
+    });
+
+    assert.equal(accepted.status, 200);
+    await untilIdle(call, sessionId);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const said = page.entries.find((entry) => entry.kind === "message" && entry.role === "user");
+
+    assert.deepEqual(said?.kind === "message" ? said.content : undefined, [
+      { kind: "text", text: "что тут" },
+      { kind: "image", mimeType: "image/png", data: image.data },
+    ]);
+  });
+
+  it("answers 400 to a payload that is not an image of a type we take", async () => {
+    const { call, start } = await serve(seeing);
+    const sessionId = String((await start()).body["id"]);
+
+    for (const images of [
+      [{ mimeType: "image/svg+xml", data: sized(16).data }],
+      [{ mimeType: "image/png", data: "не base64" }],
+      // Объявленный тип не совпадает с байтами: провайдер ответил бы на это своей невнятной ошибкой.
+      [{ mimeType: "image/jpeg", data: sized(16).data }],
+    ]) {
+      const refused = await call("POST", sessionTurnsPath(sessionId), { text: "смотри", images });
+
+      assert.equal(refused.status, 400, JSON.stringify(images[0]?.mimeType));
+    }
+  });
+
+  it("answers 413 when the payload itself is over a limit", async () => {
+    const { call, start } = await serve({
+      ...seeing,
+      imageLimits: {
+        maxImageBytes: 64,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 64,
+        maxSessionImageBytes: 1024,
+      },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    const tooBig = await call("POST", sessionTurnsPath(sessionId), {
+      text: "смотри",
+      images: [sized(128)],
+    });
+
+    assert.equal(tooBig.status, 413);
+    assert.match(String(tooBig.body["error"]), /maxImageBytes/);
+
+    const tooMany = await call("POST", sessionTurnsPath(sessionId), {
+      text: "смотри",
+      images: [sized(16), sized(16)],
+    });
+
+    assert.equal(tooMany.status, 413);
+  });
+
+  it("answers 409 when the session has no room left, and writes nothing", async () => {
+    const { call, start } = await serve({
+      ...seeing,
+      imageLimits: {
+        maxImageBytes: 128,
+        maxImagesPerMessage: 4,
+        maxMessageImageBytes: 128,
+        // Места ровно под одну картинку: вторая обязана упереться в бюджет сессии, а не в свой размер.
+        maxSessionImageBytes: 100,
+      },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "первая", images: [sized(64)] }))
+        .status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+
+    const refused = await call("POST", sessionTurnsPath(sessionId), {
+      text: "вторая",
+      images: [sized(64)],
+    });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /maxSessionImageBytes/);
+
+    // Отказ не записал ничего: в дереве осталась только первая реплика человека.
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    assert.equal(
+      page.entries.filter((entry) => entry.kind === "message" && entry.role === "user").length,
+      1,
+    );
+  });
+
+  it("carries images into a message that does not start a turn", async () => {
+    const { call, start } = await serve(seeing);
+    const sessionId = String((await start()).body["id"]);
+    const image = sized(48);
+
+    const accepted = await call("POST", sessionMessagesPath(sessionId), {
+      text: "посмотри потом",
+      images: [image],
+      mode: "append",
+    });
+
+    assert.equal(accepted.status, 200);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const said = page.entries.find((entry) => entry.kind === "message" && entry.role === "user");
+
+    assert.deepEqual(said?.kind === "message" ? said.content : undefined, [
+      { kind: "text", text: "посмотри потом" },
+      { kind: "image", mimeType: "image/png", data: image.data },
+    ]);
+  });
+
+  it("refuses a model that only reads text and says which model that is", async () => {
+    const { call, start, model } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    const refused = await call("POST", sessionMessagesPath(sessionId), {
+      text: "смотри",
+      images: [sized(16)],
+      mode: "append",
+    });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), new RegExp(model.replace("/", "\\/")));
+    assert.match(String(refused.body["error"]), /does not read images/);
   });
 });
 
