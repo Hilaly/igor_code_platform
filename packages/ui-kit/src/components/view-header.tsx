@@ -17,7 +17,7 @@ export function ViewHeader({ title, context, level = 1, actions }: ViewHeaderPro
     <header className={styles.header}>
       <div className={styles.inner}>
         <div className={styles.headingGroup}>
-          <div className={styles.title}>
+          <div className={styles.title} title={typeof title === "string" ? title : undefined}>
             <Heading level={level}>{title}</Heading>
           </div>
           {context == null ? undefined : (

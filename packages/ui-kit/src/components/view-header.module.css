@@ -20,28 +20,49 @@
   min-width: 0;
   margin-inline: auto;
 }
+/**
+ * Тот же нулевой базис, что и у контекста внутри: гипотетический размер группы считается по её
+ * max-content, то есть по полному пути, и с `auto` действия уезжали на вторую строку целиком.
+ */
 .headingGroup {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-items: baseline;
   gap: var(--sovereign-space-2);
   min-width: 0;
 }
+/**
+ * Заголовок маршрута занимает одну строку и при нехватке места усекается многоточием, а не
+ * переносится: перенос делал шапку то одно-, то двухстрочной от длины имени сессии, и содержимое
+ * страницы прыгало вместе с ней. Полное имя остаётся в нативной подсказке.
+ */
 .title {
   min-width: 0;
   flex: 0 1 auto;
+  overflow: hidden;
 }
+.title :is(h1, h2, h3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/**
+ * Базис нуль, а не `auto`: с `flex-wrap` строка разбивается по гипотетическому размеру, до сжатия,
+ * поэтому длинный путь в контексте уводил действия на вторую строку целиком. С нулевым базисом
+ * контекст сначала занимает остаток строки и лишь потом усекается.
+ */
 .context {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   color: var(--sovereign-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/** Действия не растут: остаток строки принадлежит заголовку, а не пустому месту за кнопками. */
 .actions {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-items: center;
   justify-content: flex-end;
   gap: var(--sovereign-space-2);

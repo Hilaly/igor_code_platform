@@ -408,7 +408,7 @@ describe("stylesheets of the kit", () => {
     );
 
     expect(viewHeaderCss).toMatch(
-      /\.actions\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
+      /\.actions\s*\{[^}]*flex:\s*0\s+1\s+auto;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s,
     );
     expect(viewHeaderCss).toMatch(/\.actions\s*\{[^}]*justify-content:\s*flex-end;/s);
   });
@@ -428,6 +428,22 @@ describe("stylesheets of the kit", () => {
     );
     expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*max-width:\s*var\(--sovereign-page-width\);/s);
     expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*margin-inline:\s*auto;/s);
+  });
+
+  /**
+   * Высота шапки не зависит от длины имени: заголовок и контекст усекаются, а не переносятся, иначе
+   * содержимое страницы прыгает вниз на длинном имени сессии. Нулевой базис контекста нужен именно
+   * из-за `flex-wrap`: строка разбивается до сжатия, и `auto` уводил действия на вторую строку.
+   */
+  it("keeps the ViewHeader on one line by truncating its title and context", () => {
+    const viewHeaderCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "view-header.module.css"), "utf8"),
+    );
+
+    expect(viewHeaderCss).toMatch(
+      /\.title :is\(h1, h2, h3\)\s*\{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s,
+    );
+    expect(viewHeaderCss).toMatch(/\.context\s*\{[^}]*flex:\s*1\s+1\s+0;/s);
   });
 
   /** Мера страницы принадлежит киту и меняется вместе с узким экраном в одном месте. */
