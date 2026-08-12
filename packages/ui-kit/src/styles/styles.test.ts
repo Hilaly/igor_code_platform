@@ -424,10 +424,25 @@ describe("stylesheets of the kit", () => {
     );
 
     expect(viewHeaderCss).toMatch(
-      /\.header\s*\{[^}]*padding:\s*var\(--sovereign-space-3\)\s+var\(--sovereign-page-gutter\);/s,
+      /\.header\s*\{[^}]*padding:\s*var\(--sovereign-space-2\)\s+var\(--sovereign-page-gutter\);/s,
     );
     expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*max-width:\s*var\(--sovereign-page-width\);/s);
     expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*margin-inline:\s*auto;/s);
+  });
+
+  /**
+   * Полоса шапки — постоянный хром, а не текст статьи: её кегль на шаг ниже display-кегля, иначе
+   * подпись маршрута кричит на каждой странице и оставляет разрыв до `Heading level={3}` внутри
+   * страницы. Размер задаёт полоса, а `level` остаётся семантикой.
+   */
+  it("keeps the route header a step below the display type size", () => {
+    const viewHeaderCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "view-header.module.css"), "utf8"),
+    );
+
+    expect(viewHeaderCss).toMatch(
+      /\.title :is\(h1, h2, h3\)\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-xl\);/s,
+    );
   });
 
   /**

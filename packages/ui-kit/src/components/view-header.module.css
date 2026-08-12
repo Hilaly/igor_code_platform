@@ -1,6 +1,6 @@
 .header {
   min-width: 0;
-  padding: var(--sovereign-space-3) var(--sovereign-page-gutter);
+  padding: var(--sovereign-space-2) var(--sovereign-page-gutter);
   border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
@@ -41,8 +41,15 @@
   flex: 0 1 auto;
   overflow: hidden;
 }
+/**
+ * Кегль заголовка задаёт полоса, а не уровень: `level` остаётся семантикой для скринридера, а размер
+ * здесь на шаг ниже display-кегля. Полоса — постоянный хром, её подпись ловят краем глаза на каждой
+ * странице, и 2rem в ней кричали, оставляя разрыв до `Heading level={3}` внутри страницы. Меньший
+ * кегль ещё и уходит в многоточие позже: длинных имён сессий это касается напрямую.
+ */
 .title :is(h1, h2, h3) {
   overflow: hidden;
+  font-size: var(--sovereign-font-size-xl);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
