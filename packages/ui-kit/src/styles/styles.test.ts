@@ -466,9 +466,13 @@ describe("stylesheets of the kit", () => {
     const tokens = withoutComments(readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8"));
 
     expect(tokens).toMatch(/--sovereign-page-width:\s*64rem;/);
-    expect(tokens).toMatch(/--sovereign-page-gutter:\s*var\(--sovereign-space-5\);/);
+    // Слот назван высотой той самой кнопки, которая в него встаёт: связь держится токеном, а не
+    // совпадением чисел, иначе следующая правка шкалы вернула бы накладку кнопки на заголовок.
     expect(tokens).toMatch(
-      /@media\s*\(width\s*<=\s*40rem\)\s*\{[^}]*:root\s*\{[^}]*--sovereign-page-gutter:\s*var\(--sovereign-space-3\);/s,
+      /--sovereign-page-gutter:\s*calc\(var\(--sovereign-row-height-compact\)\s*\+\s*var\(--sovereign-space-3\)\);/,
+    );
+    expect(tokens).toMatch(
+      /@media\s*\(width\s*<=\s*40rem\)\s*\{[^}]*:root\s*\{[^}]*--sovereign-page-gutter:\s*calc\(var\(--sovereign-row-height-compact\)\s*\+\s*var\(--sovereign-space-1\)\);/s,
     );
   });
 

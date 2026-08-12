@@ -36,22 +36,6 @@
   border-inline-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
-.shell-left-head,
-.shell-right-head {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: var(--sovereign-space-2);
-}
-
-.shell-left-head {
-  justify-content: flex-end;
-}
-
-.shell-right-head {
-  justify-content: space-between;
-}
-
 .shell-left-main {
   display: flex;
   flex: 1 1 auto;
@@ -123,6 +107,10 @@
   min-height: 0;
 }
 
+.shell-header {
+  position: relative;
+}
+
 .shell-body {
   display: flex;
   flex-direction: column;
@@ -189,20 +177,30 @@
   font-size: var(--sovereign-font-size-sm);
 }
 
-.shell-restore {
+/**
+ * Переключатель панели занимает жёлоб полосы шапки и не входит в её строку: заголовок маршрута
+ * начинается за жёлобом, ровно над первой строкой вью, и появление кнопки его не сдвигает. Жёлоб не
+ * бывает уже малого контрола (кит, `tokens.css`), поэтому накладки на заголовок нет ни на какой ширине
+ * окна. Постоянный рельс во всю высоту страницы вместо этого отъедал бы ширину у содержимого.
+ */
+.shell-panel-toggle {
   position: absolute;
-  top: var(--sovereign-space-2);
-  z-index: 1;
-  display: inline-flex;
-  min-width: 0;
+  inset-block-start: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: var(--sovereign-page-gutter);
+  /* Отбивка та же, что у полосы: кнопка встаёт на строку заголовка, а не в середину полосы. Разница
+     видна, когда действия шапки переносятся и полоса становится многострочной. */
+  padding-block-start: var(--sovereign-space-2);
 }
 
-.shell-restore-left {
-  left: var(--sovereign-space-2);
+.shell-panel-toggle-left {
+  inset-inline-start: 0;
 }
 
-.shell-restore-right {
-  right: var(--sovereign-space-2);
+.shell-panel-toggle-right {
+  inset-inline-end: 0;
 }
 
 .shell-resizer {
@@ -242,7 +240,6 @@
     padding-inline: var(--sovereign-space-2);
   }
 
-  .shell-right-head,
   .shell-tabs {
     gap: var(--sovereign-space-1);
   }

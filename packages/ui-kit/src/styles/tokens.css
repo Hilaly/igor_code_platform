@@ -61,7 +61,7 @@
   --sovereign-row-height-compact: calc(var(--sovereign-control-height-md) - 0.75rem);
   --sovereign-reading-width: 46rem;
   --sovereign-page-width: 64rem;
-  --sovereign-page-gutter: var(--sovereign-space-5);
+  --sovereign-page-gutter: calc(var(--sovereign-row-height-compact) + var(--sovereign-space-3));
 
   --sovereign-stroke-thin: 1px;
   --sovereign-stroke-emphasis: 2px;
@@ -78,10 +78,15 @@
 }
 
 /* Жёлоб страницы объявлен здесь, а не в оболочке: его просят и шапка кита, и тело страницы, и
-   разъехавшись на узком экране они рассинхронизировали бы заголовок с содержимым. */
+   разъехавшись на узком экране они рассинхронизировали бы заголовок с содержимым.
+
+   Жёлоб — это слот хрома, а не свободно выбранный отступ: в него целиком встаёт переключатель панели,
+   поэтому он объявлен через высоту той самой кнопки (`Button size="sm" iconOnly` — квадрат в
+   `--sovereign-row-height-compact`) плюс воздух вокруг неё. На узком экране воздуха остаётся минимум,
+   но сама кнопка помещается: сжать слот ниже неё значит пустить её на первую строку содержимого. */
 @media (width <= 40rem) {
   :root {
-    --sovereign-page-gutter: var(--sovereign-space-3);
+    --sovereign-page-gutter: calc(var(--sovereign-row-height-compact) + var(--sovereign-space-1));
   }
 }
 

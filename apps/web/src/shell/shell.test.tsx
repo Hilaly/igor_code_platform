@@ -384,12 +384,49 @@ describe("hiding and restoring the panels", () => {
     expect(screen.getByRole("main").getAttribute("data-content-mode")).toBe("contained");
   });
 
-  it("a hidden left panel is gone with its edge, and a restore button takes its place", () => {
+  it("a hidden left panel is gone with its edge, and its toggle turns into a restore", () => {
     show({ layout: { ...defaultLayout, leftHidden: true } });
 
     expect(screen.queryByRole("separator", { name: "левая панель" })).toBeNull();
     expect(screen.getByRole("button", { name: "показать левую" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "скрыть левую" })).toBeNull();
+  });
+
+  /**
+   * Свернуть и развернуть — одно место, а не два: переключатель обеих панелей живёт в полосе шапки
+   * маршрута и при смене состояния не переезжает. Пока «скрыть» стояла в самой панели, кнопка
+   * прыгала на всю её ширину, а левая панель тратила на неё целую строку и сдвигала бренд вниз.
+   */
+  it("keeps both panel toggles in the route header in either state", () => {
+    const { again } = show({ layout: rightVisible });
+
+    const inHeader = (name: string): Element | null | undefined =>
+      screen.getByRole("button", { name }).closest(".shell-header");
+
+    expect(inHeader("скрыть левую")).not.toBeNull();
+    expect(inHeader("скрыть правую")).not.toBeNull();
+
+    again({ ...rightVisible, leftHidden: true, rightHidden: true });
+
+    expect(inHeader("показать левую")).not.toBeNull();
+    expect(inHeader("показать правую")).not.toBeNull();
+  });
+
+  /** Панель не тратит строку на собственную кнопку: её содержимое начинается сразу. */
+  it("leaves no toggle row inside either panel", () => {
+    show({
+      layout: rightVisible,
+      tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
+    });
+
+    expect(
+      screen.getByRole("navigation", { name: "левая панель" }).querySelector("button"),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("complementary", { name: "правая панель" })
+        .querySelectorAll("button, [role='button']"),
+    ).toHaveLength(1);
   });
 
   it("the restore button brings the panel back", () => {

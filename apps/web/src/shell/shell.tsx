@@ -97,20 +97,8 @@ export function Shell({
       {layout.leftHidden ? undefined : (
         <>
           <nav className="shell-left" aria-label={labels.left} style={{ width: `${leftWidth}px` }}>
-            {/* Шапка панели: одна кнопка «скрыть», прижатая к правому краю. Заголовок навигации
-                приходит внутри `navigation` ниже, и совать кнопку в чужое содержимое не нужно. Стрелка
-                скрытия смотрит наружу — туда, куда панель свернётся. */}
-            <div className="shell-left-head">
-              <Button
-                size="sm"
-                iconOnly
-                aria-label={labels.hideLeft}
-                title={labels.hideLeft}
-                onClick={() => onLayoutChange({ ...layout, leftHidden: true })}
-              >
-                <PanelLeftCloseIcon size="sm" />
-              </Button>
-            </div>
+            {/* Своей шапки у панели нет: переключатель стоит в жёлобе шапки маршрута, и строка ради
+                одной кнопки не сдвигала бы вниз бренд и действие создания сессии. */}
             <div className="shell-left-main">
               {navigationHeader === undefined ? null : (
                 <div className="shell-left-nav-header" data-testid="shell-left-header">
@@ -136,7 +124,38 @@ export function Shell({
       )}
       <main className="shell-page" data-content-mode={contentMode}>
         <ShellHeaderProvider description={header}>
-          <ShellHeader {...(headerActions === undefined ? {} : { actions: headerActions })} />
+          <ShellHeader
+            {...(headerActions === undefined ? {} : { actions: headerActions })}
+            toggles={
+              <>
+                <PanelToggle
+                  side="left"
+                  hidden={layout.leftHidden}
+                  hideLabel={labels.hideLeft}
+                  showLabel={labels.showLeft}
+                  onToggle={() => onLayoutChange({ ...layout, leftHidden: !layout.leftHidden })}
+                />
+                {/* Страница, которой правая панель не положена, переключателя не показывает: кнопка,
+                    ничего не меняющая, хуже отсутствующей. */}
+                {rightUnavailable ? undefined : (
+                  <PanelToggle
+                    side="right"
+                    hidden={layout.rightHidden}
+                    hideLabel={labels.hideRight}
+                    showLabel={labels.showRight}
+                    onToggle={() =>
+                      onLayoutChange(
+                        layout.rightHidden
+                          ? { ...layout, rightHidden: false }
+                          : // Скрытая панель открытой вкладки не имеет: ту же уборку делает и команда.
+                            { ...layout, rightHidden: true, openTab: undefined },
+                      )
+                    }
+                  />
+                )}
+              </>
+            }
+          />
           <div className="shell-body" data-content-mode={contentMode}>
             <div
               className="shell-content-frame"
@@ -147,36 +166,6 @@ export function Shell({
             </div>
           </div>
         </ShellHeaderProvider>
-        {/* Возврат скрытой панели — кнопка поверх угла страницы, а не постоянный рельс: рельс
-            постоянно отъедал бы ширину у страницы ради кнопки, которая нужна редко. Кнопка идёт после
-            страницы, и порядка документа достаточно для её слоя — лишний z-index конкурировал бы с
-            меню на --sovereign-z-overlay. */}
-        {layout.leftHidden ? (
-          <span className="shell-restore shell-restore-left">
-            <Button
-              size="sm"
-              iconOnly
-              aria-label={labels.showLeft}
-              title={labels.showLeft}
-              onClick={() => onLayoutChange({ ...layout, leftHidden: false })}
-            >
-              <PanelLeftOpenIcon size="sm" />
-            </Button>
-          </span>
-        ) : undefined}
-        {!rightUnavailable && layout.rightHidden ? (
-          <span className="shell-restore shell-restore-right">
-            <Button
-              size="sm"
-              iconOnly
-              aria-label={labels.showRight}
-              title={labels.showRight}
-              onClick={() => onLayoutChange({ ...layout, rightHidden: false })}
-            >
-              <PanelRightOpenIcon size="sm" />
-            </Button>
-          </span>
-        ) : undefined}
       </main>
       {rightVisible ? (
         <>
@@ -192,37 +181,27 @@ export function Shell({
             aria-label={labels.right}
             style={{ width: `${rightWidth}px` }}
           >
-            <div className="shell-right-head">
-              {/*
-                Не `role="tablist"`: у вкладок ARIA выбрана ровно одна, а здесь повторный щелчок по
-                открытой вкладке закрывает её. Это группа кнопок-переключателей, чем `aria-pressed`
-                у каждой кнопки её и объявляет.
-              */}
-              <div className="shell-tabs">
-                {tabs.map((tab) => (
-                  <Button
-                    key={tab.id}
-                    onClick={() =>
-                      onLayoutChange({
-                        ...layout,
-                        openTab: layout.openTab === tab.id ? undefined : tab.id,
-                      })
-                    }
-                    pressed={layout.openTab === tab.id}
-                  >
-                    {tab.label}
-                  </Button>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                iconOnly
-                aria-label={labels.hideRight}
-                title={labels.hideRight}
-                onClick={() => onLayoutChange({ ...layout, rightHidden: true, openTab: undefined })}
-              >
-                <PanelRightCloseIcon size="sm" />
-              </Button>
+            {/*
+              Не `role="tablist"`: у вкладок ARIA выбрана ровно одна, а здесь повторный щелчок по
+              открытой вкладке закрывает её. Это группа кнопок-переключателей, чем `aria-pressed`
+              у каждой кнопки её и объявляет. Полоса занимает всю строку: кнопка скрытия панели
+              уехала в жёлоб шапки маршрута и места у вкладок больше не отнимает.
+            */}
+            <div className="shell-tabs">
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.id}
+                  onClick={() =>
+                    onLayoutChange({
+                      ...layout,
+                      openTab: layout.openTab === tab.id ? undefined : tab.id,
+                    })
+                  }
+                  pressed={layout.openTab === tab.id}
+                >
+                  {tab.label}
+                </Button>
+              ))}
             </div>
             {open === undefined ? (
               <div className="shell-tab-empty">{labels.emptyTabs}</div>
@@ -236,7 +215,14 @@ export function Shell({
   );
 }
 
-function ShellHeader({ actions }: { actions?: ReactNode }): React.JSX.Element {
+function ShellHeader({
+  actions,
+  toggles,
+}: {
+  actions?: ReactNode;
+  /** Переключатели панелей: стоят в жёлобах полосы и в строку шапки не входят. */
+  toggles: ReactNode;
+}): React.JSX.Element {
   const description = useActiveShellHeader();
   // Действия оболочки идут после действий вью: полосой владеет хост, но первым слово у того, кто
   // страницу показывает.
@@ -250,10 +236,48 @@ function ShellHeader({ actions }: { actions?: ReactNode }): React.JSX.Element {
       </>
     );
 
+  // Переключатели идут после шапки: они рисуются поверх её полосы, и порядка документа для этого
+  // достаточно — лишний z-index конкурировал бы с меню на --sovereign-z-overlay.
   return (
     <div className="shell-header">
       <ViewHeader {...description} {...(composed === undefined ? {} : { actions: composed })} />
+      {toggles}
     </div>
+  );
+}
+
+/** Значок переключателя: у открытой панели стрелка смотрит наружу, у скрытой — к панели. */
+const panelToggleIcons = {
+  left: { shown: PanelLeftCloseIcon, hidden: PanelLeftOpenIcon },
+  right: { shown: PanelRightCloseIcon, hidden: PanelRightOpenIcon },
+} as const;
+
+type PanelToggleProps = {
+  side: "left" | "right";
+  hidden: boolean;
+  hideLabel: string;
+  showLabel: string;
+  onToggle: () => void;
+};
+
+/**
+ * Переключатель панели: одна кнопка на оба состояния и одно место на все страницы. Стоит в жёлобе
+ * полосы шапки, за которым начинаются и заголовок маршрута, и первая строка вью, — поэтому кнопка
+ * ничего не сдвигает, а при сворачивании панели остаётся на том же пикселе.
+ *
+ * Раньше «скрыть» жила в самой панели, а «показать» — поверх угла страницы: для одного действия это
+ * были два разных места, и левая панель тратила на свою кнопку целую строку.
+ */
+function PanelToggle({ side, hidden, hideLabel, showLabel, onToggle }: PanelToggleProps) {
+  const label = hidden ? showLabel : hideLabel;
+  const Icon = panelToggleIcons[side][hidden ? "hidden" : "shown"];
+
+  return (
+    <span className={`shell-panel-toggle shell-panel-toggle-${side}`}>
+      <Button size="sm" iconOnly aria-label={label} title={label} onClick={onToggle}>
+        <Icon size="sm" />
+      </Button>
+    </span>
   );
 }
 

@@ -305,6 +305,29 @@ describe("the style sheets of the application", () => {
     expect(shell).not.toMatch(/\.shell-page\s*\{[^}]*max-width\s*:/s);
   });
 
+  /**
+   * Переключатель панели занимает жёлоб полосы шапки и ровно его ширину: заголовок маршрута начинается
+   * за жёлобом, поэтому кнопка не садится на его первые буквы даже когда страница уже общей меры и
+   * пустого поля вокруг заголовка нет вовсе.
+   */
+  it("keeps both panel toggles inside the header gutter", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-header\s*\{[^}]*position:\s*relative;/s);
+    expect(shell).toMatch(/\.shell-panel-toggle\s*\{[^}]*position:\s*absolute;/s);
+    expect(shell).toMatch(
+      /\.shell-panel-toggle\s*\{[^}]*width:\s*var\(--sovereign-page-gutter\);/s,
+    );
+    // Кнопка стоит на строке заголовка, а не по центру полосы: перенос действий делает полосу
+    // многострочной, и центрирование уводило бы её в середину пустоты.
+    expect(shell).toMatch(/\.shell-panel-toggle\s*\{[^}]*inset-block-start:\s*0;/s);
+    expect(shell).toMatch(
+      /\.shell-panel-toggle\s*\{[^}]*align-items:\s*flex-start;[^}]*padding-block-start:\s*var\(--sovereign-space-2\);/s,
+    );
+    expect(shell).toMatch(/\.shell-panel-toggle-left\s*\{[^}]*inset-inline-start:\s*0;/s);
+    expect(shell).toMatch(/\.shell-panel-toggle-right\s*\{[^}]*inset-inline-end:\s*0;/s);
+  });
+
   it("centers page route children while contained content remains full width", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
@@ -351,8 +374,10 @@ describe("the style sheets of the application", () => {
   it("keeps clean-slate shell ownership free of dead plugin and historical selectors", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
+    // `shell-restore` и головные строки панелей — прошлая раскладка, где «скрыть» и «показать» были
+    // двумя разными местами. Селекторы перечислены здесь, чтобы вернуть их случайно было нельзя.
     expect(shell).not.toMatch(
-      /(?:^|[,{])\s*\.shell-(?:status|account-status|nav|projects)\s*(?:[,{]|\{)/m,
+      /(?:^|[,{])\s*\.shell-(?:status|account-status|nav|projects|restore|restore-left|restore-right|left-head|right-head)\s*(?:[,{]|\{)/m,
     );
     expect(shell).not.toMatch(/\.plugins(?:-plugin|-contribution|-contributions|-reasons)?\b/);
   });
