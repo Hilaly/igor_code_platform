@@ -9,6 +9,7 @@ import {
 import {
   Button,
   Form,
+  Heading,
   Input,
   Notice,
   Select,
@@ -217,7 +218,7 @@ export function UserProviderForm(props: UserProviderFormProps) {
             translator={props.translator}
           />
           <div className="provider-form-section-label">
-            <Text>{t("providers.user.defaults")}</Text>
+            <Heading level={3}>{t("providers.user.defaults")}</Heading>
           </div>
           <SettingsRow label={<span>{t("providers.user.context")}</span>}>
             <Input
@@ -322,7 +323,7 @@ function ManualModelsEditor({
   return (
     <section className="provider-manual-models" aria-label={t("providers.user.models.manual")}>
       <div className="provider-form-section-label">
-        <Text>{t("providers.user.models.manual")}</Text>
+        <Heading level={3}>{t("providers.user.models.manual")}</Heading>
         <Text tone="muted">{t("providers.user.models.manual.hint")}</Text>
       </div>
       {models.map((model, index) => (

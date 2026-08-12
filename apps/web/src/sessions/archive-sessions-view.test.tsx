@@ -74,7 +74,9 @@ it("exposes every project archive as a named section with one list", () => {
     ["Beta", secondSession],
   ] as const) {
     const section = screen.getByRole("region", { name });
-    expect(within(section).getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    // Уровень секции внутри страницы один на всё приложение: крупный заголовок принадлежит шапке
+    // маршрута, и имя проекта не соперничает с ним (docs/ui-kit.md).
+    expect(within(section).getAllByRole("heading", { level: 3 })).toHaveLength(1);
     const list = within(section).getByRole("list");
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     expect(within(list).getByText(archivedSession.title ?? archivedSession.id)).toBeDefined();

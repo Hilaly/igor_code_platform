@@ -54,11 +54,6 @@
   min-width: 0;
 }
 
-.usage-section h2 {
-  margin: 0;
-  font-size: var(--sovereign-font-size-sm);
-}
-
 .usage-chart {
   display: flex;
   flex-direction: column;
@@ -82,20 +77,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.usage-chart-track {
-  display: block;
-  height: var(--sovereign-space-2);
-  overflow: hidden;
-  background: var(--sovereign-border-subtle);
-}
-
-.usage-chart-bar {
-  display: block;
-  width: calc(var(--usage-share) * 100%);
-  height: 100%;
-  background: var(--sovereign-accent-strong);
 }
 
 .usage-chart-value,
@@ -157,7 +138,7 @@
     gap: var(--sovereign-space-1) var(--sovereign-space-2);
   }
 
-  .usage-chart-track {
+  .usage-chart > li > [role="progressbar"] {
     grid-column: 1 / -1;
     grid-row: 2;
   }

@@ -153,8 +153,10 @@ function ArchiveSessionsGroup({
 
   return (
     <section className="archive-sessions-group" aria-labelledby={headingId}>
+      {/* Уровень тот же, что у любой секции внутри страницы: крупный заголовок на странице один и
+          принадлежит шапке маршрута. Прежний `level={2}` делал имя проекта почти равным ему. */}
       <hgroup id={headingId}>
-        <Heading level={2}>{projectName}</Heading>
+        <Heading level={3}>{projectName}</Heading>
       </hgroup>
       <List>
         {sessions.map((session) => (

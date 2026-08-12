@@ -1,5 +1,5 @@
-import { Badge, Notice, type Translator } from "@sovereign/ui-kit";
-import type { CSSProperties, ReactNode } from "react";
+import { Badge, Heading, Notice, Progress, type Translator } from "@sovereign/ui-kit";
+import { useId, type ReactNode } from "react";
 
 import { summarizeUsage, type UsageRecord, type UsageState } from "./usage-state.ts";
 
@@ -21,6 +21,8 @@ function Metric({ label, children }: { label: string; children: ReactNode }) {
 
 export function UsageView({ state, translator }: UsageViewProps) {
   const { t, formatNumber } = translator;
+  const chartTitleId = useId();
+  const tableTitleId = useId();
 
   if (state.status === "loading") {
     return <p role="status">{t("usage.loading")}</p>;
@@ -80,20 +82,20 @@ export function UsageView({ state, translator }: UsageViewProps) {
             <Metric label={t("usage.metric.cost")}>${totals.cost.toFixed(4)}</Metric>
           </section>
 
-          <section className="usage-section" aria-labelledby="usage-chart-title">
-            <h2 id="usage-chart-title">{t("usage.chart.title")}</h2>
+          <section className="usage-section" aria-labelledby={chartTitleId}>
+            <hgroup id={chartTitleId}>
+              <Heading level={3}>{t("usage.chart.title")}</Heading>
+            </hgroup>
             <ol className="usage-chart" aria-label={t("usage.chart.title")}>
               {snapshot.records.map((record) => {
                 const share = maximumTokens === 0 ? 0 : record.stats.totalTokens / maximumTokens;
                 return (
                   <li key={record.session.id}>
                     <span className="usage-chart-name">{sessionName(record)}</span>
-                    <span className="usage-chart-track" aria-hidden="true">
-                      <span
-                        className="usage-chart-bar"
-                        style={{ "--usage-share": String(share) } as CSSProperties}
-                      />
-                    </span>
+                    {/* Полоса — та же `Progress`, что и везде: своя разметка дорожки повторяла примитив
+                        кита другой геометрией и другой ролью цвета, то есть расходилась с ним при
+                        первой правке токенов. */}
+                    <Progress value={share} label={sessionName(record)} />
                     <span className="usage-chart-value">
                       {formatNumber(record.stats.totalTokens)}
                     </span>
@@ -103,8 +105,10 @@ export function UsageView({ state, translator }: UsageViewProps) {
             </ol>
           </section>
 
-          <section className="usage-section" aria-labelledby="usage-table-title">
-            <h2 id="usage-table-title">{t("usage.table.title")}</h2>
+          <section className="usage-section" aria-labelledby={tableTitleId}>
+            <hgroup id={tableTitleId}>
+              <Heading level={3}>{t("usage.table.title")}</Heading>
+            </hgroup>
             <div className="usage-table-scroll">
               <table className="usage-table" aria-label={t("usage.table.title")}>
                 <thead>
