@@ -10,10 +10,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 import { Shell, type ShellProps } from "./shell.tsx";
-import { useShellHeader } from "./header.tsx";
+import { useShellHeader, useShellHeaderActions } from "./header.tsx";
 import { defaultLayout, panelWidthLimits, shellResizerWidth, type ShellLayout } from "./layout.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -174,6 +174,52 @@ describe("global shell header", () => {
 
     expect(screen.getByRole("button", { name: "Действие плагина" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Создать" })).toBeNull();
+  });
+
+  /**
+   * Главное действие страницы регистрируется отдельно от описания: маршрут называет `describePage`, и
+   * вью, которому нужна одна кнопка, не обязано повторять у себя заголовок маршрута — иначе они
+   * разойдутся при первой правке.
+   */
+  it("takes the main action from a view without losing the route title", () => {
+    function ViewWithAction(): React.JSX.Element {
+      const owned = useShellHeaderActions(useMemo(() => <button>Создать проект</button>, []));
+      return <div>{owned ? "действие в шапке" : "действие на странице"}</div>;
+    }
+
+    const view = show({
+      header: { title: "Проекты", context: "Каталог" },
+      children: <ViewWithAction />,
+    });
+
+    expect(screen.getByRole("heading", { name: "Проекты" })).toBeDefined();
+    expect(screen.getByText("Каталог")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Создать проект" })).toBeDefined();
+    expect(screen.getByText("действие в шапке")).toBeDefined();
+
+    view.again(defaultLayout, { header: { title: "Проекты" }, children: <div>другое вью</div> });
+
+    expect(screen.queryByRole("button", { name: "Создать проект" })).toBeNull();
+  });
+
+  /** Своё описание вью старше отдельных действий: иначе одна кнопка показалась бы дважды. */
+  it("prefers the actions of a registered description over a separate registration", () => {
+    function ViewWithBoth(): React.JSX.Element {
+      // Узлы memo-изованы: обе регистрации требуют стабильного узла, иначе перерегистрация на каждый
+      // рендер вызывает следующий рендер.
+      const description = useMemo(
+        () => ({ title: "Своё описание", actions: <button>Из описания</button> }),
+        [],
+      );
+      useShellHeader(description);
+      useShellHeaderActions(useMemo(() => <button>Отдельное</button>, []));
+      return <div>страница</div>;
+    }
+
+    show({ header: { title: "База" }, children: <ViewWithBoth /> });
+
+    expect(screen.getByRole("button", { name: "Из описания" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Отдельное" })).toBeNull();
   });
 });
 

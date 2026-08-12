@@ -36,10 +36,11 @@ import {
   Text,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
+import { useShellHeaderActions } from "../shell/header.tsx";
 
 export type ProvidersViewProps = {
   /** Внутри страницы настроек заголовок раздела уже `h1`; самостоятельное вью по умолчанию владеет им. */
@@ -83,6 +84,24 @@ export function ProvidersView({
 }: ProvidersViewProps) {
   const { t } = translator;
   const snapshot = state.snapshot;
+
+  /**
+   * Главное действие каталога стоит в шапке маршрута, как и на странице проектов. На детали одного
+   * провайдера его нет: там маршрут занят самим провайдером, и «создать» соседствовало бы с его
+   * собственными действиями.
+   */
+  const createAction = useMemo(
+    () => (
+      <Button tone="accent" onClick={onCreate}>
+        + {t("providers.user.new")}
+      </Button>
+    ),
+    [onCreate, t],
+  );
+  const headerOwnsActions = useShellHeaderActions(
+    snapshot === undefined || providerId !== undefined ? undefined : createAction,
+  );
+
   const conflictingUserProviders =
     state.userProviders?.providers.filter(
       (details) =>
@@ -191,9 +210,8 @@ export function ProvidersView({
 
   return (
     <div className="providers">
-      <Button tone="accent" onClick={onCreate}>
-        + {t("providers.user.new")}
-      </Button>
+      {/* Вне оболочки шапки нет, и действие обязано остаться на самой странице. */}
+      {headerOwnsActions ? undefined : createAction}
 
       {/* Беда с файлом кредов — не отказ маршрута: список приезжает всё равно, а статус у всех
           становится «сказать нечем» (docs/web-api.md). */}

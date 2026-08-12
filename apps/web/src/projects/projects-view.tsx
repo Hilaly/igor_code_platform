@@ -28,11 +28,12 @@ import {
   Tooltip,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { fetchFilesystemListing } from "./api.ts";
 import { shortenPath } from "./path-shorten.ts";
 import type { ProjectsState } from "./state.ts";
+import { useShellHeaderActions } from "../shell/header.tsx";
 
 export type ProjectsViewProps = {
   headingLevel?: 1 | 2;
@@ -51,6 +52,29 @@ export function ProjectsView(props: ProjectsViewProps) {
   const snapshot = state.snapshot;
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const creationOpen = creating || state.conflict !== undefined;
+
+  /**
+   * Главное действие страницы живёт в шапке маршрута: место действия одно на все страницы, и его не
+   * приходится искать заново в каждом каталоге. Узел memo-изован — этого требует регистрация в шапке.
+   * Пока каталог не прочитан, действия нет вовсе: форма создания рисуется ниже вместе со списком, и
+   * кнопка над пустым экраном ничего бы не открыла.
+   */
+  const createAction = useMemo(
+    () => (
+      <Button
+        tone="accent"
+        onClick={() => setCreating((open) => !open)}
+        aria-expanded={creationOpen}
+      >
+        + {t("projects.new.title")}
+      </Button>
+    ),
+    [creationOpen, t],
+  );
+  const headerOwnsActions = useShellHeaderActions(
+    snapshot === undefined ? undefined : createAction,
+  );
 
   if (snapshot === undefined) {
     return (
@@ -84,16 +108,11 @@ export function ProjectsView(props: ProjectsViewProps) {
           aria-label={t("projects.search")}
           placeholder={t("projects.search")}
         />
-        <Button
-          tone="accent"
-          onClick={() => setCreating((open) => !open)}
-          aria-expanded={creating || state.conflict !== undefined}
-        >
-          + {t("projects.new.title")}
-        </Button>
+        {/* Вне оболочки шапки нет, и действие обязано остаться на самой странице. */}
+        {headerOwnsActions ? undefined : createAction}
       </div>
 
-      {creating || state.conflict !== undefined ? (
+      {creationOpen ? (
         <NewProject
           onCreate={async (draft) => {
             const created = await props.onCreate(draft);
