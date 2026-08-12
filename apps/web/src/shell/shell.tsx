@@ -21,6 +21,7 @@ import {
   type ShellLayout,
 } from "./layout.ts";
 import {
+  ShellHeaderActions,
   ShellHeaderProvider,
   useActiveShellHeader,
   type ShellHeaderDescription,
@@ -43,6 +44,8 @@ export type ShellProps = {
     hideRight: string;
     showLeft: string;
     showRight: string;
+    /** Имя меню, в которое уезжают все действия страницы, кроме главного. */
+    moreActions: string;
   };
   navigation: ReactNode;
   /** Верхняя секция навигации: бренд и главное действие. */
@@ -125,6 +128,7 @@ export function Shell({
       <main className="shell-page" data-content-mode={contentMode}>
         <ShellHeaderProvider description={header}>
           <ShellHeader
+            moreActionsLabel={labels.moreActions}
             {...(headerActions === undefined ? {} : { actions: headerActions })}
             toggles={
               <>
@@ -217,21 +221,29 @@ export function Shell({
 
 function ShellHeader({
   actions,
+  moreActionsLabel,
   toggles,
 }: {
   actions?: ReactNode;
+  moreActionsLabel: string;
   /** Переключатели панелей: стоят в жёлобах полосы и в строку шапки не входят. */
   toggles: ReactNode;
 }): React.JSX.Element {
-  const description = useActiveShellHeader();
+  const { actions: viewActions, ...description } = useActiveShellHeader();
+  // Пустая полоса действий не рисуется вовсе: узел из нуля кнопок оставил бы в шапке отступ за
+  // несуществующим контролом.
+  const viewRail =
+    viewActions === undefined || viewActions.length === 0 ? undefined : (
+      <ShellHeaderActions actions={viewActions} moreLabel={moreActionsLabel} />
+    );
   // Действия оболочки идут после действий вью: полосой владеет хост, но первым слово у того, кто
   // страницу показывает.
   const composed =
     actions === undefined ? (
-      description.actions
+      viewRail
     ) : (
       <>
-        {description.actions}
+        {viewRail}
         {actions}
       </>
     );

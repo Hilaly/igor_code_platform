@@ -413,6 +413,8 @@ export const coreRussian: CatalogRegistration = {
     "command.panel.left.hide": "Скрыть левую панель",
     "command.panel.right.show": "Показать правую панель",
     "command.panel.right.hide": "Скрыть правую панель",
+    "page.actions.more": "Ещё действия",
+    "commands.open.hint": "Команды (⌘K или Ctrl+K)",
     "commands.title": "Команды",
     "commands.open": "Команды",
     "commands.filter": "Найти команду",

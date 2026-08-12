@@ -8,6 +8,7 @@
 
 import type { FilesystemEntry, Project, ProjectDraft, ProjectUpdate } from "@sovereign/protocol";
 import {
+  AddIcon,
   Badge,
   Button,
   Code,
@@ -33,7 +34,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { fetchFilesystemListing } from "./api.ts";
 import { shortenPath } from "./path-shorten.ts";
 import type { ProjectsState } from "./state.ts";
-import { useShellHeaderActions } from "../shell/header.tsx";
+import { ShellHeaderActions, useShellHeaderActions } from "../shell/header.tsx";
 
 export type ProjectsViewProps = {
   headingLevel?: 1 | 2;
@@ -61,15 +62,17 @@ export function ProjectsView(props: ProjectsViewProps) {
    * кнопка над пустым экраном ничего бы не открыла.
    */
   const createAction = useMemo(
-    () => (
-      <Button
-        tone="accent"
-        onClick={() => setCreating((open) => !open)}
-        aria-expanded={creationOpen}
-      >
-        + {t("projects.new.title")}
-      </Button>
-    ),
+    () => [
+      {
+        id: "create",
+        label: t("projects.new.title"),
+        icon: <AddIcon size="sm" />,
+        tone: "accent" as const,
+        primary: true,
+        expanded: creationOpen,
+        run: () => setCreating((open) => !open),
+      },
+    ],
     [creationOpen, t],
   );
   const headerOwnsActions = useShellHeaderActions(
@@ -109,7 +112,9 @@ export function ProjectsView(props: ProjectsViewProps) {
           placeholder={t("projects.search")}
         />
         {/* Вне оболочки шапки нет, и действие обязано остаться на самой странице. */}
-        {headerOwnsActions ? undefined : createAction}
+        {headerOwnsActions ? undefined : (
+          <ShellHeaderActions actions={createAction} moreLabel={t("page.actions.more")} />
+        )}
       </div>
 
       {creationOpen ? (

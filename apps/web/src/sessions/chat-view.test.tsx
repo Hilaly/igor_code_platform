@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChatView, type ChatViewProps } from "./chat-view.tsx";
 import type { OpenSession } from "./state.ts";
-import { ShellHeaderProvider, useActiveShellHeader } from "../shell/header.tsx";
+import { ShellHeaderActions, ShellHeaderProvider, useActiveShellHeader } from "../shell/header.tsx";
 import { ViewHeader } from "@sovereign/ui-kit";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -149,8 +149,24 @@ const show = (open: OpenSession, overrides: Partial<ChatViewProps> = {}) => {
   };
 };
 
+/**
+ * Проба шапки собирает полосу так же, как оболочка: действия приходят данными, и превратить их в
+ * кнопку и меню «ещё» — её работа, а не работа вью.
+ */
 function HeaderProbe(): React.JSX.Element {
-  return <ViewHeader {...useActiveShellHeader()} />;
+  const { actions, ...description } = useActiveShellHeader();
+
+  return (
+    <ViewHeader
+      {...description}
+      actions={<ShellHeaderActions actions={actions} moreLabel="Ещё действия" />}
+    />
+  );
+}
+
+/** Открыть меню «ещё» шапки: в полосе у чата остаётся только оно. */
+function openHeaderMenu(header: HTMLElement): void {
+  fireEvent.click(within(header).getByRole("button", { name: "Ещё действия" }));
 }
 
 function chooseModel(scope: HTMLElement, provider: string, reference: RegExp): void {
@@ -173,9 +189,12 @@ describe("the session chat view", () => {
     const header = heading.closest("header");
 
     expect(header).not.toBeNull();
-    expect(within(header!).getByRole("button", { name: "Форк всей сессии" })).toBeDefined();
-    expect(within(header!).getByRole("button", { name: "Свернуть контекст" })).toBeDefined();
-    expect(within(header!).getByRole("button", { name: "Дерево записей" })).toBeDefined();
+    // Главного действия у чата в полосе нет: отправка живёт в композере, а три редких хода уезжают
+    // в меню «ещё» — иначе полоса переносится второй строкой на узком экране.
+    openHeaderMenu(header!);
+    expect(screen.getByRole("menuitem", { name: "Форк всей сессии" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Свернуть контекст" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Дерево записей" })).toBeDefined();
     expect(view.container.querySelector(".sessions-session-actions")).toBeNull();
     expect(screen.getByRole("log", { name: "Переписка" })).toBeDefined();
 

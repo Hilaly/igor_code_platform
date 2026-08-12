@@ -17,10 +17,12 @@ import type {
 import { parseModelReference } from "@sovereign/protocol";
 import {
   Badge,
-  Button,
+  CompactIcon,
   ConfirmDialog,
   EmptyState,
+  EntryTreeIcon,
   Field,
+  ForkThroughIcon,
   Input,
   Notice,
   type ScopedTranslator,
@@ -176,24 +178,42 @@ export function ChatView(props: ChatViewProps) {
     }
   }, [agentAvailable]);
 
+  /**
+   * Главного действия у чата в полосе нет: оно живёт в композере («отправить»), а форк, компакция и
+   * дерево записей — редкие ходы. Все три уезжают в меню «ещё», и полоса остаётся заголовком сессии,
+   * а не рядом из трёх подписей, который на узком экране переносился второй строкой.
+   */
   const headerActions = useMemo(
-    () => (
-      <>
-        {busy ? undefined : (
-          <Button onClick={() => void onFork({})}>{t("chat.fork.session")}</Button>
-        )}
-        {archived ? undefined : (
-          <Button
-            onClick={() => setCompacting(true)}
-            disabled={busy || !agentAvailable}
-            {...(busy ? { title: t("chat.busy.hint") } : {})}
-          >
-            {t("chat.compact")}
-          </Button>
-        )}
-        <Button onClick={() => setTreeOpen(true)}>{t("chat.tree.open")}</Button>
-      </>
-    ),
+    () => [
+      ...(busy
+        ? []
+        : [
+            {
+              id: "fork",
+              label: t("chat.fork.session"),
+              icon: <ForkThroughIcon size="sm" />,
+              run: () => void onFork({}),
+            },
+          ]),
+      ...(archived
+        ? []
+        : [
+            {
+              id: "compact",
+              label: t("chat.compact"),
+              icon: <CompactIcon size="sm" />,
+              disabled: busy || !agentAvailable,
+              ...(busy ? { title: t("chat.busy.hint") } : {}),
+              run: () => setCompacting(true),
+            },
+          ]),
+      {
+        id: "tree",
+        label: t("chat.tree.open"),
+        icon: <EntryTreeIcon size="sm" />,
+        run: () => setTreeOpen(true),
+      },
+    ],
     [agentAvailable, archived, busy, onFork, t],
   );
 

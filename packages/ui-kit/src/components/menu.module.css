@@ -95,6 +95,17 @@
   border: var(--sovereign-stroke-thin) solid transparent;
   border-radius: var(--sovereign-radius-2xs);
 }
+/* Слот значка держат все пункты меню сразу, как только значок есть хоть у одного: иначе подписи
+   разъезжаются по левому краю и список читается двумя колонками вместо одной. */
+.itemIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sovereign-icon-sm);
+  margin-inline-end: var(--sovereign-space-2);
+  color: var(--sovereign-text-subtle);
+}
 .item:hover:not(:disabled) {
   background: var(--sovereign-fill-surface);
 }

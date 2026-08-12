@@ -20,6 +20,11 @@ export type MenuItemTone = "normal" | "danger";
 export type MenuItemDescription = {
   id: string;
   label: string;
+  /**
+   * Значок перед подписью. Декоративный: имя пункту даёт `label`, а значок только ускоряет узнавание
+   * в списке из десятка команд. Пункт без значка не сдвигается — слот держат все пункты меню.
+   */
+  icon?: ReactNode;
   disabled?: boolean;
   tone?: MenuItemTone;
   onSelect: () => void;
@@ -196,6 +201,11 @@ export function Menu({
             triggerRef.current?.focus();
           }}
         >
+          {items.some((candidate) => candidate.icon !== undefined) ? (
+            <span className={styles.itemIcon} aria-hidden="true">
+              {item.icon}
+            </span>
+          ) : undefined}
           {item.label}
         </button>
       ))}

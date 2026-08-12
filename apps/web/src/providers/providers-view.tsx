@@ -21,6 +21,7 @@ import type {
   ProviderSummary,
 } from "@sovereign/protocol";
 import {
+  AddIcon,
   Badge,
   Button,
   Code,
@@ -40,7 +41,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
-import { useShellHeaderActions } from "../shell/header.tsx";
+import { ShellHeaderActions, useShellHeaderActions } from "../shell/header.tsx";
 
 export type ProvidersViewProps = {
   /** Внутри страницы настроек заголовок раздела уже `h1`; самостоятельное вью по умолчанию владеет им. */
@@ -91,11 +92,16 @@ export function ProvidersView({
    * собственными действиями.
    */
   const createAction = useMemo(
-    () => (
-      <Button tone="accent" onClick={onCreate}>
-        + {t("providers.user.new")}
-      </Button>
-    ),
+    () => [
+      {
+        id: "create",
+        label: t("providers.user.new"),
+        icon: <AddIcon size="sm" />,
+        tone: "accent" as const,
+        primary: true,
+        run: onCreate,
+      },
+    ],
     [onCreate, t],
   );
   const headerOwnsActions = useShellHeaderActions(
@@ -211,7 +217,9 @@ export function ProvidersView({
   return (
     <div className="providers">
       {/* Вне оболочки шапки нет, и действие обязано остаться на самой странице. */}
-      {headerOwnsActions ? undefined : createAction}
+      {headerOwnsActions ? undefined : (
+        <ShellHeaderActions actions={createAction} moreLabel={t("page.actions.more")} />
+      )}
 
       {/* Беда с файлом кредов — не отказ маршрута: список приезжает всё равно, а статус у всех
           становится «сказать нечем» (docs/web-api.md). */}

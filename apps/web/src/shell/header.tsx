@@ -9,12 +9,42 @@ import {
   type ReactNode,
 } from "react";
 
-import type { ViewHeaderProps } from "@sovereign/ui-kit";
+import { Button, Menu, MoreIcon, type ViewHeaderProps } from "@sovereign/ui-kit";
 
-export type ShellHeaderDescription = Pick<
-  ViewHeaderProps,
-  "title" | "context" | "level" | "actions"
->;
+/** Регистр действия в полосе: `accent` — главное действие страницы, `danger` — необратимое. */
+export type ShellHeaderActionTone = "normal" | "accent" | "danger";
+
+export type ShellHeaderAction = {
+  id: string;
+  label: string;
+  /** Значок: у кнопки стоит перед подписью, у пункта меню — в общем слоте значков. */
+  icon?: ReactNode;
+  disabled?: boolean;
+  /** Подсказка при наведении: обычно причина, по которой действие сейчас недоступно. */
+  title?: string;
+  tone?: ShellHeaderActionTone;
+  /**
+   * Главное действие страницы: остаётся кнопкой с подписью. Остальные уезжают в меню «ещё» — полоса
+   * постоянный хром, и четыре подписи в ней спорили с заголовком маршрута, а на узком экране
+   * переносились второй строкой, растягивая полосу вдвое.
+   */
+  primary?: boolean;
+  /**
+   * Действие раскрывает что-то на самой странице и держит это состояние. Пункту меню не нужно: меню
+   * закрывается выбором, а раскрытая форма остаётся под кнопкой, и скринридер обязан об этом узнать.
+   */
+  expanded?: boolean;
+  run: () => void;
+};
+
+export type ShellHeaderDescription = Pick<ViewHeaderProps, "title" | "context" | "level"> & {
+  /**
+   * Действия данными, а не готовым узлом: полоса решает, что остаётся кнопкой, а что уезжает в меню,
+   * и узел она не смогла бы ни пересчитать, ни разложить. Массив обязан быть стабильным между
+   * рендерами — см. `useShellHeader`.
+   */
+  actions?: readonly ShellHeaderAction[];
+};
 
 type ShellHeaderContextValue = {
   description: ShellHeaderDescription;
@@ -24,9 +54,65 @@ type ShellHeaderContextValue = {
    * то вью, которое его выполняет. Регистрируя полное описание ради одной кнопки, вью пришлось бы
    * повторить у себя заголовок маршрута — и разойтись с ним при первой правке.
    */
-  viewActions: ReactNode;
-  registerActions: (actions: ReactNode) => () => void;
+  viewActions?: readonly ShellHeaderAction[];
+  registerActions: (actions: readonly ShellHeaderAction[] | undefined) => () => void;
 };
+
+const buttonTone = (tone: ShellHeaderActionTone | undefined) =>
+  tone === "accent" ? "accent" : tone === "danger" ? "danger" : "normal";
+
+/**
+ * Полоса действий шапки: главное действие кнопкой, остальные — в меню «ещё». Возвращает `undefined`,
+ * когда действий нет вовсе: пустой узел оставил бы в полосе отступ за несуществующей кнопкой.
+ */
+export function ShellHeaderActions({
+  actions,
+  moreLabel,
+}: {
+  actions?: readonly ShellHeaderAction[];
+  moreLabel: string;
+}): ReactNode {
+  if (actions === undefined || actions.length === 0) {
+    return undefined;
+  }
+
+  const primary = actions.filter((action) => action.primary === true);
+  const rest = actions.filter((action) => action.primary !== true);
+
+  return (
+    <>
+      {primary.map((action) => (
+        <Button
+          key={action.id}
+          tone={buttonTone(action.tone)}
+          disabled={action.disabled}
+          {...(action.title === undefined ? {} : { title: action.title })}
+          {...(action.expanded === undefined ? {} : { "aria-expanded": action.expanded })}
+          onClick={action.run}
+        >
+          {action.icon}
+          {action.label}
+        </Button>
+      ))}
+      {rest.length === 0 ? undefined : (
+        <Menu
+          label={moreLabel}
+          triggerLabel={moreLabel}
+          trigger={<MoreIcon size="sm" />}
+          compact
+          items={rest.map((action) => ({
+            id: action.id,
+            label: action.label,
+            ...(action.icon === undefined ? {} : { icon: action.icon }),
+            ...(action.disabled === undefined ? {} : { disabled: action.disabled }),
+            tone: action.tone === "danger" ? ("danger" as const) : ("normal" as const),
+            onSelect: action.run,
+          }))}
+        />
+      )}
+    </>
+  );
+}
 
 const ShellHeaderContext = createContext<ShellHeaderContextValue | null>(null);
 
@@ -40,8 +126,12 @@ export function ShellHeaderProvider({
   const baseRef = useRef(baseDescription);
   const registrationsRef = useRef(new Map<symbol, ShellHeaderDescription>());
   const [description, setDescription] = useState(baseDescription);
-  const actionRegistrationsRef = useRef(new Map<symbol, ReactNode>());
-  const [viewActions, setViewActions] = useState<ReactNode>(undefined);
+  const actionRegistrationsRef = useRef(
+    new Map<symbol, readonly ShellHeaderAction[] | undefined>(),
+  );
+  const [viewActions, setViewActions] = useState<readonly ShellHeaderAction[] | undefined>(
+    undefined,
+  );
 
   useLayoutEffect(() => {
     baseRef.current = baseDescription;
@@ -62,16 +152,19 @@ export function ShellHeaderProvider({
     };
   }, []);
 
-  const registerActions = useCallback((actions: ReactNode): (() => void) => {
-    const token = Symbol("shell-header-actions");
-    actionRegistrationsRef.current.set(token, actions);
-    setViewActions(actions);
+  const registerActions = useCallback(
+    (actions: readonly ShellHeaderAction[] | undefined): (() => void) => {
+      const token = Symbol("shell-header-actions");
+      actionRegistrationsRef.current.set(token, actions);
+      setViewActions(actions);
 
-    return () => {
-      actionRegistrationsRef.current.delete(token);
-      setViewActions([...actionRegistrationsRef.current.values()].at(-1));
-    };
-  }, []);
+      return () => {
+        actionRegistrationsRef.current.delete(token);
+        setViewActions([...actionRegistrationsRef.current.values()].at(-1));
+      };
+    },
+    [],
+  );
 
   const value = useMemo(
     () => ({ description, register, viewActions, registerActions }),
@@ -98,13 +191,13 @@ export function useShellHeader(description: ShellHeaderDescription): boolean {
 }
 
 /**
- * Главное действие страницы в шапке маршрута. Узел обязан быть стабильным между рендерами — как и у
- * `useShellHeader`, вызывающий держит его в `useMemo`: новый узел на каждый рендер перерегистрировал
- * бы действие и снова вызывал рендер.
+ * Действия страницы в шапке маршрута. Массив обязан быть стабильным между рендерами — как и у
+ * `useShellHeader`, вызывающий держит его в `useMemo`: новый массив на каждый рендер
+ * перерегистрировал бы действия и снова вызывал рендер.
  *
- * Возвращает, доступна ли шапка: вне оболочки вью обязано показать действие само.
+ * Возвращает, доступна ли шапка: вне оболочки вью обязано показать действия само.
  */
-export function useShellHeaderActions(actions: ReactNode): boolean {
+export function useShellHeaderActions(actions: readonly ShellHeaderAction[] | undefined): boolean {
   const context = useContext(ShellHeaderContext);
   useLayoutEffect(
     () => (context === null ? undefined : context.registerActions(actions)),

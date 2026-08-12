@@ -3,18 +3,22 @@
 import {
   ChevronRight,
   ChevronDown,
+  Command,
   Copy,
   Folder,
   FolderOpen,
   GitBranchPlus,
   GitFork,
+  ListTree,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  Search,
   Send,
+  Shrink,
   Square,
   Tag,
   TagX,
@@ -48,6 +52,10 @@ export const SendIcon = actionIcon(Send);
 export const AppendIcon = actionIcon(Plus);
 export const StopIcon = actionIcon(Square);
 export const MoreIcon = actionIcon(MoreHorizontal);
+export const CommandsIcon = actionIcon(Command);
+export const SearchIcon = actionIcon(Search);
+export const CompactIcon = actionIcon(Shrink);
+export const EntryTreeIcon = actionIcon(ListTree);
 export const FolderIcon = actionIcon(Folder);
 export const FolderOpenIcon = actionIcon(FolderOpen);
 export const UserIcon = actionIcon(UserRound);

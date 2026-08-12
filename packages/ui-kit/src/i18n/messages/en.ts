@@ -415,6 +415,8 @@ export const coreEnglish: CatalogRegistration = {
     "command.panel.left.hide": "Hide the navigation panel",
     "command.panel.right.show": "Show the side panel",
     "command.panel.right.hide": "Hide the side panel",
+    "page.actions.more": "More actions",
+    "commands.open.hint": "Commands (⌘K or Ctrl+K)",
     "commands.title": "Commands",
     "commands.open": "Commands",
     "commands.filter": "Find a command",

@@ -17,7 +17,14 @@ import {
   type PlaceContext,
   type SessionDeltaFrame,
 } from "@sovereign/protocol";
-import { BrandLockup, Button, coreNamespace, createTranslator, Spinner } from "@sovereign/ui-kit";
+import {
+  BrandLockup,
+  Button,
+  CommandsIcon,
+  coreNamespace,
+  createTranslator,
+  Spinner,
+} from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -642,11 +649,21 @@ export function App() {
           hideRight: translator.t("panel.right.hide"),
           showLeft: translator.t("panel.left.show"),
           showRight: translator.t("panel.right.show"),
+          moreActions: translator.t("page.actions.more"),
         }}
         headerActions={
           <>
-            <Button size="sm" onClick={() => setCommandsOpen(true)}>
-              {translator.t("commands.open")}
+            {/* Палитра — значок, а не подпись: она принадлежит окну, а не странице, и в полосе
+                маршрута соседствует с действиями страницы, у которых подпись есть по делу. */}
+            <Button
+              tone="quiet"
+              size="sm"
+              iconOnly
+              aria-label={translator.t("commands.open.hint")}
+              title={translator.t("commands.open.hint")}
+              onClick={() => setCommandsOpen(true)}
+            >
+              <CommandsIcon size="sm" />
             </Button>
             <HostPlaceCollection id="core.view.header.actions" context={pageContext} />
           </>

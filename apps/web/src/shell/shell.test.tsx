@@ -33,6 +33,7 @@ const labels = {
   hideRight: "скрыть правую",
   showLeft: "показать левую",
   showRight: "показать правую",
+  moreActions: "ещё действия",
 };
 
 /** Левая панель по умолчанию видна, правая — нет: её вкладок у ядра больше нет. */
@@ -90,7 +91,7 @@ describe("global shell header", () => {
       header: {
         title: "Проекты",
         context: "Рабочее пространство",
-        actions: <button>Создать</button>,
+        actions: [{ id: "create", label: "Создать", primary: true, run: () => {} }],
       },
       children: <div>список проектов</div>,
     });
@@ -162,7 +163,10 @@ describe("global shell header", () => {
    */
   it("keeps the shell actions after the actions of the view and across a route change", () => {
     const view = show({
-      header: { title: "Проекты", actions: <button>Создать</button> },
+      header: {
+        title: "Проекты",
+        actions: [{ id: "create", label: "Создать", primary: true, run: () => {} }],
+      },
       headerActions: <button>Действие плагина</button>,
     });
 
@@ -183,7 +187,12 @@ describe("global shell header", () => {
    */
   it("takes the main action from a view without losing the route title", () => {
     function ViewWithAction(): React.JSX.Element {
-      const owned = useShellHeaderActions(useMemo(() => <button>Создать проект</button>, []));
+      const owned = useShellHeaderActions(
+        useMemo(
+          () => [{ id: "create", label: "Создать проект", primary: true, run: () => {} }],
+          [],
+        ),
+      );
       return <div>{owned ? "действие в шапке" : "действие на странице"}</div>;
     }
 
@@ -205,14 +214,19 @@ describe("global shell header", () => {
   /** Своё описание вью старше отдельных действий: иначе одна кнопка показалась бы дважды. */
   it("prefers the actions of a registered description over a separate registration", () => {
     function ViewWithBoth(): React.JSX.Element {
-      // Узлы memo-изованы: обе регистрации требуют стабильного узла, иначе перерегистрация на каждый
-      // рендер вызывает следующий рендер.
+      // Массивы memo-изованы: обе регистрации требуют стабильного значения, иначе перерегистрация на
+      // каждый рендер вызывает следующий рендер.
       const description = useMemo(
-        () => ({ title: "Своё описание", actions: <button>Из описания</button> }),
+        () => ({
+          title: "Своё описание",
+          actions: [{ id: "own", label: "Из описания", primary: true, run: () => {} }],
+        }),
         [],
       );
       useShellHeader(description);
-      useShellHeaderActions(useMemo(() => <button>Отдельное</button>, []));
+      useShellHeaderActions(
+        useMemo(() => [{ id: "separate", label: "Отдельное", primary: true, run: () => {} }], []),
+      );
       return <div>страница</div>;
     }
 

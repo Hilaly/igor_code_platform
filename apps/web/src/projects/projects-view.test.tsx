@@ -101,7 +101,7 @@ const openActions = (name: string): void => {
 };
 
 const openNewProject = (): void => {
-  fireEvent.click(screen.getByRole("button", { name: "+ Новый проект" }));
+  fireEvent.click(screen.getByRole("button", { name: "Новый проект" }));
 };
 
 describe("ProjectsView", () => {
