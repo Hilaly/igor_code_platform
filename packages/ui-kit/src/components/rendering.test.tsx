@@ -132,6 +132,33 @@ describe("markup of the ported primitives", () => {
     expect(expandedMarkup).toContain("lucide-folder-open");
   });
 
+  /**
+   * Проект без сессий — лист, и раньше он терял папку вместе с кнопкой раскрытия: одна и та же
+   * сущность выглядела узлом другой природы в зависимости от того, есть ли в ней записи.
+   */
+  it("keeps the disclosure icon on a node with no children", () => {
+    const markup = renderToStaticMarkup(
+      <Tree
+        label="Projects"
+        toggleLabel={(node) => `Toggle ${node.label}`}
+        disclosureAlignment="label"
+        nodes={[
+          {
+            id: "empty",
+            label: "Empty",
+            disclosureIcon: (expanded) => (expanded ? <FolderOpenIcon /> : <FolderIcon />),
+          },
+          { id: "session", label: "Session" },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain("lucide-folder");
+    expect(markup).not.toContain("lucide-folder-open");
+    // Слот со значком помечен отдельным классом: он единственный, кто не сжимается в нулевую ширину.
+    expect(markup.match(/togglePlaceholderIcon/g)?.length).toBe(1);
+  });
+
   it("can align child labels with a custom disclosure icon", () => {
     const markup = renderToStaticMarkup(
       <Tree

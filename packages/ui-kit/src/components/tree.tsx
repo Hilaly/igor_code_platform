@@ -292,6 +292,11 @@ export function Tree({
       const indentation = Array.from({ length: level }, (_, index) => (
         <span key={index} className={styles.indent} aria-hidden="true" />
       ));
+      // Закрытый вариант значка раскрытия: он же остаётся в слоте у узла, которому раскрываться нечем.
+      const collapsedDisclosureIcon =
+        typeof node.disclosureIcon === "function"
+          ? node.disclosureIcon(false)
+          : node.disclosureIcon;
 
       return (
         <div key={node.id} role="none" className={styles.item}>
@@ -349,7 +354,17 @@ export function Tree({
                     : (node.disclosureIcon ?? <ChevronRightIcon size="xs" />)}
                 </button>
               ) : (
-                <span className={styles.togglePlaceholder} aria-hidden="true" />
+                // Значок раскрытия остаётся на месте и у листа: у проекта он говорит «это папка», и
+                // пропадая на проекте без сессий, он превращал пустую папку в узел другой природы.
+                // Кликать нечего, поэтому это не кнопка, а тот же слот.
+                <span
+                  className={`${styles.togglePlaceholder}${
+                    collapsedDisclosureIcon ? ` ${styles.togglePlaceholderIcon}` : ""
+                  }`}
+                  aria-hidden="true"
+                >
+                  {collapsedDisclosureIcon}
+                </span>
               )}
               <span className={styles.content}>
                 {node.icon ? (

@@ -70,6 +70,12 @@
   width: 0;
   overflow: hidden;
 }
+/* Слот со значком не сжимается ни в одном режиме выравнивания: у листа с типовым значком (проект без
+   сессий) он несёт смысл, а не отступ, и уехав в нулевую ширину, значок просто исчез бы. */
+.root[data-disclosure-alignment="label"] .togglePlaceholder.togglePlaceholderIcon {
+  width: var(--sovereign-icon-sm);
+  overflow: visible;
+}
 .root[data-disclosure-alignment="label"] .indent {
   flex-basis: 1rem;
 }
