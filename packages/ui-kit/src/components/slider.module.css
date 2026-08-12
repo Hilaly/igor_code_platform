@@ -86,7 +86,7 @@
   color: var(--sovereign-text-muted);
   font-family: var(--sovereign-font-family-mono);
   font-size: var(--sovereign-font-size-sm);
-  font-weight: 500;
+  font-weight: var(--sovereign-font-weight-mono-medium);
   text-align: right;
 }
 

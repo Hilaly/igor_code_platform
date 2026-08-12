@@ -113,8 +113,9 @@
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-display);
   font-size: var(--sovereign-font-size-xl);
-  font-weight: var(--sovereign-font-weight-semibold);
+  font-weight: var(--sovereign-font-weight-bold);
   line-height: var(--sovereign-line-height-tight);
+  letter-spacing: var(--sovereign-letter-spacing-tight);
 }
 
 .pageLabel {

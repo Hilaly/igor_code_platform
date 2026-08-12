@@ -21,6 +21,12 @@
   --sovereign-font-weight-semibold: 650;
   --sovereign-font-weight-bold: 750;
 
+  /* Технический регистр держит свою пару начертаний: у IBM Plex Mono нет variable-пакета, и кит
+     поставляет статические 400 и 500. Общая шкала на этих файлах не разрешается — подбор шрифта
+     уводит 450 в 500, и моноширинный текст выходит жирнее обычного рядом с ним. */
+  --sovereign-font-weight-mono-regular: 400;
+  --sovereign-font-weight-mono-medium: 500;
+
   --sovereign-line-height-none: 1;
   --sovereign-line-height-tight: 1.2;
   --sovereign-line-height-snug: 1.35;

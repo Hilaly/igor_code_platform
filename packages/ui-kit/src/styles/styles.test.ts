@@ -168,7 +168,9 @@ describe("stylesheets of the kit", () => {
       /\.heading\s*\{[^}]*font-family:\s*var\(--sovereign-font-family-display\);/s,
     );
     expect(text).not.toMatch(/\.secondary\s*\{/);
-    expect(code.match(/font-weight:\s*400;/g)).toHaveLength(2);
+    expect(code.match(/font-weight:\s*var\(--sovereign-font-weight-mono-regular\);/g)).toHaveLength(
+      2,
+    );
     expect(code).toMatch(/\.block\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*overflow-x:\s*auto;/s);
     expect(code).toMatch(/\.inline\s*\{[^}]*font-size:\s*0\.9em;[^}]*overflow-wrap:\s*anywhere;/s);
     expect(badge).toMatch(/\.badge\s*\{[^}]*text-wrap:\s*nowrap;/s);
@@ -317,8 +319,15 @@ describe("stylesheets of the kit", () => {
       "@fontsource-variable/onest": expect.any(String),
       "@fontsource/ibm-plex-mono": expect.any(String),
     });
-    expect(codeCss.match(/font-weight: 400;/g)).toHaveLength(2);
-    expect(sliderCss).toContain("font-weight: 500;");
+    // Технический регистр обязан просить ровно те два начертания, которые кит поставляет файлами:
+    // общая шкала на статических файлах уводит 450 в 500. Пара названа токенами, поэтому проверяется
+    // и значение токена, и то, что моноширинные потребители берут его, а не число на месте.
+    expect(tokens).toContain("--sovereign-font-weight-mono-regular: 400;");
+    expect(tokens).toContain("--sovereign-font-weight-mono-medium: 500;");
+    expect(
+      codeCss.match(/font-weight: var\(--sovereign-font-weight-mono-regular\);/g),
+    ).toHaveLength(2);
+    expect(sliderCss).toContain("font-weight: var(--sovereign-font-weight-mono-medium);");
   });
 
   it("uses Imperium as the catalogue fallback", () => {
@@ -568,6 +577,28 @@ describe("stylesheets of the kit", () => {
 
   it("ships at least one stylesheet per component and the shared layer", () => {
     expect(files.length).toBeGreaterThan(1);
+  });
+
+  /**
+   * Тот же довод, что и у цвета, но для начертания: число в `font-weight` не поедет вместе со шкалой
+   * и разойдётся с соседним текстом на первой правке токенов. У технического регистра своя пара
+   * (`--sovereign-font-weight-mono-*`), потому что моношрифт поставляется статическими файлами, —
+   * это тоже токен, а не литерал на месте.
+   */
+  it("takes every font weight from a token", () => {
+    for (const { path, source } of files) {
+      if (path.includes("css-modules-contract")) {
+        // Фикстура контракта CSS Modules собирается настоящим Vite и проверяет форму имени класса,
+        // а не визуальный язык: токенов кита в ней нет вовсе.
+        continue;
+      }
+
+      const literals = (withoutComments(source).match(/font-weight:[^;}]+/g) ?? []).filter(
+        (declaration) => !declaration.includes("var(--sovereign-font-weight-"),
+      );
+
+      expect(literals, path).toEqual([]);
+    }
   });
 
   it("takes every colour from a role variable", () => {

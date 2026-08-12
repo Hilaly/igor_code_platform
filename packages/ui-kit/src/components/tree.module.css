@@ -60,8 +60,8 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 1rem;
-  height: 1rem;
+  width: var(--sovereign-icon-sm);
+  height: var(--sovereign-icon-sm);
 }
 .indent {
   flex: 0 0 var(--sovereign-space-4);

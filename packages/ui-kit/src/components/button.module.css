@@ -4,7 +4,6 @@
   justify-content: center;
   gap: var(--sovereign-space-2);
   height: var(--sovereign-control-height-sm);
-  min-height: 1.75rem;
   padding-inline: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid transparent;
   border-radius: var(--sovereign-radius-sm);
@@ -104,7 +103,6 @@
 
 .iconOnly {
   width: var(--sovereign-control-height-sm);
-  min-width: 1.75rem;
   padding: var(--sovereign-space-0);
   font-size: var(--sovereign-font-size-md);
 }

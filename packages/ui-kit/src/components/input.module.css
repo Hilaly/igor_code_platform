@@ -43,7 +43,6 @@
 
 .input {
   height: var(--sovereign-control-height-sm);
-  min-height: 1.75rem;
 }
 
 .textarea {

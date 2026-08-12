@@ -6,7 +6,7 @@
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
   font-size: var(--sovereign-font-size-xs);
-  font-weight: 400;
+  font-weight: var(--sovereign-font-weight-mono-regular);
   line-height: var(--sovereign-line-height-snug);
   text-wrap: wrap;
   overflow-wrap: anywhere;
@@ -20,6 +20,6 @@
   color: var(--sovereign-text);
   font-family: var(--sovereign-font-family-mono);
   font-size: 0.9em;
-  font-weight: 400;
+  font-weight: var(--sovereign-font-weight-mono-regular);
   overflow-wrap: anywhere;
 }

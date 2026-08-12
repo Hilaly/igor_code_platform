@@ -19,7 +19,6 @@
   justify-content: space-between;
   gap: var(--sovereign-space-2);
   height: var(--sovereign-control-height-sm);
-  min-height: 1.75rem;
   padding-inline: var(--sovereign-space-3);
   border: var(--sovereign-stroke-thin) solid var(--sovereign-border);
   border-radius: var(--sovereign-radius-sm);
