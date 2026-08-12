@@ -33,10 +33,17 @@
   background: var(--sovereign-control-surface-hover);
   border-color: var(--sovereign-border-strong);
 }
+/**
+ * Компактный триггер — та же кнопка, что `Button tone="quiet" size="sm"`: высота, отступ и роли
+ * поверхности взяты оттуда буква в букву. Своим `<button>` он остался потому, что меню нужна ссылка на
+ * элемент для возврата фокуса, а `Button` её не отдаёт; вид при этом расходиться не вправе — иначе
+ * «создать» и «ещё» в одной строке списка читаются как контролы разной природы.
+ */
 .trigger.compact {
-  height: var(--sovereign-control-height-sm);
-  min-width: var(--sovereign-control-height-sm);
-  padding-inline: var(--sovereign-space-2);
+  justify-content: center;
+  height: var(--sovereign-row-height-compact);
+  min-width: var(--sovereign-row-height-compact);
+  padding-inline: var(--sovereign-space-0);
   font-size: var(--sovereign-font-size-md);
   line-height: 1;
   background: transparent;

@@ -4,7 +4,12 @@ import type { ReactNode } from "react";
 
 import styles from "./button.module.css";
 
-export type ButtonTone = "normal" | "secondary" | "accent" | "danger";
+/**
+ * `quiet` — регистр без капсулы: поверхность приходит только при наведении и фокусе. Для действий в
+ * строке списка и в хроме, где постоянная заливка спорит с содержимым. Тот же регистр носит компактный
+ * триггер `Menu`, поэтому «создать» и «ещё» в одной строке выглядят контролами одной природы.
+ */
+export type ButtonTone = "normal" | "quiet" | "secondary" | "accent" | "danger";
 
 export type ButtonSize = "md" | "sm";
 

@@ -128,7 +128,10 @@ export function SidebarProjects(props: SidebarProjectsProps) {
 
   const projectActions = (project: Project) => (
     <span className="sidebar-project-actions">
+      {/* Тихий регистр, как у соседнего «ещё»: постоянная капсула у одной кнопки из двух читалась как
+          контрол другой природы. */}
       <Button
+        tone="quiet"
         size="sm"
         iconOnly
         aria-label={t("sessions.new.in-project", { project: project.name })}

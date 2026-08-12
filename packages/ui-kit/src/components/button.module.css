@@ -46,6 +46,21 @@
   background: var(--sovereign-control-surface-hover);
 }
 
+/**
+ * Тихий регистр: капсулы нет, поверхность приходит только при наведении и фокусе. Для действий, живущих
+ * в строке списка и в хроме, — там постоянная заливка спорит с содержимым, ради которого строка и
+ * существует. Роли поверхности те же, что у компактного триггера `Menu`: рядом в одной строке стоят
+ * «создать» кнопкой и «ещё» меню, и разъехавшись они читались бы как контролы разной природы.
+ */
+.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+.quiet:hover:not(:disabled, [aria-pressed="true"]) {
+  background: var(--sovereign-control-surface-hover);
+}
+
 .secondary {
   border-color: var(--sovereign-secondary-border);
   background: var(--sovereign-secondary);

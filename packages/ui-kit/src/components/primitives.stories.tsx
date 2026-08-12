@@ -17,9 +17,10 @@ import { ConfirmDialog } from "./dialog.tsx";
 import { Disclosure } from "./disclosure.tsx";
 import { DurationTimer } from "./duration-timer.tsx";
 import { Input } from "./input.tsx";
-import { BrandMark } from "./icons.tsx";
+import { AddIcon, BrandMark, MoreIcon } from "./icons.tsx";
 import { Link } from "./link.tsx";
 import { List, ListRow } from "./list.tsx";
+import { Menu } from "./menu.tsx";
 import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
 import { Notice } from "./notice.tsx";
 import { Panel } from "./panel.tsx";
@@ -88,6 +89,21 @@ export const Buttons = () => {
         <Button onClick={() => {}} disabled>
           Недоступна
         </Button>
+      </div>
+      <div style={row}>
+        <Button tone="quiet" onClick={() => {}}>
+          Тихая: подложка приходит при наведении
+        </Button>
+        <Button tone="quiet" size="sm" iconOnly aria-label="Добавить" onClick={() => {}}>
+          <AddIcon size="sm" />
+        </Button>
+        <Menu
+          label="Ещё"
+          triggerLabel="Ещё"
+          trigger={<MoreIcon size="sm" />}
+          compact
+          items={[{ id: "rename", label: "Переименовать", onSelect: () => {} }]}
+        />
       </div>
       <div style={row}>
         <Button pressed={pressed} onClick={() => setPressed((on) => !on)}>

@@ -274,7 +274,9 @@ function PanelToggle({ side, hidden, hideLabel, showLabel, onToggle }: PanelTogg
 
   return (
     <span className={`shell-panel-toggle shell-panel-toggle-${side}`}>
-      <Button size="sm" iconOnly aria-label={label} title={label} onClick={onToggle}>
+      {/* Тихий регистр: капсула в углу полосы спорила бы с заголовком маршрута, ради которого полоса и
+          существует. Кнопка проявляется под курсором и по фокусу. */}
+      <Button tone="quiet" size="sm" iconOnly aria-label={label} title={label} onClick={onToggle}>
         <Icon size="sm" />
       </Button>
     </span>

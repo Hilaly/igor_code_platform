@@ -67,6 +67,46 @@ describe("stylesheets of the kit", () => {
     );
   });
 
+  /**
+   * Тихая кнопка и компактный триггер меню обязаны совпадать: в строке списка они стоят рядом («создать»
+   * и «ещё»), и разница в габарите или в подложке читается как разница в природе контрола. Триггер меню —
+   * свой `<button>`, а не наш `Button` (меню нужна ссылка на элемент для возврата фокуса), поэтому от
+   * расхождения их держит только эта проверка.
+   */
+  it("gives the quiet Button and the compact Menu trigger one shape", () => {
+    const button = withoutComments(
+      readFileSync(join(kitRoot, "components", "button.module.css"), "utf8"),
+    );
+    const menu = withoutComments(
+      readFileSync(join(kitRoot, "components", "menu.module.css"), "utf8"),
+    );
+
+    expect(button).toMatch(
+      /\.quiet\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;/s,
+    );
+    expect(button).toMatch(
+      /\.quiet:hover:not\(:disabled,\s*\[aria-pressed="true"\]\)\s*\{[^}]*background:\s*var\(--sovereign-control-surface-hover\);/s,
+    );
+    expect(button).toMatch(/\.sm\s*\{[^}]*height:\s*var\(--sovereign-row-height-compact\);/s);
+    expect(button).toMatch(
+      /\.sm\.iconOnly\s*\{[^}]*width:\s*var\(--sovereign-row-height-compact\);/s,
+    );
+    expect(menu).toMatch(
+      /\.trigger\.compact\s*\{[^}]*height:\s*var\(--sovereign-row-height-compact\);[^}]*min-width:\s*var\(--sovereign-row-height-compact\);/s,
+    );
+    expect(menu).toMatch(
+      /\.trigger\.compact\s*\{[^}]*background:\s*transparent;[^}]*border-color:\s*transparent;/s,
+    );
+    /* Значок один, поэтому боковой отступ отдаёт ширину `min-width`: с отступом кнопка становилась шире
+       квадратной `Button`, и подсветка под курсором расходилась у соседей по строке. */
+    expect(menu).toMatch(
+      /\.trigger\.compact\s*\{[^}]*justify-content:\s*center;[^}]*padding-inline:\s*var\(--sovereign-space-0\);/s,
+    );
+    expect(menu).toMatch(
+      /\.trigger\.compact:hover\s*\{[^}]*background:\s*var\(--sovereign-control-surface-hover\);/s,
+    );
+  });
+
   it("keeps input and custom Select states aligned with keyboard modality", () => {
     const input = withoutComments(
       readFileSync(join(kitRoot, "components", "input.module.css"), "utf8"),
