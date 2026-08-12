@@ -256,11 +256,52 @@ describe("parseConfig", () => {
       "pluginRouteTimeoutMilliseconds",
       "pluginRouteBodyLimitBytes",
       "publicRouteRequestsPerMinute",
+      "maxImageBytes",
+      "maxImagesPerMessage",
+      "maxMessageImageBytes",
+      "maxSessionImageBytes",
     ]) {
       for (const value of [0, -1, 1.5, "500", null]) {
         assert.equal(parseConfig({ [key]: value }).kind, "rejected", `${key}=${String(value)}`);
       }
     }
+  });
+
+  it("reads the four limits that keep images inside the session file", () => {
+    const value = parsedConfig({
+      maxImageBytes: 1024,
+      maxImagesPerMessage: 2,
+      maxMessageImageBytes: 2048,
+      maxSessionImageBytes: 4096,
+    });
+
+    assert.equal(value.maxImageBytes, 1024);
+    assert.equal(value.maxImagesPerMessage, 2);
+    assert.equal(value.maxMessageImageBytes, 2048);
+    assert.equal(value.maxSessionImageBytes, 4096);
+    assert.equal(defaultConfig.maxImageBytes, 10 * 1024 * 1024);
+    assert.equal(defaultConfig.maxImagesPerMessage, 8);
+    assert.equal(defaultConfig.maxMessageImageBytes, 32 * 1024 * 1024);
+    assert.equal(defaultConfig.maxSessionImageBytes, 256 * 1024 * 1024);
+  });
+
+  it("refuses limits that contradict each other", () => {
+    // Предел одной картинки выше предела сообщения означал бы, что первая же принятая картинка
+    // не влезает в сообщение, куда её кладут. Такой файл честнее отвергнуть целиком.
+    assert.equal(
+      parseConfig({ maxImageBytes: 2048, maxMessageImageBytes: 1024 }).kind,
+      "rejected",
+    );
+    assert.equal(
+      parseConfig({ maxMessageImageBytes: 4096, maxSessionImageBytes: 2048 }).kind,
+      "rejected",
+    );
+    assert.equal(
+      parseConfig({ maxImageBytes: 1024, maxMessageImageBytes: 1024, maxSessionImageBytes: 1024 })
+        .kind,
+      "parsed",
+      "равенство пределов законно: одна картинка на сообщение и одно сообщение на сессию",
+    );
   });
 });
 

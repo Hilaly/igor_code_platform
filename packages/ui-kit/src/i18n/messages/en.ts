@@ -523,6 +523,15 @@ export const coreEnglish: CatalogRegistration = {
     "settings.config.key.publicRouteRequestsPerMinute": "Public route calls per minute",
     "settings.config.hint.publicRouteRequestsPerMinute":
       "How many calls a public route takes from one address",
+    "settings.config.key.maxImageBytes": "One image limit, bytes",
+    "settings.config.hint.maxImageBytes": "The largest picture a message takes",
+    "settings.config.key.maxImagesPerMessage": "Images per message",
+    "settings.config.hint.maxImagesPerMessage": "How many pictures one message may carry",
+    "settings.config.key.maxMessageImageBytes": "Message images limit, bytes",
+    "settings.config.hint.maxMessageImageBytes": "The sum of every picture in one message",
+    "settings.config.key.maxSessionImageBytes": "Session images limit, bytes",
+    "settings.config.hint.maxSessionImageBytes":
+      "The sum of every picture in the session, abandoned branches included",
     "settings.appearance.schemeHint": "Changes colour, not geometry",
     "settings.appearance.variantHint": "Follow the environment or choose explicitly",
     "settings.appearance.scaleHint": "Content density stays contextual",

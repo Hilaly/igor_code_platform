@@ -519,6 +519,15 @@ export const coreRussian: CatalogRegistration = {
     "settings.config.key.publicRouteRequestsPerMinute": "Вызовов публичного маршрута в минуту",
     "settings.config.hint.publicRouteRequestsPerMinute":
       "Сколько вызовов публичный маршрут принимает с одного адреса",
+    "settings.config.key.maxImageBytes": "Предел одного изображения, байт",
+    "settings.config.hint.maxImageBytes": "Самая большая картинка, которую примет сообщение",
+    "settings.config.key.maxImagesPerMessage": "Изображений в сообщении",
+    "settings.config.hint.maxImagesPerMessage": "Сколько картинок можно приложить к одному сообщению",
+    "settings.config.key.maxMessageImageBytes": "Предел изображений сообщения, байт",
+    "settings.config.hint.maxMessageImageBytes": "Сумма всех картинок одного сообщения",
+    "settings.config.key.maxSessionImageBytes": "Предел изображений сессии, байт",
+    "settings.config.hint.maxSessionImageBytes":
+      "Сумма всех картинок сессии, включая брошенные ветки",
     "settings.appearance.schemeHint": "Меняет цвет, но не геометрию",
     "settings.appearance.variantHint": "Следовать системе или выбрать явно",
     "settings.appearance.scaleHint": "Плотность содержимого остаётся контекстной",

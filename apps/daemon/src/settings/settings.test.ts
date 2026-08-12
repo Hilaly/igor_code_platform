@@ -256,6 +256,27 @@ test("two config updates preserve both supplied fields", () => {
   });
 });
 
+test("a config update that contradicts the file on disk is refused instead of written", () => {
+  const directory = freshDirectory();
+
+  const consistent = { maxImageBytes: 1024, maxMessageImageBytes: 2048, maxSessionImageBytes: 4096 };
+
+  write(directory, configFileName, JSON.stringify(consistent));
+
+  const { store } = startedStore(directory);
+
+  assert.equal(store.current().config.maxImageBytes, 1024);
+
+  // Файл на диске непротиворечив, и само значение законно — неисполнимым становится их объединение.
+  // Проверка обязана случиться **до** записи, иначе на диск ложится документ, который демон
+  // отвергнет при следующем чтении, и настройки останутся нечитаемыми.
+  const outcome = store.writeConfig({ maxImageBytes: 4096 });
+
+  assert.equal(outcome.kind, "refused");
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, configFileName), "utf8")), consistent);
+  assert.equal(store.current().config.maxImageBytes, 1024);
+});
+
 test("writing one plugin keeps what the file says about the others", () => {
   const directory = freshDirectory();
 

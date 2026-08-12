@@ -215,10 +215,18 @@ export function createSettingsStore(options: CreateSettingsStoreOptions): Settin
         return stored;
       }
 
-      writeFileAtomically(
-        join(directory, fileName),
-        `${JSON.stringify(patch(stored.document), undefined, 2)}\n`,
-      );
+      const patched = patch(stored.document);
+      // Проверяется не только исходный файл, но и то, что получилось. Отдельные значения проверены
+      // разбором тела, а вот их сочетание складывается только здесь: у конфига есть ограничения
+      // между ключами, и без этой проверки на диск лёг бы документ, который демон отвергнет при
+      // следующем чтении, — то есть правка одной настройки делала бы файл нечитаемым целиком.
+      const revised = parse(patched);
+
+      if (revised.kind === "rejected") {
+        return { kind: "refused", reason: revised.diagnostics.join("; ") };
+      }
+
+      writeFileAtomically(join(directory, fileName), `${JSON.stringify(patched, undefined, 2)}\n`);
     } catch (cause) {
       // Файловая система отказала: директория без права записи, кончилось место, файл держит кто-то
       // ещё. Исключение отсюда доходило бы до диспетчера, а он отвечает «internal error» — человек
