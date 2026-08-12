@@ -401,6 +401,16 @@ describe("file resources end to end", () => {
         "model request and read follow-up",
       );
       const firstPrompt = modelRequests[0]?.systemPrompt ?? "";
+      const agentDirectory = join(projectAgents, "project-agent");
+      assert.match(
+        firstPrompt,
+        new RegExp(
+          `<agent_data>\\n  <directory>${agentDirectory.replace(
+            /[.*+?^${}()|[\]\\]/gu,
+            "\\$&",
+          )}<\\/directory>\\n<\\/agent_data>`,
+        ),
+      );
       assert.match(firstPrompt, /<available_skills>/);
       assert.match(firstPrompt, /<name>review<\/name>/);
       assert.match(firstPrompt, /<description>Review changes<\/description>/);

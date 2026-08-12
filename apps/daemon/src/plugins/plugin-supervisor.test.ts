@@ -846,6 +846,31 @@ describe("createPluginSupervisor", () => {
         ["skill", "file-resources.review"],
       ],
     );
+    const fileAgent = registrations.find(
+      (registration) => registration.id === "file-resources.helper",
+    );
+    assert.equal(fileAgent?.kind, "agent");
+    if (fileAgent?.kind === "agent") {
+      assert.equal(
+        fileAgent.location,
+        join(fixtures, "file-resources", "agents", "helper", "AGENT.md"),
+      );
+    }
+    const contributionEvent = recorded.events.find(
+      (event) => event.type === "core.plugin.contributions",
+    );
+    assert.ok(contributionEvent);
+    assert.equal(isPluginBusEvent(contributionEvent), false);
+    if (
+      !isPluginBusEvent(contributionEvent) &&
+      contributionEvent.type === "core.plugin.contributions"
+    ) {
+      const eventAgent = contributionEvent.payload.contributions.find(
+        (registration) => registration.id === "file-resources.helper",
+      );
+      assert.equal(eventAgent?.kind, "agent");
+      assert.equal("location" in eventAgent!, false);
+    }
     assert.equal(registry.revision(), 1);
 
     const status = supervisor.statuses().find((entry) => entry.key === "data:file-resources");

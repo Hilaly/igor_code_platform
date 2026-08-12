@@ -15,8 +15,8 @@
   Точка входа: отсюда видно, что решено, что обсуждается, чего ещё нет.
 - [vision.md](vision.md) — вижн продукта.
 - [architecture.md](architecture.md) — границы ядра, где исполняется агент, состав базовой поставки.
-- [roadmap.md](roadmap.md) — какими срезами собирается платформа: пройденные 1–12c и утверждённые
-  срезы 13–16 до продакшн-артефакта.
+- [roadmap.md](roadmap.md) — какими срезами собирается платформа: пройденные 1–13 и утверждённые
+  срезы 14–16 до продакшн-артефакта.
 - [repository-structure.md](repository-structure.md) — структура репозитория и правила зависимостей.
 - [toolchain.md](toolchain.md) — рантайм, менеджер пакетов, режим исполнения TypeScript, формат
   продакшн-артефакта.
@@ -259,6 +259,14 @@
   ограниченная колонка live tool call и немедленный Markdown для reasoning и ответа агента.
 - [План live-рендеринга сессии](superpowers/plans/2026-08-09-session-live-markdown-rendering.md) —
   TDD-срез для live tool call, reasoning и стримингового Markdown.
+- [Данные папки агента в системном prompt](superpowers/specs/2026-08-09-slice-13-agent-data-design.md) —
+  утверждённый контракт `<agent_data>`, hot reload папки определения и самостоятельное чтение
+  проектного `AGENTS.md`.
+- [План данных папки агента](superpowers/plans/2026-08-09-slice-13-agent-data.md) —
+  TDD-шаги для provenance файлового определения, XML системного prompt и сквозной передачи в сессию.
+- [Срез 14a: пользовательские изображения в чате](superpowers/specs/2026-08-09-slice-14-chat-attachments-design.md) —
+  единый image payload для пяти режимов сообщения, inline Pi JSONL, лимиты, model capability,
+  picker/paste/drop и просмотр оригинала в истории.
 - [Качество встроенных starter-скилов](superpowers/specs/2026-08-10-starter-skills-quality-design.md) —
   структура workflow/reference, правила корректных примеров и автоматическая проверка четырёх
   скилов плагина `starter`.

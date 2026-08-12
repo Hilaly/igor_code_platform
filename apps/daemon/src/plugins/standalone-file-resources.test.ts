@@ -22,6 +22,12 @@ description: Reviews a change
 ---
 Read the change carefully.
 `;
+const validAgent = `---
+name: helper
+description: Helps with work
+---
+Help carefully.
+`;
 const malformedYaml = `---
 name: [review
 ---
@@ -41,7 +47,43 @@ function skillRoot(directory: string, key = "project:p1:skills:sovereign"): Stan
   };
 }
 
+function agentRoot(directory: string): StandaloneResourceRoot {
+  return {
+    key: "project:p1:agents:sovereign",
+    source: "sovereign",
+    scope: "project",
+    projectId: "p1",
+    kind: "agent",
+    precedence: 200,
+    directory,
+  };
+}
+
 describe("createStandaloneFileResourceService", () => {
+  it("registers a standalone file agent with its exact AGENT.md location", async () => {
+    const root = join(workspace, "agent-location", "agents");
+    const definition = join(root, "helper");
+    const agentPath = join(definition, "AGENT.md");
+    mkdirSync(definition, { recursive: true });
+    writeFileSync(agentPath, validAgent);
+    const registry = createContributionRegistry();
+    const service = createStandaloneFileResourceService({
+      roots: [agentRoot(root)],
+      registry,
+      logger,
+    });
+
+    await service.rescan();
+
+    const registrations = registry.resolvedForProject("p1", "agent");
+    assert.equal(registrations.length, 1);
+    assert.equal(registrations[0]?.kind, "agent");
+    if (registrations[0]?.kind === "agent") {
+      assert.equal(registrations[0].location, agentPath);
+    }
+    service.close();
+  });
+
   it("atomically replaces a root snapshot across valid, invalid, and fixed states", async () => {
     const root = join(workspace, "snapshot", "skills");
     const definition = join(root, "review");

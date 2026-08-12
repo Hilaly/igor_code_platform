@@ -4,16 +4,16 @@ import { describe, it } from "node:test";
 import { renderSkillCatalogue, type AgentSkill } from "./skills.ts";
 
 describe("the model-visible skill catalogue", () => {
-  it("escapes XML metacharacters", () => {
+  it("escapes all XML metacharacters", () => {
     assert.equal(
       renderSkillCatalogue([
         {
           name: "review&check",
           description: "Use <carefully>",
-          location: '/tmp/a"b/SKILL.md',
+          location: `/tmp/a"b'c/SKILL.md`,
         },
       ]),
-      `<available_skills>\n  <skill>\n    <name>review&amp;check</name>\n    <description>Use &lt;carefully&gt;</description>\n    <location>/tmp/a&quot;b/SKILL.md</location>\n  </skill>\n</available_skills>`,
+      `<available_skills>\n  <skill>\n    <name>review&amp;check</name>\n    <description>Use &lt;carefully&gt;</description>\n    <location>/tmp/a&quot;b&apos;c/SKILL.md</location>\n  </skill>\n</available_skills>`,
     );
   });
 

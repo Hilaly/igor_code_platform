@@ -79,6 +79,7 @@ export type EventContributionRegistration = RegistrationCommon & {
  */
 export type AgentContributionRegistration = RegistrationCommon & {
   kind: "agent";
+  location?: string;
   instructions: string;
   tools: AgentToolSelection;
   model?: string;
@@ -361,6 +362,21 @@ export type ContributionRegistration =
   | ComponentContributionRegistration
   | CommandContributionRegistration
   | PageContributionRegistration;
+
+type OmitFromUnion<Value, Key extends PropertyKey> = Value extends unknown
+  ? Omit<Value, Key>
+  : never;
+
+/** Wire-safe agent registration: the absolute definition path is runtime provenance, not UI data. */
+export type PublicAgentContributionRegistration = OmitFromUnion<
+  AgentContributionRegistration,
+  "location"
+>;
+
+/** Contributions published through HTTP and the browser event stream. */
+export type PublicContributionRegistration =
+  | Exclude<ContributionRegistration, AgentContributionRegistration>
+  | PublicAgentContributionRegistration;
 
 export type ContributionKind = ContributionRegistration["kind"];
 

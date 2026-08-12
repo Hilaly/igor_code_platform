@@ -18,6 +18,8 @@ Project rules:
   Read it with your `read` tool before doing any work in the project, and follow what it says. If it
   points to further documents, read those too. The file may be absent — then there is nothing to
   follow but these rules.
+- Before changing files in a subdirectory, use `read` to inspect any closer `AGENTS.md` that applies
+  there. Follow it when present; if it is absent, continue with the rules already loaded.
 
 Rules of work:
 

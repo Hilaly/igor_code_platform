@@ -38,6 +38,7 @@ import {
   type PluginBrowserBundle,
 } from "./plugin-browser-build.ts";
 import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
+import { publicContributions } from "./public-contributions.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";
 import {
@@ -288,7 +289,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
 
     bus.publish(coreEventTypes.pluginContributions, {
       revision,
-      contributions: registry.resolved(),
+      contributions: publicContributions(registry.resolved()),
     });
     options.publishContributionChanges?.();
   };
@@ -1048,6 +1049,7 @@ function fileRegistration(
     return {
       ...common,
       kind: "agent",
+      location: definition.location,
       instructions: definition.instructions,
       tools: definition.tools,
       skills: definition.skills,

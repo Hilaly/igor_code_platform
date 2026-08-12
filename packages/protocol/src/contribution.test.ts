@@ -2,13 +2,42 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import * as protocol from "./index.ts";
-import { pluginRouteAddress, pluginRoutePrefix, projectOfContribution } from "./contribution.ts";
+import {
+  pluginRouteAddress,
+  pluginRoutePrefix,
+  projectOfContribution,
+  type PublicAgentContributionRegistration,
+} from "./contribution.ts";
 
 const pluginOwnership = {
   ownership: "plugin",
   pluginKey: "data:themed",
   pluginId: "themed",
 } as const;
+
+const publicPluginAgent: PublicAgentContributionRegistration = {
+  ...pluginOwnership,
+  source: "data",
+  kind: "agent",
+  id: "themed.agent",
+  declaredId: "agent",
+  instructions: "work",
+  tools: { include: ["*"], exclude: [] },
+  skills: { include: [], exclude: [] },
+};
+
+const publicStandaloneAgent: PublicAgentContributionRegistration = {
+  ownership: "standalone",
+  source: "native:agent",
+  scope: "project",
+  projectId: "work",
+  kind: "agent",
+  id: "native.agent",
+  declaredId: "agent",
+  instructions: "work",
+  tools: { include: ["*"], exclude: [] },
+  skills: { include: [], exclude: [] },
+};
 
 describe("pluginRouteAddress", () => {
   it("puts the plugin identifier and the declared path behind the prefix", () => {
@@ -43,6 +72,11 @@ describe("the plugin route prefix", () => {
 });
 
 describe("projectOfContribution", () => {
+  it("keeps both ownership variants on public agent registrations", () => {
+    assert.equal(publicPluginAgent.pluginKey, "data:themed");
+    assert.equal(publicStandaloneAgent.scope, "project");
+  });
+
   it("names the project of a plugin from a project folder and nobody else's", () => {
     assert.equal(projectOfContribution({ ...pluginOwnership, source: "project:work" }), "work");
     assert.equal(projectOfContribution({ ...pluginOwnership, source: "data" }), undefined);

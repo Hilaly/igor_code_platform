@@ -54,6 +54,7 @@ import {
   type RuntimeHookRefusal,
   type RuntimeHookSeam,
 } from "./hook-events.ts";
+import { renderAgentData } from "./agent-data.ts";
 import { renderSkillCatalogue, type AgentSkill } from "./skills.ts";
 
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
@@ -83,6 +84,7 @@ export type AgentSessionSummary = {
 export type AgentDefinition = {
   id: string;
   instructions: string;
+  directory?: string;
 };
 
 export type AgentSession = {
@@ -100,6 +102,8 @@ export type AgentSession = {
   setTools: (tools: AgentTool[], activeToolNames: string[]) => Promise<void>;
   /** Целиком заменить инструкции, которые попадут в следующую операцию модели. */
   setInstructions: (instructions: string) => void;
+  /** Заменить папку данных агента, которая попадёт в следующую операцию модели. */
+  setAgentDirectory: (directory?: string) => void;
   /** Целиком заменить каталог скилов, который попадёт в следующую операцию модели. */
   setSkills: (skills: AgentSkill[]) => void;
   /**
@@ -652,6 +656,7 @@ function liveSession(
 
   const environment = new NodeExecutionEnv({ cwd: summary.folder });
   let instructions = agent.instructions;
+  let agentDirectory = agent.directory;
   let skills: AgentSkill[] = [];
   const harness = new AgentHarness<ExecutionToolContext>({
     session,
@@ -660,11 +665,10 @@ function liveSession(
     thinkingLevel: summary.thinkingLevel,
     tools: [],
     toolContext: { env: environment },
-    systemPrompt: () => {
-      const catalogue = renderSkillCatalogue(skills);
-
-      return catalogue === "" ? instructions : `${instructions}\n\n${catalogue}`;
-    },
+    systemPrompt: () =>
+      [instructions, renderAgentData(agentDirectory), renderSkillCatalogue(skills)]
+        .filter((section) => section !== "")
+        .join("\n\n"),
   });
 
   /**
@@ -957,6 +961,9 @@ function liveSession(
       }
 
       instructions = next;
+    },
+    setAgentDirectory: (next) => {
+      agentDirectory = next;
     },
     setSkills: (next) => {
       skills = [...next];

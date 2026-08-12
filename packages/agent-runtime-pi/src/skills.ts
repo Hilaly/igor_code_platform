@@ -1,3 +1,5 @@
+import { escapeXml } from "./xml.ts";
+
 /** Метаданные скила, уже разрешённого ядром для конкретной сессии. */
 export type AgentSkill = {
   name: string;
@@ -23,18 +25,4 @@ export function renderSkillCatalogue(skills: readonly AgentSkill[]): string {
   );
 
   return `<available_skills>\n${entries.join("\n")}\n</available_skills>`;
-}
-
-function escapeXml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&apos;",
-      })[character] ?? character,
-  );
 }

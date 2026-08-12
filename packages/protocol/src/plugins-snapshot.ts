@@ -6,8 +6,8 @@
 
 import type {
   ContributionConflict,
-  ContributionRegistration,
   PluginRouteMethod,
+  PublicContributionRegistration,
 } from "./contribution.ts";
 import type { PluginStatus } from "./plugin-lifecycle.ts";
 import type { PluginPreferences } from "./settings.ts";
@@ -39,13 +39,13 @@ export type PluginsSnapshot = {
    * Значит один и тот же `id` встречается дважды, если плагин лежит и в директории данных, и в папке
    * проекта. Применяющий вклад вне проекта обязан отобрать своё сам: `projectOfContribution`.
    */
-  contributions: ContributionRegistration[];
+  contributions: PublicContributionRegistration[];
   /**
    * Объявленные, но выключенные человеком (docs/plugins.md). В действующий набор они не входят и не
    * участвуют ни в чём, но переключатель им нужен: иначе выключенный вклад исчез бы из интерфейса
    * и включить его обратно было бы нечем.
    */
-  switchedOffContributions: ContributionRegistration[];
+  switchedOffContributions: PublicContributionRegistration[];
   conflicts: ContributionConflict[];
   /** Конфликты адресов маршрутов. Объявления остаются в `contributions`, но HTTP их не публикует. */
   routeConflicts: PluginRouteConflict[];

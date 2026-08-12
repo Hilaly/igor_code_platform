@@ -26,6 +26,20 @@ function assertInvalid(
 describe("parseAgentFile", () => {
   const path = "/agents/code/AGENT.md";
 
+  it("preserves the exact input path as the agent location", () => {
+    const exactPath = "/agents/./code/../code/AGENT.md";
+    const parsed = parseAgentFile({
+      path: exactPath,
+      directoryName: "code",
+      text: "---\nname: code\ndescription: Works with code\n---\nDo the work.\n",
+    });
+
+    assert.equal(parsed.kind, "valid");
+    if (parsed.kind === "valid") {
+      assert.equal(parsed.definition.location, exactPath);
+    }
+  });
+
   it("parses selectors, thinking level, instructions, and ignores unknown fields", () => {
     const parsed = parseAgentFile({
       path,
@@ -51,6 +65,7 @@ Read before changing files.
         kind: "agent",
         name: "code",
         description: "Works with code",
+        location: path,
         instructions: "Read before changing files.",
         tools: { include: ["*"], exclude: [] },
         skills: { include: ["review-*"], exclude: ["*-unsafe"] },

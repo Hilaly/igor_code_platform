@@ -186,12 +186,12 @@ describe("changing sessions", () => {
   it("creates a session and gives back the bare record", async () => {
     const calls = daemon({ status: 201, body: { id: "0199", projectId: "b7Kq" } });
 
-    await expect(
-      createSession({ projectId: "b7Kq", agentId: "starter.generic" }),
-    ).resolves.toEqual({
-      kind: "created",
-      session: { id: "0199", projectId: "b7Kq" },
-    });
+    await expect(createSession({ projectId: "b7Kq", agentId: "starter.generic" })).resolves.toEqual(
+      {
+        kind: "created",
+        session: { id: "0199", projectId: "b7Kq" },
+      },
+    );
     expect(calls[0]?.init?.method).toBe("POST");
     expect(calls[0]?.init?.body).toBe('{"projectId":"b7Kq","agentId":"starter.generic"}');
   });
