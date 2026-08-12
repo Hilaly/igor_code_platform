@@ -507,6 +507,17 @@ export function App() {
   const openPluginPage =
     pluginPageState?.kind === "open" ? pluginPageState.registration : undefined;
 
+  // Проект открытой сессии: и активный, и архивный — сессию открывают по прямому адресу, а проект к
+  // этому времени мог уехать в архив, и остаться без имени в полосе шапки она не должна.
+  const openSessionProjectId = sessions.state.open?.summary?.projectId;
+  const openSessionProject =
+    openSessionProjectId === undefined
+      ? undefined
+      : [
+          ...(projects.state.snapshot?.projects ?? []),
+          ...(projects.state.snapshot?.archived ?? []),
+        ].find(({ id }) => id === openSessionProjectId);
+
   const pageHeader = describePage(page, translator, {
     session: sessions.state.open?.summary,
     project:
@@ -515,7 +526,9 @@ export function App() {
             ...(projects.state.snapshot?.projects ?? []),
             ...(projects.state.snapshot?.archived ?? []),
           ].find(({ id }) => id === page.projectId)
-        : undefined,
+        : page.kind === "session"
+          ? openSessionProject
+          : undefined,
     provider:
       page.kind === "settings" || page.kind === "edit-provider"
         ? providers.state.snapshot?.providers.find(({ id }) => id === page.providerId)
@@ -715,6 +728,7 @@ export function App() {
                   builtIn={
                     <ChatView
                       open={sessions.state.open}
+                      {...(openSessionProject === undefined ? {} : { project: openSessionProject })}
                       providers={sessions.state.providers}
                       models={sessions.state.models}
                       onPrepareModels={sessions.prepareModels}

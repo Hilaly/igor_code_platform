@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { ModelSummary, ProviderSummary, Session } from "@sovereign/protocol";
+import type { ModelSummary, Project, ProviderSummary, Session } from "@sovereign/protocol";
 import { coreEnglish, coreNamespace, coreRussian, createTranslator } from "@sovereign/ui-kit";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -186,6 +186,40 @@ describe("the session chat view", () => {
       </ShellHeaderProvider>,
     );
     expect(screen.getByRole("heading", { level: 1, name: "Новая сессия" })).toBeDefined();
+  });
+
+  /**
+   * Полоса называет проект, а путь на диске держит подсказкой: путь обрезался первым и занимал место,
+   * ничего не сообщая. Без снимка проектов остаётся путь — это единственное, что про сессию известно.
+   */
+  it("names the project in the header and keeps the folder in a tooltip", () => {
+    const project: Project = {
+      id: "project-1",
+      name: "Sovereign",
+      folder: "/code/platform",
+      folderKey: "/code/platform",
+      archived: false,
+      availability: "available",
+      sessionCount: 1,
+      ephemeral: false,
+      createdAt: "2026-08-05T00:00:00.000Z",
+    };
+    const view = show(openSession(summary), { project });
+    const header = screen.getByRole("heading", { level: 1 }).closest("header")!;
+
+    expect(within(header).getByTitle("/code/platform").textContent).toBe("Sovereign");
+    expect(header.textContent).toContain("Sovereign · anthropic/claude-opus-4-5");
+    expect(header.textContent).not.toContain("/code/platform ·");
+
+    view.rerender(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView {...view.props} project={undefined} />
+      </ShellHeaderProvider>,
+    );
+    expect(screen.getByRole("heading", { level: 1 }).closest("header")!.textContent).toContain(
+      "/code/platform ·",
+    );
   });
 
   it("prepares providers and loads only the current model catalogue on mount", () => {

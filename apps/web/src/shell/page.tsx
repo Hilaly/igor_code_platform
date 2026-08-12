@@ -40,7 +40,14 @@ export function describePage(
     case "session":
       return {
         title: t("page.sessions.title"),
-        context: data.session?.folder,
+        // Имя проекта, а не путь на диске: путь длинный, обрезается первым и в полосе ничего не
+        // сообщает. Он остаётся доступен подсказкой у вью чата, который знает про наведение.
+        context:
+          data.project === undefined
+            ? data.session?.folder
+            : data.project.ephemeral
+              ? t("projects.ephemeral")
+              : data.project.name,
       };
     case "session-archive":
       return { title: t("sessions.archive.title") };

@@ -89,10 +89,21 @@ describe("route header descriptions", () => {
       state: "running",
     };
 
+    // Без проекта путь — единственное, что известно про сессию; с проектом полоса называет его по
+    // имени, а путь уходит в подсказку у вью чата.
     expect(describePage({ kind: "session", sessionId: "0199" }, translator, { session })).toEqual({
       title: "Сессии",
       context: "/code/platform",
     });
+    expect(
+      describePage({ kind: "session", sessionId: "0199" }, translator, { session, project }),
+    ).toEqual({ title: "Сессии", context: "Sovereign" });
+    expect(
+      describePage({ kind: "session", sessionId: "0199" }, translator, {
+        session,
+        project: { ...project, ephemeral: true },
+      }),
+    ).toEqual({ title: "Сессии", context: "Быстрая работа" });
     expect(
       describePage({ kind: "edit-provider", providerId: "local" }, translator, { provider }),
     ).toEqual({ title: "Local gateway", context: "http://localhost:11434" });

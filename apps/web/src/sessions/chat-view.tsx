@@ -6,6 +6,7 @@
  */
 
 import type {
+  Project,
   ProviderSummary,
   SessionForkRequest,
   SessionMessage,
@@ -36,6 +37,8 @@ import { useShellHeader } from "../shell/header.tsx";
 
 export type ChatViewProps = {
   open: OpenSession;
+  /** Проект сессии: полоса шапки называет его по имени, а путь на диске держит в подсказке. */
+  project?: Project;
   providers?: ProviderSummary[];
   models: Record<string, ModelsEntry>;
   onPrepareModels: () => void;
@@ -59,6 +62,7 @@ type Refusal = { what: "compact" | "label"; reason: string };
 export function ChatView(props: ChatViewProps) {
   const {
     open,
+    project,
     providers,
     models,
     onPrepareModels,
@@ -194,14 +198,37 @@ export function ChatView(props: ChatViewProps) {
   );
 
   const currentModel = model === "" ? undefined : model;
-  const context =
+  /**
+   * В полосе стоит имя проекта, а путь на диске ушёл в подсказку: путь длинный, съедал всю полосу и
+   * первым обрезался многоточием — то есть занимал место, ничего не сообщая. Имя проекта человек и
+   * держит в голове, а путь нужен изредка и точно. Проект может ещё не приехать снимком — тогда до
+   * его подхода честнее показать путь, чем пустое место.
+   */
+  const projectLabel =
+    project === undefined
+      ? open.summary?.folder
+      : project.ephemeral
+        ? t("projects.ephemeral")
+        : project.name;
+  const meta =
     [
-      open.summary?.folder,
       currentModel,
       open.summary?.phase === undefined ? undefined : t(`sessions.phase.${open.summary.phase}`),
     ]
       .filter(Boolean)
       .join(" · ") || undefined;
+  const context = useMemo(() => {
+    if (projectLabel === undefined) {
+      return meta;
+    }
+
+    return (
+      <>
+        <span title={open.summary?.folder}>{projectLabel}</span>
+        {meta === undefined ? undefined : ` · ${meta}`}
+      </>
+    );
+  }, [meta, open.summary?.folder, projectLabel]);
   useShellHeader({
     title: open.summary?.title ?? t("sessions.new.title"),
     context,
