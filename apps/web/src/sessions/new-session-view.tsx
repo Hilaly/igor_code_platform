@@ -12,15 +12,20 @@
 
 import {
   parseModelReference,
+  sessionImageMimeTypes,
   type Project,
   type ProviderSummary,
   type SessionDraft,
+  type SessionImage,
   type ThinkingLevel,
   type TurnRequest,
 } from "@sovereign/protocol";
 import {
+  AddIcon,
   Button,
+  ImageIcon,
   Link,
+  Menu,
   NextTurnPicker,
   Notice,
   RaisedSurface,
@@ -31,8 +36,10 @@ import {
   Textarea,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { ComposerAttachments } from "./composer-attachments.tsx";
+import { imageFilesOf, readImageFiles } from "./image-input.ts";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import type { ModelsEntry } from "./state.ts";
 import type { ProjectAgentsState } from "./use-sessions.ts";
@@ -80,9 +87,34 @@ export function NewSessionView(props: NewSessionViewProps) {
   const [modelRef, setModelRef] = useState<string | undefined>(undefined);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
   const [firstMessage, setFirstMessage] = useState("");
+  const [images, setImages] = useState<SessionImage[]>([]);
   const [greeting] = useState<GreetingKey>(() => greetingKey(new Date().getHours()));
   const [refusal, setRefusal] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  /** Что не так с приложением файла. Отдельно от отказа создания: это разные неудачи. */
+  const [intakeProblem, setIntakeProblem] = useState<string | undefined>(undefined);
+  const picker = useRef<HTMLInputElement | null>(null);
+
+  /**
+   * Приложить выбранное. Пачка принимается целиком: один негодный файл не оставляет от выбора
+   * половину. Отказ показывается тем же `Notice`, что и отказ создания, — экран у них один.
+   */
+  const takeImages = (files: readonly File[]): void => {
+    if (files.length === 0) {
+      return;
+    }
+
+    void readImageFiles(files).then((intake) => {
+      if (intake.kind === "read") {
+        setIntakeProblem(undefined);
+        setImages((current) => [...current, ...intake.images]);
+
+        return;
+      }
+
+      setIntakeProblem(t(`chat.attachment.${intake.kind}`, { file: intake.fileName }));
+    });
+  };
 
   // Подготовка черновика — на mount, как раньше по открытию диалога. Данные живут в контроллере
   // сессий и переживают уход с экрана и возврат; запрос на mount лишь гарантирует их наличие.
@@ -169,13 +201,17 @@ export function NewSessionView(props: NewSessionViewProps) {
   const reasoning = chosenModel === undefined || chosenModel.reasoning;
 
   // Стартовый экран создаёт разговор только вместе с первым турном. Модель не обязательна: агент
-  // может предоставить свой default, который демон применит после создания.
-  const ready = project !== undefined && agent !== undefined && firstMessage.trim() !== "";
+  // может предоставить свой default, который демон применит после создания. Первое сообщение бывает
+  // и без слов: приложенного скриншота довольно.
+  const ready =
+    project !== undefined &&
+    agent !== undefined &&
+    (firstMessage.trim() !== "" || images.length > 0);
 
   const create = (): void => {
     const text = firstMessage.trim();
 
-    if (!ready || busy || text === "") {
+    if (!ready || busy) {
       return;
     }
 
@@ -201,7 +237,10 @@ export function NewSessionView(props: NewSessionViewProps) {
         // турном: контракт `SessionDraft` текст не несёт, и ломать его ради одного экрана не стоит.
         props.onNavigate(outcome.sessionId);
 
-        props.onSubmit(outcome.sessionId, { text });
+        props.onSubmit(outcome.sessionId, {
+          text,
+          ...(images.length === 0 ? {} : { images }),
+        });
       });
   };
 
@@ -214,6 +253,8 @@ export function NewSessionView(props: NewSessionViewProps) {
       {refusal === undefined ? undefined : (
         <Notice tone="danger" title={t("sessions.new.refused", { reason: refusal })} />
       )}
+
+      {intakeProblem === undefined ? undefined : <Notice tone="danger" title={intakeProblem} />}
 
       {projects === undefined || providers === undefined ? (
         <Spinner label={t("state.loading")} />
@@ -296,10 +337,22 @@ export function NewSessionView(props: NewSessionViewProps) {
       <div className="new-session-composer">
         <RaisedSurface>
           <div className="sessions-composer">
+            {images.length === 0 ? undefined : (
+              <ComposerAttachments
+                images={images}
+                onRemove={(index) =>
+                  setImages((current) => current.filter((_, at) => at !== index))
+                }
+                disabled={busy}
+                translator={translator}
+              />
+            )}
             <Textarea
               value={firstMessage}
               onChange={setFirstMessage}
               onSubmit={create}
+              submitWhenEmpty={images.length > 0}
+              onPaste={(event) => takeImages(imageFilesOf(event.clipboardData))}
               placeholder={t("chat.compose.placeholder")}
               aria-label={t("chat.compose.label")}
               autoGrow
@@ -308,6 +361,36 @@ export function NewSessionView(props: NewSessionViewProps) {
               disabled={busy}
             />
             <div className="sessions-composer-toolbar">
+              <div className="sessions-composer-attach">
+                <Menu
+                  label={t("chat.attach")}
+                  trigger={<AddIcon />}
+                  triggerLabel={t("chat.attach")}
+                  placement="above"
+                  compact
+                  disabled={busy}
+                  items={[
+                    {
+                      id: "image",
+                      label: t("chat.attach.image"),
+                      icon: <ImageIcon size="sm" />,
+                      onSelect: () => picker.current?.click(),
+                    },
+                  ]}
+                />
+                <input
+                  ref={picker}
+                  type="file"
+                  hidden
+                  multiple
+                  accept={sessionImageMimeTypes.join(",")}
+                  aria-label={t("chat.attach.image")}
+                  onChange={(event) => {
+                    takeImages([...(event.target.files ?? [])]);
+                    event.target.value = "";
+                  }}
+                />
+              </div>
               <div className="sessions-composer-actions">
                 <NextTurnPicker
                   model={modelRef ?? ""}

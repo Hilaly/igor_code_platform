@@ -168,9 +168,12 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(
       /\.sessions-composer-actions\s*\{[^}]*justify-content:\s*flex-end;[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*nowrap;/s,
     );
+    // Левая зона toolbar перестала быть заглушкой: в ней живёт кнопка «приложить». Правило роста
+    // осталось прежним — она по-прежнему отдаёт всё лишнее место группе действий справа.
     expect(sessions).toMatch(
-      /\.sessions-composer-future-slot\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;/s,
+      /\.sessions-composer-attach\s*\{[^}]*flex:\s*1\s+1\s+auto;[^}]*min-width:\s*0;/s,
     );
+    expect(sessions).not.toMatch(/\.sessions-composer-future-slot/);
     expect(sessions).not.toMatch(/\.sessions-modes/);
     expect(sessions).not.toMatch(/\.sessions-composer-toolbar\s*\{[^}]*flex-direction:\s*column;/s);
     expect(sessions).not.toMatch(

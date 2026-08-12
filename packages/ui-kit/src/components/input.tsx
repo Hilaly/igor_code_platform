@@ -129,7 +129,13 @@ export type TextareaProps = {
    * потратил обращение к модели.
    */
   onSubmit?: () => void;
+  /**
+   * Разрешить отправку пустого поля. Нужно там, где сообщение бывает не только текстом: к пустому
+   * полю приложена картинка, и «пустое сообщение» перестаёт значить «отправлять нечего».
+   */
+  submitWhenEmpty?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 };
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
@@ -146,7 +152,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     autoGrow = false,
     maxRows,
     onSubmit,
+    submitWhenEmpty = false,
     onKeyDown,
+    onPaste,
   },
   ref,
 ) {
@@ -185,6 +193,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
           : ({ "--textarea-max-rows": String(maxRows) } as CSSProperties)
       }
       onChange={(event) => onChange(event.target.value)}
+      onPaste={onPaste}
       onKeyDown={(event) => {
         onKeyDown?.(event);
 
@@ -197,7 +206,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
           event.metaKey ||
           event.altKey ||
           event.nativeEvent.isComposing ||
-          value.trim() === ""
+          (value.trim() === "" && !submitWhenEmpty)
         ) {
           return;
         }

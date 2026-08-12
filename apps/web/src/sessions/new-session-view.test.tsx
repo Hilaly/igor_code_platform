@@ -234,8 +234,10 @@ describe("the screen that creates a session", () => {
     const composerSurface = composer.closest<HTMLDivElement>(".new-session-composer");
 
     expect(composerSurface).not.toBeNull();
-    expect(within(composerSurface!).getAllByRole("button")).toHaveLength(2);
+    // Три: приложить, next-turn и отправка. Меню вариантов отправки на стартовом экране нет.
+    expect(within(composerSurface!).getAllByRole("button")).toHaveLength(3);
     expect(within(composerSurface!).getByRole("button", { name: "Отправить" })).not.toBeNull();
+    expect(within(composerSurface!).getByRole("button", { name: "Приложить" })).not.toBeNull();
     expect(
       within(composerSurface!).getByRole("button", { name: "Выберите… · Средний" }),
     ).not.toBeNull();
