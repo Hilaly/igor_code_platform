@@ -286,9 +286,13 @@ export function ChatView(props: ChatViewProps) {
     () =>
       waiting.length === 0 ? undefined : (
         <div className="sessions-queues">
-          {waiting.map((text, index) => (
-            <Badge key={`${String(index)}:${text}`} tone="accent">
-              {text}
+          {waiting.map((message, index) => (
+            <Badge key={`${String(index)}:${message.text}`} tone="accent">
+              {/* Сообщение из одних картинок текста не имеет, и пустой бейдж молчал бы о том, что
+                  в очереди вообще что-то стоит. */}
+              {message.text === ""
+                ? t("chat.queued.images", { count: String(message.images?.length ?? 0) })
+                : message.text}
             </Badge>
           ))}
         </div>

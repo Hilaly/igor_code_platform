@@ -288,10 +288,7 @@ describe("parseConfig", () => {
   it("refuses limits that contradict each other", () => {
     // Предел одной картинки выше предела сообщения означал бы, что первая же принятая картинка
     // не влезает в сообщение, куда её кладут. Такой файл честнее отвергнуть целиком.
-    assert.equal(
-      parseConfig({ maxImageBytes: 2048, maxMessageImageBytes: 1024 }).kind,
-      "rejected",
-    );
+    assert.equal(parseConfig({ maxImageBytes: 2048, maxMessageImageBytes: 1024 }).kind, "rejected");
     assert.equal(
       parseConfig({ maxMessageImageBytes: 4096, maxSessionImageBytes: 2048 }).kind,
       "rejected",

@@ -10,13 +10,27 @@ import {
   parseTurnRequest,
   sessionEntriesPath,
   sessionForkPath,
+  sessionImageBytes,
   sessionMessagesPath,
   sessionPath,
   sessionStatsPath,
   sessionTurnsPath,
   type AgentSummary,
   type Session,
+  type SessionImage,
 } from "./session.ts";
+
+/** Байты, с которых начинается каждый из четырёх поддержанных форматов. */
+const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01];
+const jpegBytes = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10];
+const gifBytes = [...Buffer.from("GIF89a", "ascii"), 0x01, 0x02];
+const webpBytes = [...Buffer.from("RIFF", "ascii"), 0, 0, 0, 0, ...Buffer.from("WEBP", "ascii")];
+
+function base64Of(bytes: number[]): string {
+  return Buffer.from(bytes).toString("base64");
+}
+
+const png: SessionImage = { mimeType: "image/png", data: base64Of(pngBytes) };
 
 describe("AgentSummary", () => {
   it("keeps normalized skills and distinguishes plugin from standalone ownership", () => {
@@ -163,6 +177,106 @@ describe("parseTurnRequest", () => {
       assert.equal(parseTurnRequest(body).kind, "rejected", JSON.stringify(body));
     }
   });
+
+  it("reads images beside the text", () => {
+    const result = parseTurnRequest({ text: "что тут не так", images: [png] });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      text: "что тут не так",
+      images: [png],
+    });
+  });
+
+  it("accepts a turn made only of images", () => {
+    // Скриншот без единого слова — обычная просьба «посмотри», и требовать к нему текст незачем.
+    const result = parseTurnRequest({ text: "  ", images: [png] });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      text: "",
+      images: [png],
+    });
+  });
+
+  it("refuses an empty images list instead of taking it as a text-only turn", () => {
+    assert.equal(parseTurnRequest({ text: "", images: [] }).kind, "rejected");
+  });
+});
+
+describe("parseSessionImages", () => {
+  const withImage = (image: unknown): unknown => ({ text: "смотри", images: [image] });
+
+  it("takes all four supported formats", () => {
+    const images: SessionImage[] = [
+      { mimeType: "image/png", data: base64Of(pngBytes) },
+      { mimeType: "image/jpeg", data: base64Of(jpegBytes) },
+      { mimeType: "image/gif", data: base64Of(gifBytes) },
+      { mimeType: "image/webp", data: base64Of(webpBytes) },
+    ];
+    const result = parseTurnRequest({ text: "смотри", images });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value.images : undefined, images);
+  });
+
+  it("refuses a type no model of ours is promised to read", () => {
+    for (const mimeType of ["image/svg+xml", "image/bmp", "application/pdf", "image/PNG", 5]) {
+      assert.equal(
+        parseTurnRequest(withImage({ mimeType, data: base64Of(pngBytes) })).kind,
+        "rejected",
+        JSON.stringify(mimeType),
+      );
+    }
+  });
+
+  it("refuses anything that is not clean canonical base64", () => {
+    for (const data of [
+      "",
+      "   ",
+      `data:image/png;base64,${base64Of(pngBytes)}`,
+      `${base64Of(pngBytes).slice(0, 4)} ${base64Of(pngBytes).slice(4)}`,
+      "iVBORw0KGgo",
+      "не base64",
+      5,
+    ]) {
+      assert.equal(
+        parseTurnRequest(withImage({ mimeType: "image/png", data })).kind,
+        "rejected",
+        JSON.stringify(data),
+      );
+    }
+  });
+
+  it("refuses bytes that do not start the way the declared type must", () => {
+    // Иначе `image/png` с содержимым zip уезжает провайдеру и возвращается его невнятной ошибкой.
+    assert.equal(
+      parseTurnRequest(withImage({ mimeType: "image/png", data: base64Of(jpegBytes) })).kind,
+      "rejected",
+    );
+    assert.equal(
+      parseTurnRequest(
+        withImage({ mimeType: "image/webp", data: base64Of([0x50, 0x4b, 0x03, 0x04]) }),
+      ).kind,
+      "rejected",
+    );
+  });
+
+  it("refuses an image that is not an object and an unknown key inside one", () => {
+    assert.equal(parseTurnRequest(withImage("картинка")).kind, "rejected");
+    assert.equal(parseTurnRequest(withImage(null)).kind, "rejected");
+    assert.equal(parseTurnRequest({ text: "смотри", images: png }).kind, "rejected");
+    assert.equal(
+      parseTurnRequest(withImage({ ...png, name: "снимок.png" })).kind,
+      "parsed",
+      "неизвестный ключ внутри картинки — диагностика, как и везде",
+    );
+  });
+});
+
+describe("sessionImageBytes", () => {
+  it("counts the decoded payload, not the length of its base64", () => {
+    assert.equal(sessionImageBytes(png), pngBytes.length);
+    assert.equal(sessionImageBytes({ mimeType: "image/webp", data: base64Of(webpBytes) }), 12);
+    assert.equal(sessionImageBytes({ mimeType: "image/jpeg", data: base64Of(jpegBytes) }), 6);
+  });
 });
 
 describe("isSessionId", () => {
@@ -253,6 +367,29 @@ describe("parseSessionMessage", () => {
     for (const body of [{ mode: "steer" }, { text: "  ", mode: "steer" }]) {
       assert.equal(parseSessionMessage(body).kind, "rejected", JSON.stringify(body));
     }
+  });
+
+  it("carries images in every mode, including a message made only of them", () => {
+    for (const mode of ["steer", "follow-up", "next-turn", "append"]) {
+      const result = parseSessionMessage({ text: "", images: [png], mode });
+
+      assert.deepEqual(
+        result.kind === "parsed" ? result.value : undefined,
+        { text: "", images: [png], mode },
+        mode,
+      );
+    }
+  });
+
+  it("checks images the same way a turn does", () => {
+    assert.equal(
+      parseSessionMessage({
+        text: "левее",
+        images: [{ mimeType: "image/png", data: "нет" }],
+        mode: "steer",
+      }).kind,
+      "rejected",
+    );
   });
 });
 

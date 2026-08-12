@@ -28,6 +28,7 @@ import {
   type SessionBranch,
   type SessionContextUsage,
   type SessionDelta,
+  type SessionImage,
   type SessionEntry,
   type SessionQueues,
   type SessionsSnapshot,
@@ -41,6 +42,8 @@ export type StreamedMessage = {
   role: "user" | "agent";
   text: string;
   reasoning: string;
+  /** Изображения приезжают отдельным кадром и только у сообщения человека: он их и приложил. */
+  images: SessionImage[];
   done: boolean;
 };
 
@@ -645,6 +648,26 @@ function removePending(pending: Record<string, string>, turnId: string): Record<
   return Object.fromEntries(Object.entries(pending).filter(([known]) => known !== turnId));
 }
 
+/**
+ * Сообщение, к которому относится дельта. Дельта без начала — законный случай: клиент мог
+ * подключиться посреди сообщения, и терять из-за этого его содержимое незачем.
+ */
+function startedMessage(turn: LiveTurn, messageId: string): StreamedMessage {
+  const known = turn.items[messageId];
+
+  return known?.kind === "message"
+    ? known
+    : {
+        kind: "message",
+        messageId,
+        role: "agent",
+        text: "",
+        reasoning: "",
+        images: [],
+        done: false,
+      };
+}
+
 function foldIntoTurn(turn: LiveTurn, delta: SessionDelta): LiveTurn {
   const put = (key: string, item: StreamedItem): LiveTurn => ({
     turnId: turn.turnId,
@@ -660,23 +683,12 @@ function foldIntoTurn(turn: LiveTurn, delta: SessionDelta): LiveTurn {
         role: delta.role,
         text: "",
         reasoning: "",
+        images: [],
         done: false,
       });
 
     case "message-delta": {
-      const known = turn.items[delta.messageId];
-      // Дельта без начала — законный случай: клиент мог подключиться посреди сообщения.
-      const message: StreamedMessage =
-        known?.kind === "message"
-          ? known
-          : {
-              kind: "message",
-              messageId: delta.messageId,
-              role: "agent",
-              text: "",
-              reasoning: "",
-              done: false,
-            };
+      const message = startedMessage(turn, delta.messageId);
 
       return put(delta.messageId, {
         ...message,
@@ -685,6 +697,12 @@ function foldIntoTurn(turn: LiveTurn, delta: SessionDelta): LiveTurn {
           : { reasoning: message.reasoning + delta.text }),
       });
     }
+
+    case "message-images":
+      return put(delta.messageId, {
+        ...startedMessage(turn, delta.messageId),
+        images: delta.images,
+      });
 
     case "message-end": {
       const known = turn.items[delta.messageId];

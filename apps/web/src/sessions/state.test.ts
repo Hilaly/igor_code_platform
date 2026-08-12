@@ -596,25 +596,29 @@ describe("the queues, the counters and what the session lost", () => {
   it("shows what waits in the queues, replacing it wholesale", () => {
     const first = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: ["левее"], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
     });
 
-    expect(first.state.open?.queues?.steer).toEqual(["левее"]);
+    expect(first.state.open?.queues?.steer).toEqual([{ text: "левее" }]);
     // Дельта несёт всё, что ждёт прямо сейчас: опустевшая очередь опустошает и показанное.
     expect(first.reread).toBe(false);
 
     const drained = applySessionDelta(first.state, "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [], followUp: [], nextTurn: ["потом"] },
+      queues: { steer: [], followUp: [], nextTurn: [{ text: "потом" }] },
     });
 
-    expect(drained.state.open?.queues).toEqual({ steer: [], followUp: [], nextTurn: ["потом"] });
+    expect(drained.state.open?.queues).toEqual({
+      steer: [],
+      followUp: [],
+      nextTurn: [{ text: "потом" }],
+    });
   });
 
   it("forgets the queues when the stream comes back, because their deltas are gone", () => {
     const queued = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: ["левее"], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
     }).state;
 
     expect(reconnected(queued).open?.queues).toBeUndefined();

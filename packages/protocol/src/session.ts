@@ -155,6 +155,47 @@ export type SessionsSnapshot = {
   problems?: string[];
 };
 
+/**
+ * Что человек вправе приложить к сообщению. Список закрыт: это те форматы, которые провайдеры
+ * принимают одинаково, а не всё, что умеет показать браузер (docs/sessions-and-projects.md).
+ */
+export const sessionImageMimeTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+] as const;
+
+export type SessionImageMimeType = (typeof sessionImageMimeTypes)[number];
+
+export function isSessionImageMimeType(value: unknown): value is SessionImageMimeType {
+  return sessionImageMimeTypes.includes(value as SessionImageMimeType);
+}
+
+/**
+ * Изображение, приложенное к сообщению.
+ *
+ * `data` — чистый base64 без `data:` prefix. Data URL — форма браузерного рендера, а не провода: он
+ * повторяет тип, который уже назван рядом, и на проводе это две записи одного факта, способные
+ * разойтись.
+ */
+export type SessionImage = {
+  mimeType: SessionImageMimeType;
+  data: string;
+};
+
+/**
+ * Сколько байт весит изображение после декодирования. Считается арифметикой по длине base64, без
+ * самого декодирования: предел применяют и демон, и браузер, и обоим незачем ради счёта поднимать в
+ * память лишнюю копию. Значение верно для canonical base64 — то есть ровно для того, что пропускает
+ * `parseTurnRequest`.
+ */
+export function sessionImageBytes(image: SessionImage): number {
+  const padding = image.data.endsWith("==") ? 2 : image.data.endsWith("=") ? 1 : 0;
+
+  return (image.data.length / 4) * 3 - padding;
+}
+
 /** Тело создания сессии. */
 export type SessionDraft = {
   projectId: string;
@@ -164,9 +205,15 @@ export type SessionDraft = {
   thinkingLevel?: ThinkingLevel;
 };
 
-/** Тело запуска турна. Переопределения действуют с этого турна и пишутся в дерево сессии. */
+/**
+ * Тело запуска турна. Переопределения действуют с этого турна и пишутся в дерево сессии.
+ *
+ * `text` бывает пустым ровно тогда, когда есть хотя бы одно изображение: скриншот без единого слова —
+ * законная просьба. Пустого сообщения без того и другого не бывает.
+ */
 export type TurnRequest = {
   text: string;
+  images?: SessionImage[];
   model?: string;
   thinkingLevel?: ThinkingLevel;
 };
@@ -235,6 +282,7 @@ export function isSessionMessageMode(value: unknown): value is SessionMessageMod
 
 export type SessionMessage = {
   text: string;
+  images?: SessionImage[];
   mode: SessionMessageMode;
 };
 
@@ -245,13 +293,22 @@ export type SessionMessageAccepted = {
 };
 
 /**
+ * Сообщение, ждущее своего момента. Не строка: у ждущего сообщения бывают изображения, а очередь из
+ * одних текстов показала бы человеку не то, что он отправил.
+ */
+export type SessionQueuedMessage = {
+  text: string;
+  images?: SessionImage[];
+};
+
+/**
  * Очереди сообщений, ждущих своего момента. Отдаются наружу, потому что написавший стиринг обязан
  * видеть, что тот принят и ждёт, а не пропал.
  */
 export type SessionQueues = {
-  steer: string[];
-  followUp: string[];
-  nextTurn: string[];
+  steer: SessionQueuedMessage[];
+  followUp: SessionQueuedMessage[];
+  nextTurn: SessionQueuedMessage[];
 };
 
 /**
@@ -274,6 +331,8 @@ export type SessionStats = {
  */
 export type SessionContentBlock =
   | { kind: "text"; text: string }
+  /** Изображение внутри сообщения. Порядок блоков сохраняется: он и есть порядок, в котором писали. */
+  | { kind: "image"; mimeType: SessionImageMimeType; data: string }
   | { kind: "reasoning"; text: string }
   | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown };
 
@@ -476,6 +535,13 @@ export type SessionDelta =
   | { kind: "phase"; phase: SessionPhase }
   | { kind: "message-start"; messageId: string; role: "user" | "agent" }
   | { kind: "message-delta"; messageId: string; channel: "text" | "reasoning"; text: string }
+  /**
+   * Изображения сообщения человека. Отдельным кадром, а не полем `message-start`: сообщение человека
+   * не стримится, и у него уже есть одна текстовая дельта — картинки приезжают такой же одной,
+   * сохраняя порядок «текст, затем изображения», в котором их складывает рантайм. У ответа модели
+   * этого кадра не бывает.
+   */
+  | { kind: "message-images"; messageId: string; images: SessionImage[] }
   | { kind: "message-end"; messageId: string }
   | { kind: "tool-start"; toolCallId: string; toolName: string; input: unknown }
   | { kind: "tool-end"; toolCallId: string; failed: boolean }
@@ -525,10 +591,11 @@ export function isSessionId(value: unknown): value is string {
 }
 
 const draftKeys = ["projectId", "agentId", "model", "thinkingLevel"];
-const turnKeys = ["text", "model", "thinkingLevel"];
+const turnKeys = ["text", "images", "model", "thinkingLevel"];
 const updateKeys = ["title", "archived"];
 const forkKeys = ["entryId", "position"];
-const messageKeys = ["text", "mode"];
+const messageKeys = ["text", "images", "mode"];
+const imageKeys = ["mimeType", "data"];
 const compactKeys = ["instructions"];
 const navigateKeys = ["entryId", "summarize", "instructions", "replaceInstructions"];
 const labelKeys = ["label"];
@@ -577,11 +644,9 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
   }
 
   const diagnostics = diagnoseUnknownKeys(label, fields, turnKeys);
-  const text = trimmedText(fields["text"]);
+  const said = parseSaidMessage(fields, label, diagnostics);
 
-  if (text === undefined) {
-    diagnostics.push(`${label}.text must be a non-empty message`);
-
+  if (said === undefined) {
     return { kind: "rejected", diagnostics };
   }
 
@@ -591,7 +656,7 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
     return { kind: "rejected", diagnostics };
   }
 
-  return { kind: "parsed", value: { text, ...overrides }, diagnostics };
+  return { kind: "parsed", value: { ...said, ...overrides }, diagnostics };
 }
 
 export function parseSessionUpdate(
@@ -691,11 +756,9 @@ export function parseSessionMessage(
   }
 
   const diagnostics = diagnoseUnknownKeys(label, fields, messageKeys);
-  const text = trimmedText(fields["text"]);
+  const said = parseSaidMessage(fields, label, diagnostics);
 
-  if (text === undefined) {
-    diagnostics.push(`${label}.text must be a non-empty message`);
-
+  if (said === undefined) {
     return { kind: "rejected", diagnostics };
   }
 
@@ -711,7 +774,7 @@ export function parseSessionMessage(
     return { kind: "rejected", diagnostics };
   }
 
-  return { kind: "parsed", value: { text, mode }, diagnostics };
+  return { kind: "parsed", value: { ...said, mode }, diagnostics };
 }
 
 export function parseSessionCompactRequest(
@@ -848,6 +911,153 @@ export function parseSessionLabelUpdate(
   }
 
   return { kind: "parsed", value: { label: text }, diagnostics };
+}
+
+/**
+ * Что сказал человек: текст и приложенные изображения. Общий разбор у турна и у сообщения — иначе
+ * стиринг с картинкой и турн с картинкой разошлись бы в том, что считается пустым сообщением.
+ */
+function parseSaidMessage(
+  fields: Record<string, unknown>,
+  label: string,
+  diagnostics: string[],
+): { text: string; images?: SessionImage[] } | undefined {
+  const images = parseSessionImages(fields["images"], label, diagnostics);
+
+  if (images === undefined) {
+    return undefined;
+  }
+
+  const text = trimmedText(fields["text"]);
+
+  // Текст обязателен ровно до тех пор, пока нечего показать вместо него.
+  if (text === undefined && images.length === 0) {
+    diagnostics.push(
+      `${label}.text must be a non-empty message, or ${label}.images must not be empty`,
+    );
+
+    return undefined;
+  }
+
+  return {
+    text: text ?? "",
+    ...(images.length === 0 ? {} : { images }),
+  };
+}
+
+/**
+ * Разбор приложенных изображений. Пределы размера здесь не проверяются: они живут в `config.json`, а
+ * этот пакет читает и браузер, у которого файла настроек нет. Проверяется форма — то, что верно
+ * всегда и везде.
+ */
+function parseSessionImages(
+  raw: unknown,
+  label: string,
+  diagnostics: string[],
+): SessionImage[] | undefined {
+  if (raw === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(raw)) {
+    diagnostics.push(`${label}.images must be a list of images`);
+
+    return undefined;
+  }
+
+  // Пустой список — не «сообщение без картинок», а противоречие: ключ назвали, приложить забыли.
+  if (raw.length === 0) {
+    diagnostics.push(`${label}.images must not be empty when it is named at all`);
+
+    return undefined;
+  }
+
+  const images: SessionImage[] = [];
+
+  for (const [index, one] of raw.entries()) {
+    const at = `${label}.images[${String(index)}]`;
+    const image = asObject(one);
+
+    if (image === undefined) {
+      diagnostics.push(`${at} must be an object`);
+
+      return undefined;
+    }
+
+    diagnostics.push(...diagnoseUnknownKeys(at, image, imageKeys));
+
+    const mimeType = image["mimeType"];
+
+    if (!isSessionImageMimeType(mimeType)) {
+      diagnostics.push(
+        `${at}.mimeType must be one of ${sessionImageMimeTypes.join(", ")}, got ${JSON.stringify(mimeType)}`,
+      );
+
+      return undefined;
+    }
+
+    const data = image["data"];
+
+    if (typeof data !== "string" || !isCanonicalBase64(data)) {
+      diagnostics.push(`${at}.data must be canonical base64 without a data: prefix`);
+
+      return undefined;
+    }
+
+    if (!startsAsDeclared(data, mimeType)) {
+      diagnostics.push(`${at}.data does not start the way ${mimeType} must`);
+
+      return undefined;
+    }
+
+    images.push({ mimeType, data });
+  }
+
+  return images;
+}
+
+/**
+ * Строгий base64: без пробелов, без переносов, без `data:` и без лишних битов в хвосте. Строгость
+ * здесь не придирка — она делает счёт байтов по длине строки точным, а значит и предел размера
+ * честным.
+ */
+const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+
+function isCanonicalBase64(value: string): boolean {
+  if (value.length === 0 || value.length % 4 !== 0 || !base64Pattern.test(value)) {
+    return false;
+  }
+
+  // Обратная сборка ловит хвостовые биты, которые декодер прощает, а канонический base64 — нет.
+  return Buffer.from(value, "base64").toString("base64") === value;
+}
+
+/**
+ * Первые байты обязаны соответствовать объявленному типу. Иначе `image/png` с содержимым архива
+ * доезжает до провайдера и возвращается его невнятной ошибкой вместо нашей внятной.
+ */
+const formatSignatures: Record<SessionImageMimeType, number[][]> = {
+  "image/jpeg": [[0xff, 0xd8, 0xff]],
+  "image/png": [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+  "image/gif": [
+    [0x47, 0x49, 0x46, 0x38, 0x37, 0x61],
+    [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
+  ],
+  // У WebP между `RIFF` и `WEBP` лежит длина файла, поэтому проверяются два куска, а не один.
+  "image/webp": [[0x52, 0x49, 0x46, 0x46]],
+};
+
+function startsAsDeclared(data: string, mimeType: SessionImageMimeType): boolean {
+  const bytes = Buffer.from(data, "base64");
+  const matched = formatSignatures[mimeType].some((signature) =>
+    signature.every((byte, index) => bytes[index] === byte),
+  );
+
+  if (!matched) {
+    return false;
+  }
+
+  return mimeType !== "image/webp" || bytes.subarray(8, 12).toString("ascii") === "WEBP";
 }
 
 /** Модель и уровень ризонинга разбираются одинаково и в теле создания, и в теле турна. */

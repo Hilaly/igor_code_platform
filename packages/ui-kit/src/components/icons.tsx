@@ -7,12 +7,15 @@ import {
   Blocks,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Command,
   Copy,
+  Download,
   Folder,
   FolderOpen,
   GitBranchPlus,
   GitFork,
+  Image as ImageSymbol,
   ListTree,
   MoreHorizontal,
   PanelLeftClose,
@@ -80,7 +83,10 @@ export const FolderIcon = actionIcon(Folder);
 export const FolderOpenIcon = actionIcon(FolderOpen);
 export const UserIcon = actionIcon(UserRound);
 export const ChevronRightIcon = actionIcon(ChevronRight);
+export const ChevronLeftIcon = actionIcon(ChevronLeft);
 export const ChevronDownIcon = actionIcon(ChevronDown);
+export const ImageIcon = actionIcon(ImageSymbol);
+export const DownloadIcon = actionIcon(Download);
 export const PanelLeftCloseIcon = actionIcon(PanelLeftClose);
 export const PanelLeftOpenIcon = actionIcon(PanelLeftOpen);
 export const PanelRightCloseIcon = actionIcon(PanelRightClose);

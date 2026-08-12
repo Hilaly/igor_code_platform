@@ -259,7 +259,11 @@ test("two config updates preserve both supplied fields", () => {
 test("a config update that contradicts the file on disk is refused instead of written", () => {
   const directory = freshDirectory();
 
-  const consistent = { maxImageBytes: 1024, maxMessageImageBytes: 2048, maxSessionImageBytes: 4096 };
+  const consistent = {
+    maxImageBytes: 1024,
+    maxMessageImageBytes: 2048,
+    maxSessionImageBytes: 4096,
+  };
 
   write(directory, configFileName, JSON.stringify(consistent));
 

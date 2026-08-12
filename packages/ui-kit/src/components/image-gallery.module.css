@@ -1,0 +1,55 @@
+.gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sovereign-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.thumb {
+  display: block;
+  padding: 0;
+  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  border-radius: var(--sovereign-radius-sm);
+  background: var(--sovereign-sunken-surface);
+  line-height: 0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--sovereign-duration-fast) var(--sovereign-ease-out);
+}
+.thumb:hover {
+  border-color: var(--sovereign-border-strong);
+}
+/* Пропорции сохраняются, а высота ограничена: снимок целого экрана иначе занимает всю ленту. */
+.thumb img {
+  display: block;
+  max-block-size: 12rem;
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+.full {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 70vh;
+  margin-inline: auto;
+  object-fit: contain;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  inline-size: 100%;
+}
+.download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sovereign-space-1);
+  margin-inline-start: auto;
+  color: var(--sovereign-text-muted);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-sm);
+  text-decoration: none;
+}
+.download:hover {
+  color: var(--sovereign-text);
+}

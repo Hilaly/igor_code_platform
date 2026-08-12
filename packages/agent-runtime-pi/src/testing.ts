@@ -181,11 +181,19 @@ export type ScriptedModelProviderOptions = {
    * и ведёт человек, дописывающий указание посреди ответа.
    */
   beforeAnswer?: (index: number) => void;
+  /** Что модель принимает на вход. По умолчанию только текст: картинки умеет не всякая. */
+  input?: ("text" | "image")[];
 };
 
 export type ScriptedModelProvider = {
   provider: Provider;
   model: Model<Api>;
+  /**
+   * Второй, заведомо текстовый двойник того же провайдера. Нужен, чтобы отличить «модель не умеет
+   * картинки» от «модели вовсе нет»: без него переключение на текстовую модель проверялось бы
+   * несуществующим именем и проходило бы по неверной причине.
+   */
+  textOnlyModel: Model<Api>;
   /** Контексты обращений в порядке запросов: по ним видно, что именно уехало модели. */
   requests: Context[];
 };
@@ -211,11 +219,12 @@ export function scriptedModelProvider(
     provider: providerId,
     baseUrl: "https://scripted.invalid",
     reasoning: false,
-    input: ["text"],
+    input: options.input ?? ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
     maxTokens: 4096,
   };
+  const textOnlyModel: Model<Api> = { ...model, id: `${modelId}-text-only`, input: ["text"] };
 
   const stream = (streamed: Model<Api>, context: Context): AssistantMessageEventStream => {
     const events = createAssistantMessageEventStream();
@@ -230,7 +239,7 @@ export function scriptedModelProvider(
   const provider = createProvider({
     id: providerId,
     name: "Scripted model provider",
-    models: [model],
+    models: [model, textOnlyModel],
     api: { stream, streamSimple: stream },
     auth: {
       apiKey: {
@@ -241,7 +250,7 @@ export function scriptedModelProvider(
     },
   });
 
-  return { provider, model, requests };
+  return { provider, model, textOnlyModel, requests };
 }
 
 function playTurn(

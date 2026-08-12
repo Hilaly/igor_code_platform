@@ -36,8 +36,13 @@ export type Session = {
   createdAt: string;
 };
 
+/** Что человек вправе приложить к сообщению. Список закрыт, как и в протоколе. */
+export type SessionImageMimeType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
 export type SessionContentBlock =
   | { kind: "text"; text: string }
+  /** Изображение внутри сообщения. `data` — чистый base64 без `data:` prefix. */
+  | { kind: "image"; mimeType: SessionImageMimeType; data: string }
   | { kind: "reasoning"; text: string }
   | { kind: "tool-call"; toolCallId: string; toolName: string; input: unknown };
 
