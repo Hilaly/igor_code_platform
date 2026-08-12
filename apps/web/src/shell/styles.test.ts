@@ -279,15 +279,30 @@ describe("the style sheets of the application", () => {
     );
   });
 
-  it("keeps one full-width content frame without imposing a reading width", () => {
+  it("gives every route the one centred page measure", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*display:\s*flex;/s);
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*width:\s*100%;/s);
+    expect(shell).toMatch(
+      /\.shell-content-frame\s*\{[^}]*max-width:\s*var\(--sovereign-page-width\);/s,
+    );
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*margin-inline:\s*auto;/s);
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-width:\s*0;/s);
     expect(shell).toMatch(/\.shell-content-frame\s*\{[^}]*min-height:\s*0;/s);
-    expect(shell).not.toMatch(/\.shell-content-frame\s*\{[^}]*max-width\s*:/s);
+  });
+
+  /**
+   * Заголовок маршрута и первая строка вью обязаны стоять на одной вертикали. Держится это не
+   * совпадением чисел, а одной парой «жёлоб плюс мера» у шапки кита и у тела страницы, поэтому
+   * проверяется именно то, что жёлоб приходит общим токеном, а у страницы своего отступа нет.
+   */
+  it("aligns the route header with page content through one shared gutter", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-body\s*\{[^}]*padding:\s*var\(--sovereign-page-gutter\);/s);
+    expect(shell).not.toMatch(/\.shell-page\s*\{[^}]*padding[^:]*:/s);
+    expect(shell).not.toMatch(/\.shell-page\s*\{[^}]*max-width\s*:/s);
   });
 
   it("centers page route children while contained content remains full width", () => {

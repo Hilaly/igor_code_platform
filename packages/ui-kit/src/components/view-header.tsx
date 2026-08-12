@@ -15,20 +15,22 @@ export type ViewHeaderProps = {
 export function ViewHeader({ title, context, level = 1, actions }: ViewHeaderProps) {
   return (
     <header className={styles.header}>
-      <div className={styles.headingGroup}>
-        <div className={styles.title}>
-          <Heading level={level}>{title}</Heading>
+      <div className={styles.inner}>
+        <div className={styles.headingGroup}>
+          <div className={styles.title}>
+            <Heading level={level}>{title}</Heading>
+          </div>
+          {context == null ? undefined : (
+            <span
+              className={styles.context}
+              title={typeof context === "string" ? context : undefined}
+            >
+              {context}
+            </span>
+          )}
         </div>
-        {context == null ? undefined : (
-          <span
-            className={styles.context}
-            title={typeof context === "string" ? context : undefined}
-          >
-            {context}
-          </span>
-        )}
+        {actions == null ? undefined : <div className={styles.actions}>{actions}</div>}
       </div>
-      {actions == null ? undefined : <div className={styles.actions}>{actions}</div>}
     </header>
   );
 }

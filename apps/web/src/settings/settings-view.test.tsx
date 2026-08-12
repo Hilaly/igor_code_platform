@@ -84,7 +84,9 @@ it.each(["64rem", "24rem"])(
     );
 
     expect(screen.getByText("SETTINGS")).toBeTruthy();
-    expect(screen.getByText("◆ Sovereign · Настройки · Провайдеры")).toBeTruthy();
+    // Внутри оболочки маршрут уже назван её шапкой: вторая цепочка того же маршрута — слой чрома,
+    // а не сведение. Вне оболочки она остаётся, и это проверяется отдельно ниже.
+    expect(screen.queryByText("◆ Sovereign · Настройки · Провайдеры")).toBeNull();
     expect(screen.getByRole("region", { name: "Провайдеры" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Провайдеры" })).toBeNull();
   },
@@ -150,7 +152,7 @@ it.each([
   },
 );
 
-it("puts a plugin object into the full Settings context chain", () => {
+it("leaves naming a plugin object to the shell header instead of a second chain", () => {
   render(
     <ShellHeaderProvider description={{ title: "Usage insights" }}>
       <SettingsView
@@ -174,10 +176,32 @@ it("puts a plugin object into the full Settings context chain", () => {
     </ShellHeaderProvider>,
   );
 
-  expect(screen.getByText("◆ Sovereign · Настройки · Usage insights")).toBeTruthy();
+  expect(screen.queryByText("◆ Sovereign · Настройки · Usage insights")).toBeNull();
   expect(screen.queryByRole("heading", { name: "Usage insights" })).toBeNull();
   expect(screen.getByRole("heading", { level: 2, name: "Usage insights summary" })).toBeTruthy();
   expect(screen.getByText("plugin detail content")).toBeTruthy();
+});
+
+it("keeps the local context chain when it renders outside the shell", () => {
+  render(
+    <SettingsView
+      section="providers"
+      onSectionChange={vi.fn()}
+      projects={<div>project content</div>}
+      appearance={<div>appearance content</div>}
+      usage={<div>usage content</div>}
+      providers={<div>provider content</div>}
+      plugins={<div>plugin content</div>}
+      daemon={<div>daemon</div>}
+      diagnostics={<div>diagnostics</div>}
+      translator={translator}
+    />,
+  );
+
+  // Без оболочки называть маршрут больше некому, поэтому цепочка и собственный `h1` остаются: тот же
+  // компонент обязан быть самодостаточным, иначе его нельзя открыть отдельной страницей.
+  expect(screen.getByText("◆ Sovereign · Настройки · Провайдеры")).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 1, name: "Провайдеры" })).toBeTruthy();
 });
 
 it("keeps projects selected for both the list and a project detail", () => {

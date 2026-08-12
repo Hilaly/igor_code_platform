@@ -413,6 +413,34 @@ describe("stylesheets of the kit", () => {
     expect(viewHeaderCss).toMatch(/\.actions\s*\{[^}]*justify-content:\s*flex-end;/s);
   });
 
+  /**
+   * Линия шапки отделяет страницу целиком, а её содержимое стоит в той же мере и том же жёлобе, что и
+   * содержимое страницы. Пара названа токенами именно для того, чтобы совпадение держалось правилом,
+   * а не одинаковыми числами в двух пакетах.
+   */
+  it("puts the ViewHeader content in the shared page measure", () => {
+    const viewHeaderCss = withoutComments(
+      readFileSync(join(kitRoot, "components", "view-header.module.css"), "utf8"),
+    );
+
+    expect(viewHeaderCss).toMatch(
+      /\.header\s*\{[^}]*padding:\s*var\(--sovereign-space-3\)\s+var\(--sovereign-page-gutter\);/s,
+    );
+    expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*max-width:\s*var\(--sovereign-page-width\);/s);
+    expect(viewHeaderCss).toMatch(/\.inner\s*\{[^}]*margin-inline:\s*auto;/s);
+  });
+
+  /** Мера страницы принадлежит киту и меняется вместе с узким экраном в одном месте. */
+  it("declares the page measure and its narrow-screen gutter once", () => {
+    const tokens = withoutComments(readFileSync(join(kitRoot, "styles", "tokens.css"), "utf8"));
+
+    expect(tokens).toMatch(/--sovereign-page-width:\s*64rem;/);
+    expect(tokens).toMatch(/--sovereign-page-gutter:\s*var\(--sovereign-space-5\);/);
+    expect(tokens).toMatch(
+      /@media\s*\(width\s*<=\s*40rem\)\s*\{[^}]*:root\s*\{[^}]*--sovereign-page-gutter:\s*var\(--sovereign-space-3\);/s,
+    );
+  });
+
   it("owns the compact mockup geometry for settings views", () => {
     const settingsFrameCss = readFileSync(
       join(kitRoot, "components", "settings-frame.module.css"),

@@ -1,12 +1,24 @@
 .header {
+  min-width: 0;
+  padding: var(--sovereign-space-3) var(--sovereign-page-gutter);
+  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
+/**
+ * Шапка тянется во всю ширину, чтобы её линия отделяла страницу целиком, а содержимое живёт в той же
+ * мере, что и содержимое страницы: жёлоб и `--sovereign-page-width` здесь и у контейнера страницы
+ * совпадают, поэтому заголовок стоит ровно над первой строкой вью, а не с собственным отступом.
+ */
+.inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--sovereign-space-3);
+  width: 100%;
+  max-width: var(--sovereign-page-width);
   min-width: 0;
-  padding: var(--sovereign-space-3) var(--sovereign-space-4);
-  border-block-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+  margin-inline: auto;
 }
 .headingGroup {
   display: flex;

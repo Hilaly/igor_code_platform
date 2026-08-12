@@ -101,6 +101,10 @@
   gap: var(--sovereign-space-2);
 }
 
+/**
+ * Отступа у страницы нет: жёлоб принадлежит шапке и телу по отдельности. Иначе линия шапки не доходит
+ * до краёв страницы, а её заголовок получает отступ поверх общего — и уезжает от первой строки вью.
+ */
 .shell-page {
   position: relative;
   display: grid;
@@ -108,7 +112,6 @@
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  padding: var(--sovereign-space-5);
   overflow: hidden;
   background: var(--sovereign-page-surface);
 }
@@ -123,15 +126,23 @@
 .shell-body {
   display: flex;
   flex-direction: column;
+  padding: var(--sovereign-page-gutter);
   overflow: auto;
 }
 
+/**
+ * Единая мера всех рабочих страниц. Жёлоб даёт тело, ограничение и центрирование — контейнер, и та же
+ * пара стоит внутри шапки кита: левый край заголовка и левый край содержимого совпадают на любой
+ * ширине окна. Связный текст и лента разговора держат внутри ещё более узкую
+ * `--sovereign-reading-width` — это вью решает само, мера страницы её не отменяет.
+ */
 .shell-content-frame {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  max-width: var(--sovereign-page-width);
   min-width: 0;
   min-height: 0;
   margin-inline: auto;
@@ -229,10 +240,6 @@
   .shell-left,
   .shell-right {
     padding-inline: var(--sovereign-space-2);
-  }
-
-  .shell-page {
-    padding-inline: var(--sovereign-space-3);
   }
 
   .shell-right-head,

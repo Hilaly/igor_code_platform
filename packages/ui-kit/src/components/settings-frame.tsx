@@ -3,7 +3,11 @@ import { useId, type ReactNode } from "react";
 import styles from "./settings-frame.module.css";
 
 export type SettingsViewProps = {
-  context: ReactNode;
+  /**
+   * Local context line. Omitted inside a shell that already names the route: a second breadcrumb of
+   * the same route is one more chrome layer above the content, not more information.
+   */
+  context?: ReactNode;
   /** Visible eyebrow; the navigation's accessible name may be more descriptive. */
   navigationTitle?: ReactNode;
   navigationLabel: string;
@@ -21,7 +25,7 @@ export function SettingsView({
 }: SettingsViewProps) {
   return (
     <div className={styles.view}>
-      <header className={styles.context}>{context}</header>
+      {context === undefined ? undefined : <header className={styles.context}>{context}</header>}
       <div className={styles.body}>
         <nav className={styles.navigation} aria-label={navigationLabel}>
           <div className={styles.navigationHeader}>{navigationTitle ?? navigationLabel}</div>

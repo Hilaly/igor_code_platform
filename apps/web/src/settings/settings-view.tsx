@@ -71,7 +71,9 @@ export function SettingsView({
     <SettingsKitView
       navigationLabel={t("settings.sections")}
       navigationTitle="SETTINGS"
-      context={`◆ Sovereign · ${t("settings.context.title")} · ${title}`}
+      // Локальная строка контекста нужна только вне оболочки: внутри неё маршрут уже назван шапкой
+      // страницы, и вторая цепочка того же маршрута — ещё один слой чрома над содержимым.
+      {...(embedded ? {} : { context: `◆ Sovereign · ${t("settings.context.title")} · ${title}` })}
       navigation={
         <>
           {settingsSections.map((candidate) => (
