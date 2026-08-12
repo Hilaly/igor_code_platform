@@ -17,8 +17,16 @@ import { ConfirmDialog } from "./dialog.tsx";
 import { Disclosure } from "./disclosure.tsx";
 import { DurationTimer } from "./duration-timer.tsx";
 import { Input } from "./input.tsx";
-import { AddIcon, BrandMark, MoreIcon } from "./icons.tsx";
+import {
+  AddIcon,
+  ArchiveIcon,
+  BrandMark,
+  MoreIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+} from "./icons.tsx";
 import { Link } from "./link.tsx";
+import { CommandList } from "./command-list.tsx";
 import { List, ListRow } from "./list.tsx";
 import { Menu } from "./menu.tsx";
 import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
@@ -525,3 +533,57 @@ function SystemStateExamples() {
     </div>
   );
 }
+
+export const Commands = () => {
+  const [query, setQuery] = useState("");
+  const groups = [
+    {
+      id: "session",
+      label: "Сессии",
+      items: [
+        { id: "new", label: "Новая сессия", icon: <AddIcon size="sm" /> },
+        { id: "archive", label: "Открыть архив", icon: <ArchiveIcon size="sm" /> },
+      ],
+    },
+    {
+      id: "panels",
+      label: "Панели",
+      items: [
+        {
+          id: "hide-left",
+          label: "Скрыть левую панель",
+          icon: <PanelLeftCloseIcon size="sm" />,
+        },
+        {
+          id: "show-left",
+          label: "Показать левую панель",
+          icon: <PanelLeftOpenIcon size="sm" />,
+          disabled: true,
+        },
+      ],
+    },
+    {
+      id: "placed",
+      label: "placed",
+      items: [{ id: "run", label: "Запустить доску", meta: "placed" }],
+    },
+  ].map((group) => ({
+    ...group,
+    items: group.items.filter((item) =>
+      item.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+    ),
+  }));
+
+  return (
+    <div style={column}>
+      <CommandList
+        query={query}
+        onQueryChange={setQuery}
+        groups={groups.filter((group) => group.items.length > 0)}
+        onChoose={() => {}}
+        searchLabel="Найти команду"
+        emptyText="Команды с таким именем нет"
+      />
+    </div>
+  );
+};

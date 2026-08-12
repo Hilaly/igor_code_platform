@@ -21,6 +21,7 @@ export * from "./components/breadcrumbs.tsx";
 export * from "./components/button.tsx";
 export * from "./components/code.tsx";
 export * from "./components/combobox.tsx";
+export * from "./components/command-list.tsx";
 export * from "./components/dialog.tsx";
 export * from "./components/disclosure.tsx";
 export * from "./components/duration-timer.tsx";

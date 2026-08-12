@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "./button.tsx";
 import { Combobox } from "./combobox.tsx";
+import { CommandList, type CommandListGroup } from "./command-list.tsx";
 import { FilePicker, type FilePickerEntry } from "./file-picker.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { SendIcon } from "./icons.tsx";
@@ -1538,5 +1539,115 @@ describe("chat composer", () => {
       fireEvent.click(upAtRoot);
       expect(onNavigate).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("command list", () => {
+  const groups: CommandListGroup[] = [
+    {
+      id: "work",
+      label: "Работа",
+      items: [
+        { id: "new", label: "Новая сессия" },
+        { id: "archive", label: "Архив" },
+      ],
+    },
+    {
+      id: "panels",
+      label: "Панели",
+      items: [
+        { id: "hide", label: "Скрыть панель", disabled: true },
+        { id: "show", label: "Показать панель" },
+      ],
+    },
+  ];
+
+  const active = (): string | undefined =>
+    screen
+      .queryAllByRole("option")
+      .find((option) => option.getAttribute("aria-selected") === "true")?.textContent ?? undefined;
+
+  function show(onChoose = vi.fn()) {
+    render(
+      <CommandList
+        query=""
+        onQueryChange={() => {}}
+        groups={groups}
+        onChoose={onChoose}
+        searchLabel="Найти команду"
+        emptyText="Ничего не нашлось"
+      />,
+    );
+
+    return { onChoose, field: screen.getByRole("combobox", { name: "Найти команду" }) };
+  }
+
+  /**
+   * Фокус остаётся в поле, а активную строку объявляет `aria-activedescendant`: иначе после каждой
+   * стрелки пришлось бы возвращать фокус в поле, чтобы дописать букву.
+   */
+  it("keeps the focus in the field and names the active row to the screen reader", () => {
+    const { field } = show();
+
+    expect(active()).toBe("Новая сессия");
+    expect(field.getAttribute("aria-activedescendant")).toMatch(/new$/);
+    expect(field.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById(field.getAttribute("aria-controls") ?? "")).toHaveProperty(
+      "role",
+      "listbox",
+    );
+  });
+
+  /** Стрелки ходят по списку целиком и перешагивают недоступные строки: `Enter` заберёт активную. */
+  it("walks every group with the arrows and steps over the unavailable", () => {
+    const { field, onChoose } = show();
+
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    expect(active()).toBe("Архив");
+
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    expect(active()).toBe("Показать панель");
+
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(onChoose).toHaveBeenCalledWith("show");
+  });
+
+  it("wraps around and jumps to the ends", () => {
+    const { field } = show();
+
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    expect(active()).toBe("Показать панель");
+
+    fireEvent.keyDown(field, { key: "Home" });
+    expect(active()).toBe("Новая сессия");
+
+    fireEvent.keyDown(field, { key: "End" });
+    expect(active()).toBe("Показать панель");
+  });
+
+  it("takes a pointer choice but not on a disabled row", () => {
+    const { onChoose } = show();
+
+    fireEvent.click(screen.getByRole("option", { name: "Скрыть панель" }));
+    expect(onChoose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("option", { name: "Архив" }));
+    expect(onChoose).toHaveBeenCalledWith("archive");
+  });
+
+  it("says its own words when the caller filtered everything out", () => {
+    render(
+      <CommandList
+        query="ничего"
+        onQueryChange={() => {}}
+        groups={[]}
+        onChoose={() => {}}
+        searchLabel="Найти команду"
+        emptyText="Ничего не нашлось"
+      />,
+    );
+
+    expect(screen.getByText("Ничего не нашлось")).toBeDefined();
+    expect(screen.queryAllByRole("option")).toEqual([]);
   });
 });

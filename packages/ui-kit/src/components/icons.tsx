@@ -1,6 +1,10 @@
 /** Именованные пиктограммы UI-кита: прикладной код не зависит от словаря внешней библиотеки. */
 
 import {
+  Activity,
+  Archive,
+  BarChart3,
+  Blocks,
   ChevronRight,
   ChevronDown,
   Command,
@@ -15,9 +19,13 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Palette,
+  Plug,
   Plus,
   Search,
   Send,
+  Server,
+  Settings,
   Shrink,
   Square,
   Tag,
@@ -53,6 +61,18 @@ export const AppendIcon = actionIcon(Plus);
 export const StopIcon = actionIcon(Square);
 export const MoreIcon = actionIcon(MoreHorizontal);
 export const CommandsIcon = actionIcon(Command);
+export const ArchiveIcon = actionIcon(Archive);
+export const SettingsIcon = actionIcon(Settings);
+/**
+ * Значки разделов настроек: они стоят рядом в одном списке команд, и один общий значок на все
+ * различал бы разделы хуже, чем подпись, — то есть не помогал бы вовсе.
+ */
+export const AppearanceIcon = actionIcon(Palette);
+export const UsageIcon = actionIcon(BarChart3);
+export const ProviderIcon = actionIcon(Plug);
+export const PluginIcon = actionIcon(Blocks);
+export const DaemonIcon = actionIcon(Server);
+export const DiagnosticsIcon = actionIcon(Activity);
 export const SearchIcon = actionIcon(Search);
 export const CompactIcon = actionIcon(Shrink);
 export const EntryTreeIcon = actionIcon(ListTree);

@@ -106,7 +106,20 @@ function palette(
   return host;
 }
 
-const rows = (): string[] => screen.queryAllByRole("listitem").map((row) => row.textContent ?? "");
+/** Строки палитры — опции listbox: фокус живёт в поле поиска, и кнопкой строка быть не вправе. */
+const rows = (): string[] => screen.queryAllByRole("option").map((row) => row.textContent ?? "");
+
+/** Ярлыки групп: оглавление палитры, а не строки списка. Имя группе даёт её видимый ярлык. */
+const groups = (): string[] =>
+  screen.queryAllByRole("group").map((group) => {
+    const labelId = group.getAttribute("aria-labelledby") ?? "";
+
+    return document.getElementById(labelId)?.textContent ?? "";
+  });
+
+const row = (name: string): HTMLElement => screen.getByRole("option", { name });
+
+const field = (): HTMLElement => screen.getByRole("combobox", { name: "Find a command" });
 
 describe("the command palette", () => {
   /**
@@ -131,9 +144,7 @@ describe("the command palette", () => {
   it("filters by a substring of the title", () => {
     palette({ contributions: [runCommand] });
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "Find a command" }), {
-      target: { value: "board" },
-    });
+    fireEvent.change(field(), { target: { value: "board" } });
 
     expect(rows()).toEqual(["Run the board"]);
   });
@@ -141,9 +152,7 @@ describe("the command palette", () => {
   it("says so when nothing goes by that name", () => {
     palette();
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "Find a command" }), {
-      target: { value: "nothing of the sort" },
-    });
+    fireEvent.change(field(), { target: { value: "nothing of the sort" } });
 
     expect(screen.getByText("No command goes by that name")).toBeDefined();
     expect(rows()).toEqual([]);
@@ -153,7 +162,7 @@ describe("the command palette", () => {
     const onClose = vi.fn();
     const host = palette({ onClose });
 
-    fireEvent.click(screen.getByRole("button", { name: "New session" }));
+    fireEvent.click(row("New session"));
 
     expect(host.navigate).toHaveBeenCalledWith({ kind: "new-session" });
     expect(onClose).toHaveBeenCalled();
@@ -165,7 +174,7 @@ describe("the command palette", () => {
     palette({ contributions: [runCommand], ran });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Run the board" }));
+      fireEvent.click(row("Run the board"));
     });
 
     expect(ran).toEqual(["plugin command"]);
@@ -174,10 +183,8 @@ describe("the command palette", () => {
   it("runs the first available command on Enter", () => {
     const host = palette();
 
-    const field = screen.getByRole("searchbox", { name: "Find a command" });
-
-    fireEvent.change(field, { target: { value: "archive" } });
-    fireEvent.keyDown(field, { key: "Enter" });
+    fireEvent.change(field(), { target: { value: "archive" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
 
     expect(host.navigate).toHaveBeenCalledWith({ kind: "session-archive" });
   });
@@ -190,7 +197,7 @@ describe("the command palette", () => {
     palette({ contributions: [runCommand], cacheEmpty: true });
 
     expect(rows()).toContain("Run the board");
-    expect(screen.getByRole("button", { name: "Run the board" })).toBeDefined();
+    expect(row("Run the board")).toBeDefined();
     expect(peeked).toEqual([placed.key]);
     expect(asked).toEqual([]);
   });
@@ -202,10 +209,7 @@ describe("the command palette", () => {
     });
 
     expect(rows()).toContain("Run the board");
-    const button = screen.getByRole("button", { name: "Run the board" });
-
-    expect(button.hasAttribute("disabled")).toBe(true);
-    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(row("Run the board").getAttribute("aria-disabled")).toBe("true");
     expect(asked).toEqual([]);
   });
 
@@ -226,10 +230,7 @@ describe("the command palette", () => {
     });
 
     expect(rows()).toContain("Run the board");
-    const button = screen.getByRole("button", { name: "Run the board" });
-
-    expect(button.hasAttribute("disabled")).toBe(true);
-    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(row("Run the board").getAttribute("aria-disabled")).toBe("true");
     await act(async () => {});
     expect(diagnostics).toEqual([
       "the command placed.run could not determine availability: availability broke",
@@ -245,16 +246,62 @@ describe("the command palette", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  /** Недоступная команда сохраняет геометрию строки, но нативная кнопка не принимает выбор. */
-  it("leaves an unavailable command in the list as a disabled button", () => {
-    palette({ layout: { ...defaultLayout, rightHidden: true } });
+  /** Недоступная команда сохраняет строку и место в списке, но выбора не принимает. */
+  it("leaves an unavailable command in the list as a disabled option", () => {
+    const onClose = vi.fn();
+    const host = palette({ layout: { ...defaultLayout, rightHidden: true }, onClose });
 
     expect(rows()).toContain("Hide the side panel");
-    const hidden = screen.getByRole("button", { name: "Hide the side panel" });
+    expect(row("Hide the side panel").getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(row("Hide the side panel"));
+    expect(host.onLayoutChange).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(row("Show the side panel").hasAttribute("aria-disabled")).toBe(false);
+  });
 
-    expect(hidden.hasAttribute("disabled")).toBe(true);
-    expect(hidden.getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("button", { name: "Show the side panel" })).toBeDefined();
+  /**
+   * Оглавление вместо одного списка: группа отвечает, куда ведёт команда, прежде чем читать подписи.
+   * Команды плагина стоят группой с его именем — источник виден без чтения идентификатора.
+   */
+  it("splits the list into groups and names the plugin group after the plugin", () => {
+    palette({ contributions: [runCommand] });
+
+    expect(groups()).toEqual(["Sessions", "Settings", "Panels", "placed"]);
+  });
+
+  /** Пустая группа не показывается: ярлык над ничем говорит о разделе, которого в отборе нет. */
+  it("drops a group with nothing left in it", () => {
+    palette({ contributions: [runCommand] });
+
+    fireEvent.change(field(), { target: { value: "board" } });
+
+    expect(groups()).toEqual(["placed"]);
+  });
+
+  /**
+   * Стрелки ходят по всему списку и перешагивают недоступные строки: активная строка это та, которую
+   * заберёт `Enter`, и остановка на невыполнимой команде обманывала бы.
+   */
+  it("moves the active row with the arrows across groups and skips the unavailable", () => {
+    const host = palette({ layout: { ...defaultLayout, rightHidden: true } });
+    const selected = (): string | undefined =>
+      screen
+        .queryAllByRole("option")
+        .find((option) => option.getAttribute("aria-selected") === "true")?.textContent ??
+      undefined;
+
+    expect(selected()).toBe("New session");
+
+    fireEvent.keyDown(field(), { key: "ArrowDown" });
+    expect(selected()).toBe("Open the archive");
+
+    fireEvent.keyDown(field(), { key: "End" });
+    fireEvent.keyDown(field(), { key: "ArrowUp" });
+    expect(selected()).not.toBe("Hide the side panel");
+
+    fireEvent.keyDown(field(), { key: "Home" });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(host.navigate).toHaveBeenCalledWith({ kind: "new-session" });
   });
 });
 

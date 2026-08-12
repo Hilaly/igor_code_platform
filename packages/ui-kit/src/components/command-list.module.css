@@ -1,0 +1,88 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+}
+/**
+ * Поле поиска и список — одна вертикаль без своей карточки: палитра уже живёт в диалоге, и вторая
+ * рамка внутри первой читалась бы как ещё один уровень вложенности.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  /* Список прокручивается внутри себя: диалог тянуть по высоте нельзя — поле поиска обязано остаться
+     на экране, иначе набирать приходится вслепую. */
+  max-height: 22rem;
+  padding: var(--sovereign-space-0);
+  overflow-y: auto;
+  list-style: none;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/**
+ * Имя группы — не заголовок содержимого, а ярлык раздела списка: кегль наименьший, цвет приглушён.
+ * Иначе в списке из двадцати команд ярлыки читаются как сами команды.
+ */
+.groupLabel {
+  padding-inline: var(--sovereign-space-2);
+  padding-block: var(--sovereign-space-1);
+  color: var(--sovereign-text-subtle);
+  font-family: var(--sovereign-font-family-body);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+  letter-spacing: var(--sovereign-letter-spacing-wide);
+  text-transform: uppercase;
+}
+.items {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sovereign-space-0);
+  list-style: none;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-height: var(--sovereign-control-height-sm);
+  padding-inline: var(--sovereign-space-2);
+  color: var(--sovereign-text);
+  cursor: pointer;
+  border-radius: var(--sovereign-radius-xs);
+}
+/**
+ * Активная строка отмечена только фоном: фокус остаётся в поле поиска, и рамка фокуса на строке
+ * сказала бы неправду о том, куда уйдёт следующий набранный символ.
+ */
+.item[aria-selected="true"] {
+  background: var(--sovereign-accent-surface);
+}
+.item[aria-disabled="true"] {
+  color: var(--sovereign-text-subtle);
+  cursor: default;
+}
+.itemIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sovereign-icon-sm);
+  color: var(--sovereign-text-subtle);
+}
+.itemLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/** Приписка справа — откуда команда: имя плагина, а не действие. Тон и кегль те же, что у ярлыка. */
+.itemMeta {
+  flex: none;
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+}
