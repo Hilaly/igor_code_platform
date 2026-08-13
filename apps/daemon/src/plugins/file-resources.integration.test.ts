@@ -351,6 +351,7 @@ describe("file resources end to end", () => {
         [
           "review",
           "starter.creating-agents",
+          "starter.creating-prompt-templates",
           "starter.creating-skills",
           "starter.plugin-backend",
           "starter.plugin-frontend",

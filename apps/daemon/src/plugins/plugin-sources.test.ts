@@ -228,6 +228,7 @@ describe("defaultPluginRoots", () => {
       [
         ["agent", "generic"],
         ["skill", "creating-agents"],
+        ["skill", "creating-prompt-templates"],
         ["skill", "creating-skills"],
         ["skill", "plugin-backend"],
         ["skill", "plugin-frontend"],

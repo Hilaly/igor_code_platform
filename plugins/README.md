@@ -16,16 +16,17 @@
 ([docs/architecture.md](../docs/architecture.md)): выключается он тем же переключателем, что и
 любой другой, а заменяется одноимённым плагином из директории данных.
 
-Плагин `starter` несёт четыре скила о самой платформе. Каждый `SKILL.md` содержит короткий рабочий
+Плагин `starter` несёт пять скилов о самой платформе. Каждый `SKILL.md` содержит короткий рабочий
 процесс, корректный минимальный пример, проверку и частые ошибки; полный формат и API загружаются
 по необходимости из соседнего `references/`.
 
-| Скил              | О чём                                                                            |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `creating-agents` | проектирование роли, least privilege, `AGENT.md`, селекторы и проверка сценариев |
-| `creating-skills` | triggers, progressive disclosure, ресурсы, `SKILL.md` и проверка поведения       |
-| `plugin-backend`  | manifest, lifecycle, worker SDK и вклады без browser-кода                        |
-| `plugin-frontend` | browser entry, places, components, commands, pages и навигация                   |
+| Скил                        | О чём                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `creating-agents`           | проектирование роли, least privilege, `AGENT.md`, селекторы и проверка сценариев |
+| `creating-skills`           | triggers, progressive disclosure, ресурсы, `SKILL.md` и проверка поведения       |
+| `creating-prompt-templates` | `commands/<name>.md`, области, аргументы, приоритет и проверка запуска           |
+| `plugin-backend`            | manifest, lifecycle, worker SDK и вклады без browser-кода                        |
+| `plugin-frontend`           | browser entry, places, components, slash-команды, pages и навигация              |
 
 Тест демона проверяет parser diagnostics, локальные reference-ссылки, синтаксис TypeScript-примеров
 и найденные ранее ошибки контрактов event activation, browser commands и hidden skills. UI kit

@@ -282,6 +282,10 @@
   скилов плагина `starter`.
 - [План качества starter-скилов](superpowers/plans/2026-08-10-starter-skills-quality.md) —
   TDD-шаги для регрессионных тестов, progressive disclosure и проверки plugin-примеров.
+- [Авторинг prompt templates и slash-команд](superpowers/specs/2026-08-13-starter-session-authoring-design.md) —
+  граница нового template-скила и распределение plugin command между backend и frontend skills.
+- [План authoring-скилов сессии](superpowers/plans/2026-08-13-starter-session-authoring.md) —
+  TDD-шаги для нового `creating-prompt-templates`, обновления plugin skills и проверок поставки.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 

@@ -13,6 +13,7 @@ const skillsRoot = join(repositoryRoot, "plugins/starter/skills");
 const skillNames = [
   "creating-agents",
   "creating-skills",
+  "creating-prompt-templates",
   "plugin-backend",
   "plugin-frontend",
 ] as const;
@@ -118,9 +119,9 @@ describe("the built-in starter skills", () => {
   it("exports browser commands as Command descriptors", () => {
     const frontend = byName("plugin-frontend").entry;
 
-    assert.match(frontend, /export const ClearLogCommand:\s*Command\s*=\s*\{/u);
-    assert.match(frontend, /ClearLogCommand:[\s\S]*?\brun\s*:/u);
-    assert.doesNotMatch(frontend, /function ClearLogCommand\s*\(/u);
+    assert.match(frontend, /export const ReviewCommand:\s*Command\s*=\s*\{/u);
+    assert.match(frontend, /ReviewCommand:[\s\S]*?\brun\s*:/u);
+    assert.doesNotMatch(frontend, /function ReviewCommand\s*\(/u);
   });
 
   it("does not publish a newly declared event before activate returns", () => {
@@ -137,6 +138,56 @@ describe("the built-in starter skills", () => {
 
     assert.match(reference, /Селекторы агента[^.]+не возвращают/u);
     assert.doesNotMatch(reference, /выбирает другой\s+(?:код или\s+)?агент/u);
+  });
+
+  it("teaches prompt-template roots, precedence, arguments, and boundaries", () => {
+    const skill = byName("creating-prompt-templates");
+    const text = skill.entry + "\n" + markdownFile(skill, "references/file-format.md");
+
+    assert.match(text, /<data-directory>\/commands/u);
+    assert.match(text, /<project>\/.sovereign\/commands/u);
+    assert.match(text, /проектн(?:ый|ая)[\s\S]{0,40}перекрывает[\s\S]{0,40}пользовательск/u);
+    for (const placeholder of ["$1", "$2", "$@", "$ARGUMENTS", "${@:N}", "${@:N:L}"]) {
+      assert.match(text, new RegExp(escapeRegExp(placeholder), "u"), placeholder);
+    }
+    for (const reserved of ["compact", "fork", "rename", "archive"]) {
+      assert.match(text, new RegExp(`\\b${reserved}\\b`, "u"), reserved);
+    }
+    assert.match(text, /SKILL\.md/u);
+  });
+
+  it("teaches the plugin command split across backend and frontend skills", () => {
+    const backend = byName("plugin-backend").entry;
+    const frontend = byName("plugin-frontend").entry;
+
+    assert.match(backend, /core\.session\.slash/u);
+    assert.match(backend, /starter\.plugin-frontend/u);
+    assert.match(frontend, /core\.session\.slash/u);
+    assert.match(frontend, /Command/u);
+    assert.match(frontend, /run\(context\)/u);
+    assert.match(frontend, /<pluginId>\.<id>/u);
+    assert.match(frontend, /sessionId[\s\S]{0,100}project/u);
+  });
+
+  it("keeps the backend command example consistent with its manifest", () => {
+    const backend = byName("plugin-backend").entry;
+
+    assert.match(backend, /"browser":\s*"src\/browser\.tsx"/u);
+  });
+
+  it("describes slash placement as additional to the command palette", () => {
+    const frontend = byName("plugin-frontend").entry;
+
+    assert.match(frontend, /палитр[а-яё]*[\s\S]{0,100}независимо от `placeId`/u);
+    assert.doesNotMatch(frontend, /иначе остаётся в палитре/u);
+  });
+
+  it("distinguishes skills from prompt templates", () => {
+    const skill = byName("creating-skills").entry;
+
+    assert.match(skill, /creating-prompt-templates/u);
+    assert.match(skill, /commands\//u);
+    assert.match(skill, /SKILL\.md/u);
   });
 });
 
@@ -195,4 +246,8 @@ function markdownFile(artifact: SkillArtifact, path: string): string {
     throw new Error(`${artifact.name} has no ${path}`);
   }
   return file.text;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

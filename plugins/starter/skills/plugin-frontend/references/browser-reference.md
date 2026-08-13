@@ -116,8 +116,8 @@ await contribute.command({
 });
 ```
 
-Без `placeId` команда остаётся в command palette и доступна по id. С `placeId` допустим только
-action place.
+Команда попадает в command palette и доступна по id независимо от `placeId`. Если `placeId` указан,
+он дополнительно размещает команду в известном action place; другие кардинальности недопустимы.
 
 Browser export:
 
