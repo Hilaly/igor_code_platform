@@ -1832,6 +1832,46 @@ describe("reading the branch and the context over http", () => {
 });
 
 describe("the session message queue", () => {
+  it("starts a message queued during compaction after compaction finishes", async () => {
+    const compactionGate = gate();
+    let currentOperationGate: ReturnType<typeof gate> | undefined;
+    const { call, start } = await serve({
+      turns: [{ text: "первый ответ" }, { text: "пересказ" }, { text: "ответ на очередь" }],
+      operationGate: () => currentOperationGate,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый вопрос" });
+    await untilIdle(call, sessionId);
+
+    currentOperationGate = compactionGate;
+    const compacting = call("POST", sessionCompactPath(sessionId), {});
+    await compactionGate.entry;
+
+    const queued = await call("POST", sessionQueuePath(sessionId), { text: "после компакции" });
+
+    assert.equal(queued.status, 200);
+    assert.deepEqual(
+      (queued.body as unknown as SessionOutbox).messages.map((message) => message.text),
+      ["после компакции"],
+    );
+
+    currentOperationGate = undefined;
+    compactionGate.open();
+
+    await compacting;
+    await untilSaid(call, sessionId, "после компакции");
+    await untilIdle(call, sessionId);
+
+    const said = saidByUser(
+      (await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage,
+    );
+
+    assert.equal(said.length, 2);
+    assert.match(said[0] ?? "", /первый вопрос/);
+    assert.match(said[1] ?? "", /после компакции/);
+  });
+
   it("starts a queued message as a turn of its own once the session is free", async () => {
     const hold = gate();
     const { call, start } = await serve({
