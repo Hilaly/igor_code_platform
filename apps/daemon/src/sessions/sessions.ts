@@ -7,12 +7,13 @@
  */
 
 import { readFile, stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   agentsPath,
   coreEventTypes,
   defaultConfig,
+  isCoreSessionCommandName,
   isSessionId,
   parseSessionCompactRequest,
   parseSessionDraft,
@@ -70,6 +71,7 @@ import {
   type TurnAccepted,
   type TurnRequest,
 } from "@sovereign/protocol";
+import { loadPromptTemplates } from "@sovereign/agent-runtime-pi";
 import type {
   AgentDefinition,
   AgentSession,
@@ -77,6 +79,8 @@ import type {
   AgentSessionSummary,
   AgentSkill,
   InvokedSkill,
+  PromptTemplate,
+  PromptTemplateRoot,
   TurnOutcome,
 } from "@sovereign/agent-runtime-pi";
 
@@ -137,6 +141,12 @@ export type SessionServiceOptions = {
    * тесты сессий о плагинах не знают вовсе.
    */
   hooks?: Pick<HookDispatcher, "observe" | "decide">;
+  /**
+   * Корень пользовательских шаблонов промптов — `commands/` директории данных
+   * (docs/file-resources.md). Не задан — пользовательских шаблонов нет: службе, поднятой в тесте,
+   * директории данных знать неоткуда.
+   */
+  commandsDirectory?: string;
 };
 
 /** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
@@ -221,7 +231,7 @@ export type SessionService = {
   entries: (sessionId: string, after?: number) => Promise<SessionEntriesPage | undefined>;
   prompt: (request: PromptRequest) => Promise<PromptOutcome>;
   /** Что предлагает композер по `/`: скилы, применимые к этой сессии (docs/web-api.md). */
-  commands: (sessionId: string) => SessionCommandsOutcome;
+  commands: (sessionId: string) => Promise<SessionCommandsOutcome>;
   /** `false` — прерывать было нечего. */
   abort: (sessionId: string) => Promise<boolean>;
   /** Новая сессия из куска этой. Форк рождается действующим, даже если источник архивный. */
@@ -1256,7 +1266,58 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return { kind: "removed" };
   };
 
-  const commands = (sessionId: string): SessionCommandsOutcome => {
+  /**
+   * Шаблоны промптов, применимые к сессии. Читаются на каждый спрос, а не кешируются: файлов
+   * единицы и они маленькие, а кеш пришлось бы чем-то сбрасывать — вторым наблюдателем за
+   * директориями рядом с уже заведённым для файловых ресурсов (docs/file-resources.md).
+   *
+   * Имя решает спор: проектный шаблон перекрывает пользовательский — та же лестница частности, что
+   * у файловых агентов и скилов. Имя команды ядра занять нельзя вовсе.
+   */
+  const templatesFor = async (summary: AgentSessionSummary): Promise<PromptTemplate[]> => {
+    const project = options.projects.find(summary.projectId);
+    const roots: PromptTemplateRoot[] = [
+      ...(options.commandsDirectory === undefined
+        ? []
+        : [{ path: options.commandsDirectory, scope: "user" as const }]),
+      ...(project === undefined || project.archived
+        ? []
+        : [{ path: join(project.folder, ".sovereign", "commands"), scope: "project" as const }]),
+    ];
+
+    if (roots.length === 0) {
+      return [];
+    }
+
+    const loaded = await loadPromptTemplates(roots);
+
+    for (const diagnostic of loaded.diagnostics) {
+      options.logger.warn("a prompt template could not be read", {
+        path: diagnostic.path,
+        reason: diagnostic.reason,
+      });
+    }
+
+    const byName = new Map<string, PromptTemplate>();
+
+    for (const template of loaded.templates) {
+      if (isCoreSessionCommandName(template.name)) {
+        options.logger.warn("a prompt template takes the name of a core command", {
+          template: template.name,
+          scope: template.scope,
+        });
+
+        continue;
+      }
+
+      // Проектный идёт вторым и потому побеждает: корни перечислены от общего к частному.
+      byName.set(template.name, template);
+    }
+
+    return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name, "en"));
+  };
+
+  const commands = async (sessionId: string): Promise<SessionCommandsOutcome> => {
     const summary = find(sessionId);
 
     if (summary === undefined) {
@@ -1285,6 +1346,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             hidden: skill.disableModelInvocation === true,
           }))
           .sort((left, right) => left.name.localeCompare(right.name, "en")),
+        templates: (await templatesFor(summary)).map((template) => ({
+          name: template.name,
+          description: template.description,
+          scope: template.scope,
+        })),
       },
     };
   };
@@ -1350,24 +1416,40 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     | { kind: "start"; run: (turnId: string) => Promise<TurnOutcome> }
     | { kind: "refused"; reason: string }
   > => {
-    if (request.skill === undefined) {
-      const { text, images } = request;
+    if (request.template !== undefined) {
+      const wanted = request.template;
+      const template = (await templatesFor(summary)).find((candidate) => candidate.name === wanted);
 
-      return { kind: "start", run: (turnId) => session.prompt(text, turnId, images) };
+      if (template === undefined) {
+        return {
+          kind: "refused",
+          reason: `the prompt template ${wanted} is not available in this session`,
+        };
+      }
+
+      const args = request.arguments;
+
+      return { kind: "start", run: (turnId) => session.runPromptTemplate(template, turnId, args) };
     }
 
-    const invoked = await skillToRun(summary, request.skill);
+    if (request.skill !== undefined) {
+      const invoked = await skillToRun(summary, request.skill);
 
-    if (invoked.kind === "refused") {
-      return invoked;
+      if (invoked.kind === "refused") {
+        return invoked;
+      }
+
+      const { instructions } = request;
+
+      return {
+        kind: "start",
+        run: (turnId) => session.activateSkill(invoked.skill, turnId, instructions),
+      };
     }
 
-    const { instructions } = request;
+    const { text, images } = request;
 
-    return {
-      kind: "start",
-      run: (turnId) => session.activateSkill(invoked.skill, turnId, instructions),
-    };
+    return { kind: "start", run: (turnId) => session.prompt(text, turnId, images) };
   };
 
   /**
@@ -1975,8 +2057,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       {
         method: "GET",
         path: sessionCommandsPathPattern,
-        handle: ({ response, parameters }) => {
-          const catalogue = commands(parameters["sessionId"] ?? "");
+        handle: async ({ response, parameters }) => {
+          const catalogue = await commands(parameters["sessionId"] ?? "");
 
           if (catalogue.kind === "unknown") {
             respondWithError(response, 404, "not found");

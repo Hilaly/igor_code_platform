@@ -17,6 +17,7 @@ import {
 } from "./providers/public.ts";
 import {
   archivedSessionsDirectoryName,
+  commandsDirectoryName,
   ensureDataDirectory,
   sessionsDirectoryName,
 } from "./platform/public.ts";
@@ -398,6 +399,7 @@ const sessions = createSessionService({
     hooks: createRuntimeHookSeam(hookDispatcher),
   }),
   projects,
+  commandsDirectory: join(directory, commandsDirectoryName),
   contributions: {
     base: () => contributions.resolvedBase(),
     forProject: (projectId) => contributions.resolvedForProject(projectId),

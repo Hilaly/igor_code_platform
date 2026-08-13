@@ -71,6 +71,16 @@ export const RunCommand: Command = {
   available: (context) => context.subject?.["page"] !== "session-archive",
 };
 
+/**
+ * Команда в каталоге `/` композера. Живая проверка читает её след в консоли: по нему видно, что до
+ * плагина доехал контекст именно этой сессии.
+ */
+export const NoteCommand: Command = {
+  run: (context) => {
+    console.log("[placed] noted the session", context.subject?.["sessionId"] ?? "no session");
+  },
+};
+
 /** Команда без места: она видна только в палитре, а её отказ обязан приехать значением. */
 export const BoomCommand: Command = {
   run: () => {

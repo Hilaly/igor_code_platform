@@ -2,6 +2,7 @@ export { parseArguments } from "./arguments.ts";
 export { writeFileAtomically } from "./atomic-file.ts";
 export {
   archivedSessionsDirectoryName,
+  commandsDirectoryName,
   ensureDataDirectory,
   pluginFilesDirectoryName,
   pluginStorageDirectoryName,
