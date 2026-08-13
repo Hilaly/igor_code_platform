@@ -1,6 +1,6 @@
 ---
 name: plugin-backend
-description: Use when creating or changing a Sovereign plugin worker, package manifest, backend SDK integration, lifecycle, storage, provider, session operation, or non-UI contribution such as an agent, tool, hook, event, route, color scheme, locale catalog, or custom payload.
+description: Use when creating or changing a Sovereign plugin worker, package manifest, backend SDK integration, lifecycle, storage, provider, session operation, or non-UI contribution such as an agent, tool, hook, event, route, color scheme, locale catalog, or custom payload; also when declaring a browser-backed command contribution.
 ---
 
 # Бэкенд плагина
@@ -29,7 +29,8 @@ description: Use when creating or changing a Sovereign plugin worker, package ma
 6. **Ограничь внешнюю поверхность.** Предпочитай session-protected `contribute.route`;
    `publicRoute` требует собственной аутентификации, валидации и защиты от повторов.
 7. **Добавляй browser-вклады только вместе с `sovereign.browser`.** `place`, `component`, `command`
-   и `page` требуют browser bundle.
+   и `page` требуют browser bundle. Вклад `command` объявляется здесь, но его обработчик не живёт
+   в worker: за browser export обратись к `starter.plugin-frontend`.
 8. **Проверь плагин.** Запусти его tests/typecheck, включи источник, дождись состояния running и
    проверь contributions и diagnostics.
 
@@ -48,7 +49,7 @@ description: Use when creating or changing a Sovereign plugin worker, package ma
 }
 ```
 
-## Минимальный worker с событием и route
+## Минимальный worker с событием, route и slash-командой
 
 ```ts
 import { contribute, defineEvent, log, z, type PluginModule } from "@sovereign/sdk";
@@ -67,6 +68,13 @@ export const activate: PluginModule["activate"] = async () => {
       await taskCreated.publish(task);
       return { status: 201, body: task };
     },
+  });
+
+  await contribute.command({
+    id: "review",
+    title: "Review this session",
+    export: "ReviewCommand",
+    placeId: "core.session.slash",
   });
 
   await log.info("task-plugin is active");
@@ -100,6 +108,10 @@ Route вызывается после активации, поэтому к мо
 - **Плагин импортирует внутренние packages платформы.** Публичная граница — `@sovereign/sdk`.
 - **Manifest обещает browser export без browser entry.** Такой вклад не сможет загрузить код.
 - **В примере оставлен псевдокод.** Code fences копируют; используй синтаксически корректный код.
+
+`core.session.slash` добавляет строку плагина в каталог `/` текущей сессии. Объявление метаданных и
+реализация browser `Command` — разные части одного вклада; для второй части прочитай
+`starter.plugin-frontend`.
 
 Полный manifest, lifecycle, SDK и backend contributions:
 [справочник backend SDK](references/sdk-reference.md).

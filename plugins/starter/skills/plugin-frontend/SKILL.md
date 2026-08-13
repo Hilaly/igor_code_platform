@@ -22,7 +22,8 @@ worker и lifecycle.
 2. **Выбери contribution.**
    - `component` занимает существующее place.
    - `place` публикует новую точку расширения.
-   - `command` объявляет именованное действие.
+   - `command` объявляет именованное действие; с `placeId: "core.session.slash"` оно появляется в
+     каталоге `/` текущей агентской сессии, иначе остаётся в палитре.
    - `page` создаёт экран `/p/<plugin-id>/<page-id>/*`.
 3. **Зарегистрируй contribution в `activate`.** `export` — точное имя browser export.
 4. **Реализуй export правильной формы.**
@@ -63,16 +64,16 @@ export const activate: PluginModule["activate"] = async () => {
   });
 
   await contribute.command({
-    id: "clear-log",
-    title: "Clear task log",
-    export: "ClearLogCommand",
-    placeId: "core.view.header.actions",
+    id: "review",
+    title: "Review this session",
+    export: "ReviewCommand",
+    placeId: "core.session.slash",
   });
 
   await contribute.route({
-    id: "clear-log-data",
-    method: "DELETE",
-    path: "log",
+    id: "review",
+    method: "POST",
+    path: "review",
     handle: async () => ({ status: 204 }),
   });
 };
@@ -94,18 +95,31 @@ export function LogPage({ context }: { context: PlaceContext }): ReactNode {
   );
 }
 
-export const ClearLogCommand: Command = {
+export const ReviewCommand: Command = {
   run: async (context) => {
-    const project = context.project ?? "work";
-    await fetch(`/api/p/task-plugin/log?project=${encodeURIComponent(project)}`, {
-      method: "DELETE",
-    });
+    const sessionId = context.subject?.sessionId;
+    const project = context.project;
+    if (sessionId === undefined) {
+      throw new Error("the command needs an open session");
+    }
+    const response = await fetch(
+      `/api/p/task-plugin/review?session=${encodeURIComponent(sessionId)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ project }),
+        headers: { "content-type": "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`review failed: ${response.status}`);
+    }
   },
 };
 ```
 
-Host рисует кнопку команды по contribution metadata, загружает export и вызывает
-`ClearLogCommand.run(context)`. Возвращать JSX из command export не нужно.
+Host добавляет slash-команду в каталог как `/<pluginId>.<id>`, загружает export и вызывает
+`ReviewCommand.run(context)`. Контекст содержит текущую сессию и её проект; не собирай адрес
+сессии вручную из location. Возвращать JSX из command export не нужно.
 
 ## Проверка перед завершением
 
@@ -113,7 +127,10 @@ Host рисует кнопку команды по contribution metadata, заг
 - каждый contribution `export` совпадает с именованным browser export;
 - command export соответствует `Command`;
 - component и page принимают ожидаемый context;
-- command с `placeId` указывает только на action place;
+- command с `placeId` указывает только на action place; для каталога сессии используй
+  `core.session.slash`;
+- `Command.run(context)` использует текущие `context.subject.sessionId` и `project`, а отказ backend route не
+  проглатывается;
 - replaceable place имеет cardinality `single` и `builtIn`;
 - page использует `usePageNavigation`, а не собирает base path вручную;
 - loading, missing export и thrown command видны пользователю;
