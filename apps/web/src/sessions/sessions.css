@@ -260,6 +260,19 @@
 
 /* Queue register and usage tooltip ------------------------------------- */
 
+/*
+ * Очередь стоит под лентой и читается её продолжением: ждущее сообщение — та же реплика человека,
+ * только ещё не доехавшая, поэтому колонка, а не полоса бейджей.
+ */
+.sessions-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  padding-block: var(--sovereign-space-2);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
+}
+
 .sessions-queues {
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@ import type {
   SessionCommands,
   SessionContextUsage,
   SessionMessage,
+  SessionOutboxRequest,
   SessionStats,
   ThinkingLevel,
   TurnRequest,
@@ -93,6 +94,7 @@ type ComposerHarnessProps = {
   busy?: boolean;
   reasoningSupported?: boolean;
   onSubmit?: (request: TurnRequest) => Promise<string | undefined>;
+  onQueueMessage?: (request: SessionOutboxRequest) => Promise<string | undefined>;
   onSendMessage?: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt?: () => void;
   onError?: (error: unknown) => void;
@@ -106,9 +108,11 @@ type ComposerHarnessProps = {
 
 function SwitchingComposerHarness({
   onSubmit,
+  onQueueMessage = vi.fn(() => Promise.resolve(undefined)),
   onError = vi.fn(),
 }: {
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
+  onQueueMessage?: (request: SessionOutboxRequest) => Promise<string | undefined>;
   onError?: (error: unknown) => void;
 }) {
   const [sessionId, setSessionId] = useState("session-a");
@@ -126,6 +130,7 @@ function SwitchingComposerHarness({
         reasoningSupported
         onThinkingLevelChange={vi.fn()}
         onSubmit={onSubmit}
+        onQueueMessage={onQueueMessage}
         onSendMessage={vi.fn(() => Promise.resolve(undefined))}
         onInterrupt={vi.fn()}
         onRunCommand={vi.fn(() => Promise.resolve(undefined))}
@@ -151,6 +156,7 @@ function ComposerHarness({
   busy = false,
   reasoningSupported = true,
   onSubmit = vi.fn(() => Promise.resolve(undefined)),
+  onQueueMessage = vi.fn(() => Promise.resolve(undefined)),
   onSendMessage = vi.fn(() => Promise.resolve(undefined)),
   onInterrupt = vi.fn(),
   onError,
@@ -178,6 +184,7 @@ function ComposerHarness({
         reasoningSupported={reasoningSupported}
         onThinkingLevelChange={setThinkingLevel}
         onSubmit={onSubmit}
+        onQueueMessage={onQueueMessage}
         onSendMessage={onSendMessage}
         onInterrupt={onInterrupt}
         {...(onDropTarget === undefined ? {} : { onDropTarget })}
@@ -254,7 +261,8 @@ describe("the session message composer", () => {
   it("keeps the busy action set named and exposes stop without planning controls", () => {
     render(<ComposerHarness busy />);
 
-    expect(screen.getByRole("button", { name: "Вклинить" })).not.toBeNull();
+    // Подпись кнопки не меняется с занятостью: Enter делает одно и то же в любом состоянии сессии.
+    expect(screen.getByRole("button", { name: "Отправить" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Варианты отправки" })).not.toBeNull();
     expect(screen.getByRole("button", { name: /anthropic\/claude.*средний/i })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Остановить" })).not.toBeNull();
@@ -278,8 +286,10 @@ describe("the session message composer", () => {
       target: { value: "вариант" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+    // Оба варианта относятся к идущему турну; Enter к нему отношения не имеет — он ставит в очередь.
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "Дописать без запуска",
+      "Вклинить",
       "Отправить после турна",
     ]);
     expect(screen.queryByRole("radiogroup")).toBeNull();
@@ -349,10 +359,10 @@ describe("the session message composer", () => {
     ).toBe("false");
   });
 
-  it("submits an idle draft with the selected model and thinking level", async () => {
-    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+  it("queues a draft with the selected model and thinking level", async () => {
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
 
-    render(<ComposerHarness onSubmit={onSubmit} />);
+    render(<ComposerHarness onQueueMessage={onQueueMessage} />);
 
     fireEvent.click(screen.getByRole("button", { name: /anthropic\/claude.*средний/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Модель/ }));
@@ -366,7 +376,9 @@ describe("the session message composer", () => {
     fireEvent.change(field, { target: { value: "привет" } });
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    // Выбор модели уезжает вместе с сообщением: к моменту запуска он мог смениться, а отправлял
+    // человек это.
+    expect(onQueueMessage).toHaveBeenCalledWith({
       text: "привет",
       model: "google/gemini-2.5-pro",
       thinkingLevel: "high",
@@ -393,9 +405,57 @@ describe("the session message composer", () => {
     );
   });
 
+  it.each([
+    ["idle", false],
+    ["busy", true],
+  ] as const)("queues on Enter whether the session is %s", async (_name, busy) => {
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onSendMessage = vi.fn(() => Promise.resolve(undefined));
+
+    render(
+      <ComposerHarness
+        busy={busy}
+        onQueueMessage={onQueueMessage}
+        onSubmit={onSubmit}
+        onSendMessage={onSendMessage}
+      />,
+    );
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "одинаково" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    // Одно поведение на все состояния сессии: ни турна напрямую, ни стиринга — только очередь.
+    expect(onQueueMessage).toHaveBeenCalledWith({
+      text: "одинаково",
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "medium",
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSendMessage).not.toHaveBeenCalled();
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
+  });
+
+  it("runs a command right away instead of queueing it", async () => {
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness busy onQueueMessage={onQueueMessage} onRunCommand={onRunCommand} />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+    fireEvent.change(field, { target: { value: "/compact" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    // Человек, набравший `/compact`, ждать конца турна не собирался.
+    await waitFor(() => expect(onRunCommand).toHaveBeenCalled());
+    expect(onQueueMessage).not.toHaveBeenCalled();
+  });
+
   it("does not persist a queued alternative as the next Enter action", async () => {
     const onSendMessage = vi.fn(() => Promise.resolve(undefined));
-    render(<ComposerHarness busy onSendMessage={onSendMessage} />);
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
+    render(<ComposerHarness busy onSendMessage={onSendMessage} onQueueMessage={onQueueMessage} />);
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     fireEvent.change(field, { target: { value: "после турна" } });
@@ -406,7 +466,12 @@ describe("the session message composer", () => {
     fireEvent.change(field, { target: { value: "сейчас" } });
     fireEvent.keyDown(field, { key: "Enter" });
 
-    expect(onSendMessage).toHaveBeenLastCalledWith({ text: "сейчас", mode: "steer" });
+    // Выбранный вариант не становится режимом следующего Enter: Enter всегда ставит в очередь.
+    expect(onQueueMessage).toHaveBeenLastCalledWith({
+      text: "сейчас",
+      model: "anthropic/claude-opus-4-5",
+      thinkingLevel: "medium",
+    });
     await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
   });
 
@@ -441,10 +506,10 @@ describe("the session message composer", () => {
     expect(onInterrupt).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the draft and blocks repeated sends until an ordinary turn is accepted", async () => {
+  it("keeps the draft and blocks repeated sends until the queue takes the message", async () => {
     const acceptance = deferred<string | undefined>();
-    const onSubmit = vi.fn(() => acceptance.promise);
-    render(<ComposerHarness onSubmit={onSubmit} />);
+    const onQueueMessage = vi.fn(() => acceptance.promise);
+    render(<ComposerHarness onQueueMessage={onQueueMessage} />);
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     const send = screen.getByRole("button", { name: "Отправить" });
@@ -454,15 +519,15 @@ describe("the session message composer", () => {
     expect((field as HTMLTextAreaElement).value).toBe("не теряй");
     expect(send.hasAttribute("disabled")).toBe(true);
     fireEvent.click(send);
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onQueueMessage).toHaveBeenCalledTimes(1);
 
     acceptance.resolve(undefined);
     await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
   });
 
-  it("keeps the draft when an ordinary turn is refused", async () => {
+  it("keeps the draft when the queue refuses the message", async () => {
     const acceptance = deferred<string | undefined>();
-    render(<ComposerHarness onSubmit={() => acceptance.promise} />);
+    render(<ComposerHarness onQueueMessage={() => acceptance.promise} />);
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     fireEvent.change(field, { target: { value: "исправь модель" } });
@@ -479,8 +544,9 @@ describe("the session message composer", () => {
 
   it("does not let a stale session completion clear the new session draft or keep it blocked", async () => {
     const acceptance = deferred<string | undefined>();
-    const onSubmit = vi.fn(() => acceptance.promise);
-    render(<SwitchingComposerHarness onSubmit={onSubmit} />);
+    render(
+      <SwitchingComposerHarness onSubmit={vi.fn()} onQueueMessage={() => acceptance.promise} />,
+    );
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     fireEvent.change(field, { target: { value: "сообщение A" } });
@@ -505,7 +571,7 @@ describe("the session message composer", () => {
   it("unblocks and reports unexpected submission rejection while preserving the draft", async () => {
     const error = new Error("network unavailable");
     const onError = vi.fn();
-    render(<ComposerHarness onSubmit={() => Promise.reject(error)} onError={onError} />);
+    render(<ComposerHarness onQueueMessage={() => Promise.reject(error)} onError={onError} />);
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     fireEvent.change(field, { target: { value: "не теряй при ошибке" } });
@@ -524,7 +590,13 @@ describe("the session message composer", () => {
     const acceptance = deferred<string | undefined>();
     const error = new Error("session A failed");
     const onError = vi.fn();
-    render(<SwitchingComposerHarness onSubmit={() => acceptance.promise} onError={onError} />);
+    render(
+      <SwitchingComposerHarness
+        onSubmit={vi.fn()}
+        onQueueMessage={() => acceptance.promise}
+        onError={onError}
+      />,
+    );
 
     const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
     fireEvent.change(field, { target: { value: "сообщение A" } });
@@ -544,35 +616,23 @@ describe("the session message composer", () => {
   });
 
   it.each([
-    ["busy queued message", true, "Вклинить", "steer"],
+    ["busy steered message", true, "Вклинить", "steer"],
     ["idle append message", false, "Дописать без запуска", "append"],
   ] as const)(
     "ignores a stale completion for an in-flight %s after switching sessions",
-    async (_name, busy, buttonName, mode) => {
+    async (_name, busy, itemName, mode) => {
       const acceptance = deferred<string | undefined>();
       const onSendMessage = vi.fn(() => acceptance.promise);
-      const onSubmit = vi.fn(() => Promise.resolve(undefined));
-      const view = render(
-        <ComposerHarness busy={busy} onSubmit={onSubmit} onSendMessage={onSendMessage} />,
-      );
+      const view = render(<ComposerHarness busy={busy} onSendMessage={onSendMessage} />);
 
       const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
       fireEvent.change(field, { target: { value: "сообщение A" } });
-      if (busy) {
-        fireEvent.click(screen.getByRole("button", { name: buttonName }));
-      } else {
-        fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
-        fireEvent.click(screen.getByRole("menuitem", { name: buttonName }));
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Варианты отправки" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: itemName }));
       expect(onSendMessage).toHaveBeenCalledWith({ text: "сообщение A", mode });
 
       view.rerender(
-        <ComposerHarness
-          busy={busy}
-          onSubmit={onSubmit}
-          onSendMessage={onSendMessage}
-          sessionId="session-b"
-        />,
+        <ComposerHarness busy={busy} onSendMessage={onSendMessage} sessionId="session-b" />,
       );
       fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
         target: { value: "сообщение B" },
@@ -580,11 +640,9 @@ describe("the session message composer", () => {
       acceptance.resolve(undefined);
 
       await waitFor(() =>
-        expect(
-          screen
-            .getByRole("button", { name: busy ? buttonName : "Отправить" })
-            .hasAttribute("disabled"),
-        ).toBe(false),
+        expect(screen.getByRole("button", { name: "Отправить" }).hasAttribute("disabled")).toBe(
+          false,
+        ),
       );
       expect(
         (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
@@ -643,9 +701,9 @@ describe("attaching images to a message", () => {
   };
 
   it("sends the attached image with the text and clears the draft once accepted", async () => {
-    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
 
-    render(<ComposerHarness onSubmit={onSubmit} />);
+    render(<ComposerHarness onQueueMessage={onQueueMessage} />);
     await attach([readable(pngFile())]);
 
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
@@ -654,7 +712,7 @@ describe("attaching images to a message", () => {
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onQueueMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           text: "что тут",
           images: [{ mimeType: "image/png", data: pngBase64 }],
@@ -665,9 +723,9 @@ describe("attaching images to a message", () => {
   });
 
   it("sends a message made only of the image", async () => {
-    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
 
-    render(<ComposerHarness onSubmit={onSubmit} />);
+    render(<ComposerHarness onQueueMessage={onQueueMessage} />);
 
     // До картинки отправлять нечего, после — есть.
     expect(
@@ -678,16 +736,16 @@ describe("attaching images to a message", () => {
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onQueueMessage).toHaveBeenCalledWith(
         expect.objectContaining({ text: "", images: [{ mimeType: "image/png", data: pngBase64 }] }),
       ),
     );
   });
 
   it("keeps the draft when the daemon refuses the message", async () => {
-    const onSubmit = vi.fn(() => Promise.resolve("image 1 exceeds maxImageBytes"));
+    const onQueueMessage = vi.fn(() => Promise.resolve("image 1 exceeds maxImageBytes"));
 
-    render(<ComposerHarness onSubmit={onSubmit} />);
+    render(<ComposerHarness onQueueMessage={onQueueMessage} />);
     await attach([readable(pngFile())]);
 
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
@@ -695,7 +753,7 @@ describe("attaching images to a message", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    await waitFor(() => expect(onQueueMessage).toHaveBeenCalled());
     // Ни картинка, ни текст не пропали: переписывать заново уже написанное человек не должен.
     await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).not.toBeNull());
     expect(
@@ -815,9 +873,14 @@ describe("mentioning a project file", () => {
   });
 
   it("walks the list with arrows and takes the active one on Enter, without sending", async () => {
-    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onQueueMessage = vi.fn(() => Promise.resolve(undefined));
 
-    render(<ComposerHarness onSearchFiles={searching(["a.ts", "b.ts"])} onSubmit={onSubmit} />);
+    render(
+      <ComposerHarness
+        onSearchFiles={searching(["a.ts", "b.ts"])}
+        onQueueMessage={onQueueMessage}
+      />,
+    );
     type("@");
 
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
@@ -831,7 +894,7 @@ describe("mentioning a project file", () => {
 
     await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe("@b.ts "));
     // Одно нажатие — одно действие: недописанную ссылку человек отправлять не собирался.
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onQueueMessage).not.toHaveBeenCalled();
   });
 
   it("closes on Escape and leaves the at-sign as plain text", async () => {

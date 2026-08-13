@@ -11,6 +11,7 @@ import type {
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
+  SessionOutboxRequest,
   SessionUpdate,
   ThinkingLevel,
   TurnRequest,
@@ -18,6 +19,7 @@ import type {
 import { parseModelReference } from "@sovereign/protocol";
 import {
   Badge,
+  Button,
   CompactIcon,
   ConfirmDialog,
   EmptyState,
@@ -25,7 +27,10 @@ import {
   Field,
   ForkThroughIcon,
   Input,
+  Message,
   Notice,
+  RemoveIcon,
+  SendIcon,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 import { useCommands } from "@sovereign/browser-sdk";
@@ -37,7 +42,7 @@ import { carriesImages } from "./image-input.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
-import { SessionMessageList } from "./session-message-list.tsx";
+import { MessageAction, SessionMessageList } from "./session-message-list.tsx";
 import type { SlashEntry, SlashInvocation } from "./slash-command.ts";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 import { useShellHeader } from "../shell/header.tsx";
@@ -51,7 +56,15 @@ export type ChatViewProps = {
   onPrepareModels: () => void;
   onLoadModels: (providerId: string) => void;
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
+  /** Поставить набранное в очередь — то, что делает Enter. */
+  onQueueMessage: (request: SessionOutboxRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
+  /** Снять остановку очереди после упавшего турна. */
+  onResumeQueue: () => Promise<string | undefined>;
+  /** Вклинить ждущее сообщение в идущий турн. */
+  onSteerQueuedMessage: (messageId: string) => Promise<string | undefined>;
+  /** Снять ждущее сообщение с очереди. */
+  onDropQueuedMessage: (messageId: string) => Promise<string | undefined>;
   onDiagnostic?: (diagnostic: string) => void;
   onInterrupt: () => void;
   onFork: (request: SessionForkRequest) => Promise<void>;
@@ -80,7 +93,11 @@ export function ChatView(props: ChatViewProps) {
     onPrepareModels,
     onLoadModels,
     onSubmit,
+    onQueueMessage,
     onSendMessage,
+    onResumeQueue,
+    onSteerQueuedMessage,
+    onDropQueuedMessage,
     onDiagnostic,
     onInterrupt,
     onFork,
@@ -359,22 +376,84 @@ export function ChatView(props: ChatViewProps) {
     [agentAvailable, open.degradations, open.failure, open.summary?.agentId, refusal, t],
   );
 
+  /** Сообщение из одних картинок текста не имеет, и пустая строка молчала бы о том, что оно есть. */
+  const shownText = useCallback(
+    (message: { text: string; images?: unknown[] }): string =>
+      message.text === ""
+        ? t("chat.queued.images", { count: String(message.images?.length ?? 0) })
+        : message.text,
+    [t],
+  );
+
+  const outboxMessages = open.outbox?.messages ?? [];
+  const queueStopped = open.outbox?.stopped;
   const queueBadges = useMemo(
     () =>
-      waiting.length === 0 ? undefined : (
-        <div className="sessions-queues">
-          {waiting.map((message, index) => (
-            <Badge key={`${String(index)}:${message.text}`} tone="accent">
-              {/* Сообщение из одних картинок текста не имеет, и пустой бейдж молчал бы о том, что
-                  в очереди вообще что-то стоит. */}
-              {message.text === ""
-                ? t("chat.queued.images", { count: String(message.images?.length ?? 0) })
-                : message.text}
-            </Badge>
+      waiting.length === 0 &&
+      outboxMessages.length === 0 &&
+      queueStopped === undefined ? undefined : (
+        <div className="sessions-queue">
+          {queueStopped === undefined ? undefined : (
+            <Notice tone="warning" title={t("chat.queue.stopped", { reason: queueStopped.reason })}>
+              <Button tone="secondary" onClick={() => void onResumeQueue()}>
+                {t("chat.queue.resume")}
+              </Button>
+            </Notice>
+          )}
+          {/* Ждущее сообщение показывается той же разметкой, что и сохранённая реплика: это то же
+              сообщение человека, только ещё не доехавшее, и действия у него открываются так же. */}
+          {outboxMessages.map((message) => (
+            <div key={message.id} className="sessions-entry-message" data-role="human">
+              <Message role="human">
+                <Badge tone="accent">{t("chat.queue.waiting")}</Badge>
+                {shownText(message)}
+              </Message>
+              <div className="sessions-entry-meta" role="group" aria-label={t("chat.actions")}>
+                {/* Вклинить можно только в идущий турн: в простое вклиниваться некуда, и кнопка
+                    обещала бы то, чего демон не сделает. */}
+                {busy ? (
+                  <MessageAction
+                    label={t("chat.queue.steer")}
+                    disabled={false}
+                    onClick={() => void onSteerQueuedMessage(message.id)}
+                    side="left"
+                  >
+                    <SendIcon size="sm" />
+                  </MessageAction>
+                ) : undefined}
+                <MessageAction
+                  label={t("chat.queue.drop")}
+                  disabled={false}
+                  onClick={() => void onDropQueuedMessage(message.id)}
+                >
+                  <RemoveIcon size="sm" />
+                </MessageAction>
+              </div>
+            </div>
           ))}
+          {/* Очереди рантайма живут один турн и своих действий не имеют: вклиненное уже принято. */}
+          {waiting.length === 0 ? undefined : (
+            <div className="sessions-queues">
+              {waiting.map((message, index) => (
+                <Badge key={`${String(index)}:${message.text}`} tone="accent">
+                  {shownText(message)}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       ),
-    [t, waiting],
+    [
+      busy,
+      onDropQueuedMessage,
+      onResumeQueue,
+      onSteerQueuedMessage,
+      outboxMessages,
+      queueStopped,
+      shownText,
+      t,
+      waiting,
+    ],
   );
   /**
    * Приём перетащенного отдаёт композер: черновик принадлежит ему, а зона drop — всей панели.
@@ -470,6 +549,7 @@ export function ChatView(props: ChatViewProps) {
             reasoningSupported={reasoningSupported}
             onThinkingLevelChange={prepareThinkingLevel}
             onSubmit={onSubmit}
+            onQueueMessage={onQueueMessage}
             onSendMessage={onSendMessage}
             onInterrupt={onInterrupt}
             onDropTarget={takeDropTarget}

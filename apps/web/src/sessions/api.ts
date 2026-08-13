@@ -24,6 +24,8 @@ import {
   sessionNavigatePath,
   sessionPath,
   sessionProjectParameter,
+  sessionQueuePath,
+  sessionQueuedMessagePath,
   sessionStatsPath,
   sessionTurnsPath,
   sessionsPath,
@@ -40,6 +42,8 @@ import {
   type SessionMessage,
   type SessionNavigateRequest,
   type SessionNavigated,
+  type SessionOutbox,
+  type SessionOutboxRequest,
   type ProjectFilesSnapshot,
   type SessionsSnapshot,
   type SessionStats,
@@ -354,7 +358,50 @@ export async function removeSession(sessionId: string): Promise<RemoveSessionOut
 
 export type SendMessageOutcome = { kind: "accepted" } | { kind: "refused"; reason: string };
 
-/** Сообщение, которое не запускает турн: стиринг, догоняющее, к следующему турну, дозапись. */
+export type OutboxOutcome =
+  { kind: "done"; outbox: SessionOutbox } | { kind: "refused"; reason: string };
+
+/** Что ждёт своей очереди. Спрашивается при открытии сессии: дельты рассказывают лишь об изменениях. */
+export async function fetchQueue(sessionId: string, signal?: AbortSignal): Promise<SessionOutbox> {
+  const response = await fetch(sessionQueuePath(sessionId), signal === undefined ? {} : { signal });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as SessionOutbox;
+}
+
+/** Поставить сообщение в очередь: сессия запустит им турн, как только освободится. */
+export async function queueMessage(
+  sessionId: string,
+  request: SessionOutboxRequest,
+): Promise<OutboxOutcome> {
+  return changingQueue(sessionQueuePath(sessionId), "POST", request);
+}
+
+/** Снять остановку очереди после упавшего турна. */
+export async function resumeQueue(sessionId: string): Promise<OutboxOutcome> {
+  return changingQueue(sessionQueuePath(sessionId), "PUT", { stopped: false });
+}
+
+/** Вклинить ждущее сообщение в идущий турн, не дожидаясь его конца. */
+export async function steerQueuedMessage(
+  sessionId: string,
+  messageId: string,
+): Promise<OutboxOutcome> {
+  return changingQueue(sessionQueuedMessagePath(sessionId, messageId), "PUT", { mode: "steer" });
+}
+
+/** Снять сообщение с очереди. */
+export async function dropQueuedMessage(
+  sessionId: string,
+  messageId: string,
+): Promise<OutboxOutcome> {
+  return changingQueue(sessionQueuedMessagePath(sessionId, messageId), "DELETE", undefined);
+}
+
+/** Сообщение, которое не запускает турн: стиринг, догоняющее, дозапись. */
 export async function sendMessage(
   sessionId: string,
   message: SessionMessage,
@@ -445,6 +492,21 @@ export async function setEntryLabel(
 }
 
 /** Запись, отдающая сессию в ответ. Форма запроса у форка и изменения одна, различается только тело. */
+/** Все четыре изменения очереди отвечают её снимком, поэтому и разбор ответа у них один. */
+async function changingQueue(path: string, method: string, body: unknown): Promise<OutboxOutcome> {
+  const response = await fetch(path, {
+    method,
+    headers: { "content-type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+
+  if (response.ok) {
+    return { kind: "done", outbox: (await response.json()) as SessionOutbox };
+  }
+
+  return { kind: "refused", reason: await reasonOf(response) };
+}
+
 async function writing(path: string, method: string, body: unknown): Promise<SessionOutcome> {
   const response = await fetch(path, {
     method,

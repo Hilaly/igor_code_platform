@@ -751,7 +751,11 @@ export function App() {
                       onPrepareModels={sessions.prepareModels}
                       onLoadModels={sessions.loadModels}
                       onSubmit={sessions.submitTurn}
+                      onQueueMessage={sessions.queueMessage}
                       onSendMessage={sessions.sendMessage}
+                      onResumeQueue={sessions.resumeQueue}
+                      onSteerQueuedMessage={sessions.steerQueuedMessage}
+                      onDropQueuedMessage={sessions.dropQueuedMessage}
                       onDiagnostic={diagnostics.record}
                       onInterrupt={sessions.interrupt}
                       onFork={async (request) => {

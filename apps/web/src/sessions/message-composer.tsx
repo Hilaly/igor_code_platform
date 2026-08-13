@@ -6,6 +6,7 @@ import {
   type SessionImage,
   type SessionMessage,
   type SessionMessageMode,
+  type SessionOutboxRequest,
   type SessionStats,
   type ThinkingLevel,
   type TurnRequest,
@@ -62,7 +63,13 @@ export type MessageComposerProps = {
   thinkingLevel: ThinkingLevel;
   reasoningSupported: boolean;
   onThinkingLevelChange: (level: ThinkingLevel) => void;
+  /** Турн скилом или шаблоном. Обычная реплика турна не запускает: она встаёт в очередь. */
   onSubmit: (request: TurnRequest) => Promise<string | undefined>;
+  /**
+   * Поставить набранное в очередь — то, что делает Enter. Занята сессия или нет, разницы нет:
+   * очередь сама запустит турн, как только сессия освободится (docs/sessions-and-projects.md).
+   */
+  onQueueMessage: (request: SessionOutboxRequest) => Promise<string | undefined>;
   onSendMessage: (message: SessionMessage) => Promise<string | undefined>;
   onInterrupt: () => void;
   onError: (error: unknown) => void;
@@ -115,6 +122,7 @@ export function MessageComposer({
   reasoningSupported,
   onThinkingLevelChange,
   onSubmit,
+  onQueueMessage,
   onSendMessage,
   onInterrupt,
   onError,
@@ -231,11 +239,13 @@ export function MessageComposer({
     settle(acceptance, token, submittedSessionId);
   };
 
-  const submitTurn = (): void => {
+  const queueMessage = (): void => {
     startSubmission(() =>
-      onSubmit({
+      onQueueMessage({
         text: draft,
         ...(images.length === 0 ? {} : { images }),
+        // Выбор модели уезжает вместе с сообщением, а не берётся у сессии в момент запуска: к тому
+        // моменту человек мог выбрать другую, а отправлял он это.
         model,
         thinkingLevel: reasoningSupported ? thinkingLevel : "off",
       }),
@@ -484,19 +494,18 @@ export function MessageComposer({
   const sendDefault = (): void => {
     const invocation = parseInvocation(draft);
 
-    // Команда старше стиринга: человек, набравший `/compact`, не собирался говорить это модели.
+    // Команда старше очереди: человек, набравший `/compact`, не собирался ни говорить это модели,
+    // ни ждать конца турна — команда исполняется сразу.
     if (invocation !== undefined) {
       runInvocation(invocation);
 
       return;
     }
 
-    if (busy) {
-      sendMessage("steer");
-      return;
-    }
-
-    submitTurn();
+    // Одно поведение на все состояния сессии: набранное встаёт в очередь, а очередь сама решает,
+    // когда его запускать. Ветка по занятости здесь была источником зависших сообщений — стиринг
+    // уезжал в компакцию, где вычитывать его некому (docs/sessions-and-projects.md).
+    queueMessage();
   };
 
   const sendOptions: MenuItemDescription[] = [
@@ -505,8 +514,15 @@ export function MessageComposer({
       label: t("chat.append"),
       onSelect: () => sendMessage("append"),
     },
+    // Оба варианта относятся к идущему турну: вклинить в него или продолжить им же. Enter к турну
+    // отношения не имеет вовсе — он ставит в очередь.
     ...(busy
       ? ([
+          {
+            id: "steer",
+            label: t("chat.mode.steer.send"),
+            onSelect: () => sendMessage("steer"),
+          },
           {
             id: "follow-up",
             label: t("chat.mode.follow-up.send"),
@@ -714,7 +730,7 @@ export function MessageComposer({
               </Tooltip>
               <SplitButton
                 action={<SendIcon />}
-                actionLabel={busy ? t("chat.mode.steer.send") : t("chat.send")}
+                actionLabel={t("chat.send")}
                 onAction={sendDefault}
                 menuLabel={t("chat.send.options")}
                 menuTriggerLabel={t("chat.send.options")}

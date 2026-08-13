@@ -623,6 +623,41 @@ describe("the queues, the counters and what the session lost", () => {
     expect(reconnected(queued).open?.queues).toBeUndefined();
   });
 
+  it("shows the session queue and keeps it across a reconnect", () => {
+    const waiting = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "outbox",
+      outbox: { messages: [{ id: "q-1", text: "потом" }] },
+    });
+
+    expect(waiting.state.open?.outbox?.messages).toEqual([{ id: "q-1", text: "потом" }]);
+    expect(waiting.reread).toBe(false);
+
+    // В отличие от очередей рантайма очередь сессии приезжает ещё и снимком: обнулять её на разрыве
+    // значило бы показать пустую очередь ровно до ответа на запрос снимка.
+    expect(reconnected(waiting.state).open?.outbox?.messages).toEqual([
+      { id: "q-1", text: "потом" },
+    ]);
+  });
+
+  it("shows why the queue stopped and forgets it when the stop is lifted", () => {
+    const stopped = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "outbox",
+      outbox: {
+        messages: [{ id: "q-1", text: "потом" }],
+        stopped: { reason: "the model is gone" },
+      },
+    }).state;
+
+    expect(stopped.open?.outbox?.stopped).toEqual({ reason: "the model is gone" });
+
+    const resumed = applySessionDelta(stopped, "0199", "turn-1", {
+      kind: "outbox",
+      outbox: { messages: [{ id: "q-1", text: "потом" }] },
+    }).state;
+
+    expect(resumed.open?.outbox?.stopped).toBeUndefined();
+  });
+
   it("keeps every loss, not only the last one", () => {
     const lost = applyDegradation(
       applyDegradation(opened(), "0199", { kind: "tool", name: "bash" }),

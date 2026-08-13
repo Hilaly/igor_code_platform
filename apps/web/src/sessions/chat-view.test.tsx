@@ -119,7 +119,11 @@ const chatProps = (open: OpenSession, overrides: Partial<ChatViewProps> = {}): C
   onPrepareModels: vi.fn(),
   onLoadModels: vi.fn(),
   onSubmit: vi.fn(() => new Promise<string | undefined>(() => undefined)),
+  onQueueMessage: vi.fn(() => Promise.resolve(undefined)),
   onSendMessage: vi.fn(() => Promise.resolve(undefined)),
+  onResumeQueue: vi.fn(() => Promise.resolve(undefined)),
+  onSteerQueuedMessage: vi.fn(() => Promise.resolve(undefined)),
+  onDropQueuedMessage: vi.fn(() => Promise.resolve(undefined)),
   onInterrupt: vi.fn(),
   onFork: vi.fn(() => Promise.resolve()),
   onCompact: vi.fn(() => Promise.resolve(undefined)),
@@ -133,6 +137,7 @@ const chatProps = (open: OpenSession, overrides: Partial<ChatViewProps> = {}): C
 const show = (open: OpenSession, overrides: Partial<ChatViewProps> = {}) => {
   const props = chatProps(open, overrides);
   const onSubmit = props.onSubmit;
+  const onQueueMessage = props.onQueueMessage;
   const onNavigate: ChatViewProps["onNavigate"] = vi.fn(() =>
     Promise.resolve({ kind: "refused" as const, reason: "unused" }),
   );
@@ -146,6 +151,7 @@ const show = (open: OpenSession, overrides: Partial<ChatViewProps> = {}) => {
       </ShellHeaderProvider>,
     ),
     onSubmit,
+    onQueueMessage,
     props,
   };
 };
@@ -256,13 +262,13 @@ describe("the session chat view", () => {
   });
 
   it("isolates drafts, models, and reasoning between two mounted chat panels", () => {
-    const firstSubmit = vi.fn(() => new Promise<string | undefined>(() => undefined));
-    const secondSubmit = vi.fn(() => new Promise<string | undefined>(() => undefined));
+    const firstQueue = vi.fn(() => new Promise<string | undefined>(() => undefined));
+    const secondQueue = vi.fn(() => new Promise<string | undefined>(() => undefined));
     render(
       <ShellHeaderProvider description={{ title: "Сессии" }}>
         <HeaderProbe />
         <>
-          <ChatView {...chatProps(openSession(summary), { onSubmit: firstSubmit })} />
+          <ChatView {...chatProps(openSession(summary), { onQueueMessage: firstQueue })} />
           <ChatView
             {...chatProps(
               openSession({
@@ -271,7 +277,7 @@ describe("the session chat view", () => {
                 title: "Вторая сессия",
                 thinkingLevel: "low",
               }),
-              { onSubmit: secondSubmit },
+              { onQueueMessage: secondQueue },
             )}
           />
         </>
@@ -292,12 +298,12 @@ describe("the session chat view", () => {
     fireEvent.click(within(first).getByRole("button", { name: "Отправить" }));
     fireEvent.click(within(second).getByRole("button", { name: "Отправить" }));
 
-    expect(firstSubmit).toHaveBeenCalledWith({
+    expect(firstQueue).toHaveBeenCalledWith({
       text: "первая панель",
       model: "google/gemini-2.5-pro",
       thinkingLevel: "max",
     });
-    expect(secondSubmit).toHaveBeenCalledWith({
+    expect(secondQueue).toHaveBeenCalledWith({
       text: "вторая панель",
       model: "anthropic/claude-opus-4-5",
       thinkingLevel: "low",
@@ -334,16 +340,16 @@ describe("the session chat view", () => {
     ).toContain("Средний");
   });
 
-  it("keeps a busy model choice for the next idle submit without starting a turn", () => {
-    const onSubmit = vi.fn(() => new Promise<string | undefined>(() => undefined));
+  it("keeps a busy model choice for the message queued afterwards", () => {
+    const onQueueMessage = vi.fn(() => new Promise<string | undefined>(() => undefined));
     const busySummary = { ...summary, phase: "turn" as const };
-    const view = show(openSession(busySummary), { onSubmit });
+    const view = show(openSession(busySummary), { onQueueMessage });
 
     chooseModel(view.container, "Google", /google\/gemini-2\.5-pro/);
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
       target: { value: "следующий турн" },
     });
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onQueueMessage).not.toHaveBeenCalled();
 
     view.rerender(
       <ShellHeaderProvider description={{ title: "Сессии" }}>
@@ -352,7 +358,7 @@ describe("the session chat view", () => {
       </ShellHeaderProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onQueueMessage).toHaveBeenCalledWith({
       text: "следующий турн",
       model: "google/gemini-2.5-pro",
       thinkingLevel: "high",
@@ -402,7 +408,7 @@ describe("the session chat view", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
-    expect(view.onSubmit).toHaveBeenCalledWith({
+    expect(view.onQueueMessage).toHaveBeenCalledWith({
       text: "привет",
       model: "anthropic/claude-opus-4-5",
       thinkingLevel: "high",
@@ -426,10 +432,60 @@ describe("the session chat view", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
-    expect(view.onSubmit).toHaveBeenCalledWith({
+    expect(view.onQueueMessage).toHaveBeenCalledWith({
       text: "сохрани выбор",
       model: "anthropic/claude-opus-4-5",
       thinkingLevel: "high",
     });
+  });
+});
+
+describe("the session queue in the chat view", () => {
+  const waitingSession = (busy: boolean) =>
+    openSession(busy ? { ...summary, phase: "turn" as const } : summary, {
+      outbox: { messages: [{ id: "q-1", text: "потом" }] },
+    });
+
+  it("shows what waits and takes it off the queue", async () => {
+    const onDropQueuedMessage = vi.fn(() => Promise.resolve(undefined));
+
+    show(waitingSession(false), { onDropQueuedMessage });
+
+    expect(screen.getByText("потом")).not.toBeNull();
+    // Вклиниваться в простое некуда, и кнопка обещала бы то, чего демон не сделает.
+    expect(screen.queryByRole("button", { name: "Вклинить в текущий турн" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Снять с очереди" }));
+    await waitFor(() => expect(onDropQueuedMessage).toHaveBeenCalledWith("q-1"));
+  });
+
+  it("offers steering only while a turn runs", async () => {
+    const onSteerQueuedMessage = vi.fn(() => Promise.resolve(undefined));
+
+    show(waitingSession(true), { onSteerQueuedMessage });
+
+    fireEvent.click(screen.getByRole("button", { name: "Вклинить в текущий турн" }));
+    await waitFor(() => expect(onSteerQueuedMessage).toHaveBeenCalledWith("q-1"));
+  });
+
+  it("names the reason the queue stopped and offers to continue it", async () => {
+    const onResumeQueue = vi.fn(() => Promise.resolve(undefined));
+
+    show(
+      openSession(summary, {
+        outbox: {
+          messages: [{ id: "q-1", text: "потом" }],
+          stopped: { reason: "the model is gone" },
+        },
+      }),
+      { onResumeQueue },
+    );
+
+    expect(screen.getByText(/the model is gone/)).not.toBeNull();
+    // Остановленная очередь цела: продолжить её — одно нажатие, а не переписывание заново.
+    expect(screen.getByText("потом")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Продолжить" }));
+    await waitFor(() => expect(onResumeQueue).toHaveBeenCalled());
   });
 });
