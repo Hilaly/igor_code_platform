@@ -33,7 +33,7 @@
 - Consumes: `docs/file-resources.md` prompt-template rules and existing starter skill quality helpers.
 - Produces: model-invocable workflow for creating and verifying `commands/<name>.md`.
 
-- [ ] **Step 1: Extend the test inventory and add failing contract assertions**
+- [x] **Step 1: Extend the test inventory and add failing contract assertions**
 
 Add `creating-prompt-templates` to `skillNames`, then assert the new skill mentions both roots,
 project-over-user precedence, all supported argument placeholders, reserved core names, and the
@@ -47,18 +47,18 @@ pnpm --filter @sovereign/daemon exec node --test src/plugins/starter-skills.test
 
 Expected: FAIL because the new directory and skill do not exist.
 
-- [ ] **Step 2: Write the concise workflow and bundled reference**
+- [x] **Step 2: Write the concise workflow and bundled reference**
 
 Create a frontmatter-valid `SKILL.md` with a `Use when` description, workflow, minimal template
 example, verification checklist, common mistakes, and a relative link to `references/file-format.md`.
 Put exact roots, frontmatter, precedence, reserved names, placeholder semantics, and a Russian example
 in the reference file. Do not link from the skill to repository-relative `docs/` paths.
 
-- [ ] **Step 3: Run the focused quality test**
+- [x] **Step 3: Run the focused quality test**
 
 Run the same starter-skills test and expect all assertions to pass.
 
-- [ ] **Step 4: Commit the skill**
+- [x] **Step 4: Commit the skill**
 
 ```bash
 git add plugins/starter/skills/creating-prompt-templates apps/daemon/src/plugins/starter-skills.test.ts
@@ -80,7 +80,7 @@ git commit -m "docs(starter): add prompt template authoring skill"
 - Produces: unambiguous authoring guidance for backend declaration, browser implementation, and the
   boundary between `SKILL.md` and prompt templates.
 
-- [ ] **Step 1: Add failing assertions for the new guidance**
+- [x] **Step 1: Add failing assertions for the new guidance**
 
 Assert backend guidance contains `core.session.slash` and points to `starter.plugin-frontend`;
 assert frontend guidance contains `Command`, `run(context)`, the slash place, plugin-qualified command
@@ -89,25 +89,25 @@ address, and session/project context; assert `creating-skills` points prompt-tem
 
 Run the focused test and expect failure before editing the skills.
 
-- [ ] **Step 2: Update `plugin-backend`**
+- [x] **Step 2: Update `plugin-backend`**
 
 Clarify that `contribute.command` registers metadata in the worker, requires `sovereign.browser`, and
 does not itself implement the handler. Add a slash-command worker snippet using
 `placeId: "core.session.slash"` and direct browser implementation work to `starter.plugin-frontend`.
 
-- [ ] **Step 3: Update `plugin-frontend`**
+- [x] **Step 3: Update `plugin-frontend`**
 
 Explain palette versus slash placement, the generated `/<pluginId>.<id>` catalogue entry, action-place
 cardinality, `Command` descriptor shape, and `run(context)` access to current session/project. Update
 the example to use `core.session.slash` and a backend route without claiming that a command is a React
 component.
 
-- [ ] **Step 4: Update `creating-skills`**
+- [x] **Step 4: Update `creating-skills`**
 
 Add a short boundary section: `SKILL.md` is reusable model guidance, while `commands/<name>.md` is a
 human-launched prompt. Point `/name`, `$ARGUMENTS`, and `commands/` authoring requests to the new skill.
 
-- [ ] **Step 5: Run focused quality, type, and format checks**
+- [x] **Step 5: Run focused quality, type, and format checks**
 
 ```bash
 pnpm --filter @sovereign/daemon exec node --test src/plugins/starter-skills.test.ts
@@ -115,7 +115,7 @@ pnpm --filter @sovereign/plugin-starter typecheck
 pnpm exec prettier --check plugins/starter/skills apps/daemon/src/plugins/starter-skills.test.ts
 ```
 
-- [ ] **Step 6: Commit the plugin-skill updates**
+- [x] **Step 6: Commit the plugin-skill updates**
 
 ```bash
 git add plugins/starter/skills/creating-skills plugins/starter/skills/plugin-backend plugins/starter/skills/plugin-frontend apps/daemon/src/plugins/starter-skills.test.ts
@@ -136,12 +136,12 @@ git commit -m "docs(starter): document plugin slash commands"
 - Consumes: final starter skill inventory and the approved design.
 - Produces: durable documentation with the fifth skill and the backend/frontend command split.
 
-- [ ] **Step 1: Update indexes and design status**
+- [x] **Step 1: Update indexes and design status**
 
 List `creating-prompt-templates` in `plugins/README.md`, add the design and plan to `docs/README.md`,
 and mark the design as implemented while preserving its rationale.
 
-- [ ] **Step 2: Run the complete verification gate**
+- [x] **Step 2: Run the complete verification gate**
 
 ```bash
 PATH=/Users/user/.nvm/versions/node/v24.18.0/bin:$PATH make check
@@ -153,7 +153,7 @@ git status --short --branch
 If the full lint gate scans ignored `.sovereign-dev` files, rerun tracked-source lint with that local
 directory excluded and report the environmental issue without deleting user data.
 
-- [ ] **Step 3: Commit indexes and final documentation**
+- [x] **Step 3: Commit indexes and final documentation**
 
 ```bash
 git add plugins/README.md docs/README.md docs/superpowers/specs/2026-08-13-starter-session-authoring-design.md docs/superpowers/plans/2026-08-13-starter-session-authoring.md
