@@ -281,7 +281,7 @@ describe("App shell composition", () => {
 
     const productName = within(navigation).getByText("Sovereign");
 
-    expect(productName.parentElement?.querySelector("svg")).not.toBeNull();
+    expect(productName.parentElement?.querySelector('img[alt=""]')).not.toBeNull();
     expect(within(navigation).getByRole("button", { name: "+ New session" })).toBeDefined();
   });
 

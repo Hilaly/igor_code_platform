@@ -799,6 +799,14 @@ describe("stylesheets of the kit", () => {
     expect(source).not.toMatch(/color:\s*var\(--sovereign-accent\);/);
   });
 
+  it("ships a square brand image so the mark can sit in the center of its icon box", () => {
+    const source = readFileSync(join(kitRoot, "assets", "sovereign-mark.png"));
+    const width = source.readUInt32BE(16);
+    const height = source.readUInt32BE(20);
+
+    expect(width).toBe(height);
+  });
+
   it("dresses every primitive it ships", () => {
     const components = readdirSync(join(kitRoot, "components"))
       .filter((name) => name.endsWith(".tsx"))

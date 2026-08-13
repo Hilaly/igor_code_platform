@@ -74,11 +74,11 @@ describe("LoginView", () => {
   it("shows the brand sign and product name above the form title", () => {
     // Вход — единственный экран без оболочки, и без опознавательного знака карточка выглядит
     // безымянной. Бренд-блок стоит над заголовком; название продукта — видимый текст, знак —
-    // декоративный SVG (опознание даёт именно название).
+    // декоративное изображение (опознание даёт именно название).
     show();
 
     expect(screen.getByText(translator.t("product.name"))).toBeDefined();
-    expect(document.querySelector("svg")).not.toBeNull();
+    expect(document.querySelector('img[alt=""]')).not.toBeNull();
   });
 
   it("puts the cursor in the password field: the form is one field long", () => {
