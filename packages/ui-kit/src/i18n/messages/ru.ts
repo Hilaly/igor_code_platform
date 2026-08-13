@@ -39,6 +39,7 @@ export const coreRussian: CatalogRegistration = {
       "Необязательно: без них рантайм пересказывает по своему промпту.",
     "chat.compact.refused": "Свернуть контекст не вышло: {reason}",
     "chat.compact.title": "Свернуть контекст этой сессии?",
+    "chat.activity.tokens": "{total} токенов",
     "chat.compaction": "Контекст свёрнут, в него ушло {tokens} токенов",
     "chat.actions": "Действия сообщения",
     "chat.copy": "Копировать",

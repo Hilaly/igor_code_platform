@@ -43,6 +43,7 @@ export const coreEnglish: CatalogRegistration = {
       "Optional: without it the runtime summarises by its own prompt.",
     "chat.compact.refused": "The context was not folded: {reason}",
     "chat.compact.title": "Fold the context of this session?",
+    "chat.activity.tokens": "{total} tokens",
     "chat.compaction": "The context was folded; {tokens} tokens went into it",
     "chat.actions": "Message actions",
     "chat.copy": "Copy",
