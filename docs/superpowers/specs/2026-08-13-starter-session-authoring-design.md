@@ -54,7 +54,8 @@ Skill остаётся model-invocable: агент может создать ш�
 
 ### `plugin-frontend`
 
-Скил разделяет команды палитры и команды с местом `core.session.slash`. Для slash-команды фиксируется:
+Скил фиксирует, что все команды доступны в палитре, а место `core.session.slash` дополнительно
+размещает команду в каталоге `/`. Для slash-команды фиксируется:
 
 - `placeId` допустим только для cardinality `action`;
 - host показывает строку `/<pluginId>.<declared-command-id>`;

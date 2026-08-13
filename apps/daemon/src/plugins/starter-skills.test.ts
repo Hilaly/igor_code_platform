@@ -169,6 +169,19 @@ describe("the built-in starter skills", () => {
     assert.match(frontend, /sessionId[\s\S]{0,100}project/u);
   });
 
+  it("keeps the backend command example consistent with its manifest", () => {
+    const backend = byName("plugin-backend").entry;
+
+    assert.match(backend, /"browser":\s*"src\/browser\.tsx"/u);
+  });
+
+  it("describes slash placement as additional to the command palette", () => {
+    const frontend = byName("plugin-frontend").entry;
+
+    assert.match(frontend, /палитр[а-яё]*[\s\S]{0,100}независимо от `placeId`/u);
+    assert.doesNotMatch(frontend, /иначе остаётся в палитре/u);
+  });
+
   it("distinguishes skills from prompt templates", () => {
     const skill = byName("creating-skills").entry;
 

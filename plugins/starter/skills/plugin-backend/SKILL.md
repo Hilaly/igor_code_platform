@@ -44,6 +44,7 @@ description: Use when creating or changing a Sovereign plugin worker, package ma
   "sovereign": {
     "id": "task-plugin",
     "worker": "src/worker.ts",
+    "browser": "src/browser.tsx",
     "platform": "^0.1.0"
   }
 }
