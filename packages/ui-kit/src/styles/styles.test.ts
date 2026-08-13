@@ -49,6 +49,24 @@ const files = stylesheets();
 const roleProperties = new Set(roleNames.map(rolePropertyName));
 
 describe("stylesheets of the kit", () => {
+  it("gives the Sovereign activity mark three semantic independent orbits", () => {
+    const activity = withoutComments(
+      readFileSync(join(kitRoot, "components", "orbiting-brand-mark.module.css"), "utf8"),
+    );
+
+    expect(activity).toMatch(
+      /\.gold\s*\{[^}]*--orbit-color:\s*var\(--sovereign-warning\);[^}]*animation-duration:\s*1\.25s;/s,
+    );
+    expect(activity).toMatch(
+      /\.green\s*\{[^}]*--orbit-color:\s*var\(--sovereign-success\);[^}]*animation-duration:\s*1\.85s;[^}]*animation-direction:\s*reverse;/s,
+    );
+    expect(activity).toMatch(
+      /\.red\s*\{[^}]*--orbit-color:\s*var\(--sovereign-danger\);[^}]*animation-duration:\s*2\.45s;/s,
+    );
+    expect(activity).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^}]*\.spark/s);
+    expect(activity).not.toMatch(/#[0-9a-f]{3,8}|rgb\(/i);
+  });
+
   it("defines the complete Button tone and interaction-state contract", () => {
     const source = withoutComments(
       readFileSync(join(kitRoot, "components", "button.module.css"), "utf8"),
@@ -717,7 +735,7 @@ describe("stylesheets of the kit", () => {
         // (`white-space`, `border-block`), и совпадение по одному `\b` объявляло бы цветовым
         // литералом обычное свойство — с сообщением, по которому этого не понять.
         ...(body.match(
-          /(?<![-\w])(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|pink|brown|cyan|magenta|teal|navy|olive|maroon|lime|aqua|fuchsia)(?![-\w])/gi,
+          /(?<![.\w-])(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|pink|brown|cyan|magenta|teal|navy|olive|maroon|lime|aqua|fuchsia)(?![-\w])/gi,
         ) ?? []),
       ];
 

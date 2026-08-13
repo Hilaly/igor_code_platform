@@ -1,0 +1,74 @@
+.root {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  overflow: visible;
+}
+
+.mark {
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+}
+
+.spark {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: var(--sovereign-space-1);
+  block-size: var(--sovereign-space-1);
+  margin-block-start: calc(var(--sovereign-space-1) / -2);
+  margin-inline-start: calc(var(--sovereign-space-1) / -2);
+  border-radius: 50%;
+  background: var(--orbit-color);
+  box-shadow: 0 0 var(--sovereign-space-2) var(--orbit-color);
+  animation-name: orbit;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.gold {
+  --orbit-color: var(--sovereign-warning);
+  --orbit-radius: calc(var(--sovereign-icon-md) * 0.55);
+  animation-duration: 1.25s;
+}
+
+.green {
+  --orbit-color: var(--sovereign-success);
+  --orbit-radius: calc(var(--sovereign-icon-md) * 0.45);
+  animation-duration: 1.85s;
+  animation-delay: -0.7s;
+  animation-direction: reverse;
+}
+
+.red {
+  --orbit-color: var(--sovereign-danger);
+  --orbit-radius: calc(var(--sovereign-icon-md) * 0.6);
+  animation-duration: 2.45s;
+  animation-delay: -1.4s;
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(var(--orbit-radius)) rotate(-360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spark {
+    animation: none;
+  }
+  .gold {
+    transform: rotate(15deg) translateX(var(--orbit-radius));
+  }
+  .green {
+    transform: rotate(145deg) translateX(var(--orbit-radius));
+  }
+  .red {
+    transform: rotate(265deg) translateX(var(--orbit-radius));
+  }
+}

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppearancePreview } from "./appearance-preview.tsx";
 import { Badge } from "./badge.tsx";
 import { BrandLockup } from "./brand-lockup.tsx";
+import { OrbitingBrandMark } from "./orbiting-brand-mark.tsx";
 import { Button } from "./button.tsx";
 import { Code, CodeBlock } from "./code.tsx";
 import { ConfirmDialog } from "./dialog.tsx";
@@ -73,6 +74,7 @@ export const Typography = () => (
 export const Branding = () => (
   <div style={column}>
     <BrandLockup name="Sovereign" />
+    <OrbitingBrandMark size="md" />
     <div style={row}>
       <BrandMark size="sm" label="Sovereign" />
       <BrandMark size="md" label="Sovereign" />

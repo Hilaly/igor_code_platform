@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { ViewHeader } from "../index.ts";
 import { ConfirmDialog, Dialog } from "./dialog.tsx";
 import { BrandLockup } from "./brand-lockup.tsx";
+import { OrbitingBrandMark } from "./orbiting-brand-mark.tsx";
 import { Button } from "./button.tsx";
 import { Field } from "./field.tsx";
 import { FilePicker } from "./file-picker.tsx";
@@ -398,6 +399,18 @@ describe("markup of the ported primitives", () => {
     // декоративным: опознание даёт обёртка, а не сам знак.
     expect(markup).toContain('role="img"');
     expect(markup).toContain('aria-label="Sovereign"');
+  });
+
+  it("keeps the orbiting brand decorative and gives every spark its own track", () => {
+    const markup = renderToStaticMarkup(<OrbitingBrandMark size="md" />);
+
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain('data-orbit="gold"');
+    expect(markup).toContain('data-orbit="green"');
+    expect(markup).toContain('data-orbit="red"');
+    expect(markup.match(/data-orbit=/g)).toHaveLength(3);
+    expect(markup).toContain('src="');
+    expect(markup).not.toContain('role="status"');
   });
 
   it("keeps the brand lockup name accessible and only hides its mark", () => {
