@@ -240,6 +240,29 @@ describe("parseTurnRequest", () => {
     assert.match(result.diagnostics.join(" "), /instructions/);
   });
 
+  it("reads a template turn with the arguments as one string", () => {
+    const result = parseTurnRequest({ template: "review", arguments: "срез 15" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      template: "review",
+      arguments: "срез 15",
+    });
+  });
+
+  it("refuses arguments without a template", () => {
+    const result = parseTurnRequest({ text: "сделай", arguments: "срез 15" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /arguments/);
+  });
+
+  it("refuses a body that names a template beside a skill", () => {
+    const result = parseTurnRequest({ template: "review", skill: "starter.review" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /more than one operation/);
+  });
+
   it("refuses a nameless skill", () => {
     for (const skill of ["", "   ", 5, null]) {
       assert.equal(parseTurnRequest({ skill }).kind, "rejected", JSON.stringify(skill));

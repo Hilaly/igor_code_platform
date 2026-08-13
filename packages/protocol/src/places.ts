@@ -75,6 +75,11 @@ export const corePlaces = [
   { id: "core.panel.tabs", cardinality: "tabs", replaceable: false },
   /** Действия в шапке центральной колонки, после действий самого вью. */
   { id: "core.view.header.actions", cardinality: "action", replaceable: false },
+  /**
+   * Каталог команд сессии по `/` в композере. Незаменяемо: это поверхность ввода оболочки, а не
+   * рабочая страница ядра, — вклад приносит строку каталога, а не сам композер.
+   */
+  { id: "core.session.slash", cardinality: "action", replaceable: false },
 ] as const satisfies readonly CorePlace[];
 
 export type CorePlaceId = (typeof corePlaces)[number]["id"];
