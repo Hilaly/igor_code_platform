@@ -29,6 +29,7 @@ import {
   createSession as createSessionRequest,
   fetchBranch,
   fetchContextUsage,
+  fetchSessionCommands,
   fetchEntries,
   fetchSession,
   fetchSessions,
@@ -50,6 +51,7 @@ import {
 } from "./api.ts";
 import {
   applyBranch,
+  applyCommands,
   applyContext,
   applyEntries,
   applyFailure,
@@ -74,6 +76,7 @@ import {
   startModels,
   type SessionsState,
 } from "./state.ts";
+import { skillInvocation } from "./slash-command.ts";
 
 export type UseSessionsOptions = {
   bus: Pick<FrontendBus, "subscribe">;
@@ -138,6 +141,13 @@ export type ProjectAgentsState = {
 
 const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
+
+/**
+ * Что показать в ленте, пока турн ждёт очереди. У турна скилом реплики нет — вместо неё видно то,
+ * что человек набрал в композере: ту же строку запуска, которую подставил каталог.
+ */
+const said = (request: TurnRequest): string =>
+  request.skill === undefined ? request.text : skillInvocation(request.skill, request.instructions);
 
 export function useSessions(options: UseSessionsOptions): SessionsController {
   const { bus, stream, sessionId, projectId, archived, onDiagnostic } = options;
@@ -294,8 +304,9 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       fetchEntries(id, seen, controller.signal),
       fetchStats(id, controller.signal),
       fetchContextUsage(id, controller.signal),
+      fetchSessionCommands(id, controller.signal),
     ])
-      .then(([summary, page, stats, context]) => {
+      .then(([summary, page, stats, context, commands]) => {
         if (controller.signal.aborted) {
           return;
         }
@@ -303,6 +314,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         apply((current) => applySummary(current, id, summary));
         apply((current) => applyStats(current, id, stats));
         apply((current) => applyContext(current, id, context));
+        apply((current) => applyCommands(current, id, commands));
 
         if (page !== undefined) {
           apply((current) => applyEntries(current, id, page.entries, page.seen));
@@ -487,7 +499,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       // дельты, и без этого реплика ждала бы конца чужого турна. У начатого турна запись уже
       // пишется, и вторая копия реплики висела бы в ленте до самого конца работы.
       if (outcome.accepted.phase === "queued") {
-        apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, request.text));
+        apply((current) => applyPendingTurn(current, id, outcome.accepted.turnId, said(request)));
       }
       apply((current) =>
         applySummary(

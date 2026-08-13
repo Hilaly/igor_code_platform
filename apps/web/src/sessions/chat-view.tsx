@@ -11,6 +11,7 @@ import type {
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
+  SessionUpdate,
   ThinkingLevel,
   TurnRequest,
 } from "@sovereign/protocol";
@@ -35,6 +36,7 @@ import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
+import type { SlashInvocation } from "./slash-command.ts";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 import { useShellHeader } from "../shell/header.tsx";
 
@@ -55,12 +57,14 @@ export type ChatViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
+  /** Переименовать или убрать в архив. Возвращает причину отказа. */
+  onUpdateSession: (update: SessionUpdate) => Promise<string | undefined>;
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   translator: ScopedTranslator;
 };
 
-/** Что именно отказались сделать: у компакции и метки разные сообщения об отказе. */
-type Refusal = { what: "compact" | "label"; reason: string };
+/** Что именно отказались сделать: у каждого действия своё сообщение об отказе. */
+type Refusal = { what: "compact" | "label" | "command"; reason: string };
 
 export function ChatView(props: ChatViewProps) {
   const {
@@ -77,6 +81,7 @@ export function ChatView(props: ChatViewProps) {
     onFork,
     onCompact,
     onSetLabel,
+    onUpdateSession,
     translator,
   } = props;
   const { t } = translator;
@@ -128,6 +133,39 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
+
+  /**
+   * Встроенная команда сессии из композера. Ни одна не заводит нового поведения — каждая зовёт то,
+   * что панель уже умеет по нажатию, и потому отказ у них тот же самый.
+   */
+  const runCommand = async (invocation: SlashInvocation): Promise<string | undefined> => {
+    if (invocation.name === "compact") {
+      return onCompact(invocation.arguments === "" ? undefined : invocation.arguments);
+    }
+
+    if (invocation.name === "fork") {
+      await onFork({});
+
+      return undefined;
+    }
+
+    if (invocation.name === "rename") {
+      // Безымянная сессия законна, но снимает имя явная кнопка, а не команда без аргумента: человек,
+      // набравший `/rename` и промахнувшийся мимо имени, хотел назвать её, а не обезличить.
+      return invocation.arguments === ""
+        ? t("chat.slash.rename.empty")
+        : onUpdateSession({ title: invocation.arguments, archived: false });
+    }
+
+    if (invocation.name === "archive") {
+      return onUpdateSession({
+        ...(open.summary?.title === undefined ? {} : { title: open.summary.title }),
+        archived: true,
+      });
+    }
+
+    return t("chat.slash.unknown", { name: invocation.name });
+  };
 
   useEffect(() => {
     setDraftReplacement(undefined);
@@ -271,6 +309,9 @@ export function ChatView(props: ChatViewProps) {
         {refusal?.what !== "compact" ? undefined : (
           <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
         )}
+        {refusal?.what !== "command" ? undefined : (
+          <Notice tone="danger" title={t("chat.slash.refused", { reason: refusal.reason })} />
+        )}
         {open.degradations.map((lost, index) => (
           <Notice
             key={`${lost.kind}:${lost.name}:${String(index)}`}
@@ -398,6 +439,14 @@ export function ChatView(props: ChatViewProps) {
             onInterrupt={onInterrupt}
             onDropTarget={takeDropTarget}
             {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
+            {...(open.commands === undefined ? {} : { commands: open.commands })}
+            onRunCommand={async (invocation) => {
+              const reason = await runCommand(invocation);
+
+              setRefusal(reason === undefined ? undefined : { what: "command", reason });
+
+              return reason;
+            }}
             onError={(error: unknown) => {
               onDiagnostic?.(
                 `the message composer acceptance failed: ${

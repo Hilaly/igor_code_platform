@@ -1,6 +1,7 @@
 import {
   sessionImageMimeTypes,
   type ProjectFilesSnapshot,
+  type SessionCommands,
   type SessionContextUsage,
   type SessionImage,
   type SessionMessage,
@@ -12,6 +13,7 @@ import {
 import {
   AddIcon,
   Button,
+  CommandsIcon,
   ImageIcon,
   Menu,
   NextTurnPicker,
@@ -26,11 +28,22 @@ import {
   type ModelPickerGroup,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { imageFilesOf, readImageFiles, type ImageIntake } from "./image-input.ts";
 import { applyMention, mentionAt, type FileMention } from "./file-mention.ts";
 import { FileMentionList } from "./file-mention-list.tsx";
+import {
+  applySlash,
+  coreSessionCommands,
+  parseInvocation,
+  skillOf,
+  slashAt,
+  slashCatalogue,
+  type SlashDraft,
+  type SlashInvocation,
+} from "./slash-command.ts";
+import { SlashCatalogList } from "./slash-catalog-list.tsx";
 import { ComposerAttachments } from "./composer-attachments.tsx";
 import { SessionUsage } from "./session-usage.tsx";
 
@@ -60,6 +73,16 @@ export type MessageComposerProps = {
    * остаётся обычным символом: у сессии без доступной папки искать негде.
    */
   onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
+  /**
+   * Каталог команд сессии. Не приехал — по `/` предлагаются только команды ядра: они не зависят ни
+   * от агента, ни от включённых плагинов.
+   */
+  commands?: SessionCommands;
+  /**
+   * Выполнить встроенную команду сессии. Возвращает причину отказа — черновик чистится только
+   * принятой командой, ровно как принятым сообщением.
+   */
+  onRunCommand: (invocation: SlashInvocation) => Promise<string | undefined>;
   context: SessionContextUsage | undefined;
   stats: SessionStats | undefined;
   translator: ScopedTranslator;
@@ -89,6 +112,8 @@ export function MessageComposer({
   onError,
   onDropTarget,
   onSearchFiles,
+  commands,
+  onRunCommand,
   context,
   stats,
   translator,
@@ -112,6 +137,7 @@ export function MessageComposer({
     setImages([]);
     setIntakeProblem(undefined);
     setMention(undefined);
+    setSlash(undefined);
     setFound({ paths: [], truncated: false });
     appliedDraftReplacement.current = undefined;
   }, [sessionId]);
@@ -207,6 +233,37 @@ export function MessageComposer({
     );
   };
 
+  /**
+   * Запустить набранную команду. Скил — это турн, поэтому он уезжает тем же `onSubmit`, что и
+   * реплика; остальное панель чата делает сама.
+   */
+  const runInvocation = (invocation: SlashInvocation): void => {
+    // Картинки командой не отправляются: скил уезжает модели готовым текстом без вложений, а
+    // приложить картинку к переименованию нечему. Демон откажет — сказать это здесь честнее.
+    if (images.length > 0) {
+      setIntakeProblem(t("chat.slash.images"));
+
+      return;
+    }
+
+    const skill = skillOf(invocation);
+
+    if (skill === undefined) {
+      startSubmission(() => onRunCommand(invocation));
+
+      return;
+    }
+
+    startSubmission(() =>
+      onSubmit({
+        skill,
+        ...(invocation.arguments === "" ? {} : { instructions: invocation.arguments }),
+        model,
+        thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+      }),
+    );
+  };
+
   const sendMessage = (mode: SessionMessageMode): void => {
     startSubmission(() =>
       onSendMessage({ text: draft, ...(images.length === 0 ? {} : { images }), mode }),
@@ -257,7 +314,40 @@ export function MessageComposer({
   const [found, setFound] = useState<ProjectFilesSnapshot>({ paths: [], truncated: false });
   const [activeIndex, setActiveIndex] = useState(0);
   const field = useRef<HTMLTextAreaElement | null>(null);
-  const mentionOpen = mention !== undefined && found.paths.length > 0;
+
+  /**
+   * Набираемая команда и каталог под неё. Каталог считается на месте, а не запрашивается на каждую
+   * букву: скилы сессии приезжают целиком, и фильтр по ним — работа на несколько десятков строк.
+   */
+  const [slash, setSlash] = useState<SlashDraft | undefined>(undefined);
+  const catalogue = useMemo(
+    () =>
+      slash === undefined
+        ? []
+        : slashCatalogue(
+            slash.query,
+            coreSessionCommands.map((command) => ({
+              name: command.name,
+              description: t(command.descriptionKey),
+            })),
+            commands?.skills ?? [],
+          ),
+    [commands, slash, t],
+  );
+  const slashOpen = slash !== undefined && catalogue.length > 0;
+
+  /**
+   * Две подсказки в одном поле взаимно исключаются: обе хотят стрелки, `Enter`, `Tab` и `Escape`,
+   * а команда с аргументом `@файл` делает живыми оба триггера сразу. Команда стоит в начале строки
+   * и потому старше: пока набирают её имя, ссылка на файл ещё не начата.
+   */
+  const mentionOpen = !slashOpen && mention !== undefined && found.paths.length > 0;
+
+  // Список меняется с каждой буквой: выбор возвращается на первую строку, иначе он указывал бы не
+  // туда, куда указывал до нажатия.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [slash?.query]);
 
   useEffect(() => {
     if (mention === undefined || onSearchFiles === undefined) {
@@ -288,8 +378,43 @@ export function MessageComposer({
     };
   }, [mention, onSearchFiles]);
 
-  const rememberMention = (text: string, caret: number | null): void => {
+  const remember = (text: string, caret: number | null): void => {
     setMention(caret === null ? undefined : mentionAt(text, caret));
+    setSlash(caret === null ? undefined : slashAt(text, caret));
+  };
+
+  /** Вернуть фокус и курсор в поле после подстановки: следующее слово печатают там же. */
+  const restoreCaret = (caret: number): void => {
+    queueMicrotask(() => {
+      const element = field.current;
+
+      element?.focus();
+      element?.setSelectionRange(caret, caret);
+    });
+  };
+
+  const chooseSlash = (name: string): void => {
+    if (slash === undefined) {
+      return;
+    }
+
+    const applied = applySlash(draft, slash, name);
+
+    setDraft(applied.text);
+    setSlash(undefined);
+    restoreCaret(applied.caret);
+  };
+
+  /**
+   * Открыть каталог из меню `+`. Уже набранное не пропадает: `/` встаёт перед ним, и выбранная
+   * команда получает написанное аргументом.
+   */
+  const openCatalogue = (): void => {
+    const text = `/${draft}`;
+
+    setDraft(text);
+    setSlash({ end: 1, query: "" });
+    restoreCaret(1);
   };
 
   const chooseMention = (path: string): void => {
@@ -302,15 +427,7 @@ export function MessageComposer({
     setDraft(applied.text);
     setMention(undefined);
     setFound({ paths: [], truncated: false });
-
-    // Курсор возвращается за подставленный путь: следующее слово человек печатает там же, где
-    // остановился, а не в конце всего текста.
-    queueMicrotask(() => {
-      const element = field.current;
-
-      element?.focus();
-      element?.setSelectionRange(applied.caret, applied.caret);
-    });
+    restoreCaret(applied.caret);
   };
 
   const droppedRef = useRef(dropped);
@@ -337,6 +454,15 @@ export function MessageComposer({
   };
 
   const sendDefault = (): void => {
+    const invocation = parseInvocation(draft);
+
+    // Команда старше стиринга: человек, набравший `/compact`, не собирался говорить это модели.
+    if (invocation !== undefined) {
+      runInvocation(invocation);
+
+      return;
+    }
+
     if (busy) {
       sendMessage("steer");
       return;
@@ -372,6 +498,14 @@ export function MessageComposer({
       {intakeProblem === undefined ? undefined : <Notice tone="danger" title={intakeProblem} />}
       <RaisedSurface>
         <div className="sessions-composer">
+          {slashOpen ? (
+            <SlashCatalogList
+              entries={catalogue}
+              activeIndex={activeIndex}
+              onChoose={chooseSlash}
+              translator={translator}
+            />
+          ) : undefined}
           {mentionOpen ? (
             <FileMentionList
               paths={found.paths}
@@ -395,14 +529,60 @@ export function MessageComposer({
             onChange={(next) => {
               setDraft(next);
               // Позиция курсора известна только элементу; после `onChange` она уже новая.
-              rememberMention(next, field.current?.selectionStart ?? null);
+              remember(next, field.current?.selectionStart ?? null);
             }}
             onSubmit={sendDefault}
             submitWhenEmpty={images.length > 0}
             onKeyDown={(event) => {
+              if (slashOpen) {
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setActiveIndex(
+                    (current) =>
+                      (current + (event.key === "ArrowDown" ? 1 : -1) + catalogue.length) %
+                      catalogue.length,
+                  );
+
+                  return;
+                }
+
+                if (event.key === "Enter" || event.key === "Tab") {
+                  const chosen = catalogue[activeIndex];
+
+                  if (chosen === undefined) {
+                    return;
+                  }
+
+                  event.preventDefault();
+
+                  // Имя набрано целиком — подставлять нечего, и `Enter` запускает то, за чем его
+                  // нажали. Иначе он вставил бы один пробел, и человек решил бы, что ввод сломан.
+                  if (event.key === "Enter" && chosen.name === slash?.query) {
+                    setSlash(undefined);
+                    sendDefault();
+
+                    return;
+                  }
+
+                  // Иначе `Enter` подставляет имя, а не запускает команду: аргументы человек
+                  // дописывает после него, и одно нажатие делает одно дело.
+                  chooseSlash(chosen.name);
+
+                  return;
+                }
+
+                if (event.key === "Escape") {
+                  // Каталог закрывается, а `/` остаётся обычным текстом: набранное не пропадает.
+                  event.preventDefault();
+                  setSlash(undefined);
+                }
+
+                return;
+              }
+
               if (!mentionOpen) {
-                // Подсказка закрыта — клавиатура остаётся полностью за полем ввода.
-                rememberMention(draft, field.current?.selectionStart ?? null);
+                // Подсказок нет — клавиатура остаётся полностью за полем ввода.
+                remember(draft, field.current?.selectionStart ?? null);
 
                 return;
               }
@@ -446,8 +626,8 @@ export function MessageComposer({
           />
           <div className="sessions-composer-toolbar">
             <div className="sessions-composer-attach">
-              {/* Меню, а не сразу picker: тем же `+` в следующем срезе открываются скилы и шаблоны
-                  промптов, и заводить под них вторую кнопку рядом незачем. */}
+              {/* Меню, а не сразу picker: тем же `+` открывается каталог команд, и заводить под
+                  него вторую кнопку рядом незачем. */}
               <Menu
                 label={t("chat.attach")}
                 trigger={<AddIcon />}
@@ -461,6 +641,12 @@ export function MessageComposer({
                     label: t("chat.attach.image"),
                     icon: <ImageIcon size="sm" />,
                     onSelect: () => picker.current?.click(),
+                  },
+                  {
+                    id: "command",
+                    label: t("chat.slash.open"),
+                    icon: <CommandsIcon size="sm" />,
+                    onSelect: openCatalogue,
                   },
                 ]}
               />

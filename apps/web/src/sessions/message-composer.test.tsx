@@ -2,6 +2,7 @@
 
 import type {
   ProjectFilesSnapshot,
+  SessionCommands,
   SessionContextUsage,
   SessionMessage,
   SessionStats,
@@ -20,6 +21,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
+import type { SlashInvocation } from "./slash-command.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -97,6 +99,8 @@ type ComposerHarnessProps = {
   draftReplacement?: ComposerDraftReplacement;
   onDropTarget?: (drop: (transfer: DataTransfer) => void) => void;
   onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
+  commands?: SessionCommands;
+  onRunCommand?: (invocation: SlashInvocation) => Promise<string | undefined>;
 };
 
 function SwitchingComposerHarness({
@@ -123,6 +127,7 @@ function SwitchingComposerHarness({
         onSubmit={onSubmit}
         onSendMessage={vi.fn(() => Promise.resolve(undefined))}
         onInterrupt={vi.fn()}
+        onRunCommand={vi.fn(() => Promise.resolve(undefined))}
         onError={onError}
         context={contextUsage}
         stats={sessionStats}
@@ -151,6 +156,8 @@ function ComposerHarness({
   draftReplacement,
   onDropTarget,
   onSearchFiles,
+  commands,
+  onRunCommand = vi.fn(() => Promise.resolve(undefined)),
 }: ComposerHarnessProps) {
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
@@ -173,6 +180,8 @@ function ComposerHarness({
         onInterrupt={onInterrupt}
         {...(onDropTarget === undefined ? {} : { onDropTarget })}
         {...(onSearchFiles === undefined ? {} : { onSearchFiles })}
+        {...(commands === undefined ? {} : { commands })}
+        onRunCommand={onRunCommand}
         onError={onError ?? vi.fn()}
         context={contextUsage}
         stats={sessionStats}
@@ -854,5 +863,149 @@ describe("mentioning a project file", () => {
     await waitFor(() =>
       expect(screen.queryByText("Найдено больше — уточните запрос")).not.toBeNull(),
     );
+  });
+});
+
+describe("the slash catalogue of session commands", () => {
+  const commands: SessionCommands = {
+    skills: [
+      { name: "starter.review", description: "Разбор изменения", hidden: false },
+      { name: "starter.secret", description: "Только вручную", hidden: true },
+    ],
+  };
+
+  const type = (value: string): void => {
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement;
+
+    fireEvent.change(field, { target: { value } });
+    field.setSelectionRange(value.length, value.length);
+  };
+
+  it("opens on a slash at the start of the draft and shows the core commands with the skills", async () => {
+    const { container } = render(<ComposerHarness commands={commands} />);
+
+    type("/");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Команды сессии" })).not.toBeNull(),
+    );
+    expect(
+      [...container.querySelectorAll(".sessions-slash-name")].map((one) => one.textContent),
+    ).toEqual([
+      "/compact",
+      "/fork",
+      "/rename",
+      "/archive",
+      "/skill:starter.review",
+      "/skill:starter.secret",
+    ]);
+    // Скрытый от модели скил помечен, обычный — нет.
+    expect(container.querySelectorAll(".sessions-slash-hidden")).toHaveLength(1);
+  });
+
+  it("leaves a slash inside the text alone", async () => {
+    render(<ComposerHarness commands={commands} />);
+    type("посмотри src/main.ts");
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("walks the list with arrows and inserts the active name on Enter, without running it", async () => {
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness commands={commands} onRunCommand={onRunCommand} />);
+    type("/f");
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe("/fork "));
+    // Одно нажатие — одно действие: после подстановки человек ещё дописывает аргументы.
+    expect(onRunCommand).not.toHaveBeenCalled();
+  });
+
+  it("runs the typed command on Enter instead of sending it as a message", async () => {
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness commands={commands} onRunCommand={onRunCommand} onSubmit={onSubmit} />);
+    type("/rename срез 15");
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(onRunCommand).toHaveBeenCalledWith({ name: "rename", arguments: "срез 15" }),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("starts a turn from an explicitly named skill", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness commands={commands} onRunCommand={onRunCommand} onSubmit={onSubmit} />);
+    type("/skill:starter.secret начни с тестов");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Enter" });
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        skill: "starter.secret",
+        instructions: "начни с тестов",
+        model: "anthropic/claude-opus-4-5",
+        thinkingLevel: "medium",
+      }),
+    );
+    expect(onRunCommand).not.toHaveBeenCalled();
+  });
+
+  it("keeps the draft when the command was refused", async () => {
+    render(<ComposerHarness commands={commands} onRunCommand={() => Promise.resolve("занято")} />);
+    type("/fork");
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe("/fork"));
+  });
+
+  it("closes on Escape and leaves the slash as plain text", async () => {
+    render(<ComposerHarness commands={commands} />);
+    type("/comp");
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeNull());
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("/comp");
+  });
+
+  it("gives the command the field while a file mention would also be live", async () => {
+    render(
+      <ComposerHarness
+        commands={commands}
+        onSearchFiles={vi.fn(() => Promise.resolve({ paths: ["a.ts"], truncated: false }))}
+      />,
+    );
+    // Оба триггера живы: `/` в начале строки и `@` перед курсором. Побеждает команда.
+    type("/@a");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Файлы проекта" })).toBeNull(),
+    );
+  });
+
+  it("offers the core commands even when the catalogue has not arrived", async () => {
+    render(<ComposerHarness />);
+    type("/");
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(4));
   });
 });
