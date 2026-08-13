@@ -135,6 +135,7 @@ export const coreRussian: CatalogRegistration = {
     "chat.slash.rename.empty": "После /rename нужно новое имя сессии",
     "chat.slash.unknown": "Неизвестная команда: {name}",
     "chat.slash.refused": "Команду выполнить не вышло: {reason}",
+    "chat.slash.refused.plugin": "Команда {name} не выполнилась",
     "chat.attachments": "Приложенные изображения",
     "chat.attachment.remove": "Убрать",
     "chat.attachment.remove.one": "Убрать изображение {index}",

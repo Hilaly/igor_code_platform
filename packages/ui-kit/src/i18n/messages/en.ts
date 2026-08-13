@@ -140,6 +140,7 @@ export const coreEnglish: CatalogRegistration = {
     "chat.slash.rename.empty": "/rename needs a new name for the session",
     "chat.slash.unknown": "Unknown command: {name}",
     "chat.slash.refused": "The command did not run: {reason}",
+    "chat.slash.refused.plugin": "The command {name} did not run",
     "chat.attachments": "Attached images",
     "chat.attachment.remove": "Remove",
     "chat.attachment.remove.one": "Remove image {index}",

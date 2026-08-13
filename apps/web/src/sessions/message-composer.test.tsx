@@ -21,7 +21,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
-import type { SlashInvocation } from "./slash-command.ts";
+import type { SlashEntry, SlashInvocation } from "./slash-command.ts";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -100,6 +100,7 @@ type ComposerHarnessProps = {
   onDropTarget?: (drop: (transfer: DataTransfer) => void) => void;
   onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
   commands?: SessionCommands;
+  pluginCommands?: SlashEntry[];
   onRunCommand?: (invocation: SlashInvocation) => Promise<string | undefined>;
 };
 
@@ -157,6 +158,7 @@ function ComposerHarness({
   onDropTarget,
   onSearchFiles,
   commands,
+  pluginCommands,
   onRunCommand = vi.fn(() => Promise.resolve(undefined)),
 }: ComposerHarnessProps) {
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
@@ -181,6 +183,7 @@ function ComposerHarness({
         {...(onDropTarget === undefined ? {} : { onDropTarget })}
         {...(onSearchFiles === undefined ? {} : { onSearchFiles })}
         {...(commands === undefined ? {} : { commands })}
+        {...(pluginCommands === undefined ? {} : { pluginCommands })}
         onRunCommand={onRunCommand}
         onError={onError ?? vi.fn()}
         context={contextUsage}
@@ -872,6 +875,7 @@ describe("the slash catalogue of session commands", () => {
       { name: "starter.review", description: "Разбор изменения", hidden: false },
       { name: "starter.secret", description: "Только вручную", hidden: true },
     ],
+    templates: [{ name: "review-branch", description: "Разбор ветки", scope: "user" }],
   };
 
   const type = (value: string): void => {
@@ -896,6 +900,7 @@ describe("the slash catalogue of session commands", () => {
       "/fork",
       "/rename",
       "/archive",
+      "/review-branch",
       "/skill:starter.review",
       "/skill:starter.secret",
     ]);
@@ -961,6 +966,59 @@ describe("the slash catalogue of session commands", () => {
       }),
     );
     expect(onRunCommand).not.toHaveBeenCalled();
+  });
+
+  it("starts a turn from a prompt template with everything written after it", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness commands={commands} onRunCommand={onRunCommand} onSubmit={onSubmit} />);
+    type("/review-branch срез 15");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Enter" });
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        template: "review-branch",
+        arguments: "срез 15",
+        model: "anthropic/claude-opus-4-5",
+        thinkingLevel: "medium",
+      }),
+    );
+    expect(onRunCommand).not.toHaveBeenCalled();
+  });
+
+  it("hands an unknown name to the view instead of guessing", async () => {
+    const onRunCommand = vi.fn(() => Promise.resolve(undefined));
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness commands={commands} onRunCommand={onRunCommand} onSubmit={onSubmit} />);
+    type("/placed.log это команда плагина");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Enter" });
+
+    await waitFor(() =>
+      expect(onRunCommand).toHaveBeenCalledWith({
+        name: "placed.log",
+        arguments: "это команда плагина",
+      }),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("shows the commands a plugin put into the slash place", async () => {
+    const { container } = render(
+      <ComposerHarness
+        commands={commands}
+        pluginCommands={[{ name: "placed.log", description: "Записать в журнал" }]}
+      />,
+    );
+
+    type("/placed");
+
+    await waitFor(() =>
+      expect(
+        [...container.querySelectorAll(".sessions-slash-name")].map((one) => one.textContent),
+      ).toEqual(["/placed.log"]),
+    );
   });
 
   it("keeps the draft when the command was refused", async () => {

@@ -76,7 +76,7 @@ import {
   startModels,
   type SessionsState,
 } from "./state.ts";
-import { skillInvocation } from "./slash-command.ts";
+import { skillInvocation, templateInvocation } from "./slash-command.ts";
 
 export type UseSessionsOptions = {
   bus: Pick<FrontendBus, "subscribe">;
@@ -146,8 +146,15 @@ const reasonOf = (cause: unknown): string =>
  * Что показать в ленте, пока турн ждёт очереди. У турна скилом реплики нет — вместо неё видно то,
  * что человек набрал в композере: ту же строку запуска, которую подставил каталог.
  */
-const said = (request: TurnRequest): string =>
-  request.skill === undefined ? request.text : skillInvocation(request.skill, request.instructions);
+const said = (request: TurnRequest): string => {
+  if (request.skill !== undefined) {
+    return skillInvocation(request.skill, request.instructions);
+  }
+
+  return request.template === undefined
+    ? request.text
+    : templateInvocation(request.template, request.arguments);
+};
 
 export function useSessions(options: UseSessionsOptions): SessionsController {
   const { bus, stream, sessionId, projectId, archived, onDiagnostic } = options;

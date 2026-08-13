@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   applySlash,
+  coreCommandOf,
   parseInvocation,
+  skillEntries,
+  templateEntries,
+  templateInvocation,
   skillInvocation,
   skillOf,
   slashAt,
@@ -87,28 +91,55 @@ describe("slashCatalogue", () => {
     { name: "compact", description: "свернуть" },
     { name: "fork", description: "отделить" },
   ];
-  const skills = [
+  const skills = skillEntries([
     { name: "starter.review", description: "разбор", hidden: false },
     { name: "starter.deploy", description: "выкладка", hidden: true },
-  ];
+  ]);
+  const templates = templateEntries([
+    { name: "review-branch", description: "разбор ветки", scope: "project" },
+  ]);
+  const entries = [...core, ...templates, ...skills];
 
-  it("puts the commands of the core first and the skills after them", () => {
-    expect(slashCatalogue("", core, skills).map(({ name }) => name)).toEqual([
+  it("keeps the order the caller gave it", () => {
+    expect(slashCatalogue("", entries).map(({ name }) => name)).toEqual([
       "compact",
       "fork",
+      "review-branch",
       "skill:starter.review",
       "skill:starter.deploy",
     ]);
   });
 
   it("finds a namespaced skill by the part the human remembers", () => {
-    expect(slashCatalogue("review", core, skills).map(({ name }) => name)).toEqual([
+    expect(slashCatalogue("starter.review", entries).map(({ name }) => name)).toEqual([
       "skill:starter.review",
     ]);
   });
 
   it("keeps the mark of a skill the model cannot pick itself", () => {
-    expect(slashCatalogue("deploy", core, skills)[0]?.hidden).toBe(true);
-    expect(slashCatalogue("review", core, skills)[0]?.hidden).toBeUndefined();
+    expect(slashCatalogue("deploy", entries)[0]?.hidden).toBe(true);
+    expect(slashCatalogue("starter.review", entries)[0]?.hidden).toBeUndefined();
+  });
+
+  it("gives a template an unprefixed name, like a command of the core", () => {
+    expect(templates).toEqual([{ name: "review-branch", description: "разбор ветки" }]);
+  });
+});
+
+describe("templateInvocation", () => {
+  it("renders the launch the same way the catalogue inserts it", () => {
+    expect(templateInvocation("review-branch")).toBe("/review-branch");
+    expect(templateInvocation("review-branch", "срез 15")).toBe("/review-branch срез 15");
+    expect(parseInvocation(templateInvocation("review-branch", "срез 15"))).toEqual({
+      name: "review-branch",
+      arguments: "срез 15",
+    });
+  });
+});
+
+describe("coreCommandOf", () => {
+  it("recognizes only the closed list of the core", () => {
+    expect(coreCommandOf({ name: "compact", arguments: "" })).toBe("compact");
+    expect(coreCommandOf({ name: "review-branch", arguments: "" })).toBeUndefined();
   });
 });

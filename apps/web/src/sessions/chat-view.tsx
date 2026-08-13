@@ -28,6 +28,8 @@ import {
   Notice,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
+import { useCommands } from "@sovereign/browser-sdk";
+import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
@@ -36,7 +38,7 @@ import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
-import type { SlashInvocation } from "./slash-command.ts";
+import type { SlashEntry, SlashInvocation } from "./slash-command.ts";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 import { useShellHeader } from "../shell/header.tsx";
 
@@ -62,6 +64,9 @@ export type ChatViewProps = {
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   translator: ScopedTranslator;
 };
+
+/** Место каталога `/`: вклад «команда» с этим `placeId` встаёт строкой в композере. */
+const slashPlaceId = "core.session.slash";
 
 /** Что именно отказались сделать: у каждого действия своё сообщение об отказе. */
 type Refusal = { what: "compact" | "label" | "command"; reason: string };
@@ -135,6 +140,30 @@ export function ChatView(props: ChatViewProps) {
   const archived = open.summary?.archived === true;
 
   /**
+   * Команды плагинов, поставленные в место `core.session.slash`. Контекст — эта сессия: у палитры
+   * его нет, а место сессионное, и вклад из папки чужого проекта его занять не вправе.
+   */
+  const slashContext = useMemo(
+    () => ({
+      ...(open.summary?.projectId === undefined ? {} : { project: open.summary.projectId }),
+      subject: { sessionId: open.id },
+    }),
+    [open.id, open.summary?.projectId],
+  );
+  const { invoke } = useCommands();
+  const placedCommands = useHostCommandCatalog(slashContext);
+  const pluginCommands = useMemo<SlashEntry[]>(
+    () =>
+      placedCommands
+        .filter(({ registration }) => registration.placeId === slashPlaceId)
+        .map(({ registration }) => ({
+          name: registration.id,
+          description: registration.title,
+        })),
+    [placedCommands],
+  );
+
+  /**
    * Встроенная команда сессии из композера. Ни одна не заводит нового поведения — каждая зовёт то,
    * что панель уже умеет по нажатию, и потому отказ у них тот же самый.
    */
@@ -162,6 +191,16 @@ export function ChatView(props: ChatViewProps) {
         ...(open.summary?.title === undefined ? {} : { title: open.summary.title }),
         archived: true,
       });
+    }
+
+    // Команда плагина зовётся тем же `invoke`, что и из палитры: обработчик один, и контекст
+    // сессии едет вызовом, а не вторым протоколом рядом.
+    if (pluginCommands.some((command) => command.name === invocation.name)) {
+      const outcome = await invoke(invocation.name, slashContext);
+
+      return outcome.kind === "done" || outcome.kind === "unavailable"
+        ? undefined
+        : t("chat.slash.refused.plugin", { name: invocation.name });
     }
 
     return t("chat.slash.unknown", { name: invocation.name });
@@ -440,6 +479,7 @@ export function ChatView(props: ChatViewProps) {
             onDropTarget={takeDropTarget}
             {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
             {...(open.commands === undefined ? {} : { commands: open.commands })}
+            pluginCommands={pluginCommands}
             onRunCommand={async (invocation) => {
               const reason = await runCommand(invocation);
 

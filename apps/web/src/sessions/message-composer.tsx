@@ -37,10 +37,13 @@ import {
   applySlash,
   coreSessionCommands,
   parseInvocation,
+  skillEntries,
   skillOf,
   slashAt,
   slashCatalogue,
+  templateEntries,
   type SlashDraft,
+  type SlashEntry,
   type SlashInvocation,
 } from "./slash-command.ts";
 import { SlashCatalogList } from "./slash-catalog-list.tsx";
@@ -79,6 +82,11 @@ export type MessageComposerProps = {
    */
   commands?: SessionCommands;
   /**
+   * Команды плагинов, поставленные в место `core.session.slash`. Считает их вью: доступность
+   * команды это host-расчёт, а композер про снимок плагинов ничего не знает.
+   */
+  pluginCommands?: SlashEntry[];
+  /**
    * Выполнить встроенную команду сессии. Возвращает причину отказа — черновик чистится только
    * принятой командой, ровно как принятым сообщением.
    */
@@ -113,6 +121,7 @@ export function MessageComposer({
   onDropTarget,
   onSearchFiles,
   commands,
+  pluginCommands,
   onRunCommand,
   context,
   stats,
@@ -248,20 +257,35 @@ export function MessageComposer({
 
     const skill = skillOf(invocation);
 
-    if (skill === undefined) {
-      startSubmission(() => onRunCommand(invocation));
+    if (skill !== undefined) {
+      startSubmission(() =>
+        onSubmit({
+          skill,
+          ...(invocation.arguments === "" ? {} : { instructions: invocation.arguments }),
+          model,
+          thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+        }),
+      );
 
       return;
     }
 
-    startSubmission(() =>
-      onSubmit({
-        skill,
-        ...(invocation.arguments === "" ? {} : { instructions: invocation.arguments }),
-        model,
-        thinkingLevel: reasoningSupported ? thinkingLevel : "off",
-      }),
-    );
+    // Шаблон — тоже турн, и уезжает он тем же `onSubmit`. Остальное умеет панель чата: у команд
+    // ядра и у команд плагинов свои обработчики, и запросов композер не делает.
+    if ((commands?.templates ?? []).some((template) => template.name === invocation.name)) {
+      startSubmission(() =>
+        onSubmit({
+          template: invocation.name,
+          ...(invocation.arguments === "" ? {} : { arguments: invocation.arguments }),
+          model,
+          thinkingLevel: reasoningSupported ? thinkingLevel : "off",
+        }),
+      );
+
+      return;
+    }
+
+    startSubmission(() => onRunCommand(invocation));
   };
 
   const sendMessage = (mode: SessionMessageMode): void => {
@@ -320,20 +344,24 @@ export function MessageComposer({
    * букву: скилы сессии приезжают целиком, и фильтр по ним — работа на несколько десятков строк.
    */
   const [slash, setSlash] = useState<SlashDraft | undefined>(undefined);
-  const catalogue = useMemo(
-    () =>
-      slash === undefined
-        ? []
-        : slashCatalogue(
-            slash.query,
-            coreSessionCommands.map((command) => ({
-              name: command.name,
-              description: t(command.descriptionKey),
-            })),
-            commands?.skills ?? [],
-          ),
-    [commands, slash, t],
-  );
+  const catalogue = useMemo(() => {
+    if (slash === undefined) {
+      return [];
+    }
+
+    // Порядок: команды ядра, шаблоны человека, команды плагинов, скилы. Ядро первым — их четыре и
+    // они всегда применимы; скилы последними — их бывают десятки, и искать четыре знакомых имени
+    // в их хвосте человеку незачем.
+    return slashCatalogue(slash.query, [
+      ...coreSessionCommands.map((command) => ({
+        name: command.name,
+        description: t(command.descriptionKey),
+      })),
+      ...templateEntries(commands?.templates ?? []),
+      ...(pluginCommands ?? []),
+      ...skillEntries(commands?.skills ?? []),
+    ]);
+  }, [commands, pluginCommands, slash, t]);
   const slashOpen = slash !== undefined && catalogue.length > 0;
 
   /**

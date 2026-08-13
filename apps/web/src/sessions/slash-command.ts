@@ -9,7 +9,12 @@
  * или дата `12/03` каталога не открывают.
  */
 
-import type { SessionSkillSummary } from "@sovereign/protocol";
+import {
+  coreSessionCommandNames,
+  isCoreSessionCommandName,
+  type SessionSkillSummary,
+  type SessionTemplateSummary,
+} from "@sovereign/protocol";
 
 /** Набираемая команда: где она кончается в тексте и что успели напечатать после `/`. */
 export type SlashDraft = {
@@ -24,18 +29,17 @@ export type SlashDraft = {
 export const skillPrefix = "skill:";
 
 /**
- * Встроенные команды сессии. Закрытый список: только эти имена ходят без префикса, и занять их
- * ничем нельзя. Ни одна не заводит нового поведения — каждая зовёт то, что панель чата уже умеет,
- * по тому же правилу, что и команды палитры.
+ * Встроенные команды сессии. Имена приходят из контракта: занять их не может ни шаблон, ни плагин,
+ * и знать об этом обязан и демон тоже (docs/sessions-and-projects.md). Здесь к каждому добавлен
+ * только ключ подписи — переводится она, как всё остальное в интерфейсе.
+ *
+ * Ни одна команда не заводит нового поведения: каждая зовёт то, что панель чата уже умеет, — то же
+ * правило, по которому написаны команды палитры.
  */
-export const coreSessionCommands = [
-  { name: "compact", descriptionKey: "chat.slash.compact" },
-  { name: "fork", descriptionKey: "chat.slash.fork" },
-  { name: "rename", descriptionKey: "chat.slash.rename" },
-  { name: "archive", descriptionKey: "chat.slash.archive" },
-] as const;
-
-export type CoreSessionCommandName = (typeof coreSessionCommands)[number]["name"];
+export const coreSessionCommands = coreSessionCommandNames.map((name) => ({
+  name,
+  descriptionKey: `chat.slash.${name}`,
+}));
 
 /** Строка каталога: то, что видно в списке под `/`. */
 export type SlashEntry = {
@@ -99,6 +103,11 @@ export function parseInvocation(text: string): SlashInvocation | undefined {
   return { name, arguments: space === -1 ? "" : text.slice(space + 1).trim() };
 }
 
+/** Команда ядра, если набранное имя принадлежит закрытому списку. */
+export function coreCommandOf(invocation: SlashInvocation): string | undefined {
+  return isCoreSessionCommandName(invocation.name) ? invocation.name : undefined;
+}
+
 /** Имя скила, если команда — это явный запуск. */
 export function skillOf(invocation: SlashInvocation): string | undefined {
   return invocation.name.startsWith(skillPrefix)
@@ -119,26 +128,37 @@ export function skillInvocation(name: string, instructions?: string): string {
 }
 
 /**
- * Каталог под набранным запросом. Команды ядра идут первыми: их четыре и они всегда применимы, а
- * скилов бывают десятки — и искать четыре знакомых имени в их хвосте человеку незачем.
+ * Строка запуска шаблона. Одна на всех — по той же причине, что и у скила.
+ */
+export function templateInvocation(name: string, args?: string): string {
+  return args === undefined || args === "" ? `/${name}` : `/${name} ${args}`;
+}
+
+/** Строки каталога под скилы сессии. */
+export function skillEntries(skills: readonly SessionSkillSummary[]): SlashEntry[] {
+  return skills.map((skill) => ({
+    name: `${skillPrefix}${skill.name}`,
+    description: skill.description,
+    ...(skill.hidden ? { hidden: true } : {}),
+  }));
+}
+
+/**
+ * Строки каталога под шаблоны промптов. Имя без префикса: шаблон — это то же, что команда ядра, с
+ * той разницей, что его написал человек (docs/file-resources.md).
+ */
+export function templateEntries(templates: readonly SessionTemplateSummary[]): SlashEntry[] {
+  return templates.map((template) => ({ name: template.name, description: template.description }));
+}
+
+/**
+ * Каталог под набранным запросом. Порядок задаёт вызывающий; здесь только отбор.
  *
  * Отбор по вхождению, а не по префиксу: имя скила приезжает с неймспейсом плагина, и `review`
  * обязан находить `starter.review`.
  */
-export function slashCatalogue(
-  query: string,
-  core: SlashEntry[],
-  skills: SessionSkillSummary[],
-): SlashEntry[] {
+export function slashCatalogue(query: string, entries: readonly SlashEntry[]): SlashEntry[] {
   const wanted = query.toLowerCase();
-  const entries: SlashEntry[] = [
-    ...core,
-    ...skills.map((skill) => ({
-      name: `${skillPrefix}${skill.name}`,
-      description: skill.description,
-      ...(skill.hidden ? { hidden: true } : {}),
-    })),
-  ];
 
   return entries.filter((entry) => entry.name.toLowerCase().includes(wanted));
 }
