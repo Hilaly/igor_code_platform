@@ -559,6 +559,23 @@ describe("messages that do not start a turn", () => {
     await session.close();
   });
 
+  it("refuses steering while a compaction runs", async () => {
+    const { open } = await withStore([{ text: "первый" }, { text: "пересказ" }]);
+    const session = await open();
+
+    await session.prompt("первый", "t1");
+
+    const compacting = session.compact();
+
+    // Турна нет — вклиниваться некуда. Принятое здесь сообщение легло бы в очередь стиринга,
+    // которую вычитывает только идущий турн, и осталось бы там навсегда.
+    assert.deepEqual(await session.message("левее", "steer"), { kind: "idle" });
+    assert.deepEqual(session.queues().steer, []);
+
+    assert.deepEqual(await compacting, { kind: "done" });
+    await session.close();
+  });
+
   it("keeps a message for the next turn across an interruption", async () => {
     const { open, requests } = await withStore([{ text: "первый" }]);
     const session = await open();
