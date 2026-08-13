@@ -39,6 +39,7 @@ import {
 
 import { Icon, type IconSize } from "./icon.tsx";
 import styles from "./icons.module.css";
+import sovereignMark from "../assets/sovereign-mark.png";
 
 export type SymbolIconProps = {
   size?: IconSize;
@@ -92,36 +93,14 @@ export const PanelLeftOpenIcon = actionIcon(PanelLeftOpen);
 export const PanelRightCloseIcon = actionIcon(PanelRightClose);
 export const PanelRightOpenIcon = actionIcon(PanelRightOpen);
 
-/**
- * Знак продукта: монограмма «S», которой встречают и провожают сессию. Не иконка действия — у неё
- * нет семантики жеста, только опознание продукта. Цвет берётся через `currentColor`: знак встаётся в
- * акцент роли (`--sovereign-accent`) через цвет родителя, отдельная палитра не нужна.
- *
- * Живёт в этом файле, а не отдельным примитивом: дисциплина кита требует, чтобы каждый компонент
- * нёс свой CSS-модуль, а `BrandMark` переиспользует размерную сетку `Icon` и `.symbol` целиком —
- * отдельный CSS ему не нужен.
- */
+/** Знак продукта: шесть раскрытых сегментов вокруг центрального золотого ядра. */
 export function BrandMark({
   size = "xl",
   label,
 }: SymbolIconProps & { label?: string }): React.JSX.Element {
   return (
     <Icon {...(size === undefined ? {} : { size })} label={label} className={styles.symbol}>
-      {/*
-        Монограмма «S»: одна линия без заливки, в духе display-шрифта. `vector-effect` сохраняет
-        толщину штриха при любом размере; внутренний SVG всегда декоративен — опознание даёт обёртка
-        `Icon` через `label`, когда имя нужно скринридеру.
-      */}
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M19 6.5C17.5 4.7 15 4 12.5 4 8.5 4 6 5.8 6 8.4c0 2.5 2 3.6 6 4.5 4.2 1 6 2.1 6 4.7 0 2.6-2.6 4.4-6.6 4.4-2.8 0-5.4-1-7-2.8"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
+      <img src={sovereignMark} alt="" aria-hidden="true" />
     </Icon>
   );
 }

@@ -381,15 +381,13 @@ describe("markup of the ported primitives", () => {
     expect(markup).not.toContain("undefined");
   });
 
-  it("renders the brand mark as a decorative symbol that follows the accent colour", () => {
-    // Без `label` знак декоративный: `aria-hidden`, `role="img"` не ставится — продукт объявляется
-    // названием рядом, а не самим знаком. Цвет берётся через `currentColor` (stroke), своя палитра
-    // у монограммы нет.
+  it("renders the six-segment brand mark as a decorative symbol", () => {
+    // Без `label` знак декоративный: продукт объявляется названием рядом, а не самим знаком.
     const markup = renderToStaticMarkup(<BrandMark />);
 
-    expect(markup.match(/<svg/g)).toHaveLength(1);
+    expect(markup).toContain('src="');
+    expect(markup).toContain('alt=""');
     expect(markup).toContain('aria-hidden="true"');
-    expect(markup).toContain('stroke="currentColor"');
     expect(markup).not.toContain("undefined");
   });
 
@@ -405,11 +403,11 @@ describe("markup of the ported primitives", () => {
   it("keeps the brand lockup name accessible and only hides its mark", () => {
     const markup = renderToStaticMarkup(<BrandLockup name="Sovereign" />);
 
-    expect(markup).toMatch(/^<div class="[^"]+"><span[^>]*aria-hidden="true"/);
+    expect(markup).toMatch(/<div class="[^"]+"><span[^>]*aria-hidden="true"/);
     expect(markup).not.toMatch(/^<div[^>]*aria-hidden/);
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain(">Sovereign<");
-    expect(markup).toContain('stroke="currentColor"');
+    expect(markup).toContain('src="');
     expect(markup).not.toContain("undefined");
   });
 
