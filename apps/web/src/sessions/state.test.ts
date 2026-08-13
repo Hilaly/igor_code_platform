@@ -596,7 +596,7 @@ describe("the queues, the counters and what the session lost", () => {
   it("shows what waits in the queues, replacing it wholesale", () => {
     const first = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [] },
     });
 
     expect(first.state.open?.queues?.steer).toEqual([{ text: "левее" }]);
@@ -605,20 +605,19 @@ describe("the queues, the counters and what the session lost", () => {
 
     const drained = applySessionDelta(first.state, "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [], followUp: [], nextTurn: [{ text: "потом" }] },
+      queues: { steer: [], followUp: [{ text: "потом" }] },
     });
 
     expect(drained.state.open?.queues).toEqual({
       steer: [],
-      followUp: [],
-      nextTurn: [{ text: "потом" }],
+      followUp: [{ text: "потом" }],
     });
   });
 
   it("forgets the queues when the stream comes back, because their deltas are gone", () => {
     const queued = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [] },
     }).state;
 
     expect(reconnected(queued).open?.queues).toBeUndefined();

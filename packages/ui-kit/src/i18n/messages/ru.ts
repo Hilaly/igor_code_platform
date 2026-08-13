@@ -50,8 +50,6 @@ export const coreRussian: CatalogRegistration = {
     "chat.mode.follow-up": "После турна",
     "chat.mode.follow-up.send": "Отправить после турна",
     "chat.mode.label": "Когда сообщение дойдёт до агента",
-    "chat.mode.next-turn": "К следующему турну",
-    "chat.mode.next-turn.send": "Оставить к следующему турну",
     "chat.mode.steer": "Прямо сейчас",
     "chat.mode.steer.send": "Вклинить",
     "chat.model": "Модель",

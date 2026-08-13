@@ -113,12 +113,8 @@ export function ChatView(props: ChatViewProps) {
   const agentAvailable = open.summary?.agentAvailable !== false;
   const sessionQueues = open.queues;
   const waiting = useMemo(
-    () => [
-      ...(sessionQueues?.steer ?? []),
-      ...(sessionQueues?.followUp ?? []),
-      ...(sessionQueues?.nextTurn ?? []),
-    ],
-    [sessionQueues?.followUp, sessionQueues?.nextTurn, sessionQueues?.steer],
+    () => [...(sessionQueues?.steer ?? []), ...(sessionQueues?.followUp ?? [])],
+    [sessionQueues?.followUp, sessionQueues?.steer],
   );
   const reasoningSupported = selectedModel(model, models)?.reasoning !== false;
 

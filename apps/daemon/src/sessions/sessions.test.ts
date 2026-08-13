@@ -1264,7 +1264,7 @@ describe("reading sessions", () => {
 
     const answer = await call("POST", sessionMessagesPath(sessionId), {
       text: "remember this",
-      mode: "next-turn",
+      mode: "append",
     });
 
     assert.equal(answer.status, 409);
@@ -1293,7 +1293,6 @@ describe("reading sessions", () => {
       ["steer", 409],
       ["follow-up", 409],
       ["append", 200],
-      ["next-turn", 200],
     ] as const) {
       const answer = await call("POST", sessionMessagesPath(sessionId), {
         text: "remember this",
@@ -1598,7 +1597,7 @@ describe("the session lifecycle over http", () => {
     assert.equal((await call("POST", sessionForkPath("00000000"), {})).status, 404);
   });
 
-  it("refuses steering when nothing is running and takes a message for the next turn", async () => {
+  it("refuses steering when nothing is running", async () => {
     const { call, start } = await serve({ turns: [{ text: "готово" }] });
     const sessionId = String((await start()).body["id"]);
 
@@ -1610,15 +1609,7 @@ describe("the session lifecycle over http", () => {
     assert.equal(steered.status, 409);
     assert.match(String(steered.body["error"]), /idle/);
 
-    const queued = await call("POST", sessionMessagesPath(sessionId), {
-      text: "не забудь про тесты",
-      mode: "next-turn",
-    });
-
-    assert.equal(queued.status, 200);
-    assert.equal(queued.body["mode"], "next-turn");
-
-    // Сообщение к следующему турну ждёт, а не запускает работу: сессия осталась в простое.
+    // Отказ ничего не запустил: сессия осталась в простое.
     assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "idle");
   });
 

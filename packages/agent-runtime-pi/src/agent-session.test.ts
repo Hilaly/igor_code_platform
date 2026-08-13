@@ -6,7 +6,7 @@ import { after, describe, it } from "node:test";
 
 import { createModels } from "@earendil-works/pi-ai";
 import type { Context } from "@earendil-works/pi-ai";
-import { foldEntryLabels, type SessionDelta } from "@sovereign/protocol";
+import { foldEntryLabels, type SessionDelta, type SessionQueues } from "@sovereign/protocol";
 
 import {
   createAgentSessionStore,
@@ -546,7 +546,7 @@ describe("messages that do not start a turn", () => {
       { text: "возьми левее" },
     ]);
     // Очередь опустела к концу турна: сообщение ушло в разговор, а не осталось висеть.
-    assert.deepEqual(session.queues(), { steer: [], followUp: [], nextTurn: [] });
+    assert.deepEqual(session.queues(), { steer: [], followUp: [] });
     await session.close();
   });
 
@@ -573,25 +573,6 @@ describe("messages that do not start a turn", () => {
     assert.deepEqual(session.queues().steer, []);
 
     assert.deepEqual(await compacting, { kind: "done" });
-    await session.close();
-  });
-
-  it("keeps a message for the next turn across an interruption", async () => {
-    const { open, requests } = await withStore([{ text: "первый" }]);
-    const session = await open();
-
-    assert.deepEqual(await session.message("не забудь про тесты", "next-turn"), { kind: "queued" });
-    assert.deepEqual(session.queues().nextTurn, [{ text: "не забудь про тесты" }]);
-
-    // Прерывание чистит стиринг и догоняющее, но не сообщение к следующему турну: оно про турн,
-    // которого ещё не было.
-    await session.abort();
-    assert.deepEqual(session.queues().nextTurn, [{ text: "не забудь про тесты" }]);
-
-    await session.prompt("поехали", "t1");
-
-    assert.match(saidToModel(requests, 0), /не забудь про тесты/);
-    assert.deepEqual(session.queues().nextTurn, []);
     await session.close();
   });
 
@@ -701,16 +682,34 @@ describe("images in a message", () => {
   });
 
   it("keeps a queued message whole in the snapshot, images and all", async () => {
-    const { open } = await seeing([{ text: "ок" }]);
+    const running: { session?: AgentSession } = {};
+    const seen: SessionQueues[] = [];
+    const { open } = await seeing(
+      [
+        { toolCalls: [{ id: "c1", name: "read", arguments: { path: "/dev/null" } }] },
+        { text: "ок" },
+      ],
+      (index) => {
+        if (index === 0) {
+          void running.session?.message("посмотри заодно", "steer", [png]).then(() => {
+            // Снимок снимается изнутри турна: к его концу очередь опустеет, и после `prompt`
+            // проверять было бы нечего.
+            seen.push(running.session?.queues() ?? { steer: [], followUp: [] });
+          });
+        }
+      },
+    );
     const session = await open();
+
+    running.session = session;
+
     const deltas = recorder(session);
 
-    assert.deepEqual(await session.message("посмотри потом", "next-turn", [png]), {
-      kind: "queued",
-    });
-    assert.deepEqual(session.queues().nextTurn, [{ text: "посмотри потом", images: [png] }]);
-    assert.deepEqual(deltas.filter((delta) => delta.kind === "queues").at(-1)?.queues.nextTurn, [
-      { text: "посмотри потом", images: [png] },
+    await session.prompt("что тут", "t1");
+
+    assert.deepEqual(seen.at(-1)?.steer, [{ text: "посмотри заодно", images: [png] }]);
+    assert.deepEqual(deltas.filter((delta) => delta.kind === "queues").at(0)?.queues.steer, [
+      { text: "посмотри заодно", images: [png] },
     ]);
     await session.close();
   });

@@ -512,11 +512,6 @@ export function MessageComposer({
             label: t("chat.mode.follow-up.send"),
             onSelect: () => sendMessage("follow-up"),
           },
-          {
-            id: "next-turn",
-            label: t("chat.mode.next-turn.send"),
-            onSelect: () => sendMessage("next-turn"),
-          },
         ] satisfies MenuItemDescription[])
       : []),
   ];

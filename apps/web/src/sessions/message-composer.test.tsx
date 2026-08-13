@@ -281,7 +281,6 @@ describe("the session message composer", () => {
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "Дописать без запуска",
       "Отправить после турна",
-      "Оставить к следующему турну",
     ]);
     expect(screen.queryByRole("radiogroup")).toBeNull();
   });

@@ -54,8 +54,6 @@ export const coreEnglish: CatalogRegistration = {
     "chat.mode.follow-up": "After the turn",
     "chat.mode.follow-up.send": "Send after the turn",
     "chat.mode.label": "When the message reaches the agent",
-    "chat.mode.next-turn": "Next turn",
-    "chat.mode.next-turn.send": "Keep for the next turn",
     "chat.mode.steer": "Right now",
     "chat.mode.steer.send": "Steer",
     "chat.model": "Model",

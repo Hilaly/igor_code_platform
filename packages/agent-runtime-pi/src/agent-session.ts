@@ -836,7 +836,7 @@ function liveSession(
    * Очереди рантайм наружу не отдаёт — только сообщает о смене событием, поэтому последнее
    * состояние приходится помнить: клиент, подключившийся посреди турна, спросит снимок.
    */
-  let queues: SessionQueues = { steer: [], followUp: [], nextTurn: [] };
+  let queues: SessionQueues = { steer: [], followUp: [] };
 
   /**
    * Одно наше звено на событие, а не по обработчику на подписчика: `emitHook` у Pi отдаёт победу
@@ -893,7 +893,6 @@ function liveSession(
       queues = {
         steer: event.steer.map(queuedMessage),
         followUp: event.followUp.map(queuedMessage),
-        nextTurn: event.nextTurn.map(queuedMessage),
       };
       publish({ kind: "queues", queues });
 
@@ -982,7 +981,6 @@ function liveSession(
     queues: () => ({
       steer: [...queues.steer],
       followUp: [...queues.followUp],
-      nextTurn: [...queues.nextTurn],
     }),
     message: async (text, mode, images) => {
       // Требования к занятости у режимов разные, и проверяются они здесь, а не в рантайме: у
@@ -1012,11 +1010,9 @@ function liveSession(
         await harness.steer(text, { images: carried });
       } else if (mode === "follow-up") {
         await harness.followUp(text, { images: carried });
-      } else if (mode === "next-turn") {
-        await harness.nextTurn(text, { images: carried });
       } else {
         // У `appendMessage` нет `options.images`, поэтому содержимое складывается руками — в том же
-        // порядке, в котором его складывают остальные четыре пути: текст, затем изображения.
+        // порядке, в котором его складывают остальные три пути: текст, затем изображения.
         await harness.appendMessage({
           role: "user",
           content: [{ type: "text", text }, ...carried],
@@ -1759,9 +1755,9 @@ function imagesOf(content: unknown): SessionImage[] {
 }
 
 /**
- * Изображения в том виде, в котором их принимает рантайм. Один перевод на все пять путей: разные
- * реализации `prompt`, `steer`, `follow-up`, `next-turn` и `append` быстро разошлись бы в порядке
- * блоков и в том, что считается сообщением без текста.
+ * Изображения в том виде, в котором их принимает рантайм. Один перевод на все четыре пути: разные
+ * реализации `prompt`, `steer`, `follow-up` и `append` быстро разошлись бы в порядке блоков и в
+ * том, что считается сообщением без текста.
  */
 function toRuntimeImages(images: readonly SessionImage[] | undefined) {
   return (images ?? []).map((image) => ({
