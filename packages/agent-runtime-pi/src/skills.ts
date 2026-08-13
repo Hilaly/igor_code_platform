@@ -9,6 +9,14 @@ export type AgentSkill = {
   disableModelInvocation?: boolean;
 };
 
+/**
+ * Скил вместе с инструкциями. Такой формой скил приезжает только на явный запуск: в системный
+ * prompt инструкции не копируются, и держать их в памяти для каждого применимого скила незачем.
+ */
+export type InvokedSkill = AgentSkill & {
+  content: string;
+};
+
 /** Компактный каталог для progressive disclosure: инструкции скилов в prompt не копируются. */
 export function renderSkillCatalogue(skills: readonly AgentSkill[]): string {
   const visible = skills
