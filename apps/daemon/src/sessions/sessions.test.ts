@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, request as sendRequest, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -21,6 +29,7 @@ import {
   projectPath,
   projectsPath,
   sessionBranchPath,
+  sessionCommandsPath,
   sessionCompactPath,
   sessionContextPath,
   sessionEntriesPath,
@@ -147,6 +156,7 @@ async function serve(
     coldSession?: boolean;
     compactionThreshold?: number;
     imageLimits?: ImageLimits;
+    commandsDirectory?: string;
     /** Что двойник модели принимает на вход. По умолчанию только текст. */
     input?: ("text" | "image")[];
     hooks?: Pick<HookDispatcher, "observe" | "decide">;
@@ -336,6 +346,9 @@ async function serve(
     ...(options.imageLimits === undefined
       ? {}
       : { imageLimits: () => options.imageLimits as ImageLimits }),
+    ...(options.commandsDirectory === undefined
+      ? {}
+      : { commandsDirectory: options.commandsDirectory }),
     bus,
     emitDelta: (frame) => deltas.push(frame),
     logger,
@@ -651,9 +664,15 @@ describe("POST /api/sessions", () => {
     assert.equal(appliedInstructions.at(-1), "first instructions");
     assert.equal(appliedAgentDirectories.at(-1), "/agents/first");
     assert.deepEqual(appliedToolNames.at(-1), ["read"]);
+    // Скрытый скил доезжает до рантайма вместе с остальными: скрыт он от модели, а не от человека,
+    // и отсеивает его рендерер каталога системного prompt, а не отбор здесь.
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
-      ["review"],
+      ["review", "hidden"],
+    );
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ disableModelInvocation }) => disableModelInvocation),
+      [undefined, true],
     );
     assert.deepEqual(toolContexts.at(-1), { projectId, folder });
 
@@ -2062,6 +2081,210 @@ describe("labelling an entry over http", () => {
       (await call("PUT", sessionEntryLabelPath("00000000", "e-1"), { label: "и" })).status,
       404,
     );
+  });
+});
+
+describe("session commands over http", () => {
+  /** Скил на диске: явный запуск читает сам файл, а не метаданные реестра. */
+  const writtenSkill = (
+    id: string,
+    content: string,
+    overrides: Parameters<typeof skill>[1] = {},
+  ): Extract<ContributionRegistration, { kind: "skill" }> => {
+    const directory = mkdtempSync(join(workspace, `skill-${id}-`));
+    const location = join(directory, "SKILL.md");
+
+    writeFileSync(location, content, "utf8");
+
+    return skill(id, { location, ...overrides });
+  };
+
+  it("lists the skills of the session, hidden ones included", async () => {
+    const review = skill("review");
+    const secret = skill("secret", { disableModelInvocation: true });
+    const other = skill("other");
+    const agent: AgentContributionRegistration = {
+      ...baseAgent,
+      skills: { include: ["review", "secret"], exclude: [] },
+    };
+    const { call, start } = await serve({
+      contributions: {
+        base: () => [agent],
+        forProject: () => [agent, review, secret, other],
+      },
+    });
+    const sessionId = String((await start()).body["id"]);
+    const answer = await call("GET", sessionCommandsPath(sessionId));
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(answer.body["skills"], [
+      { name: "review", description: "review description", hidden: false },
+      { name: "secret", description: "secret description", hidden: true },
+    ]);
+  });
+
+  it("says there is no catalogue for a session it does not have", async () => {
+    const { call } = await serve();
+
+    assert.equal((await call("GET", sessionCommandsPath("0199missing"))).status, 404);
+  });
+
+  it("refuses the catalogue of an archived session", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: true })).status, 200);
+
+    const answer = await call("GET", sessionCommandsPath(sessionId));
+
+    assert.equal(answer.status, 409);
+    assert.match(String(answer.body["error"]), /archived/);
+  });
+
+  it("runs a turn from a skill the model cannot pick itself", async () => {
+    const secret = writtenSkill("secret", "почини сборку и ничего больше", {
+      disableModelInvocation: true,
+    });
+    const agent: AgentContributionRegistration = {
+      ...baseAgent,
+      skills: { include: ["secret"], exclude: [] },
+    };
+    const { call, start, appliedSkills } = await serve({
+      turns: [{ text: "починил" }],
+      contributions: { base: () => [agent], forProject: () => [agent, secret] },
+    });
+    const sessionId = String((await start()).body["id"]);
+    const answer = await call("POST", sessionTurnsPath(sessionId), {
+      skill: "secret",
+      instructions: "начни с тестов",
+    });
+
+    assert.equal(answer.status, 200);
+    await untilIdle(call, sessionId);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const said = JSON.stringify(
+      page.entries.filter((entry) => entry.kind === "message" && entry.role === "user"),
+    );
+
+    // Модель получила инструкции скила целиком, а каталог системного prompt его по-прежнему не
+    // видит: скрытый скил остаётся скрытым, запустил его человек.
+    assert.match(said, /почини сборку и ничего больше/);
+    assert.match(said, /начни с тестов/);
+    assert.deepEqual(
+      appliedSkills.at(-1)?.map(({ name }) => name),
+      ["secret"],
+    );
+    assert.equal(appliedSkills.at(-1)?.[0]?.disableModelInvocation, true);
+  });
+
+  it("refuses a skill outside the selection of the agent without taking a queue slot", async () => {
+    const allowed = writtenSkill("allowed", "можно");
+    const denied = writtenSkill("denied", "нельзя");
+    const agent: AgentContributionRegistration = {
+      ...baseAgent,
+      skills: { include: ["allowed"], exclude: [] },
+    };
+    const { call, start } = await serve({
+      turns: [{ text: "готово" }],
+      contributions: { base: () => [agent], forProject: () => [agent, allowed, denied] },
+    });
+    const sessionId = String((await start()).body["id"]);
+    const refused = await call("POST", sessionTurnsPath(sessionId), { skill: "denied" });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /denied/);
+
+    // Слот очереди отказ не занял: следующий турн уходит сразу, а не ждёт освобождения.
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "обычный турн" })).status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+  });
+
+  it("reads prompt templates of both roots and lets the project one win", async () => {
+    const commandsDirectory = mkdtempSync(join(workspace, "commands-"));
+
+    writeFileSync(
+      join(commandsDirectory, "review.md"),
+      "---\ndescription: Пользовательский разбор\n---\n\nРазбери $ARGUMENTS\n",
+      "utf8",
+    );
+    // Имя команды ядра занять нельзя: `/compact` обязан значить одно и то же везде.
+    writeFileSync(join(commandsDirectory, "compact.md"), "---\n---\n\nне я\n", "utf8");
+
+    const { call, start, folder } = await serve({ commandsDirectory });
+
+    mkdirSync(join(folder, ".sovereign", "commands"), { recursive: true });
+    writeFileSync(
+      join(folder, ".sovereign", "commands", "review.md"),
+      "---\ndescription: Проектный разбор\n---\n\nРазбери ветку $1\n",
+      "utf8",
+    );
+
+    const sessionId = String((await start()).body["id"]);
+    const answer = await call("GET", sessionCommandsPath(sessionId));
+
+    assert.deepEqual(answer.body["templates"], [
+      { name: "review", description: "Проектный разбор", scope: "project" },
+    ]);
+  });
+
+  it("runs a turn from a prompt template with the arguments substituted", async () => {
+    const commandsDirectory = mkdtempSync(join(workspace, "commands-"));
+
+    writeFileSync(
+      join(commandsDirectory, "review.md"),
+      "---\ndescription: Разбор\n---\n\nРазбери $1 и посмотри на $2\n",
+      "utf8",
+    );
+
+    const { call, start } = await serve({ commandsDirectory, turns: [{ text: "разобрал" }] });
+    const sessionId = String((await start()).body["id"]);
+    const answer = await call("POST", sessionTurnsPath(sessionId), {
+      template: "review",
+      arguments: 'срез "пятнадцать b"',
+    });
+
+    assert.equal(answer.status, 200);
+    await untilIdle(call, sessionId);
+
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+    const said = JSON.stringify(
+      page.entries.filter((entry) => entry.kind === "message" && entry.role === "user"),
+    );
+
+    assert.match(said, /Разбери срез/);
+    assert.match(said, /пятнадцать b/);
+  });
+
+  it("refuses an unknown prompt template without taking a queue slot", async () => {
+    const { call, start } = await serve({ turns: [{ text: "готово" }] });
+    const sessionId = String((await start()).body["id"]);
+    const refused = await call("POST", sessionTurnsPath(sessionId), { template: "нет-такого" });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /нет-такого/);
+    assert.equal(
+      (await call("POST", sessionTurnsPath(sessionId), { text: "обычный турн" })).status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+  });
+
+  it("refuses a body that names both a message and a skill", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+    const answer = await call("POST", sessionTurnsPath(sessionId), {
+      text: "сделай",
+      skill: "review",
+    });
+
+    assert.equal(answer.status, 400);
+    assert.match(String(answer.body["error"]), /skill/);
   });
 });
 

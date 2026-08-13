@@ -26,6 +26,7 @@ import {
   type ProviderSummary,
   type Session,
   type SessionBranch,
+  type SessionCommands,
   type SessionContextUsage,
   type SessionDelta,
   type SessionImage,
@@ -94,6 +95,11 @@ export type OpenSession = {
    * файлу, эта — «сколько ещё влезет» в действующую ветку (docs/sessions-and-projects.md).
    */
   context?: SessionContextUsage;
+  /**
+   * Что предлагает композер по `/`. Спрашивается вместе с остальным снимком и перечитывается на
+   * смену вкладов: включённый плагин со скилом обязан появиться в каталоге без перезагрузки.
+   */
+  commands?: SessionCommands;
   /**
    * Действующие метки записей. Свёртка, а не список записей `label`: снятие рантайм пишет такой же
    * записью, и «есть ли метка» — это результат свёртки, а не наличие записи (docs/web-api.md).
@@ -518,6 +524,16 @@ export function applyContext(
   const open = state.open;
 
   return open?.id === sessionId ? { ...state, open: { ...open, context } } : state;
+}
+
+export function applyCommands(
+  state: SessionsState,
+  sessionId: string,
+  commands: SessionCommands | undefined,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, commands } } : state;
 }
 
 /**

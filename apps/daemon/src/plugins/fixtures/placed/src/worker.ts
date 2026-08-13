@@ -55,6 +55,13 @@ export const activate = async (): Promise<void> => {
   });
 
   await contribute.command({
+    id: "note",
+    title: "Note the session in the log",
+    export: "NoteCommand",
+    placeId: "core.session.slash",
+  });
+
+  await contribute.command({
     id: "boom-command",
     title: "A command that throws when run",
     export: "BoomCommand",

@@ -14,5 +14,6 @@ export * from "./hook-events.ts";
 export * from "./interaction.ts";
 export * from "./model-catalogs.ts";
 export * from "./plugin-tool.ts";
+export * from "./prompt-templates.ts";
 export * from "./user-model-catalog.ts";
 export * from "./skills.ts";

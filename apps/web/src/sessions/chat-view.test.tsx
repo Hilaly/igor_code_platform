@@ -123,6 +123,7 @@ const chatProps = (open: OpenSession, overrides: Partial<ChatViewProps> = {}): C
   onInterrupt: vi.fn(),
   onFork: vi.fn(() => Promise.resolve()),
   onCompact: vi.fn(() => Promise.resolve(undefined)),
+  onUpdateSession: vi.fn(() => Promise.resolve(undefined)),
   onSetLabel: vi.fn(() => Promise.resolve(undefined)),
   onNavigate: vi.fn(() => Promise.resolve({ kind: "refused" as const, reason: "unused" })),
   translator,

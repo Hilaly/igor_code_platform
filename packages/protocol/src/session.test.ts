@@ -200,6 +200,74 @@ describe("parseTurnRequest", () => {
   it("refuses an empty images list instead of taking it as a text-only turn", () => {
     assert.equal(parseTurnRequest({ text: "", images: [] }).kind, "rejected");
   });
+
+  it("reads a skill turn with the instructions written after it", () => {
+    const result = parseTurnRequest({ skill: "review", instructions: "начни с тестов" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      skill: "review",
+      instructions: "начни с тестов",
+    });
+  });
+
+  it("reads a skill turn with the per-turn overrides", () => {
+    const result = parseTurnRequest({ skill: "review", thinkingLevel: "high" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      skill: "review",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("refuses a body that names both a message and a skill", () => {
+    const result = parseTurnRequest({ text: "сделай", skill: "review" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /skill/);
+  });
+
+  it("refuses images beside a skill instead of dropping them silently", () => {
+    const result = parseTurnRequest({ skill: "review", images: [png] });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /images/);
+  });
+
+  it("refuses instructions without a skill", () => {
+    const result = parseTurnRequest({ text: "сделай", instructions: "начни с тестов" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /instructions/);
+  });
+
+  it("reads a template turn with the arguments as one string", () => {
+    const result = parseTurnRequest({ template: "review", arguments: "срез 15" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      template: "review",
+      arguments: "срез 15",
+    });
+  });
+
+  it("refuses arguments without a template", () => {
+    const result = parseTurnRequest({ text: "сделай", arguments: "срез 15" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /arguments/);
+  });
+
+  it("refuses a body that names a template beside a skill", () => {
+    const result = parseTurnRequest({ template: "review", skill: "starter.review" });
+
+    assert.equal(result.kind, "rejected");
+    assert.match(result.diagnostics.join(" "), /more than one operation/);
+  });
+
+  it("refuses a nameless skill", () => {
+    for (const skill of ["", "   ", 5, null]) {
+      assert.equal(parseTurnRequest({ skill }).kind, "rejected", JSON.stringify(skill));
+    }
+  });
 });
 
 describe("parseSessionImages", () => {

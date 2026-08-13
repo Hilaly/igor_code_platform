@@ -181,6 +181,92 @@ describe("an agent session over pi", () => {
     await session.close();
   });
 
+  it("starts a turn with the instructions of an explicitly named skill", async () => {
+    const { open, requests } = await withStore([{ text: "разобрал" }]);
+    const session = await open();
+    const deltas = recorder(session);
+
+    // Каталог системного prompt при этом не трогается: скрытый скил остаётся скрытым от модели, а
+    // инструкции уезжают ровно один раз — первым сообщением турна.
+    session.setSkills([
+      {
+        name: "review",
+        description: "Review the change",
+        location: "/tmp/review/SKILL.md",
+        disableModelInvocation: true,
+      },
+    ]);
+
+    const outcome = await session.activateSkill(
+      {
+        name: "review",
+        description: "Review the change",
+        location: "/tmp/review/SKILL.md",
+        content: "смотри на границы модулей",
+        disableModelInvocation: true,
+      },
+      "t1",
+      "начни с тестов",
+    );
+
+    assert.equal(outcome.kind, "done");
+    assert.equal(requests[0]?.systemPrompt, "ты двойник");
+
+    const said = saidToModel(requests, 0);
+
+    assert.match(said, /смотри на границы модулей/);
+    assert.match(said, /начни с тестов/);
+    assert.deepEqual(
+      deltas.filter((delta) => delta.kind === "phase").map((delta) => delta.phase),
+      ["turn", "idle"],
+    );
+    await session.close();
+  });
+
+  it("starts a turn from a prompt template with the arguments substituted", async () => {
+    const { open, requests } = await withStore([{ text: "разобрал" }]);
+    const session = await open();
+
+    const outcome = await session.runPromptTemplate(
+      {
+        name: "review",
+        description: "Разбор изменения",
+        content: "Разбери $1 и обрати внимание на $ARGUMENTS",
+      },
+      "t1",
+      'срез "пятнадцать b"',
+    );
+
+    assert.equal(outcome.kind, "done");
+
+    const said = saidToModel(requests, 0);
+
+    // Кавычки разбирает Pi — тот же разбор, что и подстановка: `$1` это `срез`, а `$ARGUMENTS` —
+    // оба аргумента целиком.
+    assert.match(said, /Разбери срез/);
+    assert.match(said, /пятнадцать b/);
+    await session.close();
+  });
+
+  it("refuses a skill turn while the session is busy", async () => {
+    const { open } = await withStore([{ text: "первый" }, { text: "второй" }]);
+    const session = await open();
+    const running = session.prompt("первый", "t1");
+    const refused = await session.activateSkill(
+      {
+        name: "review",
+        description: "Review the change",
+        location: "/tmp/review/SKILL.md",
+        content: "смотри на границы модулей",
+      },
+      "t2",
+    );
+
+    assert.equal(refused.kind, "busy");
+    assert.equal((await running).kind, "done");
+    await session.close();
+  });
+
   it("uses the latest instructions, agent data and skills on every turn", async () => {
     const { open, requests } = await withStore(
       [{ text: "reviewed" }, { text: "deployed" }, { text: "finished" }],

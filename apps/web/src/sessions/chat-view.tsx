@@ -11,6 +11,7 @@ import type {
   SessionForkRequest,
   SessionMessage,
   SessionNavigateRequest,
+  SessionUpdate,
   ThinkingLevel,
   TurnRequest,
 } from "@sovereign/protocol";
@@ -27,6 +28,8 @@ import {
   Notice,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
+import { useCommands } from "@sovereign/browser-sdk";
+import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
@@ -35,6 +38,7 @@ import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
 import { SessionMessageList } from "./session-message-list.tsx";
+import type { SlashEntry, SlashInvocation } from "./slash-command.ts";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
 import { useShellHeader } from "../shell/header.tsx";
 
@@ -55,12 +59,17 @@ export type ChatViewProps = {
   onCompact: (instructions?: string) => Promise<string | undefined>;
   /** Пометить запись или снять метку (`null`). Возвращает причину отказа. */
   onSetLabel: (entryId: string, label: string | null) => Promise<string | undefined>;
+  /** Переименовать или убрать в архив. Возвращает причину отказа. */
+  onUpdateSession: (update: SessionUpdate) => Promise<string | undefined>;
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
   translator: ScopedTranslator;
 };
 
-/** Что именно отказались сделать: у компакции и метки разные сообщения об отказе. */
-type Refusal = { what: "compact" | "label"; reason: string };
+/** Место каталога `/`: вклад «команда» с этим `placeId` встаёт строкой в композере. */
+const slashPlaceId = "core.session.slash";
+
+/** Что именно отказались сделать: у каждого действия своё сообщение об отказе. */
+type Refusal = { what: "compact" | "label" | "command"; reason: string };
 
 export function ChatView(props: ChatViewProps) {
   const {
@@ -77,6 +86,7 @@ export function ChatView(props: ChatViewProps) {
     onFork,
     onCompact,
     onSetLabel,
+    onUpdateSession,
     translator,
   } = props;
   const { t } = translator;
@@ -128,6 +138,73 @@ export function ChatView(props: ChatViewProps) {
     setRefusal(reason === undefined ? undefined : { what: "compact", reason });
   };
   const archived = open.summary?.archived === true;
+
+  /**
+   * Команды плагинов, поставленные в место `core.session.slash`. Контекст — эта сессия: у палитры
+   * его нет, а место сессионное, и вклад из папки чужого проекта его занять не вправе.
+   */
+  const slashContext = useMemo(
+    () => ({
+      ...(open.summary?.projectId === undefined ? {} : { project: open.summary.projectId }),
+      subject: { sessionId: open.id },
+    }),
+    [open.id, open.summary?.projectId],
+  );
+  const { invoke } = useCommands();
+  const placedCommands = useHostCommandCatalog(slashContext);
+  const pluginCommands = useMemo<SlashEntry[]>(
+    () =>
+      placedCommands
+        .filter(({ registration }) => registration.placeId === slashPlaceId)
+        .map(({ registration }) => ({
+          name: registration.id,
+          description: registration.title,
+        })),
+    [placedCommands],
+  );
+
+  /**
+   * Встроенная команда сессии из композера. Ни одна не заводит нового поведения — каждая зовёт то,
+   * что панель уже умеет по нажатию, и потому отказ у них тот же самый.
+   */
+  const runCommand = async (invocation: SlashInvocation): Promise<string | undefined> => {
+    if (invocation.name === "compact") {
+      return onCompact(invocation.arguments === "" ? undefined : invocation.arguments);
+    }
+
+    if (invocation.name === "fork") {
+      await onFork({});
+
+      return undefined;
+    }
+
+    if (invocation.name === "rename") {
+      // Безымянная сессия законна, но снимает имя явная кнопка, а не команда без аргумента: человек,
+      // набравший `/rename` и промахнувшийся мимо имени, хотел назвать её, а не обезличить.
+      return invocation.arguments === ""
+        ? t("chat.slash.rename.empty")
+        : onUpdateSession({ title: invocation.arguments, archived: false });
+    }
+
+    if (invocation.name === "archive") {
+      return onUpdateSession({
+        ...(open.summary?.title === undefined ? {} : { title: open.summary.title }),
+        archived: true,
+      });
+    }
+
+    // Команда плагина зовётся тем же `invoke`, что и из палитры: обработчик один, и контекст
+    // сессии едет вызовом, а не вторым протоколом рядом.
+    if (pluginCommands.some((command) => command.name === invocation.name)) {
+      const outcome = await invoke(invocation.name, slashContext);
+
+      return outcome.kind === "done" || outcome.kind === "unavailable"
+        ? undefined
+        : t("chat.slash.refused.plugin", { name: invocation.name });
+    }
+
+    return t("chat.slash.unknown", { name: invocation.name });
+  };
 
   useEffect(() => {
     setDraftReplacement(undefined);
@@ -271,6 +348,9 @@ export function ChatView(props: ChatViewProps) {
         {refusal?.what !== "compact" ? undefined : (
           <Notice tone="danger" title={t("chat.compact.refused", { reason: refusal.reason })} />
         )}
+        {refusal?.what !== "command" ? undefined : (
+          <Notice tone="danger" title={t("chat.slash.refused", { reason: refusal.reason })} />
+        )}
         {open.degradations.map((lost, index) => (
           <Notice
             key={`${lost.kind}:${lost.name}:${String(index)}`}
@@ -398,6 +478,15 @@ export function ChatView(props: ChatViewProps) {
             onInterrupt={onInterrupt}
             onDropTarget={takeDropTarget}
             {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
+            {...(open.commands === undefined ? {} : { commands: open.commands })}
+            pluginCommands={pluginCommands}
+            onRunCommand={async (invocation) => {
+              const reason = await runCommand(invocation);
+
+              setRefusal(reason === undefined ? undefined : { what: "command", reason });
+
+              return reason;
+            }}
             onError={(error: unknown) => {
               onDiagnostic?.(
                 `the message composer acceptance failed: ${

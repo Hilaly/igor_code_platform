@@ -214,6 +214,80 @@ describe("the session surface", () => {
     });
   });
 
+  it("starts skill, template and image turns through the public session surface", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerSessions(() => ({
+      kind: "session-prompt",
+      accepted: { sessionId: "0199", turnId: "t2", phase: "turn" },
+    }));
+
+    const image = { mimeType: "image/png" as const, data: "iVBORw0KGgo=" };
+
+    await sessions.prompt({
+      sessionId: "0199",
+      skill: "starter.review",
+      instructions: "начни с тестов",
+      model: "scripted/one",
+    });
+    await sessions.prompt({
+      sessionId: "0199",
+      template: "review",
+      arguments: 'срез "пятнадцать b"',
+      thinkingLevel: "high",
+    });
+    await sessions.prompt({ sessionId: "0199", text: "посмотри", images: [image] });
+
+    assert.deepEqual(host.sessionRequests, [
+      {
+        kind: "session-prompt",
+        turn: {
+          sessionId: "0199",
+          skill: "starter.review",
+          instructions: "начни с тестов",
+          model: "scripted/one",
+        },
+      },
+      {
+        kind: "session-prompt",
+        turn: {
+          sessionId: "0199",
+          template: "review",
+          arguments: 'срез "пятнадцать b"',
+          thinkingLevel: "high",
+        },
+      },
+      {
+        kind: "session-prompt",
+        turn: { sessionId: "0199", text: "посмотри", images: [image] },
+      },
+    ]);
+  });
+
+  it("carries images through the public non-turn message surface", async () => {
+    const host = installTestHost({ id: "tracker" });
+    host.answerSessions(() => ({
+      kind: "session-message",
+      accepted: { sessionId: "0199", mode: "append" },
+    }));
+
+    const image = { mimeType: "image/webp" as const, data: "UklGRg==" };
+
+    assert.deepEqual(
+      await sessions.message("0199", { text: "смотри", images: [image], mode: "append" }),
+      {
+        sessionId: "0199",
+        mode: "append",
+      },
+    );
+    assert.deepEqual(host.sessionRequests, [
+      {
+        kind: "session-message",
+        sessionId: "0199",
+        message: { text: "смотри", images: [image], mode: "append" },
+      },
+    ]);
+  });
+
   it("reads the branch and the context, compacts, navigates and labels", async () => {
     const host = installTestHost({ id: "tracker" });
     const entries = [

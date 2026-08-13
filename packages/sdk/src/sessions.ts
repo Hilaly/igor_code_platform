@@ -39,6 +39,13 @@ export type Session = {
 /** Что человек вправе приложить к сообщению. Список закрыт, как и в протоколе. */
 export type SessionImageMimeType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
+/** Изображение, приложенное к реплике или явному сообщению сессии. */
+export type SessionImage = {
+  mimeType: SessionImageMimeType;
+  /** Чистый base64 без `data:` prefix. */
+  data: string;
+};
+
 export type SessionContentBlock =
   | { kind: "text"; text: string }
   /** Изображение внутри сообщения. `data` — чистый base64 без `data:` prefix. */
@@ -156,12 +163,46 @@ export type SessionDraft = {
   thinkingLevel?: ThinkingLevel;
 };
 
-export type TurnRequest = {
-  sessionId: string;
-  text: string;
+export type TurnOverrides = {
   model?: string;
   thinkingLevel?: ThinkingLevel;
 };
+
+/** Реплика человека. Текст может быть пустым только при наличии изображения. */
+export type SaidTurnRequest = TurnOverrides & {
+  sessionId: string;
+  text: string;
+  images?: SessionImage[];
+  skill?: never;
+  instructions?: never;
+  template?: never;
+  arguments?: never;
+};
+
+/** Явный запуск применимого скила. */
+export type SkillTurnRequest = TurnOverrides & {
+  sessionId: string;
+  skill: string;
+  instructions?: string;
+  text?: never;
+  images?: never;
+  template?: never;
+  arguments?: never;
+};
+
+/** Запуск файлового prompt template; аргументы передаются одной строкой. */
+export type TemplateTurnRequest = TurnOverrides & {
+  sessionId: string;
+  template: string;
+  arguments?: string;
+  text?: never;
+  images?: never;
+  skill?: never;
+  instructions?: never;
+};
+
+/** Тело запуска турна: реплика, скил или шаблон. */
+export type TurnRequest = SaidTurnRequest | SkillTurnRequest | TemplateTurnRequest;
 
 export type TurnAccepted = {
   sessionId: string;
@@ -192,6 +233,7 @@ export type SessionMessageMode = "steer" | "follow-up" | "next-turn" | "append";
 
 export type SessionMessage = {
   text: string;
+  images?: SessionImage[];
   mode: SessionMessageMode;
 };
 

@@ -193,6 +193,14 @@
   background: var(--sovereign-sunken-surface);
 }
 
+/* Строка каталога команд: имя, за ним описание. Список тот же, что у подсказки файлов. */
+.sessions-slash-description,
+.sessions-slash-hidden {
+  margin-inline-start: var(--sovereign-space-2);
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+}
+
 .sessions-mention-more {
   margin: 0;
   padding-block: var(--sovereign-space-1);

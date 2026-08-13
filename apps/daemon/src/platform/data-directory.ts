@@ -51,6 +51,12 @@ export const archivedSessionsDirectoryName = "sessions-archived";
  */
 export const pluginStorageDirectoryName = "plugin-storage";
 
+/**
+ * Папка шаблонов промптов (docs/file-resources.md). Создаётся при старте, как `plugins/` и `work/`:
+ * человеку надо куда-то положить первый шаблон, а корня, которого нет, он не заведёт.
+ */
+export const commandsDirectoryName = "commands";
+
 export const pluginFilesDirectoryName = "plugin-files";
 
 export function ensureDataDirectory(path: string): string {
@@ -65,6 +71,7 @@ export function ensureDataDirectory(path: string): string {
   mkdirSync(join(directory, workDirectoryName), { recursive: true });
   mkdirSync(join(directory, sessionsDirectoryName), { recursive: true });
   mkdirSync(join(directory, archivedSessionsDirectoryName), { recursive: true });
+  mkdirSync(join(directory, commandsDirectoryName), { recursive: true });
 
   return directory;
 }

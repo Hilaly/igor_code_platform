@@ -26,6 +26,7 @@ export const sessionBranchPathPattern = `${sessionsPath}/:sessionId/branch`;
 export const sessionCompactPathPattern = `${sessionsPath}/:sessionId/compact`;
 export const sessionNavigatePathPattern = `${sessionsPath}/:sessionId/navigate`;
 export const sessionContextPathPattern = `${sessionsPath}/:sessionId/context`;
+export const sessionCommandsPathPattern = `${sessionsPath}/:sessionId/commands`;
 export const sessionEntryLabelPathPattern = `${sessionsPath}/:sessionId/entries/:entryId/label`;
 
 /** Параметр фильтра списка: сессии одного проекта. */
@@ -89,6 +90,10 @@ export function sessionNavigatePath(sessionId: string): string {
 
 export function sessionContextPath(sessionId: string): string {
   return `${sessionPath(sessionId)}/context`;
+}
+
+export function sessionCommandsPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/commands`;
 }
 
 export function sessionEntryLabelPath(sessionId: string, entryId: string): string {
@@ -205,17 +210,101 @@ export type SessionDraft = {
   thinkingLevel?: ThinkingLevel;
 };
 
+/** Переопределения турна. Действуют с этого турна и пишутся в дерево сессии. */
+export type TurnOverrides = {
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
 /**
- * Тело запуска турна. Переопределения действуют с этого турна и пишутся в дерево сессии.
+ * Турн, начатый репликой человека.
  *
  * `text` бывает пустым ровно тогда, когда есть хотя бы одно изображение: скриншот без единого слова —
  * законная просьба. Пустого сообщения без того и другого не бывает.
  */
-export type TurnRequest = {
+export type SaidTurnRequest = TurnOverrides & {
   text: string;
   images?: SessionImage[];
-  model?: string;
-  thinkingLevel?: ThinkingLevel;
+  skill?: never;
+  template?: never;
+  instructions?: never;
+  arguments?: never;
+};
+
+/**
+ * Турн, начатый явно названным скилом (docs/sessions-and-projects.md). Модель получает инструкции
+ * скила целиком — не ссылку на них, — поэтому вместе с текстовой репликой такой турн не едет:
+ * это две разные операции, а не одна с двумя началами.
+ */
+export type SkillTurnRequest = TurnOverrides & {
+  skill: string;
+  /** Что человек дописал к запуску. Уезжает после инструкций скила. */
+  instructions?: string;
+  text?: never;
+  images?: never;
+  template?: never;
+  arguments?: never;
+};
+
+/**
+ * Турн, начатый шаблоном промпта (docs/file-resources.md). Аргументы едут одной строкой, как их
+ * набрал человек: правила кавычек принадлежат рантайму, который их и подставляет, а второй разбор
+ * на проводе разошёлся бы с ним на первой же строке с кавычками.
+ */
+export type TemplateTurnRequest = TurnOverrides & {
+  template: string;
+  arguments?: string;
+  text?: never;
+  images?: never;
+  skill?: never;
+  instructions?: never;
+};
+
+/** Тело запуска турна: реплика человека, явно названный скил либо шаблон промпта. */
+export type TurnRequest = SaidTurnRequest | SkillTurnRequest | TemplateTurnRequest;
+
+/**
+ * Скил в каталоге команд сессии. Отбор агента уже применён: браузер показывает то, что запустится,
+ * и не повторяет серверный расчёт применимости.
+ */
+export type SessionSkillSummary = {
+  name: string;
+  description: string;
+  /**
+   * Скил, скрытый от модели (`disable-model-invocation`). Его нет в каталоге системного prompt,
+   * и запустить его может только человек — поэтому в каталоге команд он есть.
+   */
+  hidden: boolean;
+};
+
+/**
+ * Имена, принадлежащие командам ядра над сессией (docs/sessions-and-projects.md). Закрытый список,
+ * и он живёт в контракте, а не в браузере: шаблон, занявший такое имя, не должен запускаться ни
+ * из композера, ни из SDK — иначе одно и то же `/compact` значило бы разное в разных проектах.
+ */
+export const coreSessionCommandNames = ["compact", "fork", "rename", "archive"] as const;
+
+export type CoreSessionCommandName = (typeof coreSessionCommandNames)[number];
+
+export function isCoreSessionCommandName(value: string): value is CoreSessionCommandName {
+  return (coreSessionCommandNames as readonly string[]).includes(value);
+}
+
+/**
+ * Шаблон промпта в каталоге команд сессии. Имя без префикса: шаблоны и команды ядра делят одно
+ * пространство имён, и занявший имя команды ядра шаблон в каталог не попадает
+ * (docs/file-resources.md).
+ */
+export type SessionTemplateSummary = {
+  name: string;
+  description: string;
+  scope: "user" | "project";
+};
+
+/** Каталог команд сессии: то, что предлагает композер по `/`. */
+export type SessionCommands = {
+  skills: SessionSkillSummary[];
+  templates: SessionTemplateSummary[];
 };
 
 /**
@@ -591,7 +680,16 @@ export function isSessionId(value: unknown): value is string {
 }
 
 const draftKeys = ["projectId", "agentId", "model", "thinkingLevel"];
-const turnKeys = ["text", "images", "model", "thinkingLevel"];
+const turnKeys = [
+  "text",
+  "images",
+  "skill",
+  "instructions",
+  "template",
+  "arguments",
+  "model",
+  "thinkingLevel",
+];
 const updateKeys = ["title", "archived"];
 const forkKeys = ["entryId", "position"];
 const messageKeys = ["text", "images", "mode"];
@@ -644,10 +742,30 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
   }
 
   const diagnostics = diagnoseUnknownKeys(label, fields, turnKeys);
-  const said = parseSaidMessage(fields, label, diagnostics);
 
-  if (said === undefined) {
+  // Тело называет ровно одну операцию. Реплика рядом со скилом — не «скил с подписью», а два
+  // начала одного турна: угадать за отправителя, какое из них он имел в виду, нечем.
+  const named = ["text", "images", "skill", "template"].filter((key) => fields[key] !== undefined);
+  const operations = new Set(named.map((key) => (key === "images" ? "text" : key)));
+
+  if (operations.size > 1) {
+    diagnostics.push(
+      `${label} names more than one operation (${named.join(", ")}): it must name one`,
+    );
+
     return { kind: "rejected", diagnostics };
+  }
+
+  // Хвост принадлежит своей ветке. Молча его выбросить значило бы соврать отправителю про
+  // отправленное — ровно как выброшенная картинка.
+  const companions: Record<string, string> = { instructions: "skill", arguments: "template" };
+
+  for (const [companion, owner] of Object.entries(companions)) {
+    if (fields[companion] !== undefined && fields[owner] === undefined) {
+      diagnostics.push(`${label}.${companion} belongs to ${label}.${owner}: name it or drop it`);
+
+      return { kind: "rejected", diagnostics };
+    }
   }
 
   const overrides = parseOverrides(fields, label, diagnostics);
@@ -656,7 +774,80 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
     return { kind: "rejected", diagnostics };
   }
 
+  if (fields["skill"] !== undefined) {
+    const skill = trimmedText(fields["skill"]);
+
+    if (skill === undefined) {
+      diagnostics.push(`${label}.skill must be a non-empty skill name`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    const instructions = optionalText(fields, "instructions", label, diagnostics);
+
+    if (instructions === undefined) {
+      return { kind: "rejected", diagnostics };
+    }
+
+    return {
+      kind: "parsed",
+      value: { skill, ...instructions, ...overrides },
+      diagnostics,
+    };
+  }
+
+  if (fields["template"] !== undefined) {
+    const template = trimmedText(fields["template"]);
+
+    if (template === undefined) {
+      diagnostics.push(`${label}.template must be a non-empty template name`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    const args = optionalText(fields, "arguments", label, diagnostics);
+
+    if (args === undefined) {
+      return { kind: "rejected", diagnostics };
+    }
+
+    return { kind: "parsed", value: { template, ...args, ...overrides }, diagnostics };
+  }
+
+  const said = parseSaidMessage(fields, label, diagnostics);
+
+  if (said === undefined) {
+    return { kind: "rejected", diagnostics };
+  }
+
   return { kind: "parsed", value: { ...said, ...overrides }, diagnostics };
+}
+
+/**
+ * Необязательный хвост ветки: либо непустой текст, либо его нет. `undefined` — отказ, потому что
+ * названный пустым хвост это противоречие, а не «хвоста нет».
+ */
+function optionalText<Key extends string>(
+  fields: Record<string, unknown>,
+  key: Key,
+  label: string,
+  diagnostics: string[],
+): Partial<Record<Key, string>> | undefined {
+  const raw = fields[key];
+
+  if (raw === undefined) {
+    return {};
+  }
+
+  const text = trimmedText(raw);
+
+  if (text === undefined) {
+    diagnostics.push(`${label}.${key} must be a non-empty text, or absent`);
+
+    return undefined;
+  }
+
+  return { [key]: text } as Record<Key, string>;
 }
 
 export function parseSessionUpdate(

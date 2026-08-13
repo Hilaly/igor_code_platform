@@ -23,6 +23,7 @@ import {
   createWriteTool,
   estimateContextTokens,
   JsonlSessionRepo,
+  parseCommandArgs,
   prepareCompaction,
   SessionError,
   type AgentHarnessEvent,
@@ -33,7 +34,7 @@ import {
   type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { MutableModels, Usage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, MutableModels, Usage } from "@earendil-works/pi-ai";
 import {
   isThinkingLevel,
   modelReference,
@@ -58,7 +59,7 @@ import {
   type RuntimeHookSeam,
 } from "./hook-events.ts";
 import { renderAgentData } from "./agent-data.ts";
-import { renderSkillCatalogue, type AgentSkill } from "./skills.ts";
+import { renderSkillCatalogue, type AgentSkill, type InvokedSkill } from "./skills.ts";
 
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
 export type AgentTool = {
@@ -96,6 +97,27 @@ export type AgentSession = {
   phase: () => SessionPhase;
   /** Отказ `busy` приезжает исходом, а не исключением: занятость — обычное состояние, а не сбой. */
   prompt: (text: string, turnId: string, images?: SessionImage[]) => Promise<TurnOutcome>;
+  /**
+   * Турн, начатый скилом, который человек назвал сам. Обычный турн, а не второй путь мимо очереди:
+   * отличается только тем, что первым сообщением уезжают инструкции скила, а не реплика.
+   *
+   * Скил приезжает с уже прочитанным текстом: искать и читать `SKILL.md` — работа ядра, у которого
+   * есть реестр вкладов и отбор агента, а у рантайма нет ни того, ни другого.
+   */
+  activateSkill: (
+    skill: InvokedSkill,
+    turnId: string,
+    instructions?: string,
+  ) => Promise<TurnOutcome>;
+  /**
+   * Турн, начатый шаблоном промпта. Аргументы приезжают строкой, как их набрал человек: правила
+   * кавычек принадлежат Pi, который их и подставляет, и второй разбор рядом с ним разошёлся бы.
+   */
+  runPromptTemplate: (
+    template: { name: string; description: string; content: string },
+    turnId: string,
+    args?: string,
+  ) => Promise<TurnOutcome>;
   /** `false` — прерывать было нечего. */
   abort: () => Promise<boolean>;
   /** Проверить текущую модель по живому каталогу, не меняя и не записывая её. */
@@ -757,6 +779,60 @@ function liveSession(
   };
 
   /**
+   * Каркас турна: захват фазы, публикация исхода и учёт трат. Реплика человека и явно названный
+   * скил различаются только тем, чем турн начинается, — всё остальное у них обязано совпадать до
+   * буквы, иначе один из двух путей однажды перестанет публиковать событие или отпускать фазу.
+   *
+   * `refused` — отказ до первого обращения к модели: турна не было, поэтому и события об упавшем
+   * турне нет.
+   */
+  const runTurn = async (
+    turnId: string,
+    start: () => Promise<
+      { kind: "answered"; answer: AssistantMessage } | { kind: "refused"; reason: string }
+    >,
+  ): Promise<TurnOutcome> => {
+    if (phase !== "idle") {
+      return { kind: "busy" };
+    }
+
+    current = { turnId, aborted: false, messages: 0 };
+    spent = undefined;
+    setPhase("turn");
+
+    try {
+      const started = await start();
+
+      if (started.kind === "refused") {
+        return { kind: "failed", reason: started.reason };
+      }
+
+      const { answer } = started;
+
+      if (answer.stopReason === "error") {
+        publish({ kind: "turn-failed", reason: answer.errorMessage ?? "the turn failed" });
+
+        return { kind: "failed", reason: answer.errorMessage ?? "the turn failed" };
+      }
+
+      publish(current.aborted ? { kind: "turn-aborted" } : { kind: "turn-end" });
+
+      return spent === undefined ? { kind: "done" } : { kind: "done", usage: spent };
+    } catch (cause) {
+      if (cause instanceof AgentHarnessError && cause.code === "busy") {
+        return { kind: "busy" };
+      }
+
+      publish({ kind: "turn-failed", reason: describe(cause) });
+
+      return { kind: "failed", reason: describe(cause) };
+    } finally {
+      current = undefined;
+      setPhase("idle");
+    }
+  };
+
+  /**
    * Очереди рантайм наружу не отдаёт — только сообщает о смене событием, поэтому последнее
    * состояние приходится помнить: клиент, подключившийся посреди турна, спросит снимок.
    */
@@ -946,47 +1022,54 @@ function liveSession(
 
       return { kind: "queued" };
     },
-    prompt: async (text, turnId, images) => {
-      if (phase !== "idle") {
-        return { kind: "busy" };
-      }
-
-      current = { turnId, aborted: false, messages: 0 };
-      spent = undefined;
-      setPhase("turn");
-
-      try {
+    prompt: async (text, turnId, images) =>
+      runTurn(turnId, async () =>
         // Проверка модели уже внутри захваченной фазы: между проверкой занятости и `setPhase` не
         // должно быть ни одного `await`, иначе второй турн того же такта не увидит первого и
         // запустится рядом.
-        if (!(await modelFits(images))) {
-          return { kind: "failed", reason: `the model ${summary.model} does not read images` };
-        }
+        (await modelFits(images))
+          ? {
+              kind: "answered",
+              answer: await harness.prompt(text, { images: toRuntimeImages(images) }),
+            }
+          : { kind: "refused", reason: `the model ${summary.model} does not read images` },
+      ),
+    activateSkill: async (skill, turnId, instructions) =>
+      runTurn(turnId, async () => {
+        // Ресурс ставится на сам вызов и в системный prompt не попадает: каталог там собирается
+        // нашим `renderSkillCatalogue`, а полный текст скила уезжает модели ровно один раз —
+        // первым сообщением этого турна (docs/agent-runtime-contract.md).
+        await harness.setResources({
+          skills: [
+            {
+              name: skill.name,
+              description: skill.description,
+              filePath: skill.location,
+              content: skill.content,
+            },
+          ],
+        });
 
-        const answer = await harness.prompt(text, { images: toRuntimeImages(images) });
+        return { kind: "answered", answer: await harness.skill(skill.name, instructions) };
+      }),
+    runPromptTemplate: async (template, turnId, args) =>
+      runTurn(turnId, async () => {
+        // Ресурс на один вызов — по той же причине, что у скила: держать все шаблоны в памяти
+        // harness незачем, а системный prompt о них не знает вовсе.
+        await harness.setResources({
+          promptTemplates: [
+            { name: template.name, description: template.description, content: template.content },
+          ],
+        });
 
-        if (answer.stopReason === "error") {
-          publish({ kind: "turn-failed", reason: answer.errorMessage ?? "the turn failed" });
-
-          return { kind: "failed", reason: answer.errorMessage ?? "the turn failed" };
-        }
-
-        publish(current.aborted ? { kind: "turn-aborted" } : { kind: "turn-end" });
-
-        return spent === undefined ? { kind: "done" } : { kind: "done", usage: spent };
-      } catch (cause) {
-        if (cause instanceof AgentHarnessError && cause.code === "busy") {
-          return { kind: "busy" };
-        }
-
-        publish({ kind: "turn-failed", reason: describe(cause) });
-
-        return { kind: "failed", reason: describe(cause) };
-      } finally {
-        current = undefined;
-        setPhase("idle");
-      }
-    },
+        return {
+          kind: "answered",
+          answer: await harness.promptFromTemplate(
+            template.name,
+            args === undefined ? [] : parseCommandArgs(args),
+          ),
+        };
+      }),
     abort: async () => {
       if (current === undefined) {
         return false;

@@ -13,6 +13,7 @@ import {
   projectFilesPath,
   sessionArchivedParameter,
   sessionBranchPath,
+  sessionCommandsPath,
   sessionCompactPath,
   sessionContextPath,
   sessionEntriesAfterParameter,
@@ -29,6 +30,7 @@ import {
   type AgentsSnapshot,
   type Session,
   type SessionBranch,
+  type SessionCommands,
   type SessionCompactAccepted,
   type SessionContextUsage,
   type SessionDraft,
@@ -210,6 +212,30 @@ export async function fetchContextUsage(
   }
 
   return (await response.json()) as SessionContextUsage;
+}
+
+/**
+ * Каталог команд сессии. `undefined` — сессии нет или она архивная: в обоих случаях предлагать по
+ * `/` нечего, и отказ здесь не событие, а обычное «каталога нет».
+ */
+export async function fetchSessionCommands(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<SessionCommands | undefined> {
+  const response = await fetch(
+    sessionCommandsPath(sessionId),
+    signal === undefined ? {} : { signal },
+  );
+
+  if (response.status === 404 || response.status === 409) {
+    return undefined;
+  }
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as SessionCommands;
 }
 
 export type CreateSessionOutcome =

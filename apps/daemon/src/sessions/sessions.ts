@@ -6,12 +6,14 @@
  * инструментов, очередь походов к модели и поток дельт.
  */
 
-import { dirname } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import {
   agentsPath,
   coreEventTypes,
   defaultConfig,
+  isCoreSessionCommandName,
   isSessionId,
   parseSessionCompactRequest,
   parseSessionDraft,
@@ -25,6 +27,7 @@ import {
   sessionArchivedParameter,
   sessionBranchFromParameter,
   sessionBranchPathPattern,
+  sessionCommandsPathPattern,
   sessionCompactPathPattern,
   sessionContextPathPattern,
   sessionEntriesAfterParameter,
@@ -45,6 +48,7 @@ import {
   type SkillContributionRegistration,
   type Session,
   type SessionBranch,
+  type SessionCommands,
   type SessionCompactAccepted,
   type SessionCompactRequest,
   type SessionContextUsage,
@@ -67,12 +71,17 @@ import {
   type TurnAccepted,
   type TurnRequest,
 } from "@sovereign/protocol";
+import { loadPromptTemplates } from "@sovereign/agent-runtime-pi";
 import type {
   AgentDefinition,
   AgentSession,
   AgentSessionStore,
   AgentSessionSummary,
   AgentSkill,
+  InvokedSkill,
+  PromptTemplate,
+  PromptTemplateRoot,
+  TurnOutcome,
 } from "@sovereign/agent-runtime-pi";
 
 import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
@@ -132,6 +141,12 @@ export type SessionServiceOptions = {
    * тесты сессий о плагинах не знают вовсе.
    */
   hooks?: Pick<HookDispatcher, "observe" | "decide">;
+  /**
+   * Корень пользовательских шаблонов промптов — `commands/` директории данных
+   * (docs/file-resources.md). Не задан — пользовательских шаблонов нет: службе, поднятой в тесте,
+   * директории данных знать неоткуда.
+   */
+  commandsDirectory?: string;
 };
 
 /** Исход создания. Отказ домена — не исключение: маршрут переводит его в код, мост — в текст. */
@@ -156,6 +171,15 @@ export type PromptOutcome =
    * `413`, а «в сессии больше нет места» — состояние сессии, то есть `409` (docs/web-api.md).
    */
   | { kind: "refused"; reason: string; status?: 413 | 409 };
+
+/**
+ * Исход чтения каталога команд. Отсутствующий агент — отказ, а не пустой каталог: пустой каталог
+ * человек читает как «скилов нет», а исчезнувший плагин с агентом — совсем другая беда.
+ */
+export type SessionCommandsOutcome =
+  | { kind: "commands"; commands: SessionCommands }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
 
 /** Исход операции, отдающей изменённую или новую сессию: форк и запись изменений. */
 export type SessionOutcome =
@@ -206,6 +230,8 @@ export type SessionService = {
   /** `undefined` — такой сессии нет. Архивная находится: убрана она с глаз, а не из системы. */
   entries: (sessionId: string, after?: number) => Promise<SessionEntriesPage | undefined>;
   prompt: (request: PromptRequest) => Promise<PromptOutcome>;
+  /** Что предлагает композер по `/`: скилы, применимые к этой сессии (docs/web-api.md). */
+  commands: (sessionId: string) => Promise<SessionCommandsOutcome>;
   /** `false` — прерывать было нечего. */
   abort: (sessionId: string) => Promise<boolean>;
   /** Новая сессия из куска этой. Форк рождается действующим, даже если источник архивный. */
@@ -255,6 +281,14 @@ const sessionCreated: PlatformHookName = "session_created";
 const sessionClosed: PlatformHookName = "session_closed";
 const turnFinished: PlatformHookName = "turn_finished";
 
+/**
+ * Предел размера `SKILL.md` на явном запуске. Совпадает с пределом обхода файловых ресурсов
+ * намеренно: файл уже прошёл его при регистрации, и второе число здесь означало бы скил, который
+ * реестр принял, а запустить нельзя. Своей константой, а не общей: обход живёт в области плагинов,
+ * а сессии на неё не опираются (docs/architecture.md).
+ */
+const maximumSkillBytes = 1_048_576;
+
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const availabilityOf =
     options.availability ?? ((project: StoredProject) => probeProjectFolder(project.folder));
@@ -295,13 +329,19 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     ...(agent.location === undefined ? {} : { directory: dirname(agent.location) }),
   });
 
+  /**
+   * Скилы, применимые к сессии. Скрытые (`disable-model-invocation`) отсюда не выбрасываются:
+   * скрыты они от модели, а не от человека, и единственное место, где их отсеивают, — рендерер
+   * каталога системного prompt. Выбрось их здесь — и явный запуск не нашёл бы их вовсе
+   * (docs/sessions-and-projects.md).
+   */
   const skillsFor = (
     contributions: ContributionRegistration[],
     agent: AgentContributionRegistration,
   ): AgentSkill[] => {
     const registrations = contributions.filter(
       (registration): registration is SkillContributionRegistration =>
-        registration.kind === "skill" && registration.disableModelInvocation !== true,
+        registration.kind === "skill",
     );
     const selected = new Set(
       selectNames(
@@ -316,6 +356,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         name: registration.id,
         description: registration.description ?? "",
         location: registration.location,
+        ...(registration.disableModelInvocation ? { disableModelInvocation: true as const } : {}),
       }));
   };
 
@@ -538,26 +579,41 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     }
   };
 
-  const prepareForModel = async (
-    session: AgentSession,
+  /**
+   * Действующий агент сессии вместе со вкладами её проекта. Спрашивают об этом все, кому нужно
+   * определение агента, и спрашивают одинаково: агента могли выключить вместе с плагином уже после
+   * того, как сессия была создана.
+   */
+  const agentOfSession = (
     summary: AgentSessionSummary,
-  ): Promise<{ kind: "ready" } | { kind: "missing-agent"; agentId: string }> => {
+  ):
+    | { contributions: ContributionRegistration[]; agent: AgentContributionRegistration }
+    | undefined => {
     const contributions = options.contributions.forProject(summary.projectId);
-    const currentAgent = contributions.find(
+    const agent = contributions.find(
       (registration): registration is AgentContributionRegistration =>
         registration.kind === "agent" && registration.id === summary.agentId,
     );
 
-    if (currentAgent === undefined) {
+    return agent === undefined ? undefined : { contributions, agent };
+  };
+
+  const prepareForModel = async (
+    session: AgentSession,
+    summary: AgentSessionSummary,
+  ): Promise<{ kind: "ready" } | { kind: "missing-agent"; agentId: string }> => {
+    const current = agentOfSession(summary);
+
+    if (current === undefined) {
       return { kind: "missing-agent", agentId: summary.agentId };
     }
 
     await applyRuntimeDefinitions(
       session,
       summary.projectId,
-      currentAgent,
+      current.agent,
       summary.folder,
-      contributions,
+      current.contributions,
     );
 
     return { kind: "ready" };
@@ -821,13 +877,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return { kind: "refused", reason: "the session is archived" };
     }
 
-    const contributions = options.contributions.forProject(summary.projectId);
-    const currentAgent = contributions.find(
-      (registration): registration is AgentContributionRegistration =>
-        registration.kind === "agent" && registration.id === summary.agentId,
-    );
-
-    if (currentAgent === undefined) {
+    if (agentOfSession(summary) === undefined) {
       return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
     }
 
@@ -1217,6 +1267,192 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   };
 
   /**
+   * Шаблоны промптов, применимые к сессии. Читаются на каждый спрос, а не кешируются: файлов
+   * единицы и они маленькие, а кеш пришлось бы чем-то сбрасывать — вторым наблюдателем за
+   * директориями рядом с уже заведённым для файловых ресурсов (docs/file-resources.md).
+   *
+   * Имя решает спор: проектный шаблон перекрывает пользовательский — та же лестница частности, что
+   * у файловых агентов и скилов. Имя команды ядра занять нельзя вовсе.
+   */
+  const templatesFor = async (summary: AgentSessionSummary): Promise<PromptTemplate[]> => {
+    const project = options.projects.find(summary.projectId);
+    const roots: PromptTemplateRoot[] = [
+      ...(options.commandsDirectory === undefined
+        ? []
+        : [{ path: options.commandsDirectory, scope: "user" as const }]),
+      ...(project === undefined || project.archived
+        ? []
+        : [{ path: join(project.folder, ".sovereign", "commands"), scope: "project" as const }]),
+    ];
+
+    if (roots.length === 0) {
+      return [];
+    }
+
+    const loaded = await loadPromptTemplates(roots);
+
+    for (const diagnostic of loaded.diagnostics) {
+      options.logger.warn("a prompt template could not be read", {
+        path: diagnostic.path,
+        reason: diagnostic.reason,
+      });
+    }
+
+    const byName = new Map<string, PromptTemplate>();
+
+    for (const template of loaded.templates) {
+      if (isCoreSessionCommandName(template.name)) {
+        options.logger.warn("a prompt template takes the name of a core command", {
+          template: template.name,
+          scope: template.scope,
+        });
+
+        continue;
+      }
+
+      // Проектный идёт вторым и потому побеждает: корни перечислены от общего к частному.
+      byName.set(template.name, template);
+    }
+
+    return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name, "en"));
+  };
+
+  const commands = async (sessionId: string): Promise<SessionCommandsOutcome> => {
+    const summary = find(sessionId);
+
+    if (summary === undefined) {
+      return { kind: "unknown" };
+    }
+
+    // Архивная сессия к модели не ходит, и каталог того, что нельзя запустить, вводил бы в
+    // заблуждение ровно там, где человек уже набрал `/`.
+    if (summary.archived) {
+      return { kind: "refused", reason: "the session is archived" };
+    }
+
+    const current = agentOfSession(summary);
+
+    if (current === undefined) {
+      return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
+    }
+
+    return {
+      kind: "commands",
+      commands: {
+        skills: skillsFor(current.contributions, current.agent)
+          .map((skill) => ({
+            name: skill.name,
+            description: skill.description,
+            hidden: skill.disableModelInvocation === true,
+          }))
+          .sort((left, right) => left.name.localeCompare(right.name, "en")),
+        templates: (await templatesFor(summary)).map((template) => ({
+          name: template.name,
+          description: template.description,
+          scope: template.scope,
+        })),
+      },
+    };
+  };
+
+  /**
+   * Скил, названный человеком: тот же отбор агента, что у каталога, плюс чтение самих инструкций.
+   *
+   * Читает ядро, а не рантайм: реестр вкладов и отбор агента есть здесь, и только здесь видно, что
+   * `starter.review` этой сессии — не тот же файл, что `starter.review` соседней.
+   */
+  const skillToRun = async (
+    summary: AgentSessionSummary,
+    name: string,
+  ): Promise<{ kind: "skill"; skill: InvokedSkill } | { kind: "refused"; reason: string }> => {
+    const current = agentOfSession(summary);
+
+    if (current === undefined) {
+      return { kind: "refused", reason: `the agent ${summary.agentId} is not available` };
+    }
+
+    const skill = skillsFor(current.contributions, current.agent).find(
+      (candidate) => candidate.name === name,
+    );
+
+    if (skill === undefined) {
+      return { kind: "refused", reason: `the skill ${name} is not available in this session` };
+    }
+
+    const size = await stat(skill.location).catch(() => undefined);
+
+    if (size === undefined) {
+      return { kind: "refused", reason: `the skill ${name} cannot be read from ${skill.location}` };
+    }
+
+    // Предел тот же, что у обхода файловых ресурсов: реестр уже прочитал этот файл по тем же
+    // правилам, и второй предел рядом означал бы, что зарегистрированный скил не запускается.
+    if (size.size > maximumSkillBytes) {
+      return {
+        kind: "refused",
+        reason: `the skill ${name} is larger than ${maximumSkillBytes} bytes`,
+      };
+    }
+
+    const content = await readFile(skill.location, "utf8").catch(() => undefined);
+
+    if (content === undefined) {
+      return { kind: "refused", reason: `the skill ${name} cannot be read from ${skill.location}` };
+    }
+
+    return { kind: "skill", skill: { ...skill, content } };
+  };
+
+  /**
+   * Чем начинается турн: репликой человека или инструкциями названного скила. Дальше оба пути
+   * совпадают до буквы — очередь, пределы, подготовка к модели и хук `turn_finished` у явного
+   * скила те же, что у обычного турна.
+   */
+  const turnStart = async (
+    session: AgentSession,
+    summary: AgentSessionSummary,
+    request: PromptRequest,
+  ): Promise<
+    | { kind: "start"; run: (turnId: string) => Promise<TurnOutcome> }
+    | { kind: "refused"; reason: string }
+  > => {
+    if (request.template !== undefined) {
+      const wanted = request.template;
+      const template = (await templatesFor(summary)).find((candidate) => candidate.name === wanted);
+
+      if (template === undefined) {
+        return {
+          kind: "refused",
+          reason: `the prompt template ${wanted} is not available in this session`,
+        };
+      }
+
+      const args = request.arguments;
+
+      return { kind: "start", run: (turnId) => session.runPromptTemplate(template, turnId, args) };
+    }
+
+    if (request.skill !== undefined) {
+      const invoked = await skillToRun(summary, request.skill);
+
+      if (invoked.kind === "refused") {
+        return invoked;
+      }
+
+      const { instructions } = request;
+
+      return {
+        kind: "start",
+        run: (turnId) => session.activateSkill(invoked.skill, turnId, instructions),
+      };
+    }
+
+    const { text, images } = request;
+
+    return { kind: "start", run: (turnId) => session.prompt(text, turnId, images) };
+  };
+
+  /**
    * Влезают ли приложенные изображения в пределы и в остаток бюджета сессии.
    *
    * Записи сессии читаются только тогда, когда картинки есть: сообщение без них ничего не добавляет
@@ -1340,6 +1576,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return oversized;
     }
 
+    // По той же причине здесь же решается, чем турн начнётся: разрешение названного скила и чтение
+    // его инструкций — работа, которая может кончиться отказом.
+    const start = await turnStart(session, summary, request);
+
+    if (start.kind === "refused") {
+      return start;
+    }
+
     const project = options.projects.find(summary.projectId);
 
     if (project === undefined || project.archived) {
@@ -1437,7 +1681,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
             }
           }
 
-          const outcome = await session.prompt(request.text, turnId, request.images);
+          const outcome = await start.run(turnId);
 
           if (outcome.kind === "failed") {
             options.logger.warn("a turn failed", { session: sessionId, reason: outcome.reason });
@@ -1519,6 +1763,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     create,
     entries,
     prompt,
+    commands,
     abort,
     fork,
     update,
@@ -1807,6 +2052,27 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
 
           respondWithJson(response, 200, counted);
+        },
+      },
+      {
+        method: "GET",
+        path: sessionCommandsPathPattern,
+        handle: async ({ response, parameters }) => {
+          const catalogue = await commands(parameters["sessionId"] ?? "");
+
+          if (catalogue.kind === "unknown") {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          if (catalogue.kind === "refused") {
+            respondWithError(response, 409, catalogue.reason);
+
+            return;
+          }
+
+          respondWithJson(response, 200, catalogue.commands);
         },
       },
       {

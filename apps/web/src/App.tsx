@@ -762,6 +762,9 @@ export function App() {
                       }}
                       onCompact={sessions.compact}
                       onSetLabel={sessions.setEntryLabel}
+                      onUpdateSession={(update) =>
+                        sessions.updateSession(sessions.state.open?.id ?? "", update)
+                      }
                       onNavigate={sessions.navigate}
                       translator={translator}
                     />
