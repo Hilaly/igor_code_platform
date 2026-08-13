@@ -223,6 +223,31 @@ describe("an agent session over pi", () => {
     await session.close();
   });
 
+  it("starts a turn from a prompt template with the arguments substituted", async () => {
+    const { open, requests } = await withStore([{ text: "разобрал" }]);
+    const session = await open();
+
+    const outcome = await session.runPromptTemplate(
+      {
+        name: "review",
+        description: "Разбор изменения",
+        content: "Разбери $1 и обрати внимание на $ARGUMENTS",
+      },
+      "t1",
+      'срез "пятнадцать b"',
+    );
+
+    assert.equal(outcome.kind, "done");
+
+    const said = saidToModel(requests, 0);
+
+    // Кавычки разбирает Pi — тот же разбор, что и подстановка: `$1` это `срез`, а `$ARGUMENTS` —
+    // оба аргумента целиком.
+    assert.match(said, /Разбери срез/);
+    assert.match(said, /пятнадцать b/);
+    await session.close();
+  });
+
   it("refuses a skill turn while the session is busy", async () => {
     const { open } = await withStore([{ text: "первый" }, { text: "второй" }]);
     const session = await open();

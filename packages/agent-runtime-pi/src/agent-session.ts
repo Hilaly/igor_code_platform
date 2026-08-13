@@ -23,6 +23,7 @@ import {
   createWriteTool,
   estimateContextTokens,
   JsonlSessionRepo,
+  parseCommandArgs,
   prepareCompaction,
   SessionError,
   type AgentHarnessEvent,
@@ -107,6 +108,15 @@ export type AgentSession = {
     skill: InvokedSkill,
     turnId: string,
     instructions?: string,
+  ) => Promise<TurnOutcome>;
+  /**
+   * Турн, начатый шаблоном промпта. Аргументы приезжают строкой, как их набрал человек: правила
+   * кавычек принадлежат Pi, который их и подставляет, и второй разбор рядом с ним разошёлся бы.
+   */
+  runPromptTemplate: (
+    template: { name: string; description: string; content: string },
+    turnId: string,
+    args?: string,
   ) => Promise<TurnOutcome>;
   /** `false` — прерывать было нечего. */
   abort: () => Promise<boolean>;
@@ -1041,6 +1051,24 @@ function liveSession(
         });
 
         return { kind: "answered", answer: await harness.skill(skill.name, instructions) };
+      }),
+    runPromptTemplate: async (template, turnId, args) =>
+      runTurn(turnId, async () => {
+        // Ресурс на один вызов — по той же причине, что у скила: держать все шаблоны в памяти
+        // harness незачем, а системный prompt о них не знает вовсе.
+        await harness.setResources({
+          promptTemplates: [
+            { name: template.name, description: template.description, content: template.content },
+          ],
+        });
+
+        return {
+          kind: "answered",
+          answer: await harness.promptFromTemplate(
+            template.name,
+            args === undefined ? [] : parseCommandArgs(args),
+          ),
+        };
       }),
     abort: async () => {
       if (current === undefined) {
