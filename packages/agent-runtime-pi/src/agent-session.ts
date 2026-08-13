@@ -58,7 +58,7 @@ import {
   type RuntimeHookRefusal,
   type RuntimeHookSeam,
 } from "./hook-events.ts";
-import { renderAgentData } from "./agent-data.ts";
+import { renderRuntimeContext } from "./agent-data.ts";
 import { renderSkillCatalogue, type AgentSkill, type InvokedSkill } from "./skills.ts";
 
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
@@ -356,6 +356,8 @@ export type CreateAgentSessionStoreOptions = {
    * за пределами пакета этим значением можно только владеть, но не пользоваться.
    */
   models: MutableModels;
+  /** Корень общих данных Sovereign, показываемый модели как отдельный от cwd runtime-контекст. */
+  sovereignDataDirectory: string;
   /** Корень записей сессий внутри директории данных (docs/data-directory.md). */
   directory: string;
   /**
@@ -382,6 +384,7 @@ export type CreateAgentSessionStoreOptions = {
  */
 type SessionSeams = {
   compactionSettings: () => CompactionTuning;
+  sovereignDataDirectory: string;
   hooks?: RuntimeHookSeam;
 };
 
@@ -508,6 +511,7 @@ export function createAgentSessionStore(
 
     const persisted = persistedSession(session, options.models, summary, {
       compactionSettings: options.compactionSettings,
+      sovereignDataDirectory: options.sovereignDataDirectory,
       ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
     });
 
@@ -702,7 +706,15 @@ function liveSession(
     tools: [],
     toolContext: { env: environment },
     systemPrompt: () =>
-      [instructions, renderAgentData(agentDirectory), renderSkillCatalogue(skills)]
+      [
+        instructions,
+        renderRuntimeContext({
+          cwd: summary.folder,
+          ...(agentDirectory === undefined ? {} : { agentPersonalDirectory: agentDirectory }),
+          sovereignDataDirectory: seams.sovereignDataDirectory,
+        }),
+        renderSkillCatalogue(skills),
+      ]
         .filter((section) => section !== "")
         .join("\n\n"),
   });

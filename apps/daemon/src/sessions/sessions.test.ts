@@ -179,6 +179,7 @@ async function serve(
     restoreModel,
   } = scriptedSessionStore({
     directory: join(directory, "sessions"),
+    sovereignDataDirectory: directory,
     archivedDirectory: join(directory, "sessions-archived"),
     turns: options.turns ?? [{ text: "готово" }],
     ...(options.input === undefined ? {} : { input: options.input }),

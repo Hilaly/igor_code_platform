@@ -296,17 +296,28 @@ Node в комплекте. Это и есть «агент из коробки 
 `medium`, `high`, `xhigh`, `max`. Инструкции — `systemPrompt`, строкой или колбэком.
 
 Платформа передаёт `systemPrompt` колбэком и вычисляет его заново на границе каждой операции
-модели. Основные инструкции агента сохраняются целиком. Для файлового агента после них через пустую
-строку добавляется папка, в которой лежит выбранный `AGENT.md`:
+модели. Основные инструкции агента сохраняются целиком. После них через пустую строку добавляется
+контекст файловых директорий сессии:
 
 ```xml
-<agent_data>
-  <directory>/absolute/path/to/agent</directory>
-</agent_data>
+<runtime_context>
+  <cwd>/absolute/path/to/project</cwd>
+  <agent_personal_directory>/absolute/path/to/agent</agent_personal_directory>
+  <sovereign_data_directory>/absolute/path/to/sovereign-data</sovereign_data_directory>
+
+  <directory_guidance>
+    Work on the current project in cwd. Use it as the default location for project files and project-relative operations.
+    The agent personal directory contains this agent's definition and private persistent files, such as its own notes. Do not treat it as the project workspace.
+    The Sovereign data directory contains platform-managed shared data. Use it only when the task requires Sovereign resources or state; do not treat it as the current project.
+  </directory_guidance>
+</runtime_context>
 ```
 
-Это runtime provenance, а не текст определения: parser переносит абсолютный путь `AGENT.md`, демон
-передаёт его `dirname`, а программный агент без файла не получает ни блока, ни пустой обёртки.
+`cwd` — настоящий корень проекта и рабочая директория инструментов. Корень данных Sovereign
+передаётся runtime явно из точки композиции демона. Для файлового агента parser переносит абсолютный
+путь `AGENT.md`, а демон передаёт его `dirname` как личную долговременную папку агента. У
+программного агента без файла отсутствует только `agent_personal_directory`; сам блок с двумя
+обязательными путями остаётся.
 Следующей непустой секцией идёт детерминированно отсортированный XML-каталог применимых скилов:
 
 ```xml
@@ -320,8 +331,8 @@ Node в комплекте. Это и есть «агент из коробки 
 ```
 
 В записи находятся только `name`, `description` и абсолютный `location`; XML-метасимволы в них и в
-`agent_data.directory` экранируются. Пустой набор не добавляет ни обёртку, ни лишние переводы строк.
-Итоговый порядок непустых секций всегда один: инструкции, `<agent_data>`, `<available_skills>`.
+путях runtime context экранируются. Пустой набор не добавляет ни обёртку, ни лишние переводы строк.
+Итоговый порядок непустых секций всегда один: инструкции, `<runtime_context>`, `<available_skills>`.
 Инструкции, папка агента и весь набор скилов заменяются на живой сессии целиком, поэтому следующая
 операция модели видит актуальные определения после hot reload без пересоздания harness.
 

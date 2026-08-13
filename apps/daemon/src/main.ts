@@ -388,6 +388,7 @@ toolCollector.register(
 const sessions = createSessionService({
   store: createAgentSessionStore({
     models: providers.models,
+    sovereignDataDirectory: directory,
     directory: join(directory, sessionsDirectoryName),
     archivedDirectory: join(directory, archivedSessionsDirectoryName),
     // Читаются живьём по той же причине, что и предел турнов: правка `config.json` применяется без

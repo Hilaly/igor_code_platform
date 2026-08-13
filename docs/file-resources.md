@@ -76,15 +76,22 @@ thinking-level: medium
 
 Parser сохраняет точный абсолютный путь входного `AGENT.md` как внутренний `location`. Файловые
 регистрации плагина и standalone-корня переносят его в реестр, а демон передаёт runtime не сам файл,
-а `dirname(location)`. Поэтому файловый агент получает в системном prompt:
+а `dirname(location)`. Поэтому файловый агент получает в системном prompt явный контекст трёх
+разных директорий:
 
 ```xml
-<agent_data>
-  <directory>/absolute/path/to/agent</directory>
-</agent_data>
+<runtime_context>
+  <cwd>/absolute/path/to/project</cwd>
+  <agent_personal_directory>/absolute/path/to/agent</agent_personal_directory>
+  <sovereign_data_directory>/absolute/path/to/sovereign-data</sovereign_data_directory>
+  <!-- fixed directory guidance follows -->
+</runtime_context>
 ```
 
-Программно объявленный агент без `AGENT.md` этого блока не получает. Путь не входит в публичный
+`cwd` — проект и рабочая директория инструментов; personal directory — место определения и
+долговременных заметок самого агента, но не workspace; data directory — общие данные Sovereign и
+тоже не текущий проект. Программно объявленный агент без `AGENT.md` не получает только
+`agent_personal_directory`. Пути не входят в публичный
 `AgentSummary`, снимок `/api/plugins` и событие `core.plugin.contributions`; он не сохраняется и в
 JSONL сессии. На публичной границе agent-registration отдаётся без `location`, а при hot reload
 runtime заново разрешает путь из живого внутреннего реестра перед следующей операцией модели.

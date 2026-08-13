@@ -353,6 +353,7 @@ function emptyUsage(): Usage {
  */
 export function scriptedSessionStore(options: {
   directory: string;
+  sovereignDataDirectory: string;
   /** Корень архива. Не назван — берётся сосед `<directory>-archived`, чтобы тест не заводил второй. */
   archivedDirectory?: string;
   turns?: ScriptedTurn[];
@@ -382,6 +383,7 @@ export function scriptedSessionStore(options: {
     store: createAgentSessionStore({
       models,
       directory: options.directory,
+      sovereignDataDirectory: options.sovereignDataDirectory,
       archivedDirectory: options.archivedDirectory ?? `${options.directory}-archived`,
       compactionSettings:
         options.compactionSettings ?? (() => ({ reserveTokens: 16384, keepRecentTokens: 20000 })),

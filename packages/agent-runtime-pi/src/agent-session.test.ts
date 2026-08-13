@@ -69,11 +69,13 @@ async function withStore(
 
   const directory = await freshFolder("sessions");
   const archivedDirectory = await freshFolder("sessions-archived");
+  const sovereignDataDirectory = await freshFolder("data");
   const folder = projectFolder ?? (await freshFolder("project"));
   const store = createAgentSessionStore({
     models,
     directory,
     archivedDirectory,
+    sovereignDataDirectory,
     compactionSettings: tuning,
     ...(hooks === undefined ? {} : { hooks }),
   });
@@ -95,7 +97,15 @@ async function withStore(
     return created;
   };
 
-  return { store, open, folder, directory, archivedDirectory, requests: scripted.requests };
+  return {
+    store,
+    open,
+    folder,
+    directory,
+    archivedDirectory,
+    sovereignDataDirectory,
+    requests: scripted.requests,
+  };
 }
 
 /** Что уехало модели в обращении с этим номером: по нему видно, доехал ли стиринг до разговора. */
@@ -182,7 +192,9 @@ describe("an agent session over pi", () => {
   });
 
   it("starts a turn with the instructions of an explicitly named skill", async () => {
-    const { open, requests } = await withStore([{ text: "разобрал" }]);
+    const { open, folder, sovereignDataDirectory, requests } = await withStore([
+      { text: "разобрал" },
+    ]);
     const session = await open();
     const deltas = recorder(session);
 
@@ -210,7 +222,13 @@ describe("an agent session over pi", () => {
     );
 
     assert.equal(outcome.kind, "done");
-    assert.equal(requests[0]?.systemPrompt, "ты двойник");
+    assert.match(requests[0]?.systemPrompt ?? "", /^ты двойник\n\n<runtime_context>/);
+    assert.match(requests[0]?.systemPrompt ?? "", new RegExp(`<cwd>${folder}</cwd>`));
+    assert.match(
+      requests[0]?.systemPrompt ?? "",
+      new RegExp(`<sovereign_data_directory>${sovereignDataDirectory}</sovereign_data_directory>`),
+    );
+    assert.doesNotMatch(requests[0]?.systemPrompt ?? "", /<available_skills>/);
 
     const said = saidToModel(requests, 0);
 
@@ -268,7 +286,7 @@ describe("an agent session over pi", () => {
   });
 
   it("uses the latest instructions, agent data and skills on every turn", async () => {
-    const { open, requests } = await withStore(
+    const { open, folder, sovereignDataDirectory, requests } = await withStore(
       [{ text: "reviewed" }, { text: "deployed" }, { text: "finished" }],
       undefined,
       undefined,
@@ -289,7 +307,7 @@ describe("an agent session over pi", () => {
 
     assert.equal(
       requests[0]?.systemPrompt,
-      `ты двойник\n\n<agent_data>\n  <directory>/tmp/review-agent</directory>\n</agent_data>\n\n<available_skills>\n  <skill>\n    <name>review</name>\n    <description>Review the change</description>\n    <location>/tmp/review/SKILL.md</location>\n  </skill>\n</available_skills>`,
+      `ты двойник\n\n<runtime_context>\n  <cwd>${folder}</cwd>\n  <agent_personal_directory>/tmp/review-agent</agent_personal_directory>\n  <sovereign_data_directory>${sovereignDataDirectory}</sovereign_data_directory>\n\n  <directory_guidance>\n    Work on the current project in cwd. Use it as the default location for project files and project-relative operations.\n    The agent personal directory contains this agent&apos;s definition and private persistent files, such as its own notes. Do not treat it as the project workspace.\n    The Sovereign data directory contains platform-managed shared data. Use it only when the task requires Sovereign resources or state; do not treat it as the current project.\n  </directory_guidance>\n</runtime_context>\n\n<available_skills>\n  <skill>\n    <name>review</name>\n    <description>Review the change</description>\n    <location>/tmp/review/SKILL.md</location>\n  </skill>\n</available_skills>`,
     );
 
     session.setInstructions("updated");
@@ -305,14 +323,17 @@ describe("an agent session over pi", () => {
 
     assert.equal(
       requests[1]?.systemPrompt,
-      `updated\n\n<agent_data>\n  <directory>/tmp/deploy-agent</directory>\n</agent_data>\n\n<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the change</description>\n    <location>/tmp/deploy/SKILL.md</location>\n  </skill>\n</available_skills>`,
+      `updated\n\n<runtime_context>\n  <cwd>${folder}</cwd>\n  <agent_personal_directory>/tmp/deploy-agent</agent_personal_directory>\n  <sovereign_data_directory>${sovereignDataDirectory}</sovereign_data_directory>\n\n  <directory_guidance>\n    Work on the current project in cwd. Use it as the default location for project files and project-relative operations.\n    The agent personal directory contains this agent&apos;s definition and private persistent files, such as its own notes. Do not treat it as the project workspace.\n    The Sovereign data directory contains platform-managed shared data. Use it only when the task requires Sovereign resources or state; do not treat it as the current project.\n  </directory_guidance>\n</runtime_context>\n\n<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the change</description>\n    <location>/tmp/deploy/SKILL.md</location>\n  </skill>\n</available_skills>`,
     );
 
     session.setAgentDirectory(undefined);
     session.setSkills([]);
     await session.prompt("finish", "t3");
 
-    assert.equal(requests[2]?.systemPrompt, "updated");
+    assert.equal(
+      requests[2]?.systemPrompt,
+      `updated\n\n<runtime_context>\n  <cwd>${folder}</cwd>\n  <sovereign_data_directory>${sovereignDataDirectory}</sovereign_data_directory>\n\n  <directory_guidance>\n    Work on the current project in cwd. Use it as the default location for project files and project-relative operations.\n    The agent personal directory contains this agent&apos;s definition and private persistent files, such as its own notes. Do not treat it as the project workspace.\n    The Sovereign data directory contains platform-managed shared data. Use it only when the task requires Sovereign resources or state; do not treat it as the current project.\n  </directory_guidance>\n</runtime_context>`,
+    );
     assert.throws(() => session.setInstructions(""), /instructions/i);
     await session.close();
   });
@@ -419,6 +440,7 @@ describe("an agent session over pi", () => {
       models,
       directory,
       archivedDirectory,
+      sovereignDataDirectory: directory,
       compactionSettings,
     });
     const listed = await restarted.list();
@@ -1043,6 +1065,7 @@ describe("reading the branch, the labels and the context", () => {
       models,
       directory,
       archivedDirectory,
+      sovereignDataDirectory: directory,
       compactionSettings,
     });
     const persisted = await restarted.open(sessionId);
@@ -1376,7 +1399,13 @@ async function freshStore(
 
   models.setProvider(scripted.provider);
 
-  return createAgentSessionStore({ models, directory, archivedDirectory, compactionSettings });
+  return createAgentSessionStore({
+    models,
+    directory,
+    archivedDirectory,
+    sovereignDataDirectory: directory,
+    compactionSettings,
+  });
 }
 
 /**
