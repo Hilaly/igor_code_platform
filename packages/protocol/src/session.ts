@@ -26,6 +26,7 @@ export const sessionBranchPathPattern = `${sessionsPath}/:sessionId/branch`;
 export const sessionCompactPathPattern = `${sessionsPath}/:sessionId/compact`;
 export const sessionNavigatePathPattern = `${sessionsPath}/:sessionId/navigate`;
 export const sessionContextPathPattern = `${sessionsPath}/:sessionId/context`;
+export const sessionCommandsPathPattern = `${sessionsPath}/:sessionId/commands`;
 export const sessionEntryLabelPathPattern = `${sessionsPath}/:sessionId/entries/:entryId/label`;
 
 /** Параметр фильтра списка: сессии одного проекта. */
@@ -89,6 +90,10 @@ export function sessionNavigatePath(sessionId: string): string {
 
 export function sessionContextPath(sessionId: string): string {
   return `${sessionPath(sessionId)}/context`;
+}
+
+export function sessionCommandsPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/commands`;
 }
 
 export function sessionEntryLabelPath(sessionId: string, entryId: string): string {
@@ -205,17 +210,58 @@ export type SessionDraft = {
   thinkingLevel?: ThinkingLevel;
 };
 
+/** Переопределения турна. Действуют с этого турна и пишутся в дерево сессии. */
+export type TurnOverrides = {
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
 /**
- * Тело запуска турна. Переопределения действуют с этого турна и пишутся в дерево сессии.
+ * Турн, начатый репликой человека.
  *
  * `text` бывает пустым ровно тогда, когда есть хотя бы одно изображение: скриншот без единого слова —
  * законная просьба. Пустого сообщения без того и другого не бывает.
  */
-export type TurnRequest = {
+export type SaidTurnRequest = TurnOverrides & {
   text: string;
   images?: SessionImage[];
-  model?: string;
-  thinkingLevel?: ThinkingLevel;
+  skill?: never;
+  instructions?: never;
+};
+
+/**
+ * Турн, начатый явно названным скилом (docs/sessions-and-projects.md). Модель получает инструкции
+ * скила целиком — не ссылку на них, — поэтому вместе с текстовой репликой такой турн не едет:
+ * это две разные операции, а не одна с двумя началами.
+ */
+export type SkillTurnRequest = TurnOverrides & {
+  skill: string;
+  /** Что человек дописал к запуску. Уезжает после инструкций скила. */
+  instructions?: string;
+  text?: never;
+  images?: never;
+};
+
+/** Тело запуска турна: реплика человека либо явно названный скил. */
+export type TurnRequest = SaidTurnRequest | SkillTurnRequest;
+
+/**
+ * Скил в каталоге команд сессии. Отбор агента уже применён: браузер показывает то, что запустится,
+ * и не повторяет серверный расчёт применимости.
+ */
+export type SessionSkillSummary = {
+  name: string;
+  description: string;
+  /**
+   * Скил, скрытый от модели (`disable-model-invocation`). Его нет в каталоге системного prompt,
+   * и запустить его может только человек — поэтому в каталоге команд он есть.
+   */
+  hidden: boolean;
+};
+
+/** Каталог команд сессии: то, что предлагает композер по `/`. */
+export type SessionCommands = {
+  skills: SessionSkillSummary[];
 };
 
 /**
@@ -591,7 +637,7 @@ export function isSessionId(value: unknown): value is string {
 }
 
 const draftKeys = ["projectId", "agentId", "model", "thinkingLevel"];
-const turnKeys = ["text", "images", "model", "thinkingLevel"];
+const turnKeys = ["text", "images", "skill", "instructions", "model", "thinkingLevel"];
 const updateKeys = ["title", "archived"];
 const forkKeys = ["entryId", "position"];
 const messageKeys = ["text", "images", "mode"];
@@ -644,15 +690,66 @@ export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseRes
   }
 
   const diagnostics = diagnoseUnknownKeys(label, fields, turnKeys);
-  const said = parseSaidMessage(fields, label, diagnostics);
+  const namesSkill = fields["skill"] !== undefined;
 
-  if (said === undefined) {
+  // Тело называет ровно одну операцию. Реплика рядом со скилом — не «скил с подписью», а два
+  // начала одного турна: угадать за отправителя, какое из них он имел в виду, нечем.
+  if (namesSkill && fields["text"] !== undefined) {
+    diagnostics.push(`${label} names both a message and ${label}.skill: it must name one of them`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  // Картинки со скилом не едут молча: `skill` уходит модели готовым текстом без вложений, и
+  // выброшенное вложение соврало бы отправителю про отправленное.
+  if (namesSkill && fields["images"] !== undefined) {
+    diagnostics.push(
+      `${label}.images cannot travel with ${label}.skill: a skill turn has no images`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  if (!namesSkill && fields["instructions"] !== undefined) {
+    diagnostics.push(`${label}.instructions belongs to ${label}.skill: name the skill or drop it`);
+
     return { kind: "rejected", diagnostics };
   }
 
   const overrides = parseOverrides(fields, label, diagnostics);
 
   if (overrides === undefined) {
+    return { kind: "rejected", diagnostics };
+  }
+
+  if (namesSkill) {
+    const skill = trimmedText(fields["skill"]);
+
+    if (skill === undefined) {
+      diagnostics.push(`${label}.skill must be a non-empty skill name`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    const rawInstructions = fields["instructions"];
+    const instructions = rawInstructions === undefined ? undefined : trimmedText(rawInstructions);
+
+    if (rawInstructions !== undefined && instructions === undefined) {
+      diagnostics.push(`${label}.instructions must be a non-empty text, or absent`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    return {
+      kind: "parsed",
+      value: { skill, ...(instructions === undefined ? {} : { instructions }), ...overrides },
+      diagnostics,
+    };
+  }
+
+  const said = parseSaidMessage(fields, label, diagnostics);
+
+  if (said === undefined) {
     return { kind: "rejected", diagnostics };
   }
 
