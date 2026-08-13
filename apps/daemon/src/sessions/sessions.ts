@@ -21,6 +21,9 @@ import {
   parseSessionLabelUpdate,
   parseSessionMessage,
   parseSessionNavigateRequest,
+  parseSessionOutboxAction,
+  parseSessionOutboxRequest,
+  parseSessionOutboxUpdate,
   parseSessionUpdate,
   parseTurnRequest,
   selectNames,
@@ -38,6 +41,8 @@ import {
   sessionNavigatePathPattern,
   sessionPathPattern,
   sessionProjectParameter,
+  sessionQueuedMessagePathPattern,
+  sessionQueuePathPattern,
   sessionsPath,
   sessionStatsPathPattern,
   sessionTurnsPathPattern,
@@ -63,6 +68,8 @@ import {
   type SessionMessageAccepted,
   type SessionNavigated,
   type SessionNavigateRequest,
+  type SessionOutbox,
+  type SessionOutboxRequest,
   type SessionsSnapshot,
   type SessionStats,
   type SessionUpdate,
@@ -100,6 +107,7 @@ import {
   refuseSessionImageBudget,
   type ImageLimits,
 } from "./image-limits.ts";
+import { createMessageOutbox } from "./message-outbox.ts";
 import type { ToolCollector } from "./tool-collection.ts";
 import type { TurnQueue } from "./turn-queue.ts";
 
@@ -194,6 +202,15 @@ export type SessionMessageOutcome =
   | { kind: "refused"; reason: string; status?: 413 | 409 };
 
 /**
+ * Исход действия над очередью. Отдаётся снимок целиком, а не изменённое сообщение: очередь
+ * показывается списком, и клиент, получивший один элемент, всё равно спросил бы остальные.
+ */
+export type SessionOutboxOutcome =
+  | { kind: "done"; outbox: SessionOutbox }
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string; status?: 413 | 409 };
+
+/**
  * Исход запуска компакции. Как у турна: возврат значит «принята», а не «свёрнут контекст» —
  * компакция ходит к модели и ждёт своей очереди наравне с турном (docs/architecture.md).
  */
@@ -239,8 +256,18 @@ export type SessionService = {
   /** Переименование, архивация и восстановление — одна запись целой записи, как у проекта. */
   update: (sessionId: string, update: SessionUpdate) => Promise<SessionOutcome>;
   remove: (sessionId: string) => Promise<SessionRemoveOutcome>;
-  /** Сообщение, которое не запускает турн: стиринг, догоняющее, к следующему турну, дозапись. */
+  /** Сообщение, которое не запускает турн: стиринг, догоняющее, дозапись. */
   message: (sessionId: string, message: SessionMessage) => Promise<SessionMessageOutcome>;
+  /** Что ждёт своей очереди. `undefined` — такой сессии нет. */
+  queued: (sessionId: string) => SessionOutbox | undefined;
+  /** Поставить сообщение в очередь. Простаивающая сессия запустит его сразу же. */
+  enqueue: (sessionId: string, request: SessionOutboxRequest) => Promise<SessionOutboxOutcome>;
+  /** Снять остановку очереди и попробовать снова. */
+  resumeQueue: (sessionId: string) => SessionOutboxOutcome;
+  /** Вклинить ждущее сообщение в идущий турн, не дожидаясь его конца. */
+  steerQueued: (sessionId: string, messageId: string) => Promise<SessionOutboxOutcome>;
+  /** Снять сообщение с очереди. */
+  dropQueued: (sessionId: string, messageId: string) => SessionOutboxOutcome;
   /** `undefined` — такой сессии нет. */
   stats: (sessionId: string) => Promise<SessionStats | undefined>;
   /**
@@ -270,6 +297,26 @@ export type SessionService = {
 
 function describeCause(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+/** Ответ у всех пяти маршрутов очереди один — её снимок, поэтому и перевод исхода в HTTP один. */
+function respondWithOutbox(
+  response: Parameters<typeof respondWithJson>[0],
+  outcome: SessionOutboxOutcome,
+): void {
+  if (outcome.kind === "unknown") {
+    respondWithError(response, 404, "not found");
+
+    return;
+  }
+
+  if (outcome.kind === "refused") {
+    respondWithError(response, outcome.status ?? 409, outcome.reason);
+
+    return;
+  }
+
+  respondWithJson(response, 200, outcome.outbox);
 }
 
 /**
@@ -521,6 +568,13 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   const places = new Map<string, { turnId: string; cancel: () => boolean; validating: boolean }>();
 
   /**
+   * Очередь сообщений, ждущих освобождения сессии. Живёт в памяти демона: сообщение, которое ждёт
+   * своей очереди, живёт минуты, а переживший перезапуск демона турн запустился бы в мире, которого
+   * отправитель уже не видит (docs/sessions-and-projects.md).
+   */
+  const outbox = createMessageOutbox();
+
+  /**
    * Активный набор инструментов на прошлом турне каждой сессии. Нужен потому, что «инструмент
    * исчез» — это разница между двумя моментами, и нигде, кроме памяти, она не лежит: сборка знает
    * только то, что есть сейчас.
@@ -660,6 +714,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     live.delete(sessionId);
     places.delete(sessionId);
     activeTools.delete(sessionId);
+    // Очередь уходит вместе с сессией: архивная и удалённая турнов не запускают, и ждущее в них
+    // сообщение ждало бы вечно.
+    outbox.clear(sessionId);
   };
 
   const create = (draft: SessionDraft): Promise<CreateSessionOutcome> =>
@@ -969,6 +1026,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           if (automatic) {
             scheduleThresholdCheck(sessionId, true);
           }
+
+          scheduleQueueDrain(sessionId);
         }
       },
     });
@@ -1059,6 +1118,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           throw cause;
         } finally {
           places.delete(sessionId);
+          scheduleQueueDrain(sessionId);
         }
       },
     });
@@ -1111,6 +1171,79 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         summarized: moved.summarized,
       },
     };
+  };
+
+  const publishOutbox = (sessionId: string): void => {
+    options.emitDelta({
+      sessionId,
+      turnId: places.get(sessionId)?.turnId ?? "",
+      delta: { kind: "outbox", outbox: outbox.list(sessionId) },
+    });
+  };
+
+  /**
+   * Слить очередь после того, как сессия вернулась в простой. Через `setImmediate` по той же
+   * причине, что и проверка автопорога: слот очереди походов освобождается на выходе из работы, и
+   * изнутри работы его не получить.
+   */
+  const scheduleQueueDrain = (sessionId: string): void => {
+    setImmediate(() => {
+      void drainOutbox(sessionId);
+    });
+  };
+
+  const drainOutbox = async (sessionId: string): Promise<void> => {
+    if (closing) {
+      return;
+    }
+
+    const waiting = outbox.list(sessionId);
+
+    if (waiting.stopped !== undefined || waiting.messages.length === 0) {
+      return;
+    }
+
+    // Сессия ещё занята — уходим молча: тот, кто занял слот, позовёт слив своим же выходом.
+    if (options.queue.stateOf(sessionId) !== "idle") {
+      return;
+    }
+
+    const head = outbox.takeHead(sessionId);
+
+    if (head === undefined) {
+      return;
+    }
+
+    publishOutbox(sessionId);
+
+    const started = await prompt({
+      sessionId,
+      text: head.text,
+      ...(head.images === undefined ? {} : { images: head.images }),
+      ...(head.model === undefined ? {} : { model: head.model }),
+      ...(head.thinkingLevel === undefined ? {} : { thinkingLevel: head.thinkingLevel }),
+    });
+
+    if (started.kind === "accepted") {
+      return;
+    }
+
+    outbox.returnHead(sessionId, head);
+
+    // Слот перехватили между проверкой и запуском — это не отказ очереди, а гонка: следующий выход
+    // из работы позовёт слив снова. Останавливаем только тогда, когда сессия свободна и всё равно
+    // не взяла сообщение: повторять было бы бесконечным походом в тот же отказ.
+    if (options.queue.stateOf(sessionId) !== "idle") {
+      publishOutbox(sessionId);
+
+      return;
+    }
+
+    const reason = started.kind === "unknown" ? "the session is gone" : started.reason;
+
+    outbox.halt(sessionId, reason);
+    options.logger.warn("a queued message did not start a turn", { session: sessionId, reason });
+    publishOutbox(sessionId);
   };
 
   /**
@@ -1557,6 +1690,101 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return { kind: "accepted", accepted: { sessionId, mode: wanted.mode } };
   };
 
+  const queued = (sessionId: string): SessionOutbox | undefined =>
+    find(sessionId) === undefined ? undefined : outbox.list(sessionId);
+
+  const enqueue = async (
+    sessionId: string,
+    request: SessionOutboxRequest,
+  ): Promise<SessionOutboxOutcome> => {
+    const summary = find(sessionId);
+
+    if (summary === undefined) {
+      return { kind: "unknown" };
+    }
+
+    if (summary.archived) {
+      return { kind: "refused", reason: "the session is archived" };
+    }
+
+    const oversized = await refuseImages(sessionId, request.images);
+
+    if (oversized !== undefined) {
+      return oversized;
+    }
+
+    outbox.enqueue(sessionId, request);
+    publishOutbox(sessionId);
+
+    // Простаивающая сессия стартует тем же путём, что и освободившаяся: одна дорога у турна из
+    // очереди, а не две, расходящиеся в мелочах.
+    scheduleQueueDrain(sessionId);
+
+    return { kind: "done", outbox: outbox.list(sessionId) };
+  };
+
+  const resumeQueue = (sessionId: string): SessionOutboxOutcome => {
+    if (find(sessionId) === undefined) {
+      return { kind: "unknown" };
+    }
+
+    outbox.resume(sessionId);
+    publishOutbox(sessionId);
+    scheduleQueueDrain(sessionId);
+
+    return { kind: "done", outbox: outbox.list(sessionId) };
+  };
+
+  const steerQueued = async (
+    sessionId: string,
+    messageId: string,
+  ): Promise<SessionOutboxOutcome> => {
+    if (find(sessionId) === undefined) {
+      return { kind: "unknown" };
+    }
+
+    const found = outbox.list(sessionId).messages.find((message) => message.id === messageId);
+
+    if (found === undefined) {
+      return { kind: "unknown" };
+    }
+
+    // Сообщение снимается только после того, как стиринг принят: отказ не имеет права стоить
+    // человеку набранного текста.
+    const steered = await message(sessionId, {
+      text: found.text,
+      ...(found.images === undefined ? {} : { images: found.images }),
+      mode: "steer",
+    });
+
+    if (steered.kind === "unknown") {
+      return { kind: "unknown" };
+    }
+
+    if (steered.kind === "refused") {
+      return steered;
+    }
+
+    outbox.remove(sessionId, messageId);
+    publishOutbox(sessionId);
+
+    return { kind: "done", outbox: outbox.list(sessionId) };
+  };
+
+  const dropQueued = (sessionId: string, messageId: string): SessionOutboxOutcome => {
+    if (find(sessionId) === undefined) {
+      return { kind: "unknown" };
+    }
+
+    if (outbox.remove(sessionId, messageId) === undefined) {
+      return { kind: "unknown" };
+    }
+
+    publishOutbox(sessionId);
+
+    return { kind: "done", outbox: outbox.list(sessionId) };
+  };
+
   const prompt = async (request: PromptRequest): Promise<PromptOutcome> => {
     const sessionId = request.sessionId;
     const ready = await readyForModel(sessionId);
@@ -1685,6 +1913,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
           if (outcome.kind === "failed") {
             options.logger.warn("a turn failed", { session: sessionId, reason: outcome.reason });
+
+            // Упавший турн останавливает очередь: остаток уехал бы в тот же тупик, только за
+            // деньги владельца. Прерванный руками турн возвращает `done` — очередь идёт дальше,
+            // потому что прервали именно этот турн, а не работу вообще.
+            outbox.halt(sessionId, outcome.reason);
+            publishOutbox(sessionId);
           }
 
           if (outcome.kind === "done") {
@@ -1703,6 +1937,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         } finally {
           places.delete(sessionId);
           scheduleThresholdCheck(sessionId);
+          scheduleQueueDrain(sessionId);
         }
       },
     });
@@ -1753,6 +1988,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       announce();
     }
 
+    // Снятый с очереди турн не выполняется вовсе, поэтому его `finally` слив не позовёт: без этого
+    // вызова «прервал — пошло следующее» не работало бы ровно там, где прерывать быстрее всего.
+    if (dropped) {
+      scheduleQueueDrain(sessionId);
+    }
+
     return interrupted;
   };
 
@@ -1769,6 +2010,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     update,
     remove,
     message,
+    queued,
+    enqueue,
+    resumeQueue,
+    steerQueued,
+    dropQueued,
     stats,
     branch,
     contextUsage,
@@ -1988,6 +2234,83 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           }
 
           respondWithJson(response, 200, accepted.accepted);
+        },
+      },
+      {
+        method: "GET",
+        path: sessionQueuePathPattern,
+        handle: ({ response, parameters }) => {
+          // Снимок, а не только дельты: переподключившийся клиент про очередь иначе не узнал бы
+          // ничего до следующего её изменения (docs/web-api.md).
+          const waiting = queued(parameters["sessionId"] ?? "");
+
+          if (waiting === undefined) {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+
+          respondWithJson(response, 200, waiting);
+        },
+      },
+      {
+        method: "POST",
+        path: sessionQueuePathPattern,
+        // Свой предел тела по той же причине, что у сообщений: сюда приезжает base64 изображений.
+        bodyLimitBytes: () => bodyLimitFor(imageLimits()),
+        handle: async ({ response, parameters, body }) => {
+          const parsed = parseSessionOutboxRequest(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          respondWithOutbox(response, await enqueue(parameters["sessionId"] ?? "", parsed.value));
+        },
+      },
+      {
+        method: "PUT",
+        path: sessionQueuePathPattern,
+        handle: ({ response, parameters, body }) => {
+          const parsed = parseSessionOutboxUpdate(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          respondWithOutbox(response, resumeQueue(parameters["sessionId"] ?? ""));
+        },
+      },
+      {
+        method: "PUT",
+        path: sessionQueuedMessagePathPattern,
+        handle: async ({ response, parameters, body }) => {
+          const parsed = parseSessionOutboxAction(body);
+
+          if (parsed.kind === "rejected") {
+            respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+            return;
+          }
+
+          respondWithOutbox(
+            response,
+            await steerQueued(parameters["sessionId"] ?? "", parameters["messageId"] ?? ""),
+          );
+        },
+      },
+      {
+        method: "DELETE",
+        path: sessionQueuedMessagePathPattern,
+        handle: ({ response, parameters }) => {
+          respondWithOutbox(
+            response,
+            dropQueued(parameters["sessionId"] ?? "", parameters["messageId"] ?? ""),
+          );
         },
       },
       {
