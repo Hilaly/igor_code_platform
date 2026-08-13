@@ -158,9 +158,79 @@
   min-width: 0;
 }
 
-.sessions-composer-future-slot {
-  flex: 1 1 auto;
+/* Подсказка файлов над полем ввода. Поверхность даёт `RaisedSurface`; здесь только раскладка. */
+.sessions-mention {
   min-width: 0;
+  max-block-size: 14rem;
+  overflow-y: auto;
+}
+
+.sessions-mention-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+
+.sessions-mention-list button {
+  display: block;
+  inline-size: 100%;
+  padding-block: var(--sovereign-space-1);
+  padding-inline: var(--sovereign-space-2);
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sessions-mention-list button:hover,
+.sessions-mention-list button[data-active="true"] {
+  background: var(--sovereign-sunken-surface);
+}
+
+.sessions-mention-more {
+  margin: 0;
+  padding-block: var(--sovereign-space-1);
+  padding-inline: var(--sovereign-space-2);
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+}
+
+.sessions-composer-attach {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Превью приложенного. Рамки и скругления живут в ките: здесь только раскладка. */
+.sessions-composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sovereign-space-2);
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+
+.sessions-composer-attachments > li {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+}
+
+.sessions-composer-attachments img {
+  display: block;
+  max-block-size: var(--sovereign-space-8);
+  max-inline-size: 100%;
+  object-fit: contain;
 }
 
 .sessions-composer-actions {

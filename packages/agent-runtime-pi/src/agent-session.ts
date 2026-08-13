@@ -38,11 +38,14 @@ import {
   isThinkingLevel,
   modelReference,
   parseModelReference,
+  isSessionImageMimeType,
   type SessionContentBlock,
   type SessionDelta,
   type SessionEntry,
+  type SessionImage,
   type SessionMessageMode,
   type SessionPhase,
+  type SessionQueuedMessage,
   type SessionQueues,
   type SessionStats,
   type ThinkingLevel,
@@ -92,7 +95,7 @@ export type AgentSession = {
   /** Состояние по версии рантайма. `queued` отсюда не приходит: очередь — забота ядра. */
   phase: () => SessionPhase;
   /** Отказ `busy` приезжает исходом, а не исключением: занятость — обычное состояние, а не сбой. */
-  prompt: (text: string, turnId: string) => Promise<TurnOutcome>;
+  prompt: (text: string, turnId: string, images?: SessionImage[]) => Promise<TurnOutcome>;
   /** `false` — прерывать было нечего. */
   abort: () => Promise<boolean>;
   /** Проверить текущую модель по живому каталогу, не меняя и не записывая её. */
@@ -110,7 +113,11 @@ export type AgentSession = {
    * Сообщение, которое не запускает турн. Куда оно встанет, решает режим; отказ приезжает исходом,
    * а не исключением, потому что у режимов разные требования к занятости сессии.
    */
-  message: (text: string, mode: SessionMessageMode) => Promise<MessageOutcome>;
+  message: (
+    text: string,
+    mode: SessionMessageMode,
+    images?: SessionImage[],
+  ) => Promise<MessageOutcome>;
   /** Что сейчас ждёт в очередях. Снимок для клиента, который подключился посреди турна. */
   queues: () => SessionQueues;
   /** Записи дерева с курсором. Курсор считается в записях рантайма, а не в наших. */
@@ -187,13 +194,20 @@ export type PersistedAgentSession = {
 export type TurnOutcome =
   { kind: "done"; usage?: unknown } | { kind: "busy" } | { kind: "failed"; reason: string };
 
-export type ModelOutcome = { kind: "applied" } | { kind: "unknown-model" };
+/**
+ * `text-only-model` — модель существует и годна, но не читает изображений, а ветка или само
+ * сообщение их содержит. Отдельно от `unknown-model`: «модели нет» и «модель не та» человек чинит
+ * по-разному, и одна причина на оба случая отправила бы его искать пропавшую модель.
+ */
+export type ModelOutcome =
+  { kind: "applied" } | { kind: "unknown-model" } | { kind: "text-only-model" };
 
 /**
  * Исход постановки сообщения в очередь. `idle` и `busy` — не сбой, а несовпадение с требованием
  * режима: стиринг и догоняющее требуют идущего турна, дозапись — простоя.
  */
-export type MessageOutcome = { kind: "queued" } | { kind: "idle" } | { kind: "busy" };
+export type MessageOutcome =
+  { kind: "queued" } | { kind: "idle" } | { kind: "busy" } | { kind: "text-only-model" };
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
 
@@ -696,6 +710,43 @@ function liveSession(
    */
   let spent: Usage | undefined;
 
+  /**
+   * Читает ли выбранная модель изображения. Неизвестная модель считается текстовой: у провайдера нет
+   * безопасного «попробуем и посмотрим» — он либо ответит невнятной ошибкой, либо молча выбросит
+   * картинку, и человек решит, что её посмотрели (docs/agent-runtime-contract.md).
+   */
+  const readsImages = (reference: string): boolean =>
+    resolveModel(models, reference)?.input.includes("image") === true;
+
+  /**
+   * Есть ли изображение в действующей ветке. Спрашивается только тогда, когда модель текстовая:
+   * ветка читается с диска, и платить за это на каждом турне с годной моделью незачем.
+   */
+  const branchHoldsImage = async (): Promise<boolean> => {
+    // Именно ветка, а не весь файл: изображение в брошенной ветке в новый контекст не попадёт.
+    const entries = await session.getBranch();
+
+    return entries.some(
+      (entry) =>
+        entry.type === "message" &&
+        entry.message.role === "user" &&
+        imagesOf(entry.message.content).length > 0,
+    );
+  };
+
+  /**
+   * Годится ли модель для того, что сейчас поедет ей в контексте. Проверяется и само сообщение, и
+   * ветка: после первой картинки текстовая модель не годится даже для чисто текстового продолжения —
+   * контекст всё равно понесёт изображение.
+   */
+  const modelFits = async (images?: readonly SessionImage[]): Promise<boolean> => {
+    if (readsImages(summary.model)) {
+      return true;
+    }
+
+    return (images ?? []).length === 0 && !(await branchHoldsImage());
+  };
+
   const setPhase = (next: SessionPhase): void => {
     if (phase === next) {
       return;
@@ -764,9 +815,9 @@ function liveSession(
 
     if (event.type === "queue_update") {
       queues = {
-        steer: event.steer.map(queuedText),
-        followUp: event.followUp.map(queuedText),
-        nextTurn: event.nextTurn.map(queuedText),
+        steer: event.steer.map(queuedMessage),
+        followUp: event.followUp.map(queuedMessage),
+        nextTurn: event.nextTurn.map(queuedMessage),
       };
       publish({ kind: "queues", queues });
 
@@ -857,7 +908,7 @@ function liveSession(
       followUp: [...queues.followUp],
       nextTurn: [...queues.nextTurn],
     }),
-    message: async (text, mode) => {
+    message: async (text, mode, images) => {
       // Требования к занятости у режимов разные, и проверяются они здесь, а не в рантайме: у
       // рантайма это исключение `invalid_state`, а у нас — обычный исход, который маршрут переводит
       // в `409` с внятной причиной.
@@ -869,23 +920,33 @@ function liveSession(
         return { kind: "busy" };
       }
 
+      // Проверка до записи: принятое сообщение уже лежало бы в дереве, и отказ пришлось бы объяснять
+      // человеку задним числом.
+      if (!(await modelFits(images))) {
+        return { kind: "text-only-model" };
+      }
+
+      const carried = toRuntimeImages(images);
+
       if (mode === "steer") {
-        await harness.steer(text);
+        await harness.steer(text, { images: carried });
       } else if (mode === "follow-up") {
-        await harness.followUp(text);
+        await harness.followUp(text, { images: carried });
       } else if (mode === "next-turn") {
-        await harness.nextTurn(text);
+        await harness.nextTurn(text, { images: carried });
       } else {
+        // У `appendMessage` нет `options.images`, поэтому содержимое складывается руками — в том же
+        // порядке, в котором его складывают остальные четыре пути: текст, затем изображения.
         await harness.appendMessage({
           role: "user",
-          content: [{ type: "text", text }],
+          content: [{ type: "text", text }, ...carried],
           timestamp: Date.now(),
         });
       }
 
       return { kind: "queued" };
     },
-    prompt: async (text, turnId) => {
+    prompt: async (text, turnId, images) => {
       if (phase !== "idle") {
         return { kind: "busy" };
       }
@@ -895,7 +956,14 @@ function liveSession(
       setPhase("turn");
 
       try {
-        const answer = await harness.prompt(text);
+        // Проверка модели уже внутри захваченной фазы: между проверкой занятости и `setPhase` не
+        // должно быть ни одного `await`, иначе второй турн того же такта не увидит первого и
+        // запустится рядом.
+        if (!(await modelFits(images))) {
+          return { kind: "failed", reason: `the model ${summary.model} does not read images` };
+        }
+
+        const answer = await harness.prompt(text, { images: toRuntimeImages(images) });
 
         if (answer.stopReason === "error") {
           publish({ kind: "turn-failed", reason: answer.errorMessage ?? "the turn failed" });
@@ -940,6 +1008,12 @@ function liveSession(
         return { kind: "unknown-model" };
       }
 
+      // Модель годна сама по себе, но не для этой ветки: в контексте уже лежит изображение, и
+      // текстовая модель не сможет продолжить разговор даже чисто текстовым сообщением.
+      if (!next.input.includes("image") && (await branchHoldsImage())) {
+        return { kind: "text-only-model" };
+      }
+
       await harness.setModel(next);
       summary.model = reference;
 
@@ -981,6 +1055,12 @@ function liveSession(
       setPhase("compaction");
 
       try {
+        // Компакция — такой же поход к модели, как турн: она пересказывает ту же ветку и наткнётся
+        // на то же изображение. Проверка внутри захваченной фазы по той же причине, что у турна.
+        if (!(await modelFits())) {
+          return { kind: "failed", reason: `the model ${summary.model} does not read images` };
+        }
+
         await harness.compact(instructions);
 
         return { kind: "done" };
@@ -1004,6 +1084,12 @@ function liveSession(
       setPhase("branch-summary");
 
       try {
+        // Переход без пересказа к модели не ходит и картинок не касается — проверяется только заказ
+        // пересказа покидаемой ветки.
+        if (request.summarize === true && !(await modelFits())) {
+          return { kind: "failed", reason: `the model ${summary.model} does not read images` };
+        }
+
         const moved = await harness.navigateTree(request.entryId, {
           ...(request.summarize === undefined ? {} : { summarize: request.summarize }),
           ...(request.instructions === undefined
@@ -1187,6 +1273,14 @@ function translate(
         channel: "text",
         text: textOf(event.message.content),
       });
+
+      const images = imagesOf(event.message.content);
+
+      // Отдельным кадром и только при наличии: у большинства сообщений картинок нет, и пустой
+      // список гнал бы через поток кадр ни о чём на каждую реплику.
+      if (images.length > 0) {
+        publish({ kind: "message-images", messageId, images });
+      }
     }
 
     return;
@@ -1361,8 +1455,10 @@ function describeEntry(entry: SessionTreeEntry): SessionEntry[] {
       {
         ...common,
         kind: "message",
+        // Тот же перевод, что у ответа модели, а не свёртка в один текст: у сообщения человека
+        // бывают изображения, и порядок блоков — это порядок, в котором он их написал.
         role: "user",
-        content: [{ kind: "text", text: textOf(message.content) }],
+        content: blocksOf(asContent(message.content)),
       },
     ];
   }
@@ -1389,14 +1485,39 @@ function describeEntry(entry: SessionTreeEntry): SessionEntry[] {
   return [{ ...common, kind: "other", type: message.role }];
 }
 
+/** Содержимое сообщения рантайма списком: у сообщения человека оно бывает просто строкой. */
+function asContent(content: unknown): readonly unknown[] {
+  if (Array.isArray(content)) {
+    return content;
+  }
+
+  return typeof content === "string" ? [{ type: "text", text: content }] : [];
+}
+
 function blocksOf(content: readonly unknown[]): SessionContentBlock[] {
   const blocks: SessionContentBlock[] = [];
 
   for (const piece of content) {
-    const part = piece as { type?: string; text?: string; thinking?: string };
+    const part = piece as {
+      type?: string;
+      text?: string;
+      thinking?: string;
+      data?: unknown;
+      mimeType?: unknown;
+    };
 
-    if (part.type === "text" && typeof part.text === "string") {
+    // Пустой текстовый блок пропускается: перед изображением его ставит сам рантайм, и показывать
+    // его значило бы рисовать в ленте абзац, которого человек не писал.
+    if (part.type === "text" && typeof part.text === "string" && part.text !== "") {
       blocks.push({ kind: "text", text: part.text });
+    }
+
+    if (
+      part.type === "image" &&
+      typeof part.data === "string" &&
+      isSessionImageMimeType(part.mimeType)
+    ) {
+      blocks.push({ kind: "image", mimeType: part.mimeType, data: part.data });
     }
 
     if (part.type === "thinking") {
@@ -1512,11 +1633,55 @@ function refusalText(refusals: RuntimeHookRefusal[]): string {
 }
 
 /**
- * Текст сообщения, ждущего в очереди. В очередях лежат сообщения человека, но тип рантайма шире —
- * в нём есть и сообщения без содержимого вовсе, и пустая строка для них честнее выдумки.
+ * Сообщение, ждущее в очереди. В очередях лежат сообщения человека, но тип рантайма шире — в нём
+ * есть и сообщения без содержимого вовсе, и пустая строка для них честнее выдумки.
+ *
+ * Картинки едут вместе с текстом: очередь показывают человеку, и очередь из одних текстов показала
+ * бы ему не то, что он отправил.
  */
-function queuedText(message: object): string {
-  return "content" in message ? textOf(message.content) : "";
+function queuedMessage(message: object): SessionQueuedMessage {
+  if (!("content" in message)) {
+    return { text: "" };
+  }
+
+  const images = imagesOf(message.content);
+
+  return {
+    text: textOf(message.content),
+    ...(images.length === 0 ? {} : { images }),
+  };
+}
+
+/** Изображения содержимого сообщения рантайма в порядке, в котором они там лежат. */
+function imagesOf(content: unknown): SessionImage[] {
+  if (!Array.isArray(content)) {
+    return [];
+  }
+
+  return content.flatMap((piece) => {
+    const part = piece as { type?: string; data?: unknown; mimeType?: unknown };
+
+    // Тип изображения у рантайма — просто строка: он не обещает, что она из нашего списка. Чужой
+    // формат мы наружу не выпускаем — иначе публичное объединение перестало бы быть закрытым.
+    return part.type === "image" &&
+      typeof part.data === "string" &&
+      isSessionImageMimeType(part.mimeType)
+      ? [{ mimeType: part.mimeType, data: part.data }]
+      : [];
+  });
+}
+
+/**
+ * Изображения в том виде, в котором их принимает рантайм. Один перевод на все пять путей: разные
+ * реализации `prompt`, `steer`, `follow-up`, `next-turn` и `append` быстро разошлись бы в порядке
+ * блоков и в том, что считается сообщением без текста.
+ */
+function toRuntimeImages(images: readonly SessionImage[] | undefined) {
+  return (images ?? []).map((image) => ({
+    type: "image" as const,
+    data: image.data,
+    mimeType: image.mimeType,
+  }));
 }
 
 function textOf(content: unknown): string {

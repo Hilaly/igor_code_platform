@@ -56,10 +56,12 @@ async function withStore(
   tuning: () => CompactionTuning = compactionSettings,
   hooks?: RuntimeHookSeam,
   definition: AgentDefinition = agent,
+  input?: ("text" | "image")[],
 ) {
   const scripted = scriptedModelProvider({
     turns,
     ...(beforeAnswer === undefined ? {} : { beforeAnswer }),
+    ...(input === undefined ? {} : { input }),
   });
   const models = createModels();
 
@@ -455,7 +457,7 @@ describe("messages that do not start a turn", () => {
 
     assert.match(saidToModel(requests, 1), /возьми левее/);
     assert.deepEqual(deltas.filter((delta) => delta.kind === "queues").at(0)?.queues.steer, [
-      "возьми левее",
+      { text: "возьми левее" },
     ]);
     // Очередь опустела к концу турна: сообщение ушло в разговор, а не осталось висеть.
     assert.deepEqual(session.queues(), { steer: [], followUp: [], nextTurn: [] });
@@ -476,12 +478,12 @@ describe("messages that do not start a turn", () => {
     const session = await open();
 
     assert.deepEqual(await session.message("не забудь про тесты", "next-turn"), { kind: "queued" });
-    assert.deepEqual(session.queues().nextTurn, ["не забудь про тесты"]);
+    assert.deepEqual(session.queues().nextTurn, [{ text: "не забудь про тесты" }]);
 
     // Прерывание чистит стиринг и догоняющее, но не сообщение к следующему турну: оно про турн,
     // которого ещё не было.
     await session.abort();
-    assert.deepEqual(session.queues().nextTurn, ["не забудь про тесты"]);
+    assert.deepEqual(session.queues().nextTurn, [{ text: "не забудь про тесты" }]);
 
     await session.prompt("поехали", "t1");
 
@@ -500,6 +502,142 @@ describe("messages that do not start a turn", () => {
 
     assert.equal(kinds.at(-1)?.kind, "message");
     assert.equal(session.phase(), "idle");
+    await session.close();
+  });
+});
+
+describe("images in a message", () => {
+  const png = {
+    mimeType: "image/png" as const,
+    data: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x07]).toString("base64"),
+  };
+  const seeing = (turns: ScriptedTurn[], beforeAnswer?: (index: number) => void) =>
+    withStore(turns, undefined, beforeAnswer, compactionSettings, undefined, agent, [
+      "text",
+      "image",
+    ]);
+
+  it("hands the model the very bytes it was given, on the turn and in every queue", async () => {
+    const running: { session?: AgentSession } = {};
+    const { open, requests } = await seeing(
+      [
+        { toolCalls: [{ id: "c1", name: "read", arguments: { path: "/dev/null" } }] },
+        { text: "ок" },
+      ],
+      (index) => {
+        if (index === 0) {
+          void running.session?.message("а тут?", "steer", [png]);
+        }
+      },
+    );
+    const session = await open();
+
+    running.session = session;
+    await session.prompt("что тут", "t1", [png]);
+
+    // Ни пережатия, ни перекодирования: провайдеру уезжает ровно то, что дал человек.
+    assert.match(saidToModel(requests, 0), new RegExp(png.data));
+    assert.match(saidToModel(requests, 1), new RegExp(png.data));
+    await session.close();
+  });
+
+  it("keeps the image in the tree as its own block, in the order it was written", async () => {
+    const { open } = await seeing([{ text: "вижу" }]);
+    const session = await open();
+
+    await session.prompt("что тут", "t1", [png]);
+
+    const said = (await session.entries()).entries.find(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+
+    assert.deepEqual(said?.kind === "message" ? said.content : undefined, [
+      { kind: "text", text: "что тут" },
+      { kind: "image", mimeType: "image/png", data: png.data },
+    ]);
+    await session.close();
+  });
+
+  it("leaves out the empty text block pi puts before an image-only message", async () => {
+    const { open } = await seeing([{ text: "вижу" }]);
+    const session = await open();
+
+    await session.prompt("", "t1", [png]);
+
+    const said = (await session.entries()).entries.find(
+      (entry) => entry.kind === "message" && entry.role === "user",
+    );
+
+    // Пустой текстовый блок ставит сам рантайм. Показывать его — значит рисовать в ленте пустой
+    // абзац, которого человек не писал.
+    assert.deepEqual(said?.kind === "message" ? said.content : undefined, [
+      { kind: "image", mimeType: "image/png", data: png.data },
+    ]);
+    await session.close();
+  });
+
+  it("refuses a model that only reads text instead of letting it lose the image", async () => {
+    // Fail closed: провайдер либо ответит невнятной ошибкой, либо молча выбросит картинку, и
+    // человек решит, что модель её посмотрела.
+    const { open } = await withStore([{ text: "вижу" }]);
+    const session = await open();
+
+    assert.deepEqual(await session.prompt("что тут", "t1", [png]), {
+      kind: "failed",
+      reason: `the model ${session.summary().model} does not read images`,
+    });
+    assert.deepEqual(await session.message("а тут", "append", [png]), { kind: "text-only-model" });
+
+    // Отказ ничего не записывает: принятое сообщение уже лежало бы в дереве, и объяснять отказ
+    // пришлось бы задним числом. Записи создания сессии при этом на месте.
+    assert.equal(
+      (await session.entries()).entries.filter((entry) => entry.kind === "message").length,
+      0,
+    );
+    await session.close();
+  });
+
+  it("keeps a queued message whole in the snapshot, images and all", async () => {
+    const { open } = await seeing([{ text: "ок" }]);
+    const session = await open();
+    const deltas = recorder(session);
+
+    assert.deepEqual(await session.message("посмотри потом", "next-turn", [png]), {
+      kind: "queued",
+    });
+    assert.deepEqual(session.queues().nextTurn, [{ text: "посмотри потом", images: [png] }]);
+    assert.deepEqual(deltas.filter((delta) => delta.kind === "queues").at(-1)?.queues.nextTurn, [
+      { text: "посмотри потом", images: [png] },
+    ]);
+    await session.close();
+  });
+
+  it("publishes the images of a live message beside its text", async () => {
+    const { open } = await seeing([{ text: "вижу" }]);
+    const session = await open();
+    const deltas = recorder(session);
+
+    await session.prompt("что тут", "t1", [png]);
+
+    assert.deepEqual(
+      deltas.filter((delta) => delta.kind === "message-images"),
+      [{ kind: "message-images", messageId: "t1:1", images: [png] }],
+    );
+    await session.close();
+  });
+
+  it("will not move a branch that already holds an image onto a text-only model", async () => {
+    const { open } = await seeing([{ text: "вижу" }]);
+    const session = await open();
+
+    await session.prompt("что тут", "t1", [png]);
+
+    // Дело не в этом сообщении, а в контексте: следующий турн всё равно понесёт картинку из ветки.
+    // Модель при этом существует и годна — негодна она именно для этой ветки.
+    assert.deepEqual(await session.setModel("scripted-model/scripted-model-1-text-only"), {
+      kind: "text-only-model",
+    });
+    assert.equal(session.summary().model, "scripted-model/scripted-model-1");
     await session.close();
   });
 });

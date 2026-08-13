@@ -10,6 +10,7 @@
 import {
   agentsPath,
   projectAgentsPath,
+  projectFilesPath,
   sessionArchivedParameter,
   sessionBranchPath,
   sessionCompactPath,
@@ -37,6 +38,7 @@ import {
   type SessionMessage,
   type SessionNavigateRequest,
   type SessionNavigated,
+  type ProjectFilesSnapshot,
   type SessionsSnapshot,
   type SessionStats,
   type SessionUpdate,
@@ -70,6 +72,28 @@ export async function fetchProjectAgents(
   }
 
   return (await response.json()) as AgentsSnapshot;
+}
+
+/**
+ * Файлы папки проекта для подстановки `@файл`. Отдельный запрос на каждое нажатие: список зависит от
+ * набранного фрагмента, а держать в браузере копию всего дерева проекта незачем — она устарела бы
+ * сразу, как только агент создаст файл.
+ */
+export async function fetchProjectFiles(
+  projectId: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<ProjectFilesSnapshot> {
+  const response = await fetch(
+    projectFilesPath(projectId, query),
+    signal === undefined ? {} : { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ProjectFilesSnapshot;
 }
 
 export async function fetchSessions(

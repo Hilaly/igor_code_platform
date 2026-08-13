@@ -70,6 +70,18 @@ export type Config = {
    * пожелание: иначе один публичный маршрут превращает демон в мишень (docs/web-api.md).
    */
   publicRouteRequestsPerMinute: number;
+  /**
+   * Четыре предела на изображения в сообщениях. Считаются в **декодированных** байтах, а не в длине
+   * base64: тогда предел одинаков для файла с диска, вставки из буфера и восстановленной сессии.
+   *
+   * Пределы нужны потому, что изображение лежит прямо в файле сессии (docs/sessions-and-projects.md):
+   * без них один разговор со скриншотами вырастает до размера, который перестаёт читаться.
+   */
+  maxImageBytes: number;
+  maxImagesPerMessage: number;
+  maxMessageImageBytes: number;
+  /** Считается по всему файлу сессии, включая брошенные ветки: заплачено местом и за них. */
+  maxSessionImageBytes: number;
 };
 
 /**
@@ -142,6 +154,10 @@ export const defaultConfig: Config = {
   pluginRouteTimeoutMilliseconds: 30000,
   pluginRouteBodyLimitBytes: 1048576,
   publicRouteRequestsPerMinute: 60,
+  maxImageBytes: 10 * 1024 * 1024,
+  maxImagesPerMessage: 8,
+  maxMessageImageBytes: 32 * 1024 * 1024,
+  maxSessionImageBytes: 256 * 1024 * 1024,
 };
 export const defaultAppearance: Appearance = {
   colorScheme: builtInColorScheme,
@@ -179,6 +195,10 @@ const everyConfigKey = {
   pluginRouteTimeoutMilliseconds: true,
   pluginRouteBodyLimitBytes: true,
   publicRouteRequestsPerMinute: true,
+  maxImageBytes: true,
+  maxImagesPerMessage: true,
+  maxMessageImageBytes: true,
+  maxSessionImageBytes: true,
 } satisfies Record<keyof Config, true>;
 
 export const configKeys = Object.keys(everyConfigKey) as (keyof Config)[];
@@ -194,7 +214,40 @@ export function parseConfig(raw: unknown): SettingsParseResult<Config> {
     return { kind: "rejected", diagnostics: [`${configFileName}: the top level is not an object`] };
   }
 
-  return parseConfigFields(fields, diagnoseUnknownKeys(configFileName, fields, configKeys));
+  const parsed = parseConfigFields(fields, diagnoseUnknownKeys(configFileName, fields, configKeys));
+
+  if (parsed.kind === "rejected") {
+    return parsed;
+  }
+
+  // Взаимные ограничения проверяются только здесь, на целом документе. В `parseConfigUpdate` их
+  // проверить нечем: там каждый названный ключ разбирается поодиночке, и соседние значения взялись
+  // бы из умолчаний, а не из файла, — отказ получил бы тот, кто ничего не нарушал. Целый документ
+  // складывает хранилище перед записью, и вот он через эту проверку и проходит.
+  const contradiction = contradictingImageLimits(parsed.value);
+
+  if (contradiction !== undefined) {
+    return { kind: "rejected", diagnostics: [...parsed.diagnostics, contradiction] };
+  }
+
+  return parsed;
+}
+
+/**
+ * Пределы, которые не могут действовать одновременно. Предел одной картинки выше предела сообщения
+ * означал бы, что первая же принятая картинка не влезает в сообщение, куда её кладут: настройка,
+ * которую нельзя исполнить, — не настройка. Равенство законно.
+ */
+function contradictingImageLimits(config: Config): string | undefined {
+  if (config.maxMessageImageBytes < config.maxImageBytes) {
+    return `${configFileName}: maxMessageImageBytes must not be below maxImageBytes`;
+  }
+
+  if (config.maxSessionImageBytes < config.maxMessageImageBytes) {
+    return `${configFileName}: maxSessionImageBytes must not be below maxMessageImageBytes`;
+  }
+
+  return undefined;
 }
 
 /**
@@ -297,6 +350,10 @@ function parseConfigFields(
     "pluginRouteTimeoutMilliseconds",
     "pluginRouteBodyLimitBytes",
     "publicRouteRequestsPerMinute",
+    "maxImageBytes",
+    "maxImagesPerMessage",
+    "maxMessageImageBytes",
+    "maxSessionImageBytes",
   ] as const) {
     const tokens = fields[key];
 

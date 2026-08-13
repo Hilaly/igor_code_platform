@@ -6,7 +6,12 @@
  * потому что буфер живёт ровно до конца турна, после чего то же самое приезжает записями.
  */
 
-import type { SessionContentBlock, SessionEntry, SessionForkRequest } from "@sovereign/protocol";
+import type {
+  SessionContentBlock,
+  SessionEntry,
+  SessionForkRequest,
+  SessionImage,
+} from "@sovereign/protocol";
 import {
   Badge,
   Button,
@@ -33,6 +38,7 @@ import {
 } from "@sovereign/ui-kit";
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { MessageImages } from "./session-images.tsx";
 import { isFeedEntry, type OpenSession, type StreamedItem } from "./state.ts";
 import { ToolCallPlace } from "./tool-call-place.tsx";
 
@@ -392,7 +398,7 @@ function EntryMessage(props: {
     <div className="sessions-entry-message" data-role={role}>
       <Message role={role}>
         {label === undefined ? undefined : <Badge tone="accent">{label}</Badge>}
-        {entry.content.map((block, index) => (
+        {groupImages(entry.content).map((block, index) => (
           <ContentBlock
             key={`${entry.id}:${String(index)}`}
             block={block}
@@ -506,8 +512,34 @@ function messageText(entry: Extract<SessionEntry, { kind: "message" }>): string 
   return parts.length === 0 ? undefined : parts.join("\n\n");
 }
 
+/** Соседние картинки — одна сетка, а не столбик: так их и прикладывали, одной пачкой. */
+type GroupedBlock =
+  Exclude<SessionContentBlock, { kind: "image" }> | { kind: "images"; images: SessionImage[] };
+
+function groupImages(content: SessionContentBlock[]): GroupedBlock[] {
+  const grouped: GroupedBlock[] = [];
+
+  for (const block of content) {
+    if (block.kind !== "image") {
+      grouped.push(block);
+
+      continue;
+    }
+
+    const last = grouped.at(-1);
+
+    if (last?.kind === "images") {
+      last.images.push(block);
+    } else {
+      grouped.push({ kind: "images", images: [block] });
+    }
+  }
+
+  return grouped;
+}
+
 function ContentBlock(props: {
-  block: SessionContentBlock;
+  block: GroupedBlock;
   outcomes: Map<string, ToolOutcome>;
   sessionId: string;
   projectId?: string;
@@ -518,6 +550,10 @@ function ContentBlock(props: {
 
   if (block.kind === "text") {
     return <Markdown text={block.text} />;
+  }
+
+  if (block.kind === "images") {
+    return <MessageImages images={block.images} translator={translator} />;
   }
 
   if (block.kind === "reasoning") {
@@ -591,6 +627,9 @@ function LiveMessage(props: {
         <Markdown text={item.text} />
       ) : (
         <StreamingText text={item.text} streaming label={t("chat.answer.label")} />
+      )}
+      {item.images.length === 0 ? undefined : (
+        <MessageImages images={item.images} translator={translator} />
       )}
     </Message>
   );

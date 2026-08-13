@@ -53,8 +53,13 @@ export type Route = {
    *   принадлежит. Аутентифицирует себя такой маршрут сам (docs/web-api.md).
    */
   access?: "open" | "public";
-  /** Свой предел тела. Не сказано — общий: тела наших запросов короткие, а вебхук приносит чужие. */
-  bodyLimitBytes?: number;
+  /**
+   * Свой предел тела. Не сказано — общий: тела наших запросов короткие, а вебхук приносит чужие.
+   *
+   * Функция спрашивается на каждый запрос: предел бывает вычислен из `config.json`, а он
+   * перечитывается на живом демоне, и число, снятое при сборке таблицы, устарело бы молча.
+   */
+  bodyLimitBytes?: number | (() => number);
   /** Предельное время чтения тела; после него соединение закрывается, чтобы поток не держал демон. */
   bodyReadTimeoutMilliseconds?: number;
   /** `raw` отдаёт тело буфером, не разбирая его как json: форму тела знает только автор маршрута. */
@@ -202,13 +207,16 @@ export function createDispatcher(
 
     // У GET и DELETE тела нет по определению: читать его — значит ждать конца потока там, где
     // ждать нечего, а SSE-поток обязан начаться сразу.
+    const routeLimit = matched.route.bodyLimitBytes;
+    const limitBytes =
+      (typeof routeLimit === "function" ? routeLimit() : routeLimit) ?? bodyLimitBytes;
     const body =
       request.method === "GET" || request.method === "DELETE"
         ? { kind: "absent" as const }
         : await readBody(
             request,
             response,
-            matched.route.bodyLimitBytes ?? bodyLimitBytes,
+            limitBytes,
             matched.route,
             matched.route.bodyReadTimeoutMilliseconds ?? defaultBodyReadTimeoutMilliseconds,
           );
@@ -217,7 +225,7 @@ export function createDispatcher(
       respondWithError(
         response,
         413,
-        `the request body must not exceed ${matched.route.bodyLimitBytes ?? bodyLimitBytes} bytes`,
+        `the request body must not exceed ${String(limitBytes)} bytes`,
       );
 
       return;

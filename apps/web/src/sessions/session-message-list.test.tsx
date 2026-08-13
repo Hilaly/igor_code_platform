@@ -138,6 +138,7 @@ describe("the session message list", () => {
               role: "agent",
               text: "живой ответ",
               reasoning: "",
+              images: [],
               done: false,
             },
           },
@@ -220,6 +221,7 @@ describe("the session message list", () => {
               role: "agent",
               text: "**форматируемый ответ**",
               reasoning: "**форматируемый reasoning**",
+              images: [],
               done: false,
             },
             "turn-1:tool": {
@@ -281,6 +283,7 @@ describe("the session message list", () => {
               role: "user",
               text: "привет",
               reasoning: "",
+              images: [],
               done: true,
             },
             "turn-1:steer": {
@@ -289,6 +292,7 @@ describe("the session message list", () => {
               role: "user",
               text: "привет",
               reasoning: "",
+              images: [],
               done: true,
             },
           },

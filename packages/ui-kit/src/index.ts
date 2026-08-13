@@ -29,6 +29,7 @@ export * from "./components/field.tsx";
 export * from "./components/file-picker.tsx";
 export * from "./components/form.tsx";
 export * from "./components/icon.tsx";
+export * from "./components/image-gallery.tsx";
 export * from "./components/input.tsx";
 export * from "./components/icons.tsx";
 export * from "./components/link.tsx";

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type {
+  ProjectFilesSnapshot,
   SessionContextUsage,
   SessionMessage,
   SessionStats,
@@ -94,6 +95,8 @@ type ComposerHarnessProps = {
   onInterrupt?: () => void;
   onError?: (error: unknown) => void;
   draftReplacement?: ComposerDraftReplacement;
+  onDropTarget?: (drop: (transfer: DataTransfer) => void) => void;
+  onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
 };
 
 function SwitchingComposerHarness({
@@ -146,6 +149,8 @@ function ComposerHarness({
   onInterrupt = vi.fn(),
   onError,
   draftReplacement,
+  onDropTarget,
+  onSearchFiles,
 }: ComposerHarnessProps) {
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
@@ -166,6 +171,8 @@ function ComposerHarness({
         onSubmit={onSubmit}
         onSendMessage={onSendMessage}
         onInterrupt={onInterrupt}
+        {...(onDropTarget === undefined ? {} : { onDropTarget })}
+        {...(onSearchFiles === undefined ? {} : { onSearchFiles })}
         onError={onError ?? vi.fn()}
         context={contextUsage}
         stats={sessionStats}
@@ -195,7 +202,9 @@ describe("the session message composer", () => {
     expect(composer?.querySelector("textarea")).not.toBeNull();
     expect(composer?.querySelector(".sessions-composer-toolbar")).not.toBeNull();
     expect(composer?.querySelectorAll(".sessions-composer-options")).toHaveLength(0);
-    expect(composer?.querySelectorAll("button")).toHaveLength(4);
+    // Пять: приложить, метрики, next-turn, стоп и отправка с её меню вариантов.
+    expect(composer?.querySelectorAll("button")).toHaveLength(5);
+    expect(composer?.querySelector(".sessions-composer-attach button")).not.toBeNull();
   });
 
   it("keeps the circular context indicator inside the composer action row", () => {
@@ -592,5 +601,258 @@ describe("the session message composer", () => {
         .getAttribute("aria-disabled"),
     ).toBe("false");
     expect(screen.getByRole("button", { name: /anthropic\/claude.*выключены/i })).not.toBeNull();
+  });
+});
+
+describe("attaching images to a message", () => {
+  const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x07]);
+  const pngBase64 = btoa(String.fromCharCode(...pngBytes));
+
+  const pngFile = (name = "снимок.png"): File => new File([pngBytes], name, { type: "image/png" });
+
+  /** Файл в jsdom без `arrayBuffer` бесполезен: чтение идёт именно через него. */
+  const readable = (file: File): File => {
+    Object.defineProperty(file, "arrayBuffer", {
+      value: () => Promise.resolve(pngBytes.buffer.slice(0)),
+    });
+
+    return file;
+  };
+
+  const transferOf = (files: File[]): DataTransfer =>
+    ({
+      items: files.map((file) => ({ kind: "file", type: file.type, getAsFile: () => file })),
+    }) as unknown as DataTransfer;
+
+  const attach = async (files: File[]): Promise<void> => {
+    const input = screen.getByLabelText("Изображение", { selector: "input" });
+
+    fireEvent.change(input, { target: { files } });
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).not.toBeNull());
+  };
+
+  it("sends the attached image with the text and clears the draft once accepted", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness onSubmit={onSubmit} />);
+    await attach([readable(pngFile())]);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "что тут" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "что тут",
+          images: [{ mimeType: "image/png", data: pngBase64 }],
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).toBeNull());
+  });
+
+  it("sends a message made only of the image", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness onSubmit={onSubmit} />);
+
+    // До картинки отправлять нечего, после — есть.
+    expect(
+      screen.getByRole("button", { name: "Отправить" }).getAttribute("aria-disabled"),
+    ).not.toBe("false");
+
+    await attach([readable(pngFile())]);
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "", images: [{ mimeType: "image/png", data: pngBase64 }] }),
+      ),
+    );
+  });
+
+  it("keeps the draft when the daemon refuses the message", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve("image 1 exceeds maxImageBytes"));
+
+    render(<ComposerHarness onSubmit={onSubmit} />);
+    await attach([readable(pngFile())]);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Сообщение агенту" }), {
+      target: { value: "что тут" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    // Ни картинка, ни текст не пропали: переписывать заново уже написанное человек не должен.
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).not.toBeNull());
+    expect(
+      screen.getByRole("textbox", { name: "Сообщение агенту" }).getAttribute("value") ??
+        (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("что тут");
+  });
+
+  it("refuses a whole batch that holds an unsupported file, keeping the draft untouched", async () => {
+    render(<ComposerHarness />);
+
+    const input = screen.getByLabelText("Изображение", { selector: "input" });
+
+    fireEvent.change(input, {
+      target: {
+        files: [readable(pngFile()), new File(["x"], "заметка.txt", { type: "text/plain" })],
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText(/заметка\.txt/)).not.toBeNull());
+    // Пачка не принята целиком: годный файл из неё тоже не приложился.
+    expect(screen.queryByLabelText("Приложенные изображения")).toBeNull();
+  });
+
+  it("takes an image out of the draft again", async () => {
+    render(<ComposerHarness />);
+    await attach([readable(pngFile())]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Убрать изображение 1" }));
+
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).toBeNull());
+  });
+
+  it("takes an image pasted into the field and leaves plain text paste alone", async () => {
+    render(<ComposerHarness />);
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.paste(field, { clipboardData: transferOf([readable(pngFile())]) });
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).not.toBeNull());
+
+    // Обычная вставка текста ничего не прикладывает и остаётся нативной.
+    const pasted = new Event("paste", { bubbles: true, cancelable: true });
+
+    Object.defineProperty(pasted, "clipboardData", { value: transferOf([]) });
+    field.dispatchEvent(pasted);
+    expect(pasted.defaultPrevented).toBe(false);
+  });
+
+  it("takes an image dropped anywhere on the panel through the handler it hands upward", async () => {
+    let accept: ((transfer: DataTransfer) => void) | undefined;
+
+    render(
+      <ComposerHarness
+        onDropTarget={(drop) => {
+          accept = drop;
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(accept).not.toBeUndefined());
+    accept?.(transferOf([readable(pngFile())]));
+
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).not.toBeNull());
+  });
+
+  it("forgets the attachments when the session changes", async () => {
+    const view = render(<ComposerHarness sessionId="session-a" />);
+
+    await attach([readable(pngFile())]);
+    view.rerender(<ComposerHarness sessionId="session-b" />);
+
+    await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).toBeNull());
+  });
+});
+
+describe("mentioning a project file", () => {
+  const searching = (paths: string[], truncated = false) =>
+    vi.fn(() => Promise.resolve({ paths, truncated }) as Promise<ProjectFilesSnapshot>);
+
+  const type = (value: string): void => {
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement;
+
+    fireEvent.change(field, { target: { value } });
+    field.setSelectionRange(value.length, value.length);
+  };
+
+  it("opens the list on an at-sign and asks the daemon for what was typed", async () => {
+    const onSearchFiles = searching(["README.md", "src/reader.ts"]);
+
+    render(<ComposerHarness onSearchFiles={onSearchFiles} />);
+    type("посмотри @rea");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Файлы проекта" })).not.toBeNull(),
+    );
+    expect(onSearchFiles).toHaveBeenCalledWith("rea", expect.anything());
+    expect(screen.getAllByRole("option").map((one) => one.textContent)).toEqual([
+      "README.md",
+      "src/reader.ts",
+    ]);
+  });
+
+  it("puts the chosen path into the message as ordinary text", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["src/reader.ts"])} />);
+    type("посмотри @rea");
+
+    await waitFor(() => expect(screen.queryByRole("option")).not.toBeNull());
+    fireEvent.click(screen.getByRole("option", { name: "src/reader.ts" }));
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+      ).toBe("посмотри @src/reader.ts "),
+    );
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("walks the list with arrows and takes the active one on Enter, without sending", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness onSearchFiles={searching(["a.ts", "b.ts"])} onSubmit={onSubmit} />);
+    type("@");
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: "b.ts" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe("@b.ts "));
+    // Одно нажатие — одно действие: недописанную ссылку человек отправлять не собирался.
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("closes on Escape and leaves the at-sign as plain text", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["a.ts"])} />);
+    type("@a");
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeNull());
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("@a");
+  });
+
+  it("stays out of the way when nothing was found or nobody can search", async () => {
+    const view = render(<ComposerHarness onSearchFiles={searching([])} />);
+
+    type("@нет");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    view.rerender(<ComposerHarness />);
+    type("@rea");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("says the list was cut instead of quietly showing a part of it", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["a.ts"], true)} />);
+    type("@a");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Найдено больше — уточните запрос")).not.toBeNull(),
+    );
   });
 });

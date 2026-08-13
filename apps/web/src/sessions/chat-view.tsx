@@ -29,7 +29,8 @@ import {
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { NavigationOutcome } from "./api.ts";
+import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
+import { carriesImages } from "./image-input.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
@@ -286,21 +287,62 @@ export function ChatView(props: ChatViewProps) {
     () =>
       waiting.length === 0 ? undefined : (
         <div className="sessions-queues">
-          {waiting.map((text, index) => (
-            <Badge key={`${String(index)}:${text}`} tone="accent">
-              {text}
+          {waiting.map((message, index) => (
+            <Badge key={`${String(index)}:${message.text}`} tone="accent">
+              {/* Сообщение из одних картинок текста не имеет, и пустой бейдж молчал бы о том, что
+                  в очереди вообще что-то стоит. */}
+              {message.text === ""
+                ? t("chat.queued.images", { count: String(message.images?.length ?? 0) })
+                : message.text}
             </Badge>
           ))}
         </div>
       ),
     [t, waiting],
   );
+  /**
+   * Приём перетащенного отдаёт композер: черновик принадлежит ему, а зона drop — всей панели.
+   * Ссылка, а не состояние: смена обработчика не должна перерисовывать ленту.
+   */
+  /**
+   * Поиск файлов для `@файл`. Без проекта его нет вовсе, и подсказка не открывается: искать негде, а
+   * `@` остаётся обычным символом.
+   */
+  const projectId = open.summary?.projectId;
+  const searchFiles = useMemo(
+    () =>
+      projectId === undefined
+        ? undefined
+        : async (query: string, signal: AbortSignal) => fetchProjectFiles(projectId, query, signal),
+    [projectId],
+  );
+  const acceptDrop = useRef<((transfer: DataTransfer) => void) | undefined>(undefined);
+  const takeDropTarget = useCallback((drop: (transfer: DataTransfer) => void): void => {
+    acceptDrop.current = drop;
+  }, []);
   const handleLabelRefusalChange = useCallback((reason: string | undefined): void => {
     setRefusal(reason === undefined ? undefined : { what: "label", reason });
   }, []);
 
   return (
-    <section className="sessions-chat">
+    <section
+      className="sessions-chat"
+      onDragOver={(event) => {
+        // Без этого браузер уходит открывать файл вместо того, чтобы отдать его нам.
+        if (carriesImages(event.dataTransfer)) {
+          event.preventDefault();
+        }
+      }}
+      onDrop={(event) => {
+        // Перетащили не картинку — страница ведёт себя как прежде: ломать чужой drop незачем.
+        if (!carriesImages(event.dataTransfer)) {
+          return;
+        }
+
+        event.preventDefault();
+        acceptDrop.current?.(event.dataTransfer);
+      }}
+    >
       <EntryTreeDrawer
         open={treeOpen}
         onClose={() => setTreeOpen(false)}
@@ -354,6 +396,8 @@ export function ChatView(props: ChatViewProps) {
             onSubmit={onSubmit}
             onSendMessage={onSendMessage}
             onInterrupt={onInterrupt}
+            onDropTarget={takeDropTarget}
+            {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
             onError={(error: unknown) => {
               onDiagnostic?.(
                 `the message composer acceptance failed: ${

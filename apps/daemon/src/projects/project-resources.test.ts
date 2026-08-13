@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { createServer, request as sendRequest, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, describe, it } from "node:test";
@@ -7,8 +10,10 @@ import { after, describe, it } from "node:test";
 import {
   projectAgentsPath,
   projectFileResourcesPath,
+  projectFilesPath,
   type AgentSummary,
   type FileResourcesSnapshot,
+  type ProjectFilesSnapshot,
 } from "@sovereign/protocol";
 
 import { createDispatcher } from "../http/public.ts";
@@ -18,12 +23,34 @@ import { projectResourceRoutes } from "./project-resources.ts";
 
 const servers: Server[] = [];
 
+const folders: string[] = [];
+
 after(async () => {
   for (const server of servers) {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
+
+  for (const folder of folders) {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
+
+/** Настоящая папка на диске: маршрут поиска ходит в файловую систему, а не в двойника. */
+function folderWith(paths: string[]): string {
+  const root = mkdtempSync(join(tmpdir(), "sovereign-project-route-"));
+
+  folders.push(root);
+
+  for (const path of paths) {
+    const full = join(root, path);
+
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, "");
+  }
+
+  return root;
+}
 
 type Answer = { status: number; body: unknown };
 
@@ -208,4 +235,55 @@ describe("projectResourceRoutes", () => {
       });
     });
   }
+});
+
+describe("GET /api/projects/:id/files", () => {
+  it("answers with relative paths matching the fragment", async () => {
+    const folder = folderWith(["README.md", join("src", "reader.ts"), join("src", "writer.ts")]);
+    const call = await serve({ project: project({ folder }) });
+
+    // Оба совпали именем файла, поэтому между собой они идут по алфавиту; `writer.ts` не совпал вовсе.
+    assert.deepEqual(await call(projectFilesPath("p1", "read")), {
+      status: 200,
+      body: {
+        paths: ["README.md", "src/reader.ts"],
+        truncated: false,
+      } satisfies ProjectFilesSnapshot,
+    });
+  });
+
+  it("takes an absent fragment as the start of the list, not as a refusal", async () => {
+    const folder = folderWith(["only.ts"]);
+    const call = await serve({ project: project({ folder }) });
+
+    assert.deepEqual(await call(projectFilesPath("p1")), {
+      status: 200,
+      body: { paths: ["only.ts"], truncated: false } satisfies ProjectFilesSnapshot,
+    });
+  });
+
+  it("refuses a project that is unknown, archived or has no folder", async () => {
+    const folder = folderWith(["one.ts"]);
+
+    assert.equal(
+      (await (await serve({ project: project({ folder }) }))(projectFilesPath("nope"))).status,
+      404,
+    );
+    assert.equal(
+      (
+        await (
+          await serve({ project: project({ folder, archived: true }) })
+        )(projectFilesPath("p1"))
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await (
+          await serve({ project: project({ folder }), availability: "missing" })
+        )(projectFilesPath("p1"))
+      ).status,
+      409,
+    );
+  });
 });
