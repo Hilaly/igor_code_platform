@@ -118,8 +118,7 @@ export type AgentSession = {
     turnId: string,
     args?: string,
   ) => Promise<TurnOutcome>;
-  /** `false` — прерывать было нечего. */
-  abort: () => Promise<boolean>;
+  abort: () => Promise<AbortOutcome>;
   /** Проверить текущую модель по живому каталогу, не меняя и не записывая её. */
   validateModel: () => ModelOutcome;
   setModel: (reference: string) => Promise<ModelOutcome>;
@@ -230,6 +229,15 @@ export type ModelOutcome =
  */
 export type MessageOutcome =
   { kind: "queued" } | { kind: "idle" } | { kind: "busy" } | { kind: "text-only-model" };
+
+/**
+ * Исход прерывания. `aborted: false` — прерывать было нечего.
+ *
+ * `cleared` — то, что прерывание вычистило из очередей рантайма: вклиненное и догоняющее, которых
+ * модель так и не увидела. Отдаётся наружу, потому что решать судьбу написанного человеком —
+ * не дело рантайма.
+ */
+export type AbortOutcome = { aborted: boolean; cleared: SessionQueuedMessage[] };
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
 
@@ -848,7 +856,7 @@ function liveSession(
    * Очереди рантайм наружу не отдаёт — только сообщает о смене событием, поэтому последнее
    * состояние приходится помнить: клиент, подключившийся посреди турна, спросит снимок.
    */
-  let queues: SessionQueues = { steer: [], followUp: [], nextTurn: [] };
+  let queues: SessionQueues = { steer: [], followUp: [] };
 
   /**
    * Одно наше звено на событие, а не по обработчику на подписчика: `emitHook` у Pi отдаёт победу
@@ -905,7 +913,6 @@ function liveSession(
       queues = {
         steer: event.steer.map(queuedMessage),
         followUp: event.followUp.map(queuedMessage),
-        nextTurn: event.nextTurn.map(queuedMessage),
       };
       publish({ kind: "queues", queues });
 
@@ -994,13 +1001,16 @@ function liveSession(
     queues: () => ({
       steer: [...queues.steer],
       followUp: [...queues.followUp],
-      nextTurn: [...queues.nextTurn],
     }),
     message: async (text, mode, images) => {
       // Требования к занятости у режимов разные, и проверяются они здесь, а не в рантайме: у
       // рантайма это исключение `invalid_state`, а у нас — обычный исход, который маршрут переводит
       // в `409` с внятной причиной.
-      if ((mode === "steer" || mode === "follow-up") && phase === "idle") {
+      // Требуется именно `turn`, а не «не простой»: обе очереди Pi вычитываются только изнутри
+      // идущего турна (steer — каждым кругом внутреннего цикла, follow-up — там, где агент собрался
+      // остановиться). В компакции и сводке ветки турна нет, и принятое сообщение легло бы в память
+      // harness навсегда — ровно так оно и зависало.
+      if ((mode === "steer" || mode === "follow-up") && phase !== "turn") {
         return { kind: "idle" };
       }
 
@@ -1020,11 +1030,9 @@ function liveSession(
         await harness.steer(text, { images: carried });
       } else if (mode === "follow-up") {
         await harness.followUp(text, { images: carried });
-      } else if (mode === "next-turn") {
-        await harness.nextTurn(text, { images: carried });
       } else {
         // У `appendMessage` нет `options.images`, поэтому содержимое складывается руками — в том же
-        // порядке, в котором его складывают остальные четыре пути: текст, затем изображения.
+        // порядке, в котором его складывают остальные три пути: текст, затем изображения.
         await harness.appendMessage({
           role: "user",
           content: [{ type: "text", text }, ...carried],
@@ -1084,13 +1092,20 @@ function liveSession(
       }),
     abort: async () => {
       if (current === undefined) {
-        return false;
+        return { aborted: false, cleared: [] };
       }
 
       current.aborted = true;
-      await harness.abort();
 
-      return true;
+      const dropped = await harness.abort();
+
+      // Вычищенное отдаётся вызывающему, а не выбрасывается: человек это написал, модель этого не
+      // видела, и молчаливая пропажа написанного — тот самый дефект, из-за которого заводилась
+      // очередь сессии. Порядок отправки сохраняется: стиринг раньше догоняющего.
+      return {
+        aborted: true,
+        cleared: [...dropped.clearedSteer, ...dropped.clearedFollowUp].map(queuedMessage),
+      };
     },
     validateModel: () =>
       resolveModel(models, summary.model) === undefined
@@ -1767,9 +1782,9 @@ function imagesOf(content: unknown): SessionImage[] {
 }
 
 /**
- * Изображения в том виде, в котором их принимает рантайм. Один перевод на все пять путей: разные
- * реализации `prompt`, `steer`, `follow-up`, `next-turn` и `append` быстро разошлись бы в порядке
- * блоков и в том, что считается сообщением без текста.
+ * Изображения в том виде, в котором их принимает рантайм. Один перевод на все четыре пути: разные
+ * реализации `prompt`, `steer`, `follow-up` и `append` быстро разошлись бы в порядке блоков и в
+ * том, что считается сообщением без текста.
  */
 function toRuntimeImages(images: readonly SessionImage[] | undefined) {
   return (images ?? []).map((image) => ({

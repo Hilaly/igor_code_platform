@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { scriptedSessionStore, type ScriptedTurn } from "@sovereign/agent-runtime-pi/testing";
+import { createPluginTool } from "@sovereign/agent-runtime-pi";
 import type {
   AgentDefinition,
   AgentSession,
@@ -38,6 +39,8 @@ import {
   sessionMessagesPath,
   sessionNavigatePath,
   sessionPath,
+  sessionQueuedMessagePath,
+  sessionQueuePath,
   sessionsPath,
   sessionStatsPath,
   sessionTurnsPath,
@@ -51,6 +54,7 @@ import {
   type SessionEntriesPage,
   type SessionEntry,
   type SessionNavigated,
+  type SessionOutbox,
   type SessionsSnapshot,
   type SessionStats,
 } from "@sovereign/protocol";
@@ -153,6 +157,8 @@ async function serve(
     openGate?: ReturnType<typeof gate>;
     createGate?: ReturnType<typeof gate>;
     operationGate?: ReturnType<typeof gate> | (() => ReturnType<typeof gate> | undefined);
+    /** Останавливает турн внутри инструмента `hold`, то есть в настоящей фазе `turn`. */
+    toolGate?: ReturnType<typeof gate>;
     coldSession?: boolean;
     compactionThreshold?: number;
     imageLimits?: ImageLimits;
@@ -333,6 +339,35 @@ async function serve(
     },
   });
 
+  // Инструмент, останавливающий турн внутри себя. Единственный способ подержать сессию именно в
+  // фазе `turn`: `operationGate` держит вызывающего до того, как рантайм начал турн, а стиринг
+  // требует турна идущего.
+  if (options.toolGate !== undefined) {
+    const toolGate = options.toolGate;
+
+    collector.register({
+      id: "holding-tool",
+      collect: () => [
+        {
+          name: "hold",
+          group: "plugin",
+          order: 10,
+          tool: createPluginTool({
+            name: "hold",
+            description: "Ждать, пока тест не отпустит",
+            parameters: { type: "object", properties: {} },
+            invoke: async () => {
+              toolGate.entered();
+              await toolGate.wait;
+
+              return { content: "отпущено", isError: false };
+            },
+          }).tool,
+        },
+      ],
+    });
+  }
+
   const defaultContributions = {
     base: () => [baseAgent],
     forProject: () => [baseAgent],
@@ -469,6 +504,54 @@ async function untilQueued(
   }
 
   throw new Error("сессия так и не встала в очередь");
+}
+
+/**
+ * Дождаться, пока названный текст доедет до дерева. Именно по дереву, а не по опустевшей очереди:
+ * из очереди сообщение уходит раньше, чем начинается его турн.
+ */
+async function untilSaid(
+  call: (method: string, path: string) => Promise<Answer>,
+  sessionId: string,
+  said: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const page = (await call("GET", sessionEntriesPath(sessionId)))
+      .body as unknown as SessionEntriesPage;
+
+    if (JSON.stringify(page.entries).includes(said)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error(`сообщение «${said}» так и не доехало до дерева`);
+}
+
+/** Дождаться остановки очереди: она случается в `finally` турна, то есть после его конца. */
+async function untilStopped(
+  call: (method: string, path: string) => Promise<Answer>,
+  sessionId: string,
+): Promise<SessionOutbox> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const waiting = (await call("GET", sessionQueuePath(sessionId)))
+      .body as unknown as SessionOutbox;
+
+    if (waiting.stopped !== undefined) {
+      return waiting;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error("очередь так и не остановилась");
+}
+
+function saidByUser(page: SessionEntriesPage): string[] {
+  return page.entries
+    .filter((entry) => entry.kind === "message" && entry.role === "user")
+    .map((entry) => JSON.stringify(entry.kind === "message" ? entry.content : []));
 }
 
 describe("GET /api/agents", () => {
@@ -1265,7 +1348,7 @@ describe("reading sessions", () => {
 
     const answer = await call("POST", sessionMessagesPath(sessionId), {
       text: "remember this",
-      mode: "next-turn",
+      mode: "append",
     });
 
     assert.equal(answer.status, 409);
@@ -1294,7 +1377,6 @@ describe("reading sessions", () => {
       ["steer", 409],
       ["follow-up", 409],
       ["append", 200],
-      ["next-turn", 200],
     ] as const) {
       const answer = await call("POST", sessionMessagesPath(sessionId), {
         text: "remember this",
@@ -1599,7 +1681,7 @@ describe("the session lifecycle over http", () => {
     assert.equal((await call("POST", sessionForkPath("00000000"), {})).status, 404);
   });
 
-  it("refuses steering when nothing is running and takes a message for the next turn", async () => {
+  it("refuses steering when nothing is running", async () => {
     const { call, start } = await serve({ turns: [{ text: "готово" }] });
     const sessionId = String((await start()).body["id"]);
 
@@ -1611,15 +1693,7 @@ describe("the session lifecycle over http", () => {
     assert.equal(steered.status, 409);
     assert.match(String(steered.body["error"]), /idle/);
 
-    const queued = await call("POST", sessionMessagesPath(sessionId), {
-      text: "не забудь про тесты",
-      mode: "next-turn",
-    });
-
-    assert.equal(queued.status, 200);
-    assert.equal(queued.body["mode"], "next-turn");
-
-    // Сообщение к следующему турну ждёт, а не запускает работу: сессия осталась в простое.
+    // Отказ ничего не запустил: сессия осталась в простое.
     assert.equal((await call("GET", sessionPath(sessionId))).body["phase"], "idle");
   });
 
@@ -1755,6 +1829,298 @@ describe("reading the branch and the context over http", () => {
       assert.equal(refused.status, 409);
       assert.match(String(refused.body["error"]), /archived/);
     }
+  });
+});
+
+describe("the session message queue", () => {
+  it("starts a message queued during compaction after compaction finishes", async () => {
+    const compactionGate = gate();
+    let currentOperationGate: ReturnType<typeof gate> | undefined;
+    const { call, start } = await serve({
+      turns: [{ text: "первый ответ" }, { text: "пересказ" }, { text: "ответ на очередь" }],
+      operationGate: () => currentOperationGate,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый вопрос" });
+    await untilIdle(call, sessionId);
+
+    currentOperationGate = compactionGate;
+    const compacting = call("POST", sessionCompactPath(sessionId), {});
+    await compactionGate.entry;
+
+    const queued = await call("POST", sessionQueuePath(sessionId), { text: "после компакции" });
+
+    assert.equal(queued.status, 200);
+    assert.deepEqual(
+      (queued.body as unknown as SessionOutbox).messages.map((message) => message.text),
+      ["после компакции"],
+    );
+
+    currentOperationGate = undefined;
+    compactionGate.open();
+
+    await compacting;
+    await untilSaid(call, sessionId, "после компакции");
+    await untilIdle(call, sessionId);
+
+    const said = saidByUser(
+      (await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage,
+    );
+
+    assert.equal(said.length, 2);
+    assert.match(said[0] ?? "", /первый вопрос/);
+    assert.match(said[1] ?? "", /после компакции/);
+  });
+
+  it("starts a queued message as a turn of its own once the session is free", async () => {
+    const hold = gate();
+    const { call, start } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }],
+      operationGate: hold,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await hold.entry;
+
+    const placed = await call("POST", sessionQueuePath(sessionId), { text: "и ещё" });
+    const waiting = placed.body as unknown as SessionOutbox;
+
+    assert.equal(placed.status, 200);
+    assert.deepEqual(
+      waiting.messages.map((message) => message.text),
+      ["и ещё"],
+    );
+
+    hold.open();
+    await untilSaid(call, sessionId, "и ещё");
+    await untilIdle(call, sessionId);
+
+    // Уехало — значит ушло из очереди: показывать ждущим то, что уже в дереве, значило бы повторить
+    // ровно тот двойной показ, из-за которого очередь и заводилась.
+    assert.deepEqual((await call("GET", sessionQueuePath(sessionId))).body, { messages: [] });
+  });
+
+  it("keeps the order in which the messages were written", async () => {
+    const hold = gate();
+    const { call, start } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }, { text: "третий" }],
+      operationGate: hold,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await hold.entry;
+    await call("POST", sessionQueuePath(sessionId), { text: "сначала это" });
+    await call("POST", sessionQueuePath(sessionId), { text: "потом это" });
+
+    hold.open();
+    await untilSaid(call, sessionId, "потом это");
+    await untilIdle(call, sessionId);
+
+    const said = saidByUser(
+      (await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage,
+    );
+
+    assert.equal(said.length, 3);
+    assert.match(said[1] ?? "", /сначала это/);
+    assert.match(said[2] ?? "", /потом это/);
+  });
+
+  it("stops the queue when a turn fails and runs the rest after the stop is lifted", async () => {
+    const hold = gate();
+    // Сценарий двойника кончается на первом ответе: следующий турн упадёт, и упадёт по-настоящему.
+    const { call, start } = await serve({ turns: [{ text: "первый" }], operationGate: hold });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await hold.entry;
+    await call("POST", sessionQueuePath(sessionId), { text: "упадёт" });
+    await call("POST", sessionQueuePath(sessionId), { text: "не должно уехать" });
+
+    hold.open();
+
+    const stopped = await untilStopped(call, sessionId);
+
+    // Остаток цел: очередь остановлена, а не выброшена — гнать её в тот же тупик было бы тратой
+    // денег владельца, а терять написанное нельзя вовсе.
+    assert.deepEqual(
+      stopped.messages.map((message) => message.text),
+      ["не должно уехать"],
+    );
+    assert.match(stopped.stopped?.reason ?? "", /сценарий двойника кончился/);
+
+    const resumed = await call("PUT", sessionQueuePath(sessionId), { stopped: false });
+
+    assert.equal(resumed.status, 200);
+    assert.equal((resumed.body as unknown as SessionOutbox).stopped, undefined);
+  });
+
+  it("runs the next queued message after a queued turn is cancelled", async () => {
+    const hold = gate();
+    // Предел в один поход: турн второй сессии встаёт в очередь и до старта не доходит.
+    const { call, start, projectId } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }],
+      operationGate: hold,
+      limit: 1,
+    });
+    const first = String((await start()).body["id"]);
+    const second = String((await start()).body["id"]);
+
+    assert.notEqual(projectId, "");
+    await call("POST", sessionTurnsPath(first), { text: "занимаю слот" });
+    await hold.entry;
+    await call("POST", sessionTurnsPath(second), { text: "жду слота" });
+    await untilQueued(call, second);
+    await call("POST", sessionQueuePath(second), { text: "а это следующим" });
+
+    // Снятый с очереди турн не выполняется вовсе, поэтому его `finally` очередь не сливает — это
+    // делает сам `abort`.
+    assert.equal((await call("DELETE", sessionTurnsPath(second))).status, 200);
+
+    hold.open();
+    await untilSaid(call, second, "а это следующим");
+    await untilIdle(call, second);
+  });
+
+  it("steers a waiting message into the running turn and takes it off the queue", async () => {
+    const holdInTool = gate();
+    const { call, start } = await serve({
+      turns: [{ toolCalls: [{ id: "c1", name: "hold", arguments: {} }] }, { text: "готово" }],
+      toolGate: holdInTool,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await holdInTool.entry;
+
+    const placed = (await call("POST", sessionQueuePath(sessionId), { text: "левее" }))
+      .body as unknown as SessionOutbox;
+    const messageId = placed.messages[0]?.id ?? "";
+    const steered = await call("PUT", sessionQueuedMessagePath(sessionId, messageId), {
+      mode: "steer",
+    });
+
+    assert.equal(steered.status, 200);
+    // Снялось только после того, как стиринг принят: показанным дважды сообщение не бывает.
+    assert.deepEqual(steered.body, { messages: [] });
+
+    holdInTool.open();
+    await untilSaid(call, sessionId, "левее");
+    await untilIdle(call, sessionId);
+  });
+
+  it("puts the steering an interruption cleared back at the head of the queue", async () => {
+    const holdInTool = gate();
+    const { call, start } = await serve({
+      turns: [{ toolCalls: [{ id: "c1", name: "hold", arguments: {} }] }, { text: "готово" }],
+      toolGate: holdInTool,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await holdInTool.entry;
+    assert.equal(
+      (await call("POST", sessionMessagesPath(sessionId), { text: "левее", mode: "steer" })).status,
+      200,
+    );
+    await call("POST", sessionQueuePath(sessionId), { text: "и потом это" });
+
+    // Прерывание чистит очереди рантайма. Вклиненное модель не видела — оно возвращается в голову
+    // очереди, а не пропадает, и уезжает первым, потому что написано раньше ждущего.
+    holdInTool.open();
+    assert.equal((await call("DELETE", sessionTurnsPath(sessionId))).status, 200);
+    await untilSaid(call, sessionId, "левее");
+    await untilIdle(call, sessionId);
+
+    const said = saidByUser(
+      (await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage,
+    );
+
+    assert.match(said[1] ?? "", /левее/);
+  });
+
+  it("keeps a waiting message on the queue when there is no turn to steer", async () => {
+    const hold = gate();
+    // Сценарий двойника кончается на первом ответе: следующий турн упадёт и остановит очередь,
+    // оставив в ней сообщение при простаивающей сессии — то самое состояние, в котором вклиниваться
+    // некуда, а показать кнопку «вклинить» было бы обманом.
+    const { call, start } = await serve({ turns: [{ text: "первый" }], operationGate: hold });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await hold.entry;
+    await call("POST", sessionQueuePath(sessionId), { text: "упадёт" });
+    await call("POST", sessionQueuePath(sessionId), { text: "левее" });
+
+    hold.open();
+
+    const stopped = await untilStopped(call, sessionId);
+    const messageId = stopped.messages[0]?.id ?? "";
+    const refused = await call("PUT", sessionQueuedMessagePath(sessionId, messageId), {
+      mode: "steer",
+    });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /idle/);
+
+    // Отказ ничего не стоил: сообщение по-прежнему ждёт своей очереди.
+    const kept = (await call("GET", sessionQueuePath(sessionId))).body as unknown as SessionOutbox;
+
+    assert.deepEqual(
+      kept.messages.map((message) => message.text),
+      ["левее"],
+    );
+  });
+
+  it("drops a waiting message and answers 404 for one that is not there", async () => {
+    const hold = gate();
+    const { call, start } = await serve({
+      turns: [{ text: "первый" }, { text: "второй" }],
+      operationGate: hold,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await hold.entry;
+
+    const placed = (await call("POST", sessionQueuePath(sessionId), { text: "передумал" }))
+      .body as unknown as SessionOutbox;
+    const messageId = placed.messages[0]?.id ?? "";
+    const dropped = await call("DELETE", sessionQueuedMessagePath(sessionId, messageId));
+
+    assert.equal(dropped.status, 200);
+    assert.deepEqual(dropped.body, { messages: [] });
+    assert.equal(
+      (await call("DELETE", sessionQueuedMessagePath(sessionId, messageId))).status,
+      404,
+    );
+
+    hold.open();
+    await untilIdle(call, sessionId);
+  });
+
+  it("answers with an empty queue for a session that never queued anything", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    // Снимок есть всегда: без него переподключившийся клиент про очередь не узнал бы ничего.
+    assert.deepEqual((await call("GET", sessionQueuePath(sessionId))).body, { messages: [] });
+    assert.equal((await call("GET", sessionQueuePath("нет-такой"))).status, 404);
+  });
+
+  it("refuses to queue anything for an archived session", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    await untilIdle(call, sessionId);
+    assert.equal((await call("PUT", sessionPath(sessionId), { archived: true })).status, 200);
+
+    const refused = await call("POST", sessionQueuePath(sessionId), { text: "потом" });
+
+    assert.equal(refused.status, 409);
+    assert.match(String(refused.body["error"]), /archived/);
   });
 });
 

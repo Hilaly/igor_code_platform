@@ -31,6 +31,7 @@ import {
   type SessionDelta,
   type SessionImage,
   type SessionEntry,
+  type SessionOutbox,
   type SessionQueues,
   type SessionsSnapshot,
   type SessionStats,
@@ -88,6 +89,11 @@ export type OpenSession = {
    * принят и ждёт, а не пропал (docs/web-api.md).
    */
   queues?: SessionQueues;
+  /**
+   * Что ждёт освобождения сессии. В отличие от `queues` приезжает и снимком: очередь переживает
+   * перезагрузку страницы, и узнавать о ней только из дельт значило бы терять её на каждом разрыве.
+   */
+  outbox?: SessionOutbox;
   /** Токены и деньги. Спрашиваются отдельным запросом по открытию сессии и по концу турна. */
   stats?: SessionStats;
   /**
@@ -468,6 +474,17 @@ export function applyQueues(
   return open?.id === sessionId ? { ...state, open: { ...open, queues } } : state;
 }
 
+/** Очередь приезжает целиком по той же причине, что и очереди рантайма: дельта несёт всё её тело. */
+export function applyOutbox(
+  state: SessionsState,
+  sessionId: string,
+  outbox: SessionOutbox,
+): SessionsState {
+  const open = state.open;
+
+  return open?.id === sessionId ? { ...state, open: { ...open, outbox } } : state;
+}
+
 export function applyStats(
   state: SessionsState,
   sessionId: string,
@@ -603,10 +620,14 @@ export function applySessionDelta(
     return { state, reread: false };
   }
 
-  // Очереди про турн ничего не говорят: сообщение к следующему турну кладут и в простое, и
-  // выбрасывать по нему буфер или снимать ожидающий текст было бы неверно.
+  // Очереди про турн ничего не говорят: сообщение кладут в них и в простое, и выбрасывать по ним
+  // буфер или снимать ожидающий текст было бы неверно.
   if (delta.kind === "queues") {
     return { state: applyQueues(state, sessionId, delta.queues), reread: false };
+  }
+
+  if (delta.kind === "outbox") {
+    return { state: applyOutbox(state, sessionId, delta.outbox), reread: false };
   }
 
   // `phase: queued` подтверждает только ожидание: записи реплики и живого буфера ещё нет. Любая
@@ -810,9 +831,12 @@ export function reconnected(state: SessionsState): SessionsState {
       branchEntryIds: new Set(),
       live: undefined,
       pending: {},
-      // Очереди обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за время
-      // разрыва потеряны. Верное значение приедет со следующим `queue_update`.
+      // Очереди рантайма обнуляются вместе с буфером: их состояние приезжает дельтой, а дельты за
+      // время разрыва потеряны. Верное значение приедет со следующим `queue_update`.
       queues: undefined,
+      // Очередь сессии не обнуляется: она спрашивается снимком вместе с остальным, и стереть её
+      // здесь значило бы показать пустую очередь ровно до ответа на этот запрос.
+
       loading: true,
     },
   };

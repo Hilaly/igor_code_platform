@@ -6,6 +6,9 @@ import {
   parseSessionDraft,
   parseSessionForkRequest,
   parseSessionMessage,
+  parseSessionOutboxAction,
+  parseSessionOutboxRequest,
+  parseSessionOutboxUpdate,
   parseSessionUpdate,
   parseTurnRequest,
   sessionEntriesPath,
@@ -13,6 +16,8 @@ import {
   sessionImageBytes,
   sessionMessagesPath,
   sessionPath,
+  sessionQueuedMessagePath,
+  sessionQueuePath,
   sessionStatsPath,
   sessionTurnsPath,
   type AgentSummary,
@@ -426,9 +431,14 @@ describe("parseSessionMessage", () => {
   });
 
   it("refuses a message without a mode", () => {
-    // Умолчания нет намеренно: у четырёх режимов разные предусловия по занятости сессии.
+    // Умолчания нет намеренно: у трёх режимов разные предусловия по занятости сессии.
     assert.equal(parseSessionMessage({ text: "левее" }).kind, "rejected");
     assert.equal(parseSessionMessage({ text: "левее", mode: "steering" }).kind, "rejected");
+  });
+
+  it("no longer knows the next-turn mode", () => {
+    // Сообщение, ждущее нового турна, идёт в очередь сессии: она этот турн ещё и запускает.
+    assert.equal(parseSessionMessage({ text: "потом", mode: "next-turn" }).kind, "rejected");
   });
 
   it("refuses a message without text", () => {
@@ -438,7 +448,7 @@ describe("parseSessionMessage", () => {
   });
 
   it("carries images in every mode, including a message made only of them", () => {
-    for (const mode of ["steer", "follow-up", "next-turn", "append"]) {
+    for (const mode of ["steer", "follow-up", "append"]) {
       const result = parseSessionMessage({ text: "", images: [png], mode });
 
       assert.deepEqual(
@@ -461,6 +471,64 @@ describe("parseSessionMessage", () => {
   });
 });
 
+describe("parseSessionOutboxRequest", () => {
+  it("reads the text, the images and the chosen model without asking for a mode", () => {
+    const result = parseSessionOutboxRequest({
+      text: "  потом  ",
+      images: [png],
+      model: "anthropic/claude",
+      thinkingLevel: "high",
+    });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, {
+      text: "потом",
+      images: [png],
+      model: "anthropic/claude",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("refuses an override the runtime does not know", () => {
+    assert.equal(
+      parseSessionOutboxRequest({ text: "потом", thinkingLevel: "выше некуда" }).kind,
+      "rejected",
+    );
+  });
+
+  it("refuses an empty message and reports a named mode as unknown", () => {
+    assert.equal(parseSessionOutboxRequest({ text: "  " }).kind, "rejected");
+
+    const withMode = parseSessionOutboxRequest({ text: "потом", mode: "steer" });
+
+    assert.equal(withMode.kind, "parsed");
+    assert.match(withMode.diagnostics.join("\n"), /mode/);
+  });
+});
+
+describe("parseSessionOutboxUpdate", () => {
+  it("reads the removal of a stop", () => {
+    const result = parseSessionOutboxUpdate({ stopped: false });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, { stopped: false });
+  });
+
+  it("refuses stopping the queue from outside", () => {
+    // Останавливает очередь упавший турн: «остановлено» — его след, а не переключатель.
+    assert.equal(parseSessionOutboxUpdate({ stopped: true }).kind, "rejected");
+    assert.equal(parseSessionOutboxUpdate({}).kind, "rejected");
+  });
+});
+
+describe("parseSessionOutboxAction", () => {
+  it("reads steering and refuses everything else", () => {
+    const result = parseSessionOutboxAction({ mode: "steer" });
+
+    assert.deepEqual(result.kind === "parsed" ? result.value : undefined, { mode: "steer" });
+    assert.equal(parseSessionOutboxAction({ mode: "append" }).kind, "rejected");
+    assert.equal(parseSessionOutboxAction({}).kind, "rejected");
+  });
+});
+
 describe("session paths", () => {
   it("builds the paths of one session", () => {
     assert.equal(sessionPath("abc"), "/api/sessions/abc");
@@ -469,5 +537,7 @@ describe("session paths", () => {
     assert.equal(sessionForkPath("abc"), "/api/sessions/abc/fork");
     assert.equal(sessionMessagesPath("abc"), "/api/sessions/abc/messages");
     assert.equal(sessionStatsPath("abc"), "/api/sessions/abc/stats");
+    assert.equal(sessionQueuePath("abc"), "/api/sessions/abc/queue");
+    assert.equal(sessionQueuedMessagePath("abc", "m 1"), "/api/sessions/abc/queue/m%201");
   });
 });

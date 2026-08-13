@@ -227,9 +227,10 @@ export type SessionForkRequest = {
 
 /**
  * Куда встаёт сообщение, отправленное не турном: вклинить в идущий турн, продолжить им же после
- * текущего, лечь в начало следующего или просто дописать в дерево.
+ * текущего или просто дописать в дерево. Сообщение, ждущее нового турна, идёт не сюда, а в очередь
+ * сессии.
  */
-export type SessionMessageMode = "steer" | "follow-up" | "next-turn" | "append";
+export type SessionMessageMode = "steer" | "follow-up" | "append";
 
 export type SessionMessage = {
   text: string;

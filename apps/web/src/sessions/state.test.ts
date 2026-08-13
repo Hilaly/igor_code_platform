@@ -596,7 +596,7 @@ describe("the queues, the counters and what the session lost", () => {
   it("shows what waits in the queues, replacing it wholesale", () => {
     const first = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [] },
     });
 
     expect(first.state.open?.queues?.steer).toEqual([{ text: "левее" }]);
@@ -605,23 +605,57 @@ describe("the queues, the counters and what the session lost", () => {
 
     const drained = applySessionDelta(first.state, "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [], followUp: [], nextTurn: [{ text: "потом" }] },
+      queues: { steer: [], followUp: [{ text: "потом" }] },
     });
 
     expect(drained.state.open?.queues).toEqual({
       steer: [],
-      followUp: [],
-      nextTurn: [{ text: "потом" }],
+      followUp: [{ text: "потом" }],
     });
   });
 
   it("forgets the queues when the stream comes back, because their deltas are gone", () => {
     const queued = applySessionDelta(opened(), "0199", "turn-1", {
       kind: "queues",
-      queues: { steer: [{ text: "левее" }], followUp: [], nextTurn: [] },
+      queues: { steer: [{ text: "левее" }], followUp: [] },
     }).state;
 
     expect(reconnected(queued).open?.queues).toBeUndefined();
+  });
+
+  it("shows the session queue and keeps it across a reconnect", () => {
+    const waiting = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "outbox",
+      outbox: { messages: [{ id: "q-1", text: "потом" }] },
+    });
+
+    expect(waiting.state.open?.outbox?.messages).toEqual([{ id: "q-1", text: "потом" }]);
+    expect(waiting.reread).toBe(false);
+
+    // В отличие от очередей рантайма очередь сессии приезжает ещё и снимком: обнулять её на разрыве
+    // значило бы показать пустую очередь ровно до ответа на запрос снимка.
+    expect(reconnected(waiting.state).open?.outbox?.messages).toEqual([
+      { id: "q-1", text: "потом" },
+    ]);
+  });
+
+  it("shows why the queue stopped and forgets it when the stop is lifted", () => {
+    const stopped = applySessionDelta(opened(), "0199", "turn-1", {
+      kind: "outbox",
+      outbox: {
+        messages: [{ id: "q-1", text: "потом" }],
+        stopped: { reason: "the model is gone" },
+      },
+    }).state;
+
+    expect(stopped.open?.outbox?.stopped).toEqual({ reason: "the model is gone" });
+
+    const resumed = applySessionDelta(stopped, "0199", "turn-1", {
+      kind: "outbox",
+      outbox: { messages: [{ id: "q-1", text: "потом" }] },
+    }).state;
+
+    expect(resumed.open?.outbox?.stopped).toBeUndefined();
   });
 
   it("keeps every loss, not only the last one", () => {

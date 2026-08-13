@@ -34,6 +34,7 @@ import {
   Tag,
   TagX,
   UserRound,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +64,8 @@ export const AddIcon = actionIcon(Plus);
 export const SendIcon = actionIcon(Send);
 export const AppendIcon = actionIcon(Plus);
 export const StopIcon = actionIcon(Square);
+/** Снять ждущее сообщение с очереди. Крест, а не корзина: сообщение убирают, а не удаляют навсегда. */
+export const RemoveIcon = actionIcon(X);
 export const MoreIcon = actionIcon(MoreHorizontal);
 export const CommandsIcon = actionIcon(Command);
 export const ArchiveIcon = actionIcon(Archive);

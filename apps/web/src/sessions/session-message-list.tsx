@@ -471,7 +471,11 @@ function EntryMessage(props: {
   );
 }
 
-function MessageAction(props: {
+/**
+ * Кнопка действия сообщения. Экспортируется, потому что ждущее сообщение очереди показывается той
+ * же разметкой и обязано открывать действия тем же наведением, а не своим похожим.
+ */
+export function MessageAction(props: {
   label: string;
   disabled: boolean;
   onClick: () => void;

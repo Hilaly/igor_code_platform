@@ -16,6 +16,7 @@ import {
   type SessionForkRequest,
   type SessionMessage,
   type SessionNavigateRequest,
+  type SessionOutboxRequest,
   type SessionUpdate,
   type TurnRequest,
 } from "@sovereign/protocol";
@@ -27,8 +28,10 @@ import { fetchProjectsSnapshot } from "../projects/api.ts";
 import { fetchProviderModels, fetchProvidersSnapshot } from "../providers/api.ts";
 import {
   createSession as createSessionRequest,
+  dropQueuedMessage as dropQueuedMessageRequest,
   fetchBranch,
   fetchContextUsage,
+  fetchQueue,
   fetchSessionCommands,
   fetchEntries,
   fetchSession,
@@ -38,14 +41,18 @@ import {
   forkSession as forkSessionRequest,
   interruptTurn,
   navigateTo,
+  queueMessage as queueMessageRequest,
   removeSession as removeSessionRequest,
   requestCompaction,
+  resumeQueue as resumeQueueRequest,
   sendMessage as sendMessageRequest,
+  steerQueuedMessage as steerQueuedMessageRequest,
   setEntryLabel as setEntryLabelRequest,
   submitTurn as submitTurnRequest,
   updateSession as updateSessionRequest,
   type CreateSessionOutcome,
   type NavigationOutcome,
+  type OutboxOutcome,
   type RemoveSessionOutcome,
   type SessionOutcome,
 } from "./api.ts";
@@ -59,6 +66,7 @@ import {
   applyModels,
   applyModelsFailure,
   applyOpenFailure,
+  applyOutbox,
   applyPendingTurn,
   applySessionDelta,
   applyProjects,
@@ -107,6 +115,14 @@ export type SessionsController = {
   submitTurnToSession: SubmitTurnToSession;
   /** Сообщение, которое не запускает турн. Отказ приезжает причиной, а не исключением. */
   sendMessage: (message: SessionMessage) => Promise<string | undefined>;
+  /** Поставить сообщение в очередь: сессия запустит им турн, как только освободится. */
+  queueMessage: (request: SessionOutboxRequest) => Promise<string | undefined>;
+  /** Снять остановку очереди после упавшего турна. */
+  resumeQueue: () => Promise<string | undefined>;
+  /** Вклинить ждущее сообщение в идущий турн. */
+  steerQueuedMessage: (messageId: string) => Promise<string | undefined>;
+  /** Снять ждущее сообщение с очереди. */
+  dropQueuedMessage: (messageId: string) => Promise<string | undefined>;
   interrupt: () => void;
   /** Свернуть контекст руками. Инструкции пересказа необязательны. Возвращает причину отказа. */
   compact: (instructions?: string) => Promise<string | undefined>;
@@ -312,8 +328,11 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
       fetchStats(id, controller.signal),
       fetchContextUsage(id, controller.signal),
       fetchSessionCommands(id, controller.signal),
+      // Очередь спрашивается снимком наравне с остальным: дельты за время разрыва потеряны, и без
+      // этого запроса ждущее сообщение пропадало бы с перезагрузкой страницы.
+      fetchQueue(id, controller.signal),
     ])
-      .then(([summary, page, stats, context, commands]) => {
+      .then(([summary, page, stats, context, commands, outbox]) => {
         if (controller.signal.aborted) {
           return;
         }
@@ -322,6 +341,7 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
         apply((current) => applyStats(current, id, stats));
         apply((current) => applyContext(current, id, context));
         apply((current) => applyCommands(current, id, commands));
+        apply((current) => applyOutbox(current, id, outbox));
 
         if (page !== undefined) {
           apply((current) => applyEntries(current, id, page.entries, page.seen));
@@ -593,6 +613,68 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
   );
 
   /**
+   * Изменения очереди отвечают её снимком, поэтому и применяются они одинаково: ответ кладётся в
+   * состояние сразу, не дожидаясь дельты — нажавший обязан увидеть результат своего нажатия.
+   */
+  const changeQueue = useCallback(
+    async (
+      change: (sessionId: string) => Promise<OutboxOutcome>,
+      failure: string,
+    ): Promise<string | undefined> => {
+      const id = latest.current.open?.id;
+
+      if (id === undefined) {
+        return undefined;
+      }
+
+      const outcome = await change(id).catch((cause: unknown) => ({
+        kind: "refused" as const,
+        reason: reasonOf(cause),
+      }));
+
+      if (outcome.kind === "refused") {
+        onDiagnostic(`${failure}: ${outcome.reason}`);
+
+        return outcome.reason;
+      }
+
+      apply((current) => applyOutbox(current, id, outcome.outbox));
+
+      return undefined;
+    },
+    [apply, onDiagnostic],
+  );
+
+  const queueMessage = useCallback(
+    (request: SessionOutboxRequest) =>
+      changeQueue((id) => queueMessageRequest(id, request), "the message could not be queued"),
+    [changeQueue],
+  );
+
+  const resumeQueue = useCallback(
+    () => changeQueue((id) => resumeQueueRequest(id), "the queue could not be resumed"),
+    [changeQueue],
+  );
+
+  const steerQueuedMessage = useCallback(
+    (messageId: string) =>
+      changeQueue(
+        (id) => steerQueuedMessageRequest(id, messageId),
+        "the queued message could not be steered",
+      ),
+    [changeQueue],
+  );
+
+  const dropQueuedMessage = useCallback(
+    (messageId: string) =>
+      changeQueue(
+        (id) => dropQueuedMessageRequest(id, messageId),
+        "the queued message could not be dropped",
+      ),
+    [changeQueue],
+  );
+
+  /**
    * Ручная компакция. Отказ возвращается причиной, а не исключением: занятая и архивная сессии
    * отвечают `409`, и это то, что показывают человеку.
    */
@@ -775,6 +857,10 @@ export function useSessions(options: UseSessionsOptions): SessionsController {
     submitTurn,
     submitTurnToSession,
     sendMessage,
+    queueMessage,
+    resumeQueue,
+    steerQueuedMessage,
+    dropQueuedMessage,
     interrupt,
     compact,
     navigate,

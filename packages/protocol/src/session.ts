@@ -28,6 +28,8 @@ export const sessionNavigatePathPattern = `${sessionsPath}/:sessionId/navigate`;
 export const sessionContextPathPattern = `${sessionsPath}/:sessionId/context`;
 export const sessionCommandsPathPattern = `${sessionsPath}/:sessionId/commands`;
 export const sessionEntryLabelPathPattern = `${sessionsPath}/:sessionId/entries/:entryId/label`;
+export const sessionQueuePathPattern = `${sessionsPath}/:sessionId/queue`;
+export const sessionQueuedMessagePathPattern = `${sessionsPath}/:sessionId/queue/:messageId`;
 
 /** Параметр фильтра списка: сессии одного проекта. */
 export const sessionProjectParameter = "projectId";
@@ -98,6 +100,14 @@ export function sessionCommandsPath(sessionId: string): string {
 
 export function sessionEntryLabelPath(sessionId: string, entryId: string): string {
   return `${sessionEntriesPath(sessionId)}/${encodeURIComponent(entryId)}/label`;
+}
+
+export function sessionQueuePath(sessionId: string): string {
+  return `${sessionPath(sessionId)}/queue`;
+}
+
+export function sessionQueuedMessagePath(sessionId: string, messageId: string): string {
+  return `${sessionQueuePath(sessionId)}/${encodeURIComponent(messageId)}`;
 }
 
 /**
@@ -355,13 +365,15 @@ export type SessionForkRequest = {
  *
  * - `steer` — вклинить в идущий турн, модель увидит его следующим шагом;
  * - `follow-up` — дождаться конца текущего турна и продолжить им же;
- * - `next-turn` — лечь в начало следующего турна; переживает прерывание;
  * - `append` — просто дописать в дерево, никого не будя.
  *
- * Один маршрут с полем вместо четырёх: расширять `POST .../turns` нельзя — он значит «запусти турн»
+ * Один маршрут с полем вместо трёх: расширять `POST .../turns` нельзя — он значит «запусти турн»
  * и требует простоя, а `steer` требует ровно обратного (docs/web-api.md).
+ *
+ * Режима «к следующему турну» здесь нет: сообщение, ждущее нового турна, лежит в очереди сессии
+ * (`SessionOutbox`), и очередь этот турн сама запускает.
  */
-export const sessionMessageModes = ["steer", "follow-up", "next-turn", "append"] as const;
+export const sessionMessageModes = ["steer", "follow-up", "append"] as const;
 
 export type SessionMessageMode = (typeof sessionMessageModes)[number];
 
@@ -391,13 +403,66 @@ export type SessionQueuedMessage = {
 };
 
 /**
- * Очереди сообщений, ждущих своего момента. Отдаются наружу, потому что написавший стиринг обязан
- * видеть, что тот принят и ждёт, а не пропал.
+ * Очереди рантайма: сообщения, вклиненные в идущий турн и ещё не увиденные моделью. Отдаются
+ * наружу, потому что написавший стиринг обязан видеть, что тот принят и ждёт, а не пропал.
+ *
+ * Живут ровно один турн и его же переживают только внутри: прерывание турна их чистит. Очередь,
+ * которая ждёт **следующего** турна, — это `SessionOutbox`, и она принадлежит демону.
  */
 export type SessionQueues = {
   steer: SessionQueuedMessage[];
   followUp: SessionQueuedMessage[];
-  nextTurn: SessionQueuedMessage[];
+};
+
+/**
+ * Ждущее сообщение очереди сессии. От `SessionQueuedMessage` отличается идентификатором: элемент
+ * очереди адресуем — его снимают, вклинивают в идущий турн и показывают ключом списка. У очередей
+ * рантайма идентификаторов нет, и выдумывать их значило бы обещать адресуемость, которой там нет.
+ */
+export type SessionOutboxMessage = {
+  id: string;
+  text: string;
+  images?: SessionImage[];
+  /**
+   * Модель и уровень рассуждений, выбранные в момент отправки. Едут с сообщением, а не берутся у
+   * сессии в момент запуска: очередь запускает тот самый турн, который человек отправил, и выбор,
+   * сделанный тогда, к моменту старта успел бы смениться.
+   */
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
+/**
+ * Очередь сессии: то, что человек отправил, пока сессия была занята. Освободившись, сессия сама
+ * забирает голову очереди и запускает ею турн (docs/sessions-and-projects.md).
+ *
+ * `stopped` — причина остановки: турн упал, и гнать в тот же тупик остаток очереди нельзя. Очередь
+ * при этом цела, и человек продолжает её сам.
+ */
+export type SessionOutbox = {
+  messages: SessionOutboxMessage[];
+  stopped?: { reason: string };
+};
+
+/** Тело постановки в очередь. Режима нет: у очереди он один — «когда освободишься». */
+export type SessionOutboxRequest = {
+  text: string;
+  images?: SessionImage[];
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
+/**
+ * Изменение состояния очереди. Единственное значение — снятие остановки: останавливает очередь
+ * упавший турн, а не отправитель.
+ */
+export type SessionOutboxUpdate = {
+  stopped: false;
+};
+
+/** Что сделать с ждущим сообщением. Пока одно: вклинить его в идущий турн. */
+export type SessionOutboxAction = {
+  mode: "steer";
 };
 
 /**
@@ -637,7 +702,13 @@ export type SessionDelta =
   | { kind: "turn-end" }
   | { kind: "turn-aborted" }
   | { kind: "turn-failed"; reason: string }
-  | { kind: "queues"; queues: SessionQueues };
+  | { kind: "queues"; queues: SessionQueues }
+  /**
+   * Очередь сессии целиком. Отдельно от `queues`: те публикует рантайм по своему `queue_update`,
+   * а очередь ведёт демон, и совмещать их в одном кадре значило бы заставлять каждого издателя
+   * знать состояние второго.
+   */
+  | { kind: "outbox"; outbox: SessionOutbox };
 
 type AgentSummaryCommon = {
   id: string;
@@ -693,6 +764,9 @@ const turnKeys = [
 const updateKeys = ["title", "archived"];
 const forkKeys = ["entryId", "position"];
 const messageKeys = ["text", "images", "mode"];
+const outboxKeys = ["text", "images", "model", "thinkingLevel"];
+const outboxUpdateKeys = ["stopped"];
+const outboxActionKeys = ["mode"];
 const imageKeys = ["mimeType", "data"];
 const compactKeys = ["instructions"];
 const navigateKeys = ["entryId", "summarize", "instructions", "replaceInstructions"];
@@ -966,6 +1040,78 @@ export function parseSessionMessage(
   }
 
   return { kind: "parsed", value: { ...said, mode }, diagnostics };
+}
+
+export function parseSessionOutboxRequest(
+  raw: unknown,
+  label = "queued message",
+): SettingsParseResult<SessionOutboxRequest> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, outboxKeys);
+  const said = parseSaidMessage(fields, label, diagnostics);
+
+  if (said === undefined) {
+    return { kind: "rejected", diagnostics };
+  }
+
+  const overrides = parseOverrides(fields, label, diagnostics);
+
+  if (overrides === undefined) {
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: { ...said, ...overrides }, diagnostics };
+}
+
+export function parseSessionOutboxUpdate(
+  raw: unknown,
+  label = "queue",
+): SettingsParseResult<SessionOutboxUpdate> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, outboxUpdateKeys);
+
+  // Единственное законное значение — `false`. Остановить очередь снаружи нечем: останавливает её
+  // упавший турн, и «остановлено» это его след, а не переключатель.
+  if (fields["stopped"] !== false) {
+    diagnostics.push(
+      `${label}.stopped must be false: the queue stops itself when a turn fails, got ${JSON.stringify(fields["stopped"])}`,
+    );
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: { stopped: false }, diagnostics };
+}
+
+export function parseSessionOutboxAction(
+  raw: unknown,
+  label = "queued message",
+): SettingsParseResult<SessionOutboxAction> {
+  const fields = asObject(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = diagnoseUnknownKeys(label, fields, outboxActionKeys);
+
+  if (fields["mode"] !== "steer") {
+    diagnostics.push(`${label}.mode must be steer, got ${JSON.stringify(fields["mode"])}`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: { mode: "steer" }, diagnostics };
 }
 
 export function parseSessionCompactRequest(
