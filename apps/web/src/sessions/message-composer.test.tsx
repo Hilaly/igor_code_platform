@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type {
+  ProjectFilesSnapshot,
   SessionContextUsage,
   SessionMessage,
   SessionStats,
@@ -95,6 +96,7 @@ type ComposerHarnessProps = {
   onError?: (error: unknown) => void;
   draftReplacement?: ComposerDraftReplacement;
   onDropTarget?: (drop: (transfer: DataTransfer) => void) => void;
+  onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
 };
 
 function SwitchingComposerHarness({
@@ -148,6 +150,7 @@ function ComposerHarness({
   onError,
   draftReplacement,
   onDropTarget,
+  onSearchFiles,
 }: ComposerHarnessProps) {
   const [model, setModel] = useState("anthropic/claude-opus-4-5");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
@@ -169,6 +172,7 @@ function ComposerHarness({
         onSendMessage={onSendMessage}
         onInterrupt={onInterrupt}
         {...(onDropTarget === undefined ? {} : { onDropTarget })}
+        {...(onSearchFiles === undefined ? {} : { onSearchFiles })}
         onError={onError ?? vi.fn()}
         context={contextUsage}
         stats={sessionStats}
@@ -754,5 +758,101 @@ describe("attaching images to a message", () => {
     view.rerender(<ComposerHarness sessionId="session-b" />);
 
     await waitFor(() => expect(screen.queryByLabelText("Приложенные изображения")).toBeNull());
+  });
+});
+
+describe("mentioning a project file", () => {
+  const searching = (paths: string[], truncated = false) =>
+    vi.fn(() => Promise.resolve({ paths, truncated }) as Promise<ProjectFilesSnapshot>);
+
+  const type = (value: string): void => {
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement;
+
+    fireEvent.change(field, { target: { value } });
+    field.setSelectionRange(value.length, value.length);
+  };
+
+  it("opens the list on an at-sign and asks the daemon for what was typed", async () => {
+    const onSearchFiles = searching(["README.md", "src/reader.ts"]);
+
+    render(<ComposerHarness onSearchFiles={onSearchFiles} />);
+    type("посмотри @rea");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Файлы проекта" })).not.toBeNull(),
+    );
+    expect(onSearchFiles).toHaveBeenCalledWith("rea", expect.anything());
+    expect(screen.getAllByRole("option").map((one) => one.textContent)).toEqual([
+      "README.md",
+      "src/reader.ts",
+    ]);
+  });
+
+  it("puts the chosen path into the message as ordinary text", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["src/reader.ts"])} />);
+    type("посмотри @rea");
+
+    await waitFor(() => expect(screen.queryByRole("option")).not.toBeNull());
+    fireEvent.click(screen.getByRole("option", { name: "src/reader.ts" }));
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+      ).toBe("посмотри @src/reader.ts "),
+    );
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("walks the list with arrows and takes the active one on Enter, without sending", async () => {
+    const onSubmit = vi.fn(() => Promise.resolve(undefined));
+
+    render(<ComposerHarness onSearchFiles={searching(["a.ts", "b.ts"])} onSubmit={onSubmit} />);
+    type("@");
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+
+    const field = screen.getByRole("textbox", { name: "Сообщение агенту" });
+
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: "b.ts" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe("@b.ts "));
+    // Одно нажатие — одно действие: недописанную ссылку человек отправлять не собирался.
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("closes on Escape and leaves the at-sign as plain text", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["a.ts"])} />);
+    type("@a");
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeNull());
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Сообщение агенту" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(
+      (screen.getByRole("textbox", { name: "Сообщение агенту" }) as HTMLTextAreaElement).value,
+    ).toBe("@a");
+  });
+
+  it("stays out of the way when nothing was found or nobody can search", async () => {
+    const view = render(<ComposerHarness onSearchFiles={searching([])} />);
+
+    type("@нет");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    view.rerender(<ComposerHarness />);
+    type("@rea");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("says the list was cut instead of quietly showing a part of it", async () => {
+    render(<ComposerHarness onSearchFiles={searching(["a.ts"], true)} />);
+    type("@a");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Найдено больше — уточните запрос")).not.toBeNull(),
+    );
   });
 });

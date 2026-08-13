@@ -29,7 +29,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { NavigationOutcome } from "./api.ts";
+import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
 import { carriesImages } from "./image-input.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
@@ -304,6 +304,18 @@ export function ChatView(props: ChatViewProps) {
    * Приём перетащенного отдаёт композер: черновик принадлежит ему, а зона drop — всей панели.
    * Ссылка, а не состояние: смена обработчика не должна перерисовывать ленту.
    */
+  /**
+   * Поиск файлов для `@файл`. Без проекта его нет вовсе, и подсказка не открывается: искать негде, а
+   * `@` остаётся обычным символом.
+   */
+  const projectId = open.summary?.projectId;
+  const searchFiles = useMemo(
+    () =>
+      projectId === undefined
+        ? undefined
+        : async (query: string, signal: AbortSignal) => fetchProjectFiles(projectId, query, signal),
+    [projectId],
+  );
   const acceptDrop = useRef<((transfer: DataTransfer) => void) | undefined>(undefined);
   const takeDropTarget = useCallback((drop: (transfer: DataTransfer) => void): void => {
     acceptDrop.current = drop;
@@ -385,6 +397,7 @@ export function ChatView(props: ChatViewProps) {
             onSendMessage={onSendMessage}
             onInterrupt={onInterrupt}
             onDropTarget={takeDropTarget}
+            {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
             onError={(error: unknown) => {
               onDiagnostic?.(
                 `the message composer acceptance failed: ${

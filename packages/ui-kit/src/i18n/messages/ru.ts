@@ -121,6 +121,8 @@ export const coreRussian: CatalogRegistration = {
     "chat.reasoning": "Размышления",
     "chat.images": "Изображения сообщения",
     "chat.attach": "Приложить",
+    "chat.mention.label": "Файлы проекта",
+    "chat.mention.truncated": "Найдено больше — уточните запрос",
     "chat.attach.image": "Изображение",
     "chat.attachments": "Приложенные изображения",
     "chat.attachment.remove": "Убрать",

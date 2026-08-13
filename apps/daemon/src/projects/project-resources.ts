@@ -7,6 +7,8 @@
 import {
   projectAgentsPathPattern,
   projectFileResourcesPathPattern,
+  projectFilesPathPattern,
+  projectFilesQueryParameter,
   type AgentsSnapshot,
   type FileResourcesSnapshot,
   type ProjectAvailability,
@@ -14,6 +16,7 @@ import {
 
 import { respondWithError, respondWithJson, type Route } from "../http/public.ts";
 import { probeProjectFolder } from "./project-availability.ts";
+import { searchProjectFiles } from "./project-files.ts";
 import type { ProjectStore, StoredProject } from "./project-store.ts";
 
 export type ProjectResourceRouteOptions = {
@@ -73,6 +76,25 @@ export function projectResourceRoutes(options: ProjectResourceRouteOptions): Rou
         const projectId = parameters["id"] ?? "";
         withProject(response, projectId, () => {
           respondWithJson(response, 200, options.fileResources(projectId));
+        });
+      },
+    },
+    {
+      method: "GET",
+      path: projectFilesPathPattern,
+      handle: ({ response, parameters, url }) => {
+        const projectId = parameters["id"] ?? "";
+        // Проверки те же, что у остальных ресурсов проекта: архивный и пропавшая папка отсекаются
+        // выше, и искать в них нечего.
+        withProject(response, projectId, (project) => {
+          respondWithJson(
+            response,
+            200,
+            searchProjectFiles({
+              folder: project.folder,
+              query: url.searchParams.get(projectFilesQueryParameter) ?? "",
+            }),
+          );
         });
       },
     },

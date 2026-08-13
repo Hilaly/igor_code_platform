@@ -198,7 +198,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         onKeyDown?.(event);
 
         // Метод ввода ещё собирает символ: `Enter` подтверждает вариант, а не отправляет сообщение.
+        // `defaultPrevented` — то же самое от вызывающего: он уже обработал нажатие своим списком
+        // подсказок, и отправлять поверх этого значило бы делать по одному нажатию два действия.
         if (
+          event.defaultPrevented ||
           onSubmit === undefined ||
           event.key !== "Enter" ||
           event.shiftKey ||

@@ -14,6 +14,10 @@ export const projectsPath = "/api/projects";
 export const projectPathPattern = `${projectsPath}/:id`;
 export const projectAgentsPathPattern = `${projectsPath}/:id/agents`;
 export const projectFileResourcesPathPattern = `${projectsPath}/:id/file-resources`;
+export const projectFilesPathPattern = `${projectsPath}/:id/files`;
+
+/** Фрагмент пути, по которому ищутся файлы проекта. Пустой — начало списка, а не отказ. */
+export const projectFilesQueryParameter = "query";
 
 export function projectPath(id: string): string {
   return `${projectsPath}/${encodeURIComponent(id)}`;
@@ -21,6 +25,29 @@ export function projectPath(id: string): string {
 
 export const projectAgentsPath = (id: string): string => `${projectPath(id)}/agents`;
 export const projectFileResourcesPath = (id: string): string => `${projectPath(id)}/file-resources`;
+
+export function projectFilesPath(id: string, query?: string): string {
+  const base = `${projectPath(id)}/files`;
+
+  return query === undefined || query === ""
+    ? base
+    : `${base}?${projectFilesQueryParameter}=${encodeURIComponent(query)}`;
+}
+
+/**
+ * Файлы проекта для подстановки `@файл` в сообщение (docs/sessions-and-projects.md).
+ *
+ * Пути **относительные** и с прямым слэшем на любой системе: они уезжают в текст сообщения, а
+ * агент разрешает их от папки проекта. Абсолютный путь в тексте разговора привязал бы историю к
+ * одной машине.
+ *
+ * `truncated` — список обрезан пределом, а не кончился. Без этого признака человек, не увидевший
+ * своего файла, не отличит «его нет» от «их слишком много».
+ */
+export type ProjectFilesSnapshot = {
+  paths: string[];
+  truncated: boolean;
+};
 
 /**
  * Доступность папки — не ошибка, а состояние проекта (docs/sessions-and-projects.md): папку могли

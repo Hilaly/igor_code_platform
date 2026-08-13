@@ -126,6 +126,8 @@ export const coreEnglish: CatalogRegistration = {
     "chat.reasoning": "Reasoning",
     "chat.images": "Message images",
     "chat.attach": "Attach",
+    "chat.mention.label": "Project files",
+    "chat.mention.truncated": "More were found — narrow the query",
     "chat.attach.image": "Image",
     "chat.attachments": "Attached images",
     "chat.attachment.remove": "Remove",

@@ -1,5 +1,6 @@
 import {
   sessionImageMimeTypes,
+  type ProjectFilesSnapshot,
   type SessionContextUsage,
   type SessionImage,
   type SessionMessage,
@@ -28,6 +29,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { imageFilesOf, readImageFiles, type ImageIntake } from "./image-input.ts";
+import { applyMention, mentionAt, type FileMention } from "./file-mention.ts";
+import { FileMentionList } from "./file-mention-list.tsx";
 import { ComposerAttachments } from "./composer-attachments.tsx";
 import { SessionUsage } from "./session-usage.tsx";
 
@@ -52,6 +55,11 @@ export type MessageComposerProps = {
    * в узкую полоску композера ради картинки — работа, которой быть не должно.
    */
   onDropTarget?: (drop: (transfer: DataTransfer) => void) => void;
+  /**
+   * Найти файлы проекта по фрагменту после `@`. Не задан — подсказка не открывается, и `@`
+   * остаётся обычным символом: у сессии без доступной папки искать негде.
+   */
+  onSearchFiles?: (query: string, signal: AbortSignal) => Promise<ProjectFilesSnapshot>;
   context: SessionContextUsage | undefined;
   stats: SessionStats | undefined;
   translator: ScopedTranslator;
@@ -80,6 +88,7 @@ export function MessageComposer({
   onInterrupt,
   onError,
   onDropTarget,
+  onSearchFiles,
   context,
   stats,
   translator,
@@ -102,6 +111,8 @@ export function MessageComposer({
     setDraft("");
     setImages([]);
     setIntakeProblem(undefined);
+    setMention(undefined);
+    setFound({ paths: [], truncated: false });
     appliedDraftReplacement.current = undefined;
   }, [sessionId]);
 
@@ -238,6 +249,70 @@ export function MessageComposer({
     takeImages(imageFilesOf(transfer));
   };
 
+  /**
+   * Набираемая ссылка на файл и то, что по ней нашлось. Живёт в композере, а не выше: это состояние
+   * ввода, и лента о нём знать не должна.
+   */
+  const [mention, setMention] = useState<FileMention | undefined>(undefined);
+  const [found, setFound] = useState<ProjectFilesSnapshot>({ paths: [], truncated: false });
+  const [activeIndex, setActiveIndex] = useState(0);
+  const field = useRef<HTMLTextAreaElement | null>(null);
+  const mentionOpen = mention !== undefined && found.paths.length > 0;
+
+  useEffect(() => {
+    if (mention === undefined || onSearchFiles === undefined) {
+      setFound({ paths: [], truncated: false });
+
+      return;
+    }
+
+    // Набор идёт быстрее ответа демона: запрос предыдущей буквы отменяется, иначе список мигал бы
+    // тем, что уже неактуально.
+    const aborter = new AbortController();
+    const asked = setTimeout(() => {
+      void onSearchFiles(mention.query, aborter.signal).then(
+        (snapshot) => {
+          setFound(snapshot);
+          setActiveIndex(0);
+        },
+        () => {
+          // Отказ поиска — не отказ ввода: подсказка просто не открывается, `@` остаётся текстом.
+          setFound({ paths: [], truncated: false });
+        },
+      );
+    }, 120);
+
+    return () => {
+      clearTimeout(asked);
+      aborter.abort();
+    };
+  }, [mention, onSearchFiles]);
+
+  const rememberMention = (text: string, caret: number | null): void => {
+    setMention(caret === null ? undefined : mentionAt(text, caret));
+  };
+
+  const chooseMention = (path: string): void => {
+    if (mention === undefined) {
+      return;
+    }
+
+    const applied = applyMention(draft, mention, path);
+
+    setDraft(applied.text);
+    setMention(undefined);
+    setFound({ paths: [], truncated: false });
+
+    // Курсор возвращается за подставленный путь: следующее слово человек печатает там же, где
+    // остановился, а не в конце всего текста.
+    queueMicrotask(() => {
+      const element = field.current;
+
+      element?.focus();
+      element?.setSelectionRange(applied.caret, applied.caret);
+    });
+  };
+
   const droppedRef = useRef(dropped);
 
   droppedRef.current = dropped;
@@ -297,6 +372,15 @@ export function MessageComposer({
       {intakeProblem === undefined ? undefined : <Notice tone="danger" title={intakeProblem} />}
       <RaisedSurface>
         <div className="sessions-composer">
+          {mentionOpen ? (
+            <FileMentionList
+              paths={found.paths}
+              truncated={found.truncated}
+              activeIndex={activeIndex}
+              onChoose={chooseMention}
+              translator={translator}
+            />
+          ) : undefined}
           {images.length === 0 ? undefined : (
             <ComposerAttachments
               images={images}
@@ -306,10 +390,52 @@ export function MessageComposer({
             />
           )}
           <Textarea
+            ref={field}
             value={draft}
-            onChange={setDraft}
+            onChange={(next) => {
+              setDraft(next);
+              // Позиция курсора известна только элементу; после `onChange` она уже новая.
+              rememberMention(next, field.current?.selectionStart ?? null);
+            }}
             onSubmit={sendDefault}
             submitWhenEmpty={images.length > 0}
+            onKeyDown={(event) => {
+              if (!mentionOpen) {
+                // Подсказка закрыта — клавиатура остаётся полностью за полем ввода.
+                rememberMention(draft, field.current?.selectionStart ?? null);
+
+                return;
+              }
+
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveIndex(
+                  (current) =>
+                    (current + (event.key === "ArrowDown" ? 1 : -1) + found.paths.length) %
+                    found.paths.length,
+                );
+
+                return;
+              }
+
+              if (event.key === "Enter" || event.key === "Tab") {
+                const chosen = found.paths[activeIndex];
+
+                if (chosen !== undefined) {
+                  // `Enter` при открытой подсказке выбирает файл, а не отправляет сообщение:
+                  // отправить недописанную ссылку человек не собирался.
+                  event.preventDefault();
+                  chooseMention(chosen);
+                }
+
+                return;
+              }
+
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setMention(undefined);
+              }
+            }}
             onPaste={paste}
             placeholder={t("chat.compose.placeholder")}
             aria-label={t("chat.compose.label")}
