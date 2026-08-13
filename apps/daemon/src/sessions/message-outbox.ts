@@ -26,6 +26,11 @@ export type OutboxRequest = {
 export type MessageOutbox = {
   /** Поставить сообщение в хвост. Идентификатор выдаёт очередь: по нему сообщение потом адресуют. */
   enqueue: (sessionId: string, message: OutboxRequest) => SessionOutboxMessage;
+  /**
+   * Поставить сообщение в голову. Тем, что вернуло прерывание: написано оно было раньше всего, что
+   * успело встать в очередь, пока турн шёл.
+   */
+  enqueueHead: (sessionId: string, message: OutboxRequest) => SessionOutboxMessage;
   /** Снимок очереди одной сессии. Пустая очередь — законный снимок, а не отсутствие. */
   list: (sessionId: string) => SessionOutbox;
   /** Снять голову. `undefined` — очередь пуста; остановленную очередь это не проверяет. */
@@ -86,18 +91,26 @@ export function createMessageOutbox(options: CreateMessageOutboxOptions = {}): M
     }
   };
 
+  const place = (message: OutboxRequest): SessionOutboxMessage => ({
+    id: createMessageId(),
+    text: message.text,
+    ...(message.images === undefined ? {} : { images: message.images }),
+    ...(message.model === undefined ? {} : { model: message.model }),
+    ...(message.thinkingLevel === undefined ? {} : { thinkingLevel: message.thinkingLevel }),
+  });
+
   return {
     enqueue: (sessionId, message) => {
-      const queue = queueOf(sessionId);
-      const placed: SessionOutboxMessage = {
-        id: createMessageId(),
-        text: message.text,
-        ...(message.images === undefined ? {} : { images: message.images }),
-        ...(message.model === undefined ? {} : { model: message.model }),
-        ...(message.thinkingLevel === undefined ? {} : { thinkingLevel: message.thinkingLevel }),
-      };
+      const placed = place(message);
 
-      queue.messages.push(placed);
+      queueOf(sessionId).messages.push(placed);
+
+      return placed;
+    },
+    enqueueHead: (sessionId, message) => {
+      const placed = place(message);
+
+      queueOf(sessionId).messages.unshift(placed);
 
       return placed;
     },

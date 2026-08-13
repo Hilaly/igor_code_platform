@@ -1970,6 +1970,36 @@ describe("the session message queue", () => {
     await untilIdle(call, sessionId);
   });
 
+  it("puts the steering an interruption cleared back at the head of the queue", async () => {
+    const holdInTool = gate();
+    const { call, start } = await serve({
+      turns: [{ toolCalls: [{ id: "c1", name: "hold", arguments: {} }] }, { text: "готово" }],
+      toolGate: holdInTool,
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "скажи" });
+    await holdInTool.entry;
+    assert.equal(
+      (await call("POST", sessionMessagesPath(sessionId), { text: "левее", mode: "steer" })).status,
+      200,
+    );
+    await call("POST", sessionQueuePath(sessionId), { text: "и потом это" });
+
+    // Прерывание чистит очереди рантайма. Вклиненное модель не видела — оно возвращается в голову
+    // очереди, а не пропадает, и уезжает первым, потому что написано раньше ждущего.
+    holdInTool.open();
+    assert.equal((await call("DELETE", sessionTurnsPath(sessionId))).status, 200);
+    await untilSaid(call, sessionId, "левее");
+    await untilIdle(call, sessionId);
+
+    const said = saidByUser(
+      (await call("GET", sessionEntriesPath(sessionId))).body as unknown as SessionEntriesPage,
+    );
+
+    assert.match(said[1] ?? "", /левее/);
+  });
+
   it("keeps a waiting message on the queue when there is no turn to steer", async () => {
     const hold = gate();
     // Сценарий двойника кончается на первом ответе: следующий турн упадёт и остановит очередь,

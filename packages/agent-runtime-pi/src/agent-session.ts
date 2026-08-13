@@ -118,8 +118,7 @@ export type AgentSession = {
     turnId: string,
     args?: string,
   ) => Promise<TurnOutcome>;
-  /** `false` — прерывать было нечего. */
-  abort: () => Promise<boolean>;
+  abort: () => Promise<AbortOutcome>;
   /** Проверить текущую модель по живому каталогу, не меняя и не записывая её. */
   validateModel: () => ModelOutcome;
   setModel: (reference: string) => Promise<ModelOutcome>;
@@ -230,6 +229,15 @@ export type ModelOutcome =
  */
 export type MessageOutcome =
   { kind: "queued" } | { kind: "idle" } | { kind: "busy" } | { kind: "text-only-model" };
+
+/**
+ * Исход прерывания. `aborted: false` — прерывать было нечего.
+ *
+ * `cleared` — то, что прерывание вычистило из очередей рантайма: вклиненное и догоняющее, которых
+ * модель так и не увидела. Отдаётся наружу, потому что решать судьбу написанного человеком —
+ * не дело рантайма.
+ */
+export type AbortOutcome = { aborted: boolean; cleared: SessionQueuedMessage[] };
 
 export type AgentSessionStats = Omit<SessionStats, "sessionId">;
 
@@ -1072,13 +1080,20 @@ function liveSession(
       }),
     abort: async () => {
       if (current === undefined) {
-        return false;
+        return { aborted: false, cleared: [] };
       }
 
       current.aborted = true;
-      await harness.abort();
 
-      return true;
+      const dropped = await harness.abort();
+
+      // Вычищенное отдаётся вызывающему, а не выбрасывается: человек это написал, модель этого не
+      // видела, и молчаливая пропажа написанного — тот самый дефект, из-за которого заводилась
+      // очередь сессии. Порядок отправки сохраняется: стиринг раньше догоняющего.
+      return {
+        aborted: true,
+        cleared: [...dropped.clearedSteer, ...dropped.clearedFollowUp].map(queuedMessage),
+      };
     },
     validateModel: () =>
       resolveModel(models, summary.model) === undefined

@@ -1982,7 +1982,19 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     }
 
     const session = live.get(sessionId);
-    const interrupted = dropped || (session === undefined ? false : await session.abort());
+    const stopped = session === undefined ? undefined : await session.abort();
+    const interrupted = dropped || stopped?.aborted === true;
+
+    // Прерывание чистит очереди рантайма, и вклиненное, которого модель так и не увидела, иначе
+    // пропало бы молча. Оно встаёт в голову: написано раньше всего, что успело встать в очередь,
+    // пока турн шёл. Обратный порядок — потому что каждое следующее оттесняет предыдущее.
+    for (const cleared of [...(stopped?.cleared ?? [])].reverse()) {
+      outbox.enqueueHead(sessionId, cleared);
+    }
+
+    if (stopped !== undefined && stopped.cleared.length > 0) {
+      publishOutbox(sessionId);
+    }
 
     if (interrupted) {
       announce();

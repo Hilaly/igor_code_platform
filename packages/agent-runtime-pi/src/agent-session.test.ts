@@ -23,6 +23,7 @@ import type {
   SessionHookContext,
   SessionHookSeam,
 } from "./hook-events.ts";
+import { createPluginTool } from "./plugin-tool.ts";
 import { scriptedModelProvider, type ScriptedTurn } from "./testing.ts";
 
 const folders: string[] = [];
@@ -372,7 +373,63 @@ describe("an agent session over pi", () => {
     const { open } = await withStore([{ text: "тихо" }]);
     const session = await open();
 
-    assert.equal(await session.abort(), false);
+    assert.deepEqual(await session.abort(), { aborted: false, cleared: [] });
+    await session.close();
+  });
+
+  it("hands back the steering an interruption cleared", async () => {
+    const { open } = await withStore([
+      { toolCalls: [{ id: "c1", name: "hold", arguments: {} }] },
+      { text: "ок" },
+    ]);
+    const session = await open();
+
+    // Турн останавливается внутри инструмента: только так момент прерывания попадает наверняка
+    // внутрь идущего турна, а не до его начала и не после конца.
+    let release = (): void => undefined;
+    let entered = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const inTool = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+
+    await session.setTools(
+      [
+        createPluginTool({
+          name: "hold",
+          description: "Ждать, пока тест не отпустит",
+          parameters: { type: "object", properties: {} },
+          invoke: async () => {
+            entered();
+            await held;
+
+            return { content: "отпущено", isError: false };
+          },
+        }),
+      ],
+      ["hold"],
+    );
+
+    const turn = session.prompt("сделай", "t1");
+
+    await inTool;
+    assert.deepEqual(await session.message("возьми левее", "steer"), { kind: "queued" });
+
+    // Отпустить инструмент до ожидания исхода: прерывание разматывает идущий турн, а тот стоит
+    // внутри инструмента — дождись мы сначала прерывания, оба ждали бы друг друга.
+    const stopping = session.abort();
+
+    release();
+
+    const stopped = await stopping;
+
+    await turn;
+
+    // Написанное человеком прерывание не выбрасывает: модель его не видела, и молчаливая пропажа
+    // выглядела бы как проглоченное сообщение.
+    assert.deepEqual(stopped, { aborted: true, cleared: [{ text: "возьми левее" }] });
     await session.close();
   });
 
