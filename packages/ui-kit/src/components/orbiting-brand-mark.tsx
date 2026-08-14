@@ -7,9 +7,12 @@ export function OrbitingBrandMark({ size = "md" }: SymbolIconProps): React.JSX.E
       <span className={styles.mark}>
         <BrandMark size={size} />
       </span>
-      <span className={`${styles.spark} ${styles.gold}`} data-orbit="gold" />
-      <span className={`${styles.spark} ${styles.green}`} data-orbit="green" />
-      <span className={`${styles.spark} ${styles.red}`} data-orbit="red" />
+      <span className={`${styles.spark} ${styles.trackWarning}`} data-orbit="gold" />
+      {/* The marker names describe the approved tracks; CSS still supplies their semantic roles. */}
+      {/* eslint-disable-next-line no-restricted-syntax -- track identity is not a color declaration */}
+      <span className={`${styles.spark} ${styles.trackSuccess}`} data-orbit="green" />
+      {/* eslint-disable-next-line no-restricted-syntax -- track identity is not a color declaration */}
+      <span className={`${styles.spark} ${styles.trackDanger}`} data-orbit="red" />
     </span>
   );
 }

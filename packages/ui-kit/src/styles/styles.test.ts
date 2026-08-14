@@ -55,13 +55,13 @@ describe("stylesheets of the kit", () => {
     );
 
     expect(activity).toMatch(
-      /\.gold\s*\{[^}]*--orbit-color:\s*var\(--sovereign-warning\);[^}]*animation-duration:\s*1\.25s;/s,
+      /\.trackWarning\s*\{[^}]*--orbit-color:\s*var\(--sovereign-warning\);[^}]*animation-duration:\s*1\.25s;/s,
     );
     expect(activity).toMatch(
-      /\.green\s*\{[^}]*--orbit-color:\s*var\(--sovereign-success\);[^}]*animation-duration:\s*1\.85s;[^}]*animation-direction:\s*reverse;/s,
+      /\.trackSuccess\s*\{[^}]*--orbit-color:\s*var\(--sovereign-success\);[^}]*animation-duration:\s*1\.85s;[^}]*animation-direction:\s*reverse;/s,
     );
     expect(activity).toMatch(
-      /\.red\s*\{[^}]*--orbit-color:\s*var\(--sovereign-danger\);[^}]*animation-duration:\s*2\.45s;/s,
+      /\.trackDanger\s*\{[^}]*--orbit-color:\s*var\(--sovereign-danger\);[^}]*animation-duration:\s*2\.45s;/s,
     );
     expect(activity).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^}]*\.spark/s);
     expect(activity).not.toMatch(/#[0-9a-f]{3,8}|rgb\(/i);

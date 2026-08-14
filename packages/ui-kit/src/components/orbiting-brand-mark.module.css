@@ -28,13 +28,13 @@
   animation-iteration-count: infinite;
 }
 
-.gold {
+.trackWarning {
   --orbit-color: var(--sovereign-warning);
   --orbit-radius: calc(var(--sovereign-icon-md) * 0.55);
   animation-duration: 1.25s;
 }
 
-.green {
+.trackSuccess {
   --orbit-color: var(--sovereign-success);
   --orbit-radius: calc(var(--sovereign-icon-md) * 0.45);
   animation-duration: 1.85s;
@@ -42,7 +42,7 @@
   animation-direction: reverse;
 }
 
-.red {
+.trackDanger {
   --orbit-color: var(--sovereign-danger);
   --orbit-radius: calc(var(--sovereign-icon-md) * 0.6);
   animation-duration: 2.45s;
@@ -62,13 +62,13 @@
   .spark {
     animation: none;
   }
-  .gold {
+  .trackWarning {
     transform: rotate(15deg) translateX(var(--orbit-radius));
   }
-  .green {
+  .trackSuccess {
     transform: rotate(145deg) translateX(var(--orbit-radius));
   }
-  .red {
+  .trackDanger {
     transform: rotate(265deg) translateX(var(--orbit-radius));
   }
 }
