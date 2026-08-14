@@ -34,9 +34,9 @@ plugin identity вручную и не импортируй внутренний
 | `core.settings.plugins`     | single      | да          | `view`, `pluginKey`  |
 | `core.settings.daemon`      | single      | да          | —                    |
 | `core.settings.diagnostics` | single      | да          | —                    |
-| `core.sidebar.sections`     | collection  | нет         | `page`               |
-| `core.panel.tabs`           | tabs        | нет         | `page`               |
-| `core.view.header.actions`  | action      | нет         | `page`               |
+| `core.sidebar.sections`     | collection  | нет         | `page`, `sessionId`  |
+| `core.panel.tabs`           | tabs        | нет         | `page`, `sessionId`  |
+| `core.view.header.actions`  | action      | нет         | `page`, `sessionId`  |
 
 Динамическое семейство `core.session.tool-call.t-<hex-tool-name>` создаёт replaceable single place
 для конкретного tool call.

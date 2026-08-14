@@ -274,6 +274,23 @@ describe("App shell composition", () => {
     expect(screen.getByText("доска")).toBeDefined();
   });
 
+  it("names the open session in the context of the window places", async () => {
+    placeTabs = [
+      { id: "placed.board", label: "Board", content: createElement("p", null, "доска") },
+    ];
+    history.replaceState(null, "", "/sessions/a1b2c3d4");
+    render(<App />);
+
+    await screen.findByRole("navigation", { name: "Navigation" });
+
+    // Вкладке правой панели незачем читать адрес самой: какой разговор открыт — часть предмета
+    // места. Проекта в контексте по-прежнему нет: он решает, кто вправе занять место.
+    expect(lastTabsRequest).toEqual({
+      id: "core.panel.tabs",
+      context: { subject: { page: "session", sessionId: "a1b2c3d4" } },
+    });
+  });
+
   it("wires the localized product brand and real new-session action into authenticated navigation", async () => {
     render(<App />);
 

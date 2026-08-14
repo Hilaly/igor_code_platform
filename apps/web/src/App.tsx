@@ -430,8 +430,17 @@ export function App() {
     [draftProjectId],
   );
   // Боковая полоса и полоса действий шапки принадлежат окну целиком, и предмет у них один — та
-  // страница, что сейчас открыта: вклад решает по ней, показываться ли ему.
-  const pageContext = useMemo<PlaceContext>(() => ({ subject: { page: page.kind } }), [page.kind]);
+  // страница, что сейчас открыта: вклад решает по ней, показываться ли ему. Открытая сессия —
+  // часть этого предмета: вкладу правой панели незачем гадать, про какой разговор она сейчас.
+  const pageContext = useMemo<PlaceContext>(
+    () => ({
+      subject: {
+        page: page.kind,
+        ...(page.kind === "session" ? { sessionId: page.sessionId } : {}),
+      },
+    }),
+    [page],
+  );
   const settingsContext = useMemo<PlaceContext>(() => ({}), []);
   const settingsProjectsContext = useMemo(
     () =>
