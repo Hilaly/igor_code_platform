@@ -85,7 +85,9 @@ export async function contributeTools(): Promise<void> {
       }
 
       const agentId = given.agent ?? parent.agentId;
-      const agents = await sessions.agents();
+      // Каталог спрашивается по проекту: агент, поставленный плагином из папки проекта, в базовый
+      // набор не попадает, и без проекта здесь не нашёлся бы даже агент самой вызывающей сессии.
+      const agents = await sessions.agents(invocation.projectId);
       const agent = agents.find((one) => one.id === agentId);
 
       if (agent === undefined) {
@@ -159,8 +161,8 @@ export async function contributeTools(): Promise<void> {
       "List the agents available to subagents, with their default model and reasoning level. " +
       "Call this before subagent-spawn when the task suits a specialised agent.",
     parameters: z.object({}),
-    invoke: async () => {
-      const agents = await sessions.agents();
+    invoke: async (_given, invocation) => {
+      const agents = await sessions.agents(invocation.projectId);
 
       if (agents.length === 0) {
         return "No agent is available.";

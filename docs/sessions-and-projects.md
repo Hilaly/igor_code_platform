@@ -170,7 +170,7 @@ prompt.
 ```ts
 import { sessions } from "@sovereign/sdk";
 
-const [agent] = await sessions.agents();
+const [agent] = await sessions.agents(projectId);
 const session = await sessions.create({ projectId, agentId: agent.id, model: "anthropic/claude" });
 
 await sessions.prompt({ sessionId: session.id, text: "создай hello.txt" });
@@ -180,6 +180,11 @@ const archived = await sessions.list(projectId, true);
 
 Один и тот же набор проверяется тем, что маршруты и мост плагинов зовут **одни и те же функции**
 службы: разойтись им негде.
+
+**Каталог агентов спрашивается по проекту.** `sessions.agents(projectId)` в SDK и
+`GET /api/projects/:id/agents` в веб-API отдают набор после разрешения перекрытий в этом проекте.
+Без проекта отдаётся базовый каталог, а агента, поставленного плагином из папки проекта, в нём нет
+вовсе — там же, где сессия выбирает агента, каталог обязан быть проектным.
 
 Стиринг, форк, архив и разархив владелец продукта назвал обязательными. Архив — единственное в
 этом списке, чего в рантайме нет; остальное берётся из него.

@@ -179,7 +179,13 @@ describe("the session surface", () => {
     host.answerSessions(() => ({ kind: "agent-list", agents: [agent] }));
 
     assert.deepEqual(await sessions.agents(), [agent]);
-    assert.deepEqual(host.sessionRequests, [{ kind: "agent-list" }]);
+    // Проект называется только когда он назван: без него спрашивается базовый каталог, и лишнее
+    // поле в запросе значило бы «проект такой-то», а не «любой».
+    assert.deepEqual(await sessions.agents("p1"), [agent]);
+    assert.deepEqual(host.sessionRequests, [
+      { kind: "agent-list" },
+      { kind: "agent-list", projectId: "p1" },
+    ]);
   });
 
   it("creates a session and starts a turn in it", async () => {

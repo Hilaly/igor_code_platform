@@ -354,7 +354,7 @@ export type SessionCreateOutcome =
   | { kind: "refused"; refusals: SessionRefusedByHook[] };
 
 export type SessionRequest =
-  | { kind: "agent-list" }
+  | { kind: "agent-list"; projectId?: string }
   | { kind: "session-list"; projectId?: string; archived?: boolean }
   | { kind: "session-create"; draft: SessionDraft }
   | { kind: "session-entries"; sessionId: string; after?: number }
@@ -409,9 +409,21 @@ async function ask<Kind extends SessionResponse["kind"]>(
 }
 
 export const sessions = {
-  /** Включённые агенты. Пустой список — законный ответ, а не ошибка. */
-  agents: async (): Promise<AgentSummary[]> =>
-    (await ask({ kind: "agent-list" }, "agent-list")).agents,
+  /**
+   * Включённые агенты. Пустой список — законный ответ, а не ошибка.
+   *
+   * **С проектом — набор после разрешения перекрытий в нём**, тот же, из которого сессия выбирает
+   * агента. Без проекта возвращается базовый каталог, и агента, поставленного плагином из папки
+   * проекта, в нём нет вовсе: спросив без проекта, плагин не увидел бы даже агента той сессии,
+   * из которой его позвали.
+   */
+  agents: async (projectId?: string): Promise<AgentSummary[]> =>
+    (
+      await ask(
+        { kind: "agent-list", ...(projectId === undefined ? {} : { projectId }) },
+        "agent-list",
+      )
+    ).agents,
 
   /** Сессии, при желании — только одного проекта; `archived` переключает список на архивные. */
   list: async (projectId?: string, archived = false): Promise<Session[]> =>

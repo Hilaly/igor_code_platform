@@ -6,6 +6,7 @@
 
 import { installTestHost, type PluginTestHost } from "@sovereign/sdk/testing";
 import type {
+  AgentSummary,
   Session,
   SessionEntry,
   SessionRequest,
@@ -97,28 +98,45 @@ function describeSession(one: FakeSession): Session {
 
 function answer(world: World, request: SessionRequest): SessionResponse {
   if (request.kind === "agent-list") {
+    const base: AgentSummary[] = [
+      {
+        id: "starter.generic",
+        ownership: "plugin",
+        pluginKey: "builtin:starter",
+        source: "builtin",
+        model: "scripted/one",
+        thinkingLevel: "medium",
+        skills: { include: [], exclude: [] },
+      },
+      {
+        id: "starter.reviewer",
+        ownership: "plugin",
+        pluginKey: "builtin:starter",
+        source: "builtin",
+        model: "scripted/two",
+        thinkingLevel: "high",
+        skills: { include: [], exclude: [] },
+      },
+    ];
+
+    // Как у платформы: агент из папки проекта есть только в каталоге, спрошенном по проекту.
     return {
       kind: "agent-list",
-      agents: [
-        {
-          id: "starter.generic",
-          ownership: "plugin",
-          pluginKey: "builtin:starter",
-          source: "builtin",
-          model: "scripted/one",
-          thinkingLevel: "medium",
-          skills: { include: [], exclude: [] },
-        },
-        {
-          id: "starter.reviewer",
-          ownership: "plugin",
-          pluginKey: "builtin:starter",
-          source: "builtin",
-          model: "scripted/two",
-          thinkingLevel: "high",
-          skills: { include: [], exclude: [] },
-        },
-      ],
+      agents:
+        request.projectId === undefined
+          ? base
+          : [
+              ...base,
+              {
+                id: "local.specialist",
+                ownership: "plugin",
+                pluginKey: `project:${request.projectId}:local`,
+                source: `project:${request.projectId}`,
+                model: "scripted/four",
+                thinkingLevel: "low",
+                skills: { include: [], exclude: [] },
+              },
+            ],
     };
   }
 

@@ -35,6 +35,7 @@ function bridge(overrides: Partial<SessionService> = {}) {
   const service: Pick<
     SessionService,
     | "agents"
+    | "agentsForProject"
     | "list"
     | "create"
     | "entries"
@@ -51,7 +52,16 @@ function bridge(overrides: Partial<SessionService> = {}) {
     | "navigate"
     | "labelEntry"
   > = {
-    agents: () => [],
+    agents: () => {
+      calls.push({ agents: "base" });
+
+      return [];
+    },
+    agentsForProject: (projectId) => {
+      calls.push({ agents: projectId });
+
+      return [];
+    },
     list: (projectId, archived) => {
       calls.push({ list: projectId, archived });
 
@@ -141,6 +151,17 @@ describe("isSessionRequest", () => {
 });
 
 describe("createPluginSessions", () => {
+  it("resolves the agent catalogue inside the named project", async () => {
+    const { sessions, calls } = bridge();
+
+    // Без проекта — базовый каталог; с проектом — набор после разрешения перекрытий в нём. Иначе
+    // агент, поставленный плагином из папки проекта, плагину не виден вовсе.
+    await sessions.answer({ kind: "agent-list" });
+    await sessions.answer({ kind: "agent-list", projectId: "p1" });
+
+    assert.deepEqual(calls, [{ agents: "base" }, { agents: "p1" }]);
+  });
+
   it("hands the list over as the service gave it", async () => {
     const { sessions, calls } = bridge();
 

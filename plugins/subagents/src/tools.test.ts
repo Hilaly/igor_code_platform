@@ -103,6 +103,25 @@ describe("subagent-spawn", () => {
     assert.equal(await readRecord("s-new"), undefined);
   });
 
+  it("finds an agent that only the project of the caller has", async () => {
+    const here = await ready();
+
+    const outcome = await here.host.callTool(
+      "subagent-spawn",
+      { description: "local work", prompt: "do it", agent: "local.specialist" },
+      parent,
+    );
+
+    assert.equal(outcome.isError, false);
+
+    const created = here.calls.find((call) => call.kind === "session-create");
+
+    assert.equal(
+      created?.kind === "session-create" ? created.draft.agentId : undefined,
+      "local.specialist",
+    );
+  });
+
   it("names an agent that does not exist instead of starting something else", async () => {
     const here = await ready();
 
@@ -114,6 +133,19 @@ describe("subagent-spawn", () => {
 
     assert.equal(outcome.isError, true);
     assert.match(outcome.content, /there is no agent never\.declared/u);
+  });
+});
+
+describe("subagent-types", () => {
+  it("offers the agents of the project of the caller, not only the base catalogue", async () => {
+    const here = await ready();
+
+    const outcome = await here.host.callTool("subagent-types", {}, parent);
+
+    assert.match(outcome.content, /starter\.generic \| model=scripted\/one/u);
+    // Агент из папки проекта обязан быть в списке выбора: сессия его принимает, и скрывать его от
+    // модели значило бы предлагать ей меньше, чем платформа умеет.
+    assert.match(outcome.content, /local\.specialist/u);
   });
 });
 

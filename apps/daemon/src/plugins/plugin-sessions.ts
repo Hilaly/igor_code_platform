@@ -143,6 +143,7 @@ export type PluginSessionsOptions = {
   sessions: Pick<
     SessionService,
     | "agents"
+    | "agentsForProject"
     | "list"
     | "create"
     | "entries"
@@ -180,7 +181,15 @@ export function createPluginSessions(options: PluginSessionsOptions): PluginSess
     answer: async (request) => {
       switch (request.kind) {
         case "agent-list":
-          return { kind: "agent-list", agents: sessions.agents().map(agentForPlugin) };
+          // Названный проект — набор после разрешения перекрытий в нём: агент из папки проекта в
+          // базовый каталог не попадает, и без этого плагин не видел бы его вовсе.
+          return {
+            kind: "agent-list",
+            agents: (request.projectId === undefined
+              ? sessions.agents()
+              : sessions.agentsForProject(request.projectId)
+            ).map(agentForPlugin),
+          };
         case "session-list":
           return {
             kind: "session-list",

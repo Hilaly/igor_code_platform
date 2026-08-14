@@ -153,6 +153,10 @@ Provider credentials через SDK не читаются и не записыв
 Доступны `agents`, `list`, `create`, `prompt`, `abort`, `entries`, `fork`, `update`, `remove`,
 `message`, `stats`, `branch`, `context`, `compact`, `navigate`, `label`.
 
+`agents(projectId?)` без проекта отдаёт базовый каталог. Агента, поставленного плагином из папки
+проекта, в нём нет — для выбора агента сессии каталог спрашивается по проекту:
+`await sessions.agents(projectId)`.
+
 ```ts
 const session = await sessions.create({
   projectId: "b7Kq3xv9pQdT",
