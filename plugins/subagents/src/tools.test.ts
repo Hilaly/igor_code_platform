@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
 import { contributeTools } from "./tools.ts";
+import { settled, sweep } from "./lifecycle.ts";
 import { readRecord } from "./registry.ts";
 import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
 
 let world: World | undefined;
 
-afterEach(() => {
+afterEach(async () => {
+  // Запуск заканчивается обходом, который никто не ждёт: снимать шов из-под него нельзя.
+  await settled();
   world?.restore();
   world = undefined;
 });
@@ -101,6 +104,29 @@ describe("subagent-spawn", () => {
     assert.equal(outcome.isError, true);
     assert.match(outcome.content, /guard\.no-subagents: subagents are switched off/u);
     assert.equal(await readRecord("s-new"), undefined);
+  });
+
+  it("does not lose a subagent whose turn ended before the tool returned", async () => {
+    const here = await ready();
+
+    // Турн кончился раньше, чем `prompt` вернулся: событие о его конце прошло мимо записи, которая
+    // тогда ещё числилась запускающейся, и второго события может не быть вовсе.
+    here.answerAtOnce = "done before you looked";
+
+    await here.host.callTool("subagent-spawn", { description: "quick", prompt: "a" }, parent);
+    await settled();
+
+    const settledRecord = await readRecord("s-new");
+
+    assert.equal(settledRecord?.state, "finished");
+    assert.equal(settledRecord?.lastResponse, "done before you looked");
+    // Родитель узнал об итоге, хотя шина плагина за это время не сказала ни слова.
+    assert.equal(
+      here.calls.some(
+        (call) => call.kind === "session-prompt" && call.turn.sessionId === "s-parent",
+      ),
+      true,
+    );
   });
 
   it("finds an agent that only the project of the caller has", async () => {
@@ -272,6 +298,34 @@ describe("subagent-stop", () => {
     // То, что субагент успел сказать, доходит до родителя: молчать о прерванном значило бы
     // оставить родителя ждать ответа, которого не будет.
     assert.equal(record?.lastResponse, "got this far");
+  });
+
+  it("tells the parent once even when a sweep runs on the same interruption", async () => {
+    const here = await ready();
+
+    await here.host.callTool("subagent-spawn", { description: "mine", prompt: "a" }, parent);
+    await settled();
+    here.calls.length = 0;
+
+    // Прерывание возвращает сессию в простой, а платформа объявляет об этом на шине — обход
+    // приходит прямо посреди остановки и тоже считает субагента отработавшим. Очередь жизненного
+    // цикла оставляет от двух докладов один.
+    here.onAbort = () => void sweep();
+    here.branchDelayMilliseconds = 5;
+
+    await here.host.callTool("subagent-stop", { sessionId: "s-new" }, parent);
+    await settled();
+
+    // Считаются оба способа доставки: второй доклад уехал бы догоняющим сообщением, потому что
+    // первый успел увести родителя в турн.
+    assert.equal(
+      here.calls.filter(
+        (call) =>
+          (call.kind === "session-prompt" && call.turn.sessionId === "s-parent") ||
+          (call.kind === "session-message" && call.sessionId === "s-parent"),
+      ).length,
+      1,
+    );
   });
 
   it("says so when the subagent had already finished", async () => {

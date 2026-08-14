@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { SubagentDetail, SubagentListed } from "./routes.ts";
-import type { SubagentState } from "./registry.ts";
+import { isWorking, type SubagentState } from "./state.ts";
 
 /** Как часто перечитываются данные. Второго SSE-соединения нет, значит остаётся опрос. */
 const pollMilliseconds = 2_000;
@@ -38,6 +38,7 @@ const pollMilliseconds = 2_000;
 const routes = "/api/p/subagents";
 
 const tones: Record<SubagentState, StatusDotTone> = {
+  starting: "pending",
   running: "pending",
   finished: "positive",
   failed: "danger",
@@ -141,7 +142,7 @@ function SubagentList({
             </span>
             <span className="subagents-row-facts">
               <Text tone="muted">{subagent.agentId}</Text>
-              {subagent.state === "running" ? (
+              {isWorking(subagent.state) ? (
                 <DurationTimer
                   totalSeconds={elapsedSeconds(subagent.startedAt)}
                   labels={durationLabels(translator)}
@@ -205,7 +206,7 @@ function SubagentDetailView({
       )}
       <Transcript
         entries={detail.value?.entries ?? []}
-        busy={record?.state === "running"}
+        busy={record !== undefined && isWorking(record.state)}
         translator={translator}
       />
     </div>

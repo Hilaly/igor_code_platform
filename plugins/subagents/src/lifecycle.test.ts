@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { lastAgentText, notification, reconcile } from "./lifecycle.ts";
+import { lastAgentText, notification, reconcile, settled } from "./lifecycle.ts";
 import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
 import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
 
 let world: World | undefined;
 
-afterEach(() => {
+afterEach(async () => {
+  await settled();
   world?.restore();
   world = undefined;
 });
@@ -87,6 +88,45 @@ describe("reconcile", () => {
 
     assert.equal(told?.kind === "session-message" ? told.message.mode : undefined, "follow-up");
     assert.equal((await readRecord("s-child"))?.notified, true);
+  });
+
+  it("leaves a starting subagent to the call that is starting it", async () => {
+    // Сессия создана, задание ещё не отправлено. Простой здесь не значит «отработал»: объяви его
+    // концом — и настоящий турн пошёл бы дальше без присмотра, а родитель получил бы пустой ответ.
+    world = installWorld([session({ id: "s-parent" }), session({ id: "s-child", phase: "idle" })]);
+    await writeRecord(record({ state: "starting" }));
+
+    await reconcile(await listRecords(), now);
+
+    assert.equal((await readRecord("s-child"))?.state, "starting");
+    assert.equal(
+      world.calls.some((call) => call.kind === "session-prompt"),
+      false,
+    );
+  });
+
+  it("takes over a starting subagent after the worker was reloaded", async () => {
+    // Вызова, поставившего `starting`, больше нет: он умер вместе с памятью воркера. Работающая
+    // сессия значит, что задание доехало, — запись возвращается на сопровождение.
+    world = installWorld([session({ id: "s-parent" }), session({ id: "s-child", phase: "turn" })]);
+    await writeRecord(record({ state: "starting" }));
+
+    await reconcile(await listRecords(), now, { afterReload: true });
+
+    assert.equal((await readRecord("s-child"))?.state, "running");
+  });
+
+  it("finishes a starting subagent that ended while the worker was reloading", async () => {
+    world = installWorld([
+      session({ id: "s-parent", phase: "idle" }),
+      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+    ]);
+    await writeRecord(record({ state: "starting" }));
+
+    await reconcile(await listRecords(), now, { afterReload: true });
+
+    assert.equal((await readRecord("s-child"))?.state, "finished");
+    assert.equal((await readRecord("s-child"))?.lastResponse, "all green");
   });
 
   it("leaves a working subagent alone", async () => {

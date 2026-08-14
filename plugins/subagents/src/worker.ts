@@ -11,8 +11,7 @@ import { contribute, events, log, type PluginModule } from "@sovereign/sdk";
 import { contributeTools } from "./tools.ts";
 import { contributeRoutes } from "./routes.ts";
 import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
-import { listRecords } from "./registry.ts";
-import { reconcile } from "./lifecycle.ts";
+import { sweep } from "./lifecycle.ts";
 
 /**
  * Событие ядра «перечитай список сессий» (docs/event-bus.md). Полного имени в SDK нет — имена
@@ -20,27 +19,6 @@ import { reconcile } from "./lifecycle.ts";
  * которое её читает.
  */
 const sessionsChanged = "core.sessions.changed";
-
-/**
- * Обходы не наслаиваются: событие приходит на каждое изменение любой сессии, и параллельные обходы
- * доложили бы родителю об одном итоге дважды.
- */
-let sweeping = Promise.resolve();
-
-const sweep = (): Promise<void> => {
-  sweeping = sweeping
-    .then(async () => {
-      await reconcile(await listRecords(), new Date().toISOString());
-    })
-    .catch(async (cause: unknown) => {
-      // Сорвавшийся обход не снимает подписку: следующее событие попробует снова.
-      await log.warn("a sweep over the subagents failed", {
-        reason: cause instanceof Error ? cause.message : String(cause),
-      });
-    });
-
-  return sweeping;
-};
 
 export const activate: PluginModule["activate"] = async () => {
   await contributeTools();
@@ -69,8 +47,9 @@ export const activate: PluginModule["activate"] = async () => {
   await events.subscribe(sessionsChanged, () => void sweep());
 
   // Память воркера теряется при перезагрузке плагина, а субагент к этому моменту мог закончить.
-  // Без этого обхода запись навсегда осталась бы идущей, а родитель — не позванным.
-  await sweep();
+  // Без этого обхода запись навсегда осталась бы идущей, а родитель — не позванным. Только этот
+  // обход разбирает и записи `starting`: вызова, который их поставил, больше не существует.
+  await sweep({ afterReload: true });
 
   await log.info("the subagents plugin is active");
 };

@@ -8,8 +8,7 @@
 
 import { storage, type ThinkingLevel } from "@sovereign/sdk";
 
-/** Чем кончилась работа субагента. `running` — ещё идёт. */
-export type SubagentState = "running" | "finished" | "failed" | "stopped";
+import type { SubagentState } from "./state.ts";
 
 export type SubagentRecord = {
   sessionId: string;

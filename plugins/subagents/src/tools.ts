@@ -9,8 +9,9 @@
 
 import { contribute, sessions, thinkingLevels, z } from "@sovereign/sdk";
 
-import { describe, finish, lastAgentText } from "./lifecycle.ts";
-import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
+import { lastAgentText, launch, stop } from "./lifecycle.ts";
+import { listRecords, readRecord, type SubagentRecord } from "./registry.ts";
+import { isWorking } from "./state.ts";
 
 const thinkingLevel = z.enum(thinkingLevels);
 
@@ -121,28 +122,16 @@ export async function contributeTools(): Promise<void> {
         thinkingLevel: created.session.thinkingLevel,
         description: given.description,
         prompt: given.prompt,
-        state: "running",
+        state: "starting",
         startedAt: new Date().toISOString(),
       };
 
       // Запись до задания: если `prompt` сорвётся, субагент уже виден и его можно довести руками.
-      await writeRecord(record);
+      const started = await launch(record, given.prompt);
 
-      try {
-        await sessions.prompt({ sessionId: created.session.id, text: given.prompt });
-      } catch (cause) {
-        const reason = describe(cause);
-
-        await writeRecord({
-          ...record,
-          state: "failed",
-          finishedAt: new Date().toISOString(),
-          failure: reason,
-          notified: true,
-        });
-
+      if (started.kind === "failed") {
         return failed(
-          `the subagent ${created.session.id} was created but did not start: ${reason}`,
+          `the subagent ${created.session.id} was created but did not start: ${started.reason}`,
         );
       }
 
@@ -264,29 +253,36 @@ export async function contributeTools(): Promise<void> {
         return failed(`there is no subagent ${given.sessionId}`);
       }
 
-      if (record.state === "running") {
+      if (isWorking(record.state)) {
         await sessions.message(given.sessionId, { text: given.text, mode: "steer" });
 
         return `Steered the subagent ${given.sessionId}. Its answer will arrive on its own.`;
       }
 
       // Законченный субагент берёт второе задание обычным турном, без единого перехода файла:
-      // ровно ради этого сессия скрытая, а не архивная.
-      await sessions.prompt({ sessionId: given.sessionId, text: given.text });
-      // Итог прошлого задания стирается: старый ответ рядом с новой работой вводил бы в
-      // заблуждение и панель, и модель.
-      await writeRecord({
-        sessionId: record.sessionId,
-        parentSessionId: record.parentSessionId,
-        projectId: record.projectId,
-        agentId: record.agentId,
-        model: record.model,
-        thinkingLevel: record.thinkingLevel,
-        description: record.description,
-        prompt: given.text,
-        state: "running",
-        startedAt: new Date().toISOString(),
-      });
+      // ровно ради этого сессия скрытая, а не архивная. Итог прошлого задания стирается: старый
+      // ответ рядом с новой работой вводил бы в заблуждение и панель, и модель.
+      const restarted = await launch(
+        {
+          sessionId: record.sessionId,
+          parentSessionId: record.parentSessionId,
+          projectId: record.projectId,
+          agentId: record.agentId,
+          model: record.model,
+          thinkingLevel: record.thinkingLevel,
+          description: record.description,
+          prompt: given.text,
+          state: "starting",
+          startedAt: new Date().toISOString(),
+        },
+        given.text,
+      );
+
+      if (restarted.kind === "failed") {
+        return failed(
+          `the subagent ${given.sessionId} did not take the new task: ${restarted.reason}`,
+        );
+      }
 
       return `Gave the subagent ${given.sessionId} a new task. Its answer will arrive on its own.`;
     },
@@ -302,23 +298,19 @@ export async function contributeTools(): Promise<void> {
       sessionId: z.string().min(1).describe("The subagent, by the identifier spawn returned."),
     }),
     invoke: async (given) => {
-      const record = await readRecord(given.sessionId);
+      // Остановка идёт очередью жизненного цикла: прерывание возвращает сессию в простой, и обход,
+      // разбуженный этим же событием, тоже считает субагента отработавшим.
+      const outcome = await stop(given.sessionId);
 
-      if (record === undefined) {
+      if (outcome.kind === "unknown") {
         return failed(`there is no subagent ${given.sessionId}`);
       }
 
-      if (record.state !== "running") {
-        return `The subagent ${given.sessionId} had already ${record.state}.`;
+      if (outcome.kind === "already") {
+        return `The subagent ${given.sessionId} had already ${outcome.state}.`;
       }
 
-      const interrupted = await sessions.abort(given.sessionId);
-
-      // Прерванный доводится тем же кодом, что и доработавший: родителю уезжает то, что субагент
-      // успел сказать. Прерывать было нечего — сессия уже простаивает, и это тоже конец работы.
-      await finish({ ...record, state: "stopped" }, new Date().toISOString());
-
-      return interrupted
+      return outcome.interrupted
         ? `Stopped the subagent ${given.sessionId}.`
         : `The subagent ${given.sessionId} had already stopped working.`;
     },

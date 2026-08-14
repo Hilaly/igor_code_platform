@@ -9,7 +9,32 @@
 
 import { log, sessions, type Session, type SessionEntry } from "@sovereign/sdk";
 
-import { readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
+import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
+import { isWorking, type SubagentState } from "./state.ts";
+
+/**
+ * Очередь всего, что доводит записи до конца. Одна на плагин: событие шины приходит на каждое
+ * изменение любой сессии, и параллельные обходы доложили бы родителю об одном итоге дважды. По той
+ * же причине через неё идёт и остановка руками — она тоже кончается уведомлением родителя.
+ */
+let queue: Promise<void> = Promise.resolve();
+
+function serialize<Value>(work: () => Promise<Value>): Promise<Value> {
+  const done = queue.then(work);
+
+  // Сорвавшаяся работа не рвёт очередь: следующему в ней своя причина не мешает.
+  queue = done.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return done;
+}
+
+/** Дождаться, пока очередь опустеет. Нужно тому, кто обязан видеть итог: тесту и остановке. */
+export function settled(): Promise<void> {
+  return serialize(async () => undefined);
+}
 
 /**
  * Свести последнее сообщение агента в текст. Именно последнее, а не вся ветка: родителю нужен
@@ -151,13 +176,120 @@ async function settle(record: SubagentRecord): Promise<SubagentRecord> {
 }
 
 /**
+ * Запустить работу субагента и взять запись на сопровождение.
+ *
+ * Порядок записей — не украшение: он единственное, что отличает субагента, который вот-вот начнёт,
+ * от субагента, который уже кончил.
+ *
+ * 1. **`starting` до задания.** Событие «сессии изменились» приходит уже на создание сессии, и
+ *    обход, заставший запись `running` рядом с ещё простаивающей сессией, объявил бы субагента
+ *    отработавшим до того, как тот начал, — а настоящий турн пошёл бы дальше без присмотра.
+ * 2. **`running` после того, как платформа задание приняла.**
+ * 3. **Обход сразу за этим.** Быстрый турн мог кончиться, пока мы писали `running`, и его событие
+ *    прошло мимо записи, которая тогда ещё числилась запускающейся. Второго события может не быть
+ *    вовсе, и без этого обхода субагент остался бы идущим навсегда.
+ */
+export async function launch(
+  record: SubagentRecord,
+  text: string,
+): Promise<{ kind: "started" } | { kind: "failed"; reason: string }> {
+  await writeRecord({ ...record, state: "starting" });
+
+  try {
+    await sessions.prompt({ sessionId: record.sessionId, text });
+  } catch (cause) {
+    const reason = describe(cause);
+
+    // Родителю об этом скажет сам инструмент своим ответом: досылать ему то же самое отдельным
+    // сообщением незачем.
+    await writeRecord({
+      ...record,
+      state: "failed",
+      finishedAt: new Date().toISOString(),
+      failure: reason,
+      notified: true,
+    });
+
+    return { kind: "failed", reason };
+  }
+
+  await writeRecord({ ...record, state: "running" });
+
+  void sweep();
+
+  return { kind: "started" };
+}
+
+/** Исход остановки: чего именно остановили и было ли что останавливать. */
+export type StopOutcome =
+  | { kind: "unknown" }
+  | { kind: "already"; state: SubagentState }
+  | { kind: "stopped"; interrupted: boolean };
+
+/**
+ * Остановить субагента и довести его запись до конца.
+ *
+ * Идёт той же очередью, что и обход, и перечитывает запись внутри неё: прерывание возвращает сессию
+ * в простой, и обход, разбуженный этим же событием, тоже считает субагента отработавшим. Вдвоём и
+ * без этой проверки они доложили бы родителю дважды об одном.
+ */
+export function stop(sessionId: string): Promise<StopOutcome> {
+  return serialize(async () => {
+    const record = await readRecord(sessionId);
+
+    if (record === undefined) {
+      return { kind: "unknown" };
+    }
+
+    if (!isWorking(record.state)) {
+      return { kind: "already", state: record.state };
+    }
+
+    const interrupted = await sessions.abort(sessionId);
+
+    // Прерванный доводится тем же кодом, что и доработавший: родителю уезжает то, что субагент
+    // успел сказать. Прерывать было нечего — сессия уже простаивает, и это тоже конец работы.
+    await finish({ ...record, state: "stopped" }, new Date().toISOString());
+
+    return { kind: "stopped", interrupted };
+  });
+}
+
+/**
+ * Обойти записи одной очередью. Сорвавшийся обход не снимает подписку и не роняет вызвавшего:
+ * следующее событие шины попробует снова.
+ */
+export function sweep(options: ReconcileOptions = {}): Promise<void> {
+  return serialize(async () => {
+    try {
+      await reconcile(await listRecords(), new Date().toISOString(), options);
+    } catch (cause) {
+      await log.warn("a sweep over the subagents failed", { reason: describe(cause) });
+    }
+  });
+}
+
+export type ReconcileOptions = {
+  /**
+   * Обход сразу после перезагрузки воркера. Только он вправе судить о записи `starting`: вызова,
+   * который её поставил, к этому моменту не существует — память воркера потеряна вместе с ним.
+   */
+  afterReload?: boolean;
+};
+
+/**
  * Пройтись по записям: идущие, чьи сессии простаивают, довести до конца; законченные, о которых
  * родитель ещё не узнал, — дослать.
  *
- * Простой — надёжный признак конца: `sessions.prompt` возвращает уже непростойную фазу, поэтому
- * окна «задание принято, но сессия ещё `idle`» не существует.
+ * Простой значит «отработал» только у записи, запуск которой платформа подтвердила: `sessions.prompt`
+ * возвращается уже с непростойной фазой, поэтому окна «задание принято, но сессия ещё `idle`» не
+ * существует. Окно до самого `prompt` закрывает состояние `starting`.
  */
-export async function reconcile(records: readonly SubagentRecord[], now: string): Promise<void> {
+export async function reconcile(
+  records: readonly SubagentRecord[],
+  now: string,
+  options: ReconcileOptions = {},
+): Promise<void> {
   const byProject = new Map<string, Session[]>();
   const listed = async (projectId: string): Promise<Session[]> => {
     const known = byProject.get(projectId);
@@ -172,9 +304,14 @@ export async function reconcile(records: readonly SubagentRecord[], now: string)
     return fresh;
   };
 
+  // Запускающаяся запись — дело того вызова, который её поставил, и трогать её обход не вправе.
+  // После перезагрузки воркера такого вызова уже нет, и разбирать её больше некому.
+  const judges = (state: SubagentState): boolean =>
+    state === "running" || (state === "starting" && options.afterReload === true);
+
   for (const record of records) {
-    if (record.state !== "running") {
-      if (record.notified !== true) {
+    if (!judges(record.state)) {
+      if (record.state !== "starting" && record.notified !== true) {
         await deliver(record);
       }
 
@@ -199,14 +336,19 @@ export async function reconcile(records: readonly SubagentRecord[], now: string)
     }
 
     if (session.phase !== "idle") {
+      // Задание, отправленное до перезагрузки, доехало: сессия работает, значит и запись работает.
+      if (record.state === "starting") {
+        await writeRecord({ ...record, state: "running" });
+      }
+
       continue;
     }
 
-    // Читаем запись заново: между списком и этим местом её мог обновить параллельный обход, и
+    // Читаем запись заново: между списком и этим местом её мог обновить запуск или остановка, и
     // повторное уведомление родителя было бы вторым сообщением об одном и том же.
     const current = await readRecord(record.sessionId);
 
-    if (current?.state === "running") {
+    if (current !== undefined && judges(current.state)) {
       await finish(current, now);
     }
   }

@@ -34,6 +34,22 @@ export type World = {
   nextId: string[];
   /** Отказать созданию сессии подписчиком на `before_session_start`. */
   refuseCreate?: string;
+  /**
+   * Турн, кончившийся раньше, чем `prompt` вернулся: сессия отвечает и сразу простаивает. Так
+   * проверяется самое узкое место жизненного цикла — событие о конце работы проходит мимо записи,
+   * которая ещё числится запускающейся.
+   */
+  answerAtOnce?: string;
+  /**
+   * Что делает платформа, вернув сессию в простой прерыванием. У настоящей это публикация
+   * `core.sessions.changed`, то есть чужой обход прямо посреди остановки.
+   */
+  onAbort?: () => void;
+  /**
+   * Сколько платформа думает над чтением ветки. Настоящая ходит за ней через границу воркера, и
+   * чужой обход успевает пройти свои шаги целиком, пока итог ещё не записан.
+   */
+  branchDelayMilliseconds?: number;
   restore: () => void;
 };
 
@@ -50,10 +66,15 @@ export function session(overrides: Partial<FakeSession> & { id: string }): FakeS
   };
 }
 
-export function agentMessage(id: string, text: string): SessionEntry {
+/** Ответ агента. Время по умолчанию — сейчас: запись субагента заводится тем же часами. */
+export function agentMessage(
+  id: string,
+  text: string,
+  time = new Date().toISOString(),
+): SessionEntry {
   return {
     id,
-    time: "2026-08-14T09:00:00.000Z",
+    time,
     kind: "message",
     role: "agent",
     content: [{ kind: "text", text }],
@@ -71,7 +92,7 @@ export function installWorld(sessions: FakeSession[] = []): World {
     restore: () => host.restore(),
   };
 
-  host.answerSessions((request): SessionResponse => {
+  host.answerSessions((request): SessionResponse | Promise<SessionResponse> => {
     world.calls.push(request);
 
     return answer(world, request);
@@ -96,7 +117,7 @@ function describeSession(one: FakeSession): Session {
   };
 }
 
-function answer(world: World, request: SessionRequest): SessionResponse {
+function answer(world: World, request: SessionRequest): SessionResponse | Promise<SessionResponse> {
   if (request.kind === "agent-list") {
     const base: AgentSummary[] = [
       {
@@ -195,6 +216,13 @@ function answer(world: World, request: SessionRequest): SessionResponse {
 
     target.phase = "turn";
 
+    if (world.answerAtOnce !== undefined && target.hidden) {
+      target.entries.push(
+        agentMessage(`e${String(target.entries.length + 1)}`, world.answerAtOnce),
+      );
+      target.phase = "idle";
+    }
+
     return {
       kind: "session-prompt",
       accepted: { sessionId: target.id, turnId: "t1", phase: "turn" },
@@ -224,15 +252,23 @@ function answer(world: World, request: SessionRequest): SessionResponse {
       target.phase = "idle";
     }
 
+    world.onAbort?.();
+
     return { kind: "session-abort", interrupted };
   }
 
   if (request.kind === "session-branch") {
     const target = world.sessions.get(request.sessionId);
+    const response: SessionResponse =
+      target === undefined
+        ? { kind: "failed", reason: `there is no session ${request.sessionId}` }
+        : { kind: "session-branch", branch: { sessionId: target.id, entries: target.entries } };
 
-    return target === undefined
-      ? { kind: "failed", reason: `there is no session ${request.sessionId}` }
-      : { kind: "session-branch", branch: { sessionId: target.id, entries: target.entries } };
+    return world.branchDelayMilliseconds === undefined
+      ? response
+      : new Promise((resolve) =>
+          setTimeout(() => resolve(response), world.branchDelayMilliseconds),
+        );
   }
 
   if (request.kind === "session-stats") {
