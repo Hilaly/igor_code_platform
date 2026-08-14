@@ -758,7 +758,9 @@ describe("POST /api/sessions", () => {
       appliedSkills.at(-1)?.map(({ disableModelInvocation }) => disableModelInvocation),
       [undefined, true],
     );
-    assert.deepEqual(toolContexts.at(-1), { projectId, folder });
+    // Вместе с проектом и папкой источник получает и сессию: без неё инструмент плагина не знает,
+    // кто его позвал (docs/plugins.md).
+    assert.deepEqual(toolContexts.at(-1), { projectId, folder, sessionId });
 
     agent = {
       ...agent,

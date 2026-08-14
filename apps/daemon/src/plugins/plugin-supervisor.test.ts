@@ -1638,6 +1638,8 @@ describe("createPluginSupervisor", () => {
 });
 
 describe("a call from the core into a plugin", () => {
+  /** Обратный адрес вызова инструмента: его кладёт источник набора (docs/plugins.md). */
+  const invocation = { sessionId: "s1", projectId: "p1", folder: "/tmp/project" };
   const callable = async (recorded: Journal, clock?: ReturnType<typeof manualClock>) => {
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,
@@ -1661,7 +1663,7 @@ describe("a call from the core into a plugin", () => {
     assert.deepEqual(
       await supervisor.call(
         "data:callable",
-        { kind: "tool", contributionId: "echo", arguments: { text: "ау" } },
+        { kind: "tool", contributionId: "echo", arguments: { text: "ау" }, invocation },
         { timeoutMilliseconds: 5_000 },
       ),
       // Признак неудачи едет рядом с текстом: инструмент, сказавший «не вышло», не сбой плагина.
@@ -1738,7 +1740,7 @@ describe("a call from the core into a plugin", () => {
     );
     const tool = await supervisor.call(
       "data:callable",
-      { kind: "tool", contributionId: "broken", arguments: {} },
+      { kind: "tool", contributionId: "broken", arguments: {}, invocation },
       { timeoutMilliseconds: 5_000 },
     );
 
@@ -1832,7 +1834,7 @@ describe("a call from the core into a plugin", () => {
     assert.deepEqual(
       await supervisor.call(
         "data:absent",
-        { kind: "tool", contributionId: "echo", arguments: {} },
+        { kind: "tool", contributionId: "echo", arguments: {}, invocation },
         { timeoutMilliseconds: 5_000 },
       ),
       {

@@ -200,7 +200,10 @@ const answerCall = async (callId: string, call: PluginCall): Promise<void> => {
   const result = await (async (): Promise<PluginCallResult> => {
     try {
       if (call.kind === "tool") {
-        return { kind: "value", value: await invokeTool(call.contributionId, call.arguments) };
+        return {
+          kind: "value",
+          value: await invokeTool(call.contributionId, call.arguments, call.invocation),
+        };
       }
 
       if (call.kind === "route") {

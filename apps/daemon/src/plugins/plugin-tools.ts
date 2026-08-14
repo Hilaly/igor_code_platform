@@ -14,7 +14,7 @@ import type { ContributionRegistration } from "@sovereign/protocol";
 import type { ContributionRegistry } from "./contribution-registry.ts";
 import type { Logger } from "../platform/public.ts";
 import type { PluginSupervisor } from "./plugin-supervisor.ts";
-import type { CollectedTool, ToolSource } from "../sessions/public.ts";
+import type { CollectedTool, ToolContext, ToolSource } from "../sessions/public.ts";
 
 export type PluginToolSourceOptions = {
   registry: ContributionRegistry;
@@ -39,13 +39,14 @@ export function pluginToolSource(options: PluginToolSourceOptions): ToolSource {
         .resolvedForProject(context.projectId, "tool")
         .flatMap((registration) =>
           registration.kind === "tool" && registration.ownership === "plugin"
-            ? [collected(registration)]
+            ? [collected(registration, context)]
             : [],
         ),
   };
 
   function collected(
     registration: Extract<ContributionRegistration, { kind: "tool"; ownership: "plugin" }>,
+    context: ToolContext,
   ): CollectedTool {
     const timeoutMilliseconds = options.timeoutMilliseconds();
     const tool = createPluginTool({
@@ -58,7 +59,18 @@ export function pluginToolSource(options: PluginToolSourceOptions): ToolSource {
       invoke: async (toolArguments) => {
         const outcome = await plugins.call(
           registration.pluginKey,
-          { kind: "tool", contributionId: registration.declaredId, arguments: toolArguments },
+          {
+            kind: "tool",
+            contributionId: registration.declaredId,
+            arguments: toolArguments,
+            // Набор пересобирается на каждый турн, поэтому контекст сборки и есть контекст вызова:
+            // ручка живёт ровно до следующей сборки и чужой сессии не увидит.
+            invocation: {
+              sessionId: context.sessionId,
+              projectId: context.projectId,
+              folder: context.folder,
+            },
+          },
           { timeoutMilliseconds },
         );
 

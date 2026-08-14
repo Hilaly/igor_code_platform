@@ -14,13 +14,26 @@
  */
 export type PluginToolOutcome = string | { content: string; isError?: boolean };
 
+/**
+ * Кто позвал инструмент. Набор собирается на каждый турн под конкретную сессию, и её идентичность
+ * едет вместе с вызовом: иначе плагин, которому нужен обратный адрес — довести работу до вызвавшей
+ * сессии, — не имеет его вовсе (docs/plugins.md).
+ */
+export type PluginToolInvocation = {
+  sessionId: string;
+  projectId: string;
+  /** Папка проекта: рабочая директория вызова. */
+  folder: string;
+};
+
 export type PluginToolInvoke<Arguments> = (
   toolArguments: Arguments,
+  invocation: PluginToolInvocation,
 ) => PluginToolOutcome | Promise<PluginToolOutcome>;
 
 const invocationsSymbol = Symbol.for("sovereign.plugin.tool.invocations");
 
-type AnyToolInvoke = (toolArguments: never) => unknown;
+type AnyToolInvoke = (toolArguments: never, invocation: PluginToolInvocation) => unknown;
 
 function invocations(): Map<string, AnyToolInvoke> {
   const existing = (globalThis as Record<symbol, unknown>)[invocationsSymbol];
@@ -51,6 +64,7 @@ export function rememberToolInvoke(declaredId: string, invoke: AnyToolInvoke): v
 export async function invokeTool(
   declaredId: string,
   toolArguments: unknown,
+  invocation: PluginToolInvocation,
 ): Promise<{ content: string; isError: boolean }> {
   const invoke = invocations().get(declaredId);
 
@@ -58,7 +72,7 @@ export async function invokeTool(
     throw new Error(`the plugin has no implementation for the tool ${declaredId}`);
   }
 
-  const outcome = await invoke(toolArguments as never);
+  const outcome = await invoke(toolArguments as never, invocation);
 
   if (typeof outcome === "string") {
     return { content: outcome, isError: false };

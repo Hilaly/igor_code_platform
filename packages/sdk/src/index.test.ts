@@ -980,6 +980,32 @@ describe("a tool of a plugin", () => {
     );
   });
 
+  it("tells the tool which session called it", async () => {
+    const host = installTestHost({ id: "weather" });
+    const seen: unknown[] = [];
+
+    await contribute.tool({
+      id: "forecast",
+      description: "говорит погоду в городе",
+      parameters,
+      invoke: (_toolArguments, invocation) => {
+        seen.push(invocation);
+
+        return "ясно";
+      },
+    });
+
+    await host.callTool(
+      "forecast",
+      { city: "Тбилиси" },
+      { sessionId: "s1", projectId: "p1", folder: "/tmp/project" },
+    );
+
+    // Обратный адрес: без него плагин знает только аргументы и не может довести работу до
+    // вызвавшей сессии (docs/plugins.md).
+    assert.deepEqual(seen, [{ sessionId: "s1", projectId: "p1", folder: "/tmp/project" }]);
+  });
+
   it("names the tool the core asked about but the plugin never declared", async () => {
     const host = installTestHost({ id: "weather" });
 

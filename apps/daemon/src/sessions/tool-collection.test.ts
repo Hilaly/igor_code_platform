@@ -6,7 +6,7 @@ import { createCoreTools } from "@sovereign/agent-runtime-pi";
 import { coreToolSource } from "./core-tools.ts";
 import { createToolCollector, type CollectedTool, type ToolSource } from "./tool-collection.ts";
 
-const context = { projectId: "p1", folder: "/tmp/project" };
+const context = { projectId: "p1", folder: "/tmp/project", sessionId: "s1" };
 
 const source = (id: string, tools: CollectedTool[]): ToolSource => ({ id, collect: () => tools });
 
@@ -77,7 +77,7 @@ describe("createToolCollector", () => {
     assert.deepEqual((await collector.collect(context)).tools, []);
   });
 
-  it("passes the project identity and folder to every source", async () => {
+  it("passes the project identity, the folder and the calling session to every source", async () => {
     const collector = createToolCollector();
     const seen: unknown[] = [];
 
@@ -87,7 +87,7 @@ describe("createToolCollector", () => {
     });
     await collector.collect(context);
 
-    assert.deepEqual(seen, [{ projectId: "p1", folder: "/tmp/project" }]);
+    assert.deepEqual(seen, [{ projectId: "p1", folder: "/tmp/project", sessionId: "s1" }]);
   });
 });
 

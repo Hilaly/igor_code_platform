@@ -223,6 +223,21 @@ await contribute.tool({
 Tool id: `^[a-z0-9][a-z0-9-]{0,63}$`. Результат `invoke`: строка или
 `{ content: string; isError?: boolean }`.
 
+Вторым аргументом `invoke` получает `PluginToolInvocation` — `{ sessionId, projectId, folder }`
+вызвавшей сессии. Ставит его ядро; аргументы модели на него не влияют.
+
+```ts
+await contribute.tool({
+  id: "note-here",
+  description: "Leave a note in the calling session",
+  parameters: z.object({ text: z.string() }),
+  invoke: async ({ text }, { sessionId }) => {
+    await sessions.message(sessionId, { text, mode: "append" });
+    return "noted";
+  },
+});
+```
+
 ### Hook
 
 ```ts

@@ -15,7 +15,7 @@ import {
   type PluginRouteKind,
   type PluginRouteResponse,
 } from "./routes.ts";
-import { clearToolInvocations, invokeTool } from "./tools.ts";
+import { clearToolInvocations, invokeTool, type PluginToolInvocation } from "./tools.ts";
 import {
   installPluginHost,
   removePluginHost,
@@ -83,9 +83,14 @@ export type PluginTestHost = {
    * объявленный, без неймспейса: в воркере таблица обработчиков ключуется им же (docs/hooks.md).
    */
   callHook: (declaredId: string, payload: unknown) => Promise<unknown>;
+  /**
+   * Контекст вызова необязателен: тесту инструмента, которому обратный адрес неинтересен, писать его
+   * незачем. Умолчание — сессия `test-session` в проекте `test-project`.
+   */
   callTool: (
     declaredId: string,
     toolArguments: unknown,
+    invocation?: Partial<PluginToolInvocation>,
   ) => Promise<{ content: string; isError: boolean }>;
   /** Позвать маршрут — то же, что делает диспетчер, получив запрос на `/api/p/<id плагина>/…`. */
   callRoute: (declaredId: string, request: PluginRouteRequest) => Promise<PluginRouteResponse>;
@@ -226,7 +231,12 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
     },
     deliver: deliverEvent,
     callHook: invokeHookHandler,
-    callTool: invokeTool,
+    callTool: (declaredId, toolArguments, invocation) =>
+      invokeTool(declaredId, toolArguments, {
+        sessionId: invocation?.sessionId ?? "test-session",
+        projectId: invocation?.projectId ?? "test-project",
+        folder: invocation?.folder ?? "/test-project",
+      }),
     callRoute: (declaredId, request) =>
       invokeRoute(
         (request.public ? "public-route" : "route") satisfies PluginRouteKind,

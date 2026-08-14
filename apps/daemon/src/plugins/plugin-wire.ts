@@ -23,6 +23,7 @@ import type {
   PluginLogLevel,
   PluginRouteKind,
   PluginRouteRequest,
+  PluginToolInvocation,
   ProviderRequest,
   ProviderResponse,
   SessionRequest,
@@ -52,7 +53,12 @@ export type PluginResponse = ProviderResponse | SessionResponse | StorageRespons
  */
 export type PluginCall =
   | { kind: "hook"; contributionId: string; event: string; payload: unknown }
-  | { kind: "tool"; contributionId: string; arguments: unknown }
+  /**
+   * `invocation` — обратный адрес вызова: сессия, проект и папка, для которых собран набор. Без него
+   * инструмент видит только аргументы и не может ни привязать сделанное к сессии, ни ответить в неё
+   * (docs/plugins.md).
+   */
+  | { kind: "tool"; contributionId: string; arguments: unknown; invocation: PluginToolInvocation }
   | {
       kind: "route";
       routeKind: PluginRouteKind;

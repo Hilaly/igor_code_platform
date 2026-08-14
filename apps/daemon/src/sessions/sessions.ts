@@ -605,7 +605,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     folder: string,
     contributions: ContributionRegistration[],
   ): Promise<void> => {
-    const collected = await options.tools.collect({ projectId, folder });
+    const sessionId = session.summary().id;
+    const collected = await options.tools.collect({ projectId, folder, sessionId });
 
     for (const problem of collected.problems) {
       options.logger.warn("a tool source did not answer", { problem });
@@ -613,7 +614,6 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
     const names = collected.tools.map((tool) => tool.name);
     const active = selectNames(names, agent.tools ?? emptySelection);
-    const sessionId = session.summary().id;
     const before = activeTools.get(sessionId) ?? [];
 
     await session.setTools(

@@ -12,7 +12,7 @@ import { pluginToolSource } from "./plugin-tools.ts";
 import type { CollectedTool } from "../sessions/public.ts";
 
 const weather: ContributingPlugin = { key: "data:weather", id: "weather", source: "data" };
-const context = { projectId: "p1", folder: "/tmp/project" };
+const context = { projectId: "p1", folder: "/tmp/project", sessionId: "s1" };
 const timeout = 120_000;
 
 const forecast: PluginContribution = {
@@ -103,10 +103,34 @@ describe("the tools of a plugin as a source of the collection", () => {
     assert.deepEqual(asked, [
       {
         pluginKey: "data:weather",
-        call: { kind: "tool", contributionId: "forecast", arguments: { city: "Тбилиси" } },
+        call: {
+          kind: "tool",
+          contributionId: "forecast",
+          arguments: { city: "Тбилиси" },
+          // Обратный адрес вызова: набор собран под сессию, и она едет вместе с вызовом.
+          invocation: { sessionId: "s1", projectId: "p1", folder: "/tmp/project" },
+        },
         timeoutMilliseconds: timeout,
       },
     ]);
+  });
+
+  it("carries the context of the collection into every call of the tool", async () => {
+    const { source, asked } = world(() => answered("ясно"));
+
+    const collected = await source.collect({
+      projectId: "p2",
+      folder: "/tmp/other",
+      sessionId: "s2",
+    });
+
+    await handleOf(collected[0]!).execute("c1", {});
+
+    assert.deepEqual(asked[0]?.call.kind === "tool" ? asked[0].call.invocation : undefined, {
+      sessionId: "s2",
+      projectId: "p2",
+      folder: "/tmp/other",
+    });
   });
 
   it("gives the model an error result with the author when the plugin did not answer in time", async () => {

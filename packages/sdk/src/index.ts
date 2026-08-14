@@ -24,7 +24,7 @@ import {
 } from "./host.ts";
 import { rememberHookHandler, type HookHandler, type HookName } from "./hooks.ts";
 import { rememberRouteHandler, type PluginRouteHandler } from "./routes.ts";
-import { rememberToolInvoke, type PluginToolInvoke } from "./tools.ts";
+import { rememberToolInvoke, type PluginToolInvocation, type PluginToolInvoke } from "./tools.ts";
 
 export type { EventHandler, EventOrigin, Unsubscribe } from "./events.ts";
 
@@ -74,7 +74,7 @@ export type {
   RuntimeHookResult,
 } from "./hooks.ts";
 
-export type { PluginToolInvoke, PluginToolOutcome } from "./tools.ts";
+export type { PluginToolInvocation, PluginToolInvoke, PluginToolOutcome } from "./tools.ts";
 
 /**
  * HTTP-маршруты плагина (docs/web-api.md). Публичный маршрут открыт наружу и аутентифицирует себя
@@ -290,7 +290,10 @@ export const contribute = {
   }): Promise<void> => {
     const { invoke, parameters, ...declaration } = tool;
 
-    rememberToolInvoke(declaration.id, invoke as (toolArguments: never) => unknown);
+    rememberToolInvoke(
+      declaration.id,
+      invoke as (toolArguments: never, invocation: PluginToolInvocation) => unknown,
+    );
 
     await currentPluginHost().contribute({
       kind: "tool",
