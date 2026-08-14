@@ -239,18 +239,33 @@ importers:
       '@sovereign/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.17)
       eslint:
         specifier: ^9.0.0
         version: 9.39.5(supports-color@7.2.0)
+      jsdom:
+        specifier: ^30.0.0
+        version: 30.0.0
       react:
         specifier: ^19.0.0
         version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
       vite:
         specifier: ^7.0.0
         version: 7.3.6(@types/node@24.13.3)(yaml@2.9.0)
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jsdom@30.0.0)(msw@2.15.0(@types/node@24.13.3)(typescript@5.9.3))(supports-color@7.2.0)(yaml@2.9.0)
 
 packages:
 

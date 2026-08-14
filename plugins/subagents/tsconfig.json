@@ -9,5 +9,5 @@
     // проверяются исходники кита, приезжающие в браузерную часть.
     "types": ["node", "vite/client"]
   },
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }
