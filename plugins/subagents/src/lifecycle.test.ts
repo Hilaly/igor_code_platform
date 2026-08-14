@@ -14,6 +14,8 @@ afterEach(async () => {
 });
 
 const now = "2026-08-14T10:00:00.000Z";
+/** Когда субагент ответил: позже начала своего задания, иначе ответ относится к прошлому. */
+const answered = "2026-08-14T09:30:00.000Z";
 
 function record(overrides: Partial<SubagentRecord> = {}): SubagentRecord {
   return {
@@ -52,7 +54,11 @@ describe("reconcile", () => {
   it("finishes a running record whose session went idle and tells an idle parent with a turn", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record());
 
@@ -78,7 +84,11 @@ describe("reconcile", () => {
   it("tells a working parent with a follow-up message instead of a turn", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "turn" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record());
 
@@ -119,7 +129,11 @@ describe("reconcile", () => {
   it("finishes a starting subagent that ended while the worker was reloading", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record({ state: "starting" }));
 
@@ -127,6 +141,44 @@ describe("reconcile", () => {
 
     assert.equal((await readRecord("s-child"))?.state, "finished");
     assert.equal((await readRecord("s-child"))?.lastResponse, "all green");
+  });
+
+  it("calls a wordless turn failed instead of finished", async () => {
+    // Провал похода к модели в файл сессии не пишется, поэтому молчание и сбой снаружи неотличимы.
+    // Выдать молчание за удачный итог значило бы соврать родителю о результате работы.
+    world = installWorld([
+      session({ id: "s-parent", phase: "idle" }),
+      session({ id: "s-child", phase: "idle" }),
+    ]);
+    await writeRecord(record());
+
+    await reconcile(await listRecords(), now);
+
+    const stopped = await readRecord("s-child");
+
+    assert.equal(stopped?.state, "failed");
+    assert.match(stopped?.failure ?? "", /without saying anything/u);
+  });
+
+  it("does not take the answer to the previous task as the answer to this one", async () => {
+    // Сессия субагента переживает своё задание: вся прошлая работа остаётся в той же ветке. Без
+    // отсечки по времени сорвавшееся второе задание вернуло бы ответ на первое — как свежий.
+    world = installWorld([
+      session({ id: "s-parent", phase: "idle" }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "answer to the first task", "2026-08-14T09:30:00.000Z")],
+      }),
+    ]);
+    await writeRecord(record({ startedAt: "2026-08-14T09:45:00.000Z", prompt: "the second task" }));
+
+    await reconcile(await listRecords(), now);
+
+    const settledRecord = await readRecord("s-child");
+
+    assert.equal(settledRecord?.lastResponse, undefined);
+    assert.equal(settledRecord?.state, "failed");
   });
 
   it("leaves a working subagent alone", async () => {
@@ -147,7 +199,11 @@ describe("reconcile", () => {
     // не принимает ни того, ни другого.
     world = installWorld([
       session({ id: "s-parent", phase: "queued" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record());
 
@@ -172,7 +228,11 @@ describe("reconcile", () => {
   it("does not tell the parent twice about one subagent", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record());
 
@@ -199,7 +259,11 @@ describe("reconcile", () => {
 
   it("does not lose a subagent whose parent is gone", async () => {
     world = installWorld([
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
     await writeRecord(record());
 

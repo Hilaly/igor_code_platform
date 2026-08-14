@@ -11,6 +11,9 @@ afterEach(() => {
   world = undefined;
 });
 
+/** Когда субагент ответил: позже начала своего задания, иначе ответ относится к прошлому. */
+const answered = "2026-08-14T09:30:00.000Z";
+
 describe("the subagents plugin", () => {
   it("brings the tools, the routes, the panel and the catalogs of the panel", async () => {
     world = installWorld();
@@ -56,7 +59,11 @@ describe("the subagents plugin", () => {
   it("finishes a subagent that ended while the worker was reloading", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
-      session({ id: "s-child", phase: "idle", entries: [agentMessage("e1", "all green")] }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
     ]);
 
     // Запись пережила перезагрузку воркера, память — нет: субагент успел закончить, пока плагина

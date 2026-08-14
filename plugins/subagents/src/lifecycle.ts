@@ -61,12 +61,35 @@ export function lastAgentText(entries: readonly SessionEntry[]): string | undefi
   return undefined;
 }
 
+/**
+ * Ответ на **текущее** задание: последнее сказанное агентом не раньше, чем задание началось.
+ *
+ * Сессия субагента переживает своё задание: законченному дают второе тем же турном, и вся прошлая
+ * работа остаётся в той же ветке. Без отсечки по времени сорвавшееся второе задание вернуло бы
+ * родителю ответ на первое — как свежий.
+ */
+export function answerOf(
+  record: SubagentRecord,
+  entries: readonly SessionEntry[],
+): string | undefined {
+  return lastAgentText(entries.filter((entry) => entry.time >= record.startedAt));
+}
+
+/**
+ * Турн кончился, не сказав ни слова. Провал похода к модели в файл сессии не пишется вовсе, поэтому
+ * отличить его от молчаливого турна плагину нечем — и выдавать молчание за удачный итог нельзя.
+ */
+const wordless =
+  "It ended its turn without saying anything. A turn that fails leaves no trace in the session file, " +
+  "so this may be a model or provider failure rather than a silent answer: read its work in the " +
+  "Subagents panel, or give it the task again.";
+
 /** Что родитель прочитает, когда субагент закончил. */
 export function notification(record: SubagentRecord): string {
   const head = `Subagent ${record.sessionId} (${record.description}) ${verdict(record)}.`;
 
   if (record.state === "finished") {
-    return `${head}\n\n${record.lastResponse ?? "It answered with no text."}`;
+    return `${head}\n\n${record.lastResponse ?? wordless}`;
   }
 
   return record.failure === undefined ? head : `${head}\n\n${record.failure}`;
@@ -97,10 +120,16 @@ export async function finish(record: SubagentRecord, now: string): Promise<Subag
 
   try {
     const branch = await sessions.branch(record.sessionId);
-    const text = lastAgentText(branch.entries);
+    const text = answerOf(record, branch.entries);
 
     if (text !== undefined) {
       settled.lastResponse = text;
+    } else if (settled.state === "finished") {
+      // Прерванный молчит по понятной причине, а доработавший — нет: молчание это либо провал
+      // похода к модели, либо турн без ответа, и различить их нечем. Выдавать его за удачный
+      // итог значило бы врать родителю о результате работы, за которую он заплатил.
+      settled.state = "failed";
+      settled.failure = wordless;
     }
   } catch (cause) {
     // Ветку не прочитать — субагент всё равно закончил: без итога родителю уедет причина, а не

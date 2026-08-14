@@ -9,7 +9,7 @@
 
 import { contribute, sessions, thinkingLevels, z } from "@sovereign/sdk";
 
-import { lastAgentText, launch, stop } from "./lifecycle.ts";
+import { answerOf, launch, stop } from "./lifecycle.ts";
 import { listRecords, readRecord, type SubagentRecord } from "./registry.ts";
 import { isWorking } from "./state.ts";
 
@@ -224,7 +224,7 @@ export async function contributeTools(): Promise<void> {
       // Итога ещё нет: субагент либо работает, либо кончился, не сказав ни слова. Читаем ветку
       // сейчас — то, что он успел сказать, полезнее отписки «пока ничего».
       const branch = await sessions.branch(given.sessionId);
-      const said = lastAgentText(branch.entries);
+      const said = answerOf(record, branch.entries);
 
       if (said !== undefined) {
         return said;
