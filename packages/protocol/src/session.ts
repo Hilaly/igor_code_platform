@@ -161,6 +161,12 @@ export type Session = {
    * (docs/sessions-and-projects.md).
    */
   archived: boolean;
+  /**
+   * Скрытая сессия не показывается в списках интерфейса, но остаётся живой: она ведёт турны,
+   * принимает сообщения и открывается по прямому адресу. Задаётся при создании и не меняется
+   * (docs/sessions-and-projects.md).
+   */
+  hidden: boolean;
   createdAt: string;
 };
 
@@ -218,6 +224,11 @@ export type SessionDraft = {
   /** Не названа — берётся у агента; у агента нет — отказ с названной причиной. */
   model?: string;
   thinkingLevel?: ThinkingLevel;
+  /**
+   * Служебная сессия: не показывается в списках, но живёт как обычная. Задаётся только здесь —
+   * менять признак у существующей сессии нечем (docs/sessions-and-projects.md).
+   */
+  hidden?: boolean;
 };
 
 /** Переопределения турна. Действуют с этого турна и пишутся в дерево сессии. */
@@ -750,7 +761,7 @@ export function isSessionId(value: unknown): value is string {
   return typeof value === "string" && sessionIdPattern.test(value);
 }
 
-const draftKeys = ["projectId", "agentId", "model", "thinkingLevel"];
+const draftKeys = ["projectId", "agentId", "model", "thinkingLevel", "hidden"];
 const turnKeys = [
   "text",
   "images",
@@ -805,7 +816,26 @@ export function parseSessionDraft(
     return { kind: "rejected", diagnostics };
   }
 
-  return { kind: "parsed", value: { projectId, agentId, ...overrides }, diagnostics };
+  const hidden = fields["hidden"];
+
+  // Необязателен, но если назван — только булевым: скрытость решается один раз и на всю жизнь
+  // сессии, и угадывать её из непонятного значения нечем.
+  if (hidden !== undefined && typeof hidden !== "boolean") {
+    diagnostics.push(`${label}.hidden must be a boolean, got ${JSON.stringify(hidden)}`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: {
+      projectId,
+      agentId,
+      ...overrides,
+      ...(hidden === true ? { hidden: true } : {}),
+    },
+    diagnostics,
+  };
 }
 
 export function parseTurnRequest(raw: unknown, label = "turn"): SettingsParseResult<TurnRequest> {

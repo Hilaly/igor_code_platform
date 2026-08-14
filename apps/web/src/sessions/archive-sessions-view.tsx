@@ -47,6 +47,12 @@ export function ArchiveSessionsView({
     const groups = new Map<string, Session[]>();
 
     for (const session of sessions ?? []) {
+      // Архив — тоже список, и скрытая сессия не появляется и в нём: правило одно на все списки
+      // интерфейса (docs/sessions-and-projects.md).
+      if (session.hidden) {
+        continue;
+      }
+
       const current = groups.get(session.projectId) ?? [];
       current.push(session);
       groups.set(session.projectId, current);

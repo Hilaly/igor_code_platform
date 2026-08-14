@@ -1576,6 +1576,31 @@ describe("the session lifecycle over http", () => {
     );
   });
 
+  it("keeps a hidden session in the list, alive and addressable", async () => {
+    const { call, start, directory } = await serve({ turns: [{ text: "готово" }] });
+    const created = await start({ hidden: true });
+    const sessionId = String(created.body["id"]);
+
+    assert.equal(created.body["hidden"], true);
+
+    // Список отдаёт скрытую сессию как есть: по прямому адресу интерфейсу нужна её сводка, и
+    // отобрать её обязан тот, кто рисует список (docs/sessions-and-projects.md).
+    assert.deepEqual(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions.map(
+        (session) => [session.id, session.hidden],
+      ),
+      [[sessionId, true]],
+    );
+    assert.equal((await call("GET", sessionPath(sessionId))).body["hidden"], true);
+
+    // Файл лежит в обычном корне, а не в архивном: скрытая сессия ничем не заморожена.
+    assert.ok(findSessionFile(join(directory, "sessions"), sessionId));
+
+    // И турн она ведёт как обычная — ради этого признак и заведён отдельно от архива.
+    assert.equal((await call("POST", sessionTurnsPath(sessionId), { text: "сделай" })).status, 200);
+    await untilIdle(call, sessionId);
+  });
+
   it("refuses a turn in an archived session", async () => {
     const { call, start } = await serve();
     const sessionId = String((await start()).body["id"]);

@@ -30,6 +30,7 @@ const session = (id: string, title: string | undefined, archived = false): Sessi
   phase: "idle",
   title,
   archived,
+  hidden: false,
   createdAt: "2026-08-08T12:00:00.000Z",
 });
 

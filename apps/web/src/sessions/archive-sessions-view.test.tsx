@@ -40,6 +40,7 @@ const session: Session = {
   thinkingLevel: "medium",
   phase: "idle",
   archived: true,
+  hidden: false,
   title: "Session A",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
@@ -81,6 +82,24 @@ it("exposes every project archive as a named section with one list", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     expect(within(list).getByText(archivedSession.title ?? archivedSession.id)).toBeDefined();
   }
+});
+
+it("leaves hidden sessions out of the archive too", () => {
+  render(
+    <ArchiveSessionsView
+      sessions={[session, { ...session, id: "0200", title: "Subagent", hidden: true }]}
+      projects={[project]}
+      loaded
+      onOpen={vi.fn()}
+      onRestore={vi.fn()}
+      onRemove={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  // Правило одно на все списки интерфейса: архив тоже список.
+  expect(screen.getByText("Session A")).toBeDefined();
+  expect(screen.queryByText("Subagent")).toBeNull();
 });
 
 it("groups archived sessions by project and opens their history", () => {

@@ -243,7 +243,9 @@ export function SidebarProjects(props: SidebarProjectsProps) {
       </TreeContextCard>
     ),
     children: (props.sessions ?? [])
-      .filter((session) => session.projectId === project.id && !session.archived)
+      // Скрытая сессия жива и открывается по прямому адресу, но в дереве ей не место: её завёл не
+      // человек, а плагин для своей работы (docs/sessions-and-projects.md).
+      .filter((session) => session.projectId === project.id && !session.archived && !session.hidden)
       .map((session) => ({
         id: `session:${session.id}`,
         label: session.title ?? t("sessions.untitled"),

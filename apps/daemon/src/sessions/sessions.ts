@@ -451,6 +451,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     phase: phaseOf(summary.id),
     ...(summary.name === undefined ? {} : { title: summary.name }),
     archived: summary.archived,
+    hidden: summary.hidden,
     createdAt: summary.createdAt,
   });
 
@@ -771,6 +772,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         model,
         thinkingLevel: draft.thinkingLevel ?? agent.thinkingLevel ?? "off",
         agent: agentDefinition(agent),
+        ...(draft.hidden === true ? { hidden: true } : {}),
       });
 
       if ("kind" in created) {

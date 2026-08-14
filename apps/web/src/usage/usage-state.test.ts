@@ -13,6 +13,7 @@ const session = (id: string, archived = false): Session => ({
   thinkingLevel: "medium",
   phase: "idle",
   archived,
+  hidden: false,
   createdAt: "2026-08-08T12:00:00.000Z",
 });
 

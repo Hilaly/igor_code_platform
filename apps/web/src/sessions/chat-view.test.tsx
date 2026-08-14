@@ -35,6 +35,7 @@ const summary: Session = {
   phase: "idle",
   title: "План релиза",
   archived: false,
+  hidden: false,
   createdAt: "2026-08-05T00:00:00.000Z",
 };
 

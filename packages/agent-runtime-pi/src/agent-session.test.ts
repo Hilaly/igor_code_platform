@@ -81,7 +81,7 @@ async function withStore(
     ...(hooks === undefined ? {} : { hooks }),
   });
 
-  const open = async (): Promise<AgentSession> => {
+  const open = async (extra: { hidden?: boolean } = {}): Promise<AgentSession> => {
     const created = await store.create({
       projectId: "p1",
       agentId: agent.id,
@@ -90,6 +90,7 @@ async function withStore(
       model: `scripted-model/${scripted.model.id}`,
       thinkingLevel: "off",
       agent: definition,
+      ...extra,
     });
 
     assert.ok(!("kind" in created), "модель двойника обязана резолвиться");
@@ -452,6 +453,34 @@ describe("an agent session over pi", () => {
     // выглядела бы как проглоченное сообщение.
     assert.deepEqual(stopped, { aborted: true, cleared: [{ text: "возьми левее" }] });
     await session.close();
+  });
+
+  it("writes the hidden mark into the header, where a restart still finds it", async () => {
+    const { open, directory, archivedDirectory } = await withStore([{ text: "привет" }]);
+    const created = await open({ hidden: true });
+
+    assert.equal(created.summary().hidden, true);
+    await created.close();
+
+    // Заголовок не переписывается никогда, поэтому признак читается свежим стором как есть.
+    const listed = await (await freshStore(directory, archivedDirectory)).list();
+
+    assert.deepEqual(
+      listed.map((summary) => summary.hidden),
+      [true],
+    );
+  });
+
+  it("calls a session that never asked to be hidden an ordinary one", async () => {
+    const { open, store } = await withStore([{ text: "привет" }]);
+    const session = await open();
+
+    assert.equal(session.summary().hidden, false);
+    await session.close();
+    assert.deepEqual(
+      (await store.list()).map((summary) => summary.hidden),
+      [false],
+    );
   });
 
   it("keeps a session across a restart of the store", async () => {

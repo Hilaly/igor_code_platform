@@ -16,6 +16,7 @@ const session: Session = {
   thinkingLevel: "off",
   phase: "idle",
   archived: false,
+  hidden: false,
   createdAt: "2026-07-29T09:00:00.000Z",
 };
 

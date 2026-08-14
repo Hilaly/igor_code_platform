@@ -40,6 +40,7 @@ const session: Session = {
   thinkingLevel: "medium",
   phase: "idle",
   archived: false,
+  hidden: false,
   title: "Session A",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
@@ -102,6 +103,20 @@ it("expands projects, persists the layout, and opens a child session", () => {
   ]);
   fireEvent.click(screen.getByRole("treeitem", { name: "Session A" }));
   expect(onOpenSession).toHaveBeenCalledWith("0199");
+});
+
+it("leaves hidden sessions out of the tree", () => {
+  values.clear();
+  show({
+    sessions: [session, { ...session, id: "0200", title: "Subagent", hidden: true }],
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Развернуть Alpha" }));
+
+  // Скрытую сессию завёл плагин для своей работы: она жива и открывается по прямому адресу, но в
+  // дереве человека ей не место.
+  expect(screen.getByRole("treeitem", { name: "Session A" })).toBeTruthy();
+  expect(screen.queryByRole("treeitem", { name: "Subagent" })).toBeNull();
 });
 
 it("toggles a project by clicking anywhere on its row", () => {

@@ -194,6 +194,7 @@ describe("the session surface", () => {
       thinkingLevel: "off" as const,
       phase: "idle" as const,
       archived: false,
+      hidden: false,
       createdAt: "2026-07-29T09:00:00.000Z",
     };
 

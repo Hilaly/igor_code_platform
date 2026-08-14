@@ -81,6 +81,11 @@ export type AgentSessionSummary = {
   name?: string;
   /** Признак архива — корень, в котором лежит файл, а не запись внутри него. */
   archived: boolean;
+  /**
+   * Служебная сессия: живая и адресуемая, но не место ей в списках. Пишется в заголовок при
+   * создании и не меняется — в отличие от архива, который перекладывает файл.
+   */
+  hidden: boolean;
   createdAt: string;
 };
 
@@ -317,6 +322,8 @@ export type CreateAgentSessionInput = {
   model: string;
   thinkingLevel: ThinkingLevel;
   agent: AgentDefinition;
+  /** Служебная сессия. По умолчанию — обычная, видимая. */
+  hidden?: boolean;
 };
 
 export type AgentSessionStore = {
@@ -542,6 +549,9 @@ export function createAgentSessionStore(
           projectId: input.projectId,
           agentId: input.agentId,
           folderKey: input.folderKey,
+          // Скрытость известна при создании и не меняется — потому и живёт в заголовке рядом с
+          // проектом, а не записью дерева.
+          ...(input.hidden === true ? { hidden: true } : {}),
         },
       });
 
@@ -684,6 +694,7 @@ async function summaryOf(session: PiSession, archived: boolean): Promise<AgentSe
     thinkingLevel,
     ...(name === undefined ? {} : { name }),
     archived,
+    hidden: fields["hidden"] === true,
     createdAt: metadata.createdAt,
   };
 }

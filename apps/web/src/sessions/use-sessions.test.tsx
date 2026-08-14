@@ -54,6 +54,7 @@ const session = (overrides: Partial<Session> = {}): Session => ({
   thinkingLevel: "medium",
   phase: "idle",
   archived: false,
+  hidden: false,
   createdAt: "2026-07-29T00:00:00.000Z",
   ...overrides,
 });

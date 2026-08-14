@@ -33,6 +33,11 @@ export type Session = {
   title?: string;
   /** Архивная сессия убрана с глаз, но цела и читается по прямому адресу. */
   archived: boolean;
+  /**
+   * Скрытая сессия не показывается в списках интерфейса, но живёт как обычная: ведёт турны и
+   * открывается по прямому адресу. Задаётся при создании и не меняется.
+   */
+  hidden: boolean;
   createdAt: string;
 };
 
@@ -161,6 +166,11 @@ export type SessionDraft = {
   agentId: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
+  /**
+   * Служебная сессия: не показывается в списках интерфейса, но живёт как обычная. Задаётся только
+   * здесь — менять признак у существующей сессии нечем.
+   */
+  hidden?: boolean;
 };
 
 export type TurnOverrides = {

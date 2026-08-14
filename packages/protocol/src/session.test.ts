@@ -106,6 +106,7 @@ describe("Session", () => {
       thinkingLevel: "off",
       phase: "idle",
       archived: false,
+      hidden: false,
       createdAt: "2026-08-02T09:00:00.000Z",
     };
 
@@ -134,6 +135,22 @@ describe("parseSessionDraft", () => {
 
     assert.deepEqual(result.kind === "parsed" ? result.value.thinkingLevel : undefined, "high");
     assert.deepEqual(result.kind === "parsed" ? result.value.model : undefined, "anthropic/claude");
+  });
+
+  it("keeps the hidden mark only when it is asked for", () => {
+    const asked = parseSessionDraft({ projectId: "work", agentId: "a", hidden: true });
+    const declined = parseSessionDraft({ projectId: "work", agentId: "a", hidden: false });
+
+    assert.deepEqual(asked.kind === "parsed" ? asked.value.hidden : undefined, true);
+    // Явное `false` — то же самое, что не сказать ничего: сессия обычная.
+    assert.deepEqual(declined.kind === "parsed" ? declined.value.hidden : undefined, undefined);
+  });
+
+  it("refuses a hidden mark that is not a boolean", () => {
+    assert.equal(
+      parseSessionDraft({ projectId: "work", agentId: "a", hidden: "yes" }).kind,
+      "rejected",
+    );
   });
 
   it("refuses a draft that names no project or no agent", () => {
