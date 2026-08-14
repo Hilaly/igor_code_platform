@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { lastAgentText, notification, reconcile, settled } from "./lifecycle.ts";
+import { lastAgentText, launch, notification, reconcile, settled, stop } from "./lifecycle.ts";
 import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
 import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
 
@@ -276,6 +276,36 @@ describe("reconcile", () => {
     assert.equal(settled?.state, "finished");
     assert.equal(settled?.lastResponse, "all green");
     assert.equal(settled?.notified, true);
+  });
+});
+
+describe("launch", () => {
+  it("does not let a stop land in the middle of it", async () => {
+    // Остановка руками приходит, пока задание ещё едет до платформы. Не будь запуск в одной очереди
+    // с ней, он дописал бы `running` поверх уже подведённого итога, а родитель узнал бы об одной
+    // работе дважды: от остановки и от обхода, разбуженного тем же прерыванием.
+    world = installWorld([
+      session({ id: "s-parent", phase: "idle" }),
+      session({ id: "s-child", phase: "idle", hidden: true }),
+    ]);
+    world.promptDelayMilliseconds = 5;
+
+    const started = launch(record(), "run the tests");
+    const stopped = await stop("s-child");
+
+    await started;
+    await settled();
+
+    assert.equal(stopped.kind, "stopped");
+    assert.equal((await readRecord("s-child"))?.state, "stopped");
+    assert.equal(
+      world.calls.filter(
+        (call) =>
+          (call.kind === "session-prompt" && call.turn.sessionId === "s-parent") ||
+          (call.kind === "session-message" && call.sessionId === "s-parent"),
+      ).length,
+      1,
+    );
   });
 });
 

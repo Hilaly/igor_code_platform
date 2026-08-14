@@ -13,9 +13,10 @@ import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./reg
 import { isWorking, type SubagentState } from "./state.ts";
 
 /**
- * Очередь всего, что доводит записи до конца. Одна на плагин: событие шины приходит на каждое
+ * Очередь всего, что пишет записи субагентов. Одна на плагин: событие шины приходит на каждое
  * изменение любой сессии, и параллельные обходы доложили бы родителю об одном итоге дважды. По той
- * же причине через неё идёт и остановка руками — она тоже кончается уведомлением родителя.
+ * же причине через неё идут остановка руками — она тоже кончается уведомлением родителя — и запуск:
+ * его три записи только тогда и значат что-то, когда между ними ту же запись не переписал никто.
  */
 let queue: Promise<void> = Promise.resolve();
 
@@ -217,36 +218,45 @@ async function settle(record: SubagentRecord): Promise<SubagentRecord> {
  * 3. **Обход сразу за этим.** Быстрый турн мог кончиться, пока мы писали `running`, и его событие
  *    прошло мимо записи, которая тогда ещё числилась запускающейся. Второго события может не быть
  *    вовсе, и без этого обхода субагент остался бы идущим навсегда.
+ *
+ * Все три шага идут **одной очередью** с обходом и остановкой. Порядок записей защищает от чужого
+ * обхода только тогда, когда никто не пишет ту же запись между ними: остановка, пришедшая посреди
+ * `prompt`, довела бы субагента до конца и позвала родителя, а продолжившийся запуск вернул бы
+ * запись в `running` поверх итога.
  */
-export async function launch(
+export function launch(
   record: SubagentRecord,
   text: string,
 ): Promise<{ kind: "started" } | { kind: "failed"; reason: string }> {
-  await writeRecord({ ...record, state: "starting" });
+  return serialize(async () => {
+    await writeRecord({ ...record, state: "starting" });
 
-  try {
-    await sessions.prompt({ sessionId: record.sessionId, text });
-  } catch (cause) {
-    const reason = describe(cause);
+    try {
+      await sessions.prompt({ sessionId: record.sessionId, text });
+    } catch (cause) {
+      const reason = describe(cause);
 
-    // Родителю об этом скажет сам инструмент своим ответом: досылать ему то же самое отдельным
-    // сообщением незачем.
-    await writeRecord({
-      ...record,
-      state: "failed",
-      finishedAt: new Date().toISOString(),
-      failure: reason,
-      notified: true,
-    });
+      // Родителю об этом скажет сам инструмент своим ответом: досылать ему то же самое отдельным
+      // сообщением незачем.
+      await writeRecord({
+        ...record,
+        state: "failed",
+        finishedAt: new Date().toISOString(),
+        failure: reason,
+        notified: true,
+      });
 
-    return { kind: "failed", reason };
-  }
+      return { kind: "failed", reason };
+    }
 
-  await writeRecord({ ...record, state: "running" });
+    await writeRecord({ ...record, state: "running" });
 
-  void sweep();
+    // Обход встаёт в очередь **за** этим запуском, а не внутрь него: ждать его здесь значило бы
+    // ждать самого себя.
+    void sweep();
 
-  return { kind: "started" };
+    return { kind: "started" };
+  });
 }
 
 /** Исход остановки: чего именно остановили и было ли что останавливать. */

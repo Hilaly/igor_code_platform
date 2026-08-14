@@ -50,6 +50,12 @@ export type World = {
    * чужой обход успевает пройти свои шаги целиком, пока итог ещё не записан.
    */
   branchDelayMilliseconds?: number;
+  /**
+   * Сколько платформа думает над приёмом задания субагентом. Настоящая ходит за ним через границу
+   * воркера, и остановка руками успевает прийти целиком, пока запуск ещё не кончился. Только
+   * скрытым сессиям: уведомление родителя тем же вызовом задерживать незачем.
+   */
+  promptDelayMilliseconds?: number;
   restore: () => void;
 };
 
@@ -223,10 +229,16 @@ function answer(world: World, request: SessionRequest): SessionResponse | Promis
       target.phase = "idle";
     }
 
-    return {
+    const accepted: SessionResponse = {
       kind: "session-prompt",
       accepted: { sessionId: target.id, turnId: "t1", phase: "turn" },
     };
+
+    return world.promptDelayMilliseconds === undefined || !target.hidden
+      ? accepted
+      : new Promise((resolve) =>
+          setTimeout(() => resolve(accepted), world.promptDelayMilliseconds),
+        );
   }
 
   if (request.kind === "session-message") {
