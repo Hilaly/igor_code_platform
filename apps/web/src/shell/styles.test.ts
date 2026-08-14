@@ -231,6 +231,13 @@ describe("the style sheets of the application", () => {
     expect(sessions).toMatch(
       /\.sessions-composer-surface\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
     );
+    expect(sessions).toMatch(
+      /\.sessions-agent-activity\s*\{[^}]*align-self:\s*center;[^}]*width:\s*min\(calc\(100%\s*-\s*2\s*\*\s*var\(--sovereign-space-3\)\),\s*var\(--sovereign-reading-width\)\);[^}]*min-width:\s*0;/s,
+    );
+    expect(sessions).toMatch(
+      /\.sessions-agent-activity-text\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s,
+    );
+    expect(sessions).not.toMatch(/\.sessions-composer[^,{]*,\s*\.sessions-agent-activity/s);
     expect(sessions).toMatch(/\.new-session-composer\s*\{[^}]*min-width:\s*0;/s);
   });
 

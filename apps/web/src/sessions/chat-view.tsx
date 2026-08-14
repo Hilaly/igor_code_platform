@@ -32,12 +32,14 @@ import {
   RemoveIcon,
   SendIcon,
   type ScopedTranslator,
+  type Translator,
 } from "@sovereign/ui-kit";
 import { useCommands } from "@sovereign/browser-sdk";
 import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
+import { AgentActivity } from "./agent-activity.tsx";
 import { carriesImages } from "./image-input.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
@@ -75,7 +77,7 @@ export type ChatViewProps = {
   /** Переименовать или убрать в архив. Возвращает причину отказа. */
   onUpdateSession: (update: SessionUpdate) => Promise<string | undefined>;
   onNavigate: (request: SessionNavigateRequest) => Promise<NavigationOutcome>;
-  translator: ScopedTranslator;
+  translator: Translator;
 };
 
 /** Место каталога `/`: вклад «команда» с этим `placeId` встаёт строкой в композере. */
@@ -536,44 +538,52 @@ export function ChatView(props: ChatViewProps) {
 
       <div className="sessions-chat-bottom">
         {archived ? undefined : (
-          <MessageComposer
-            sessionId={open.id}
-            {...(draftReplacement === undefined ? {} : { draftReplacement })}
-            busy={busy}
-            disabled={!agentAvailable}
-            model={model}
-            modelGroups={modelPickerGroups(providers, models, model)}
-            onModelChange={prepareModel}
-            onExpandModelGroup={onLoadModels}
-            thinkingLevel={thinkingLevel}
-            reasoningSupported={reasoningSupported}
-            onThinkingLevelChange={prepareThinkingLevel}
-            onSubmit={onSubmit}
-            onQueueMessage={onQueueMessage}
-            onSendMessage={onSendMessage}
-            onInterrupt={onInterrupt}
-            onDropTarget={takeDropTarget}
-            {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
-            {...(open.commands === undefined ? {} : { commands: open.commands })}
-            pluginCommands={pluginCommands}
-            onRunCommand={async (invocation) => {
-              const reason = await runCommand(invocation);
+          <>
+            <AgentActivity
+              sessionId={open.id}
+              phase={open.summary?.phase ?? "idle"}
+              {...(open.stats === undefined ? {} : { totalTokens: open.stats.totalTokens })}
+              translator={translator}
+            />
+            <MessageComposer
+              sessionId={open.id}
+              {...(draftReplacement === undefined ? {} : { draftReplacement })}
+              busy={busy}
+              disabled={!agentAvailable}
+              model={model}
+              modelGroups={modelPickerGroups(providers, models, model)}
+              onModelChange={prepareModel}
+              onExpandModelGroup={onLoadModels}
+              thinkingLevel={thinkingLevel}
+              reasoningSupported={reasoningSupported}
+              onThinkingLevelChange={prepareThinkingLevel}
+              onSubmit={onSubmit}
+              onQueueMessage={onQueueMessage}
+              onSendMessage={onSendMessage}
+              onInterrupt={onInterrupt}
+              onDropTarget={takeDropTarget}
+              {...(searchFiles === undefined ? {} : { onSearchFiles: searchFiles })}
+              {...(open.commands === undefined ? {} : { commands: open.commands })}
+              pluginCommands={pluginCommands}
+              onRunCommand={async (invocation) => {
+                const reason = await runCommand(invocation);
 
-              setRefusal(reason === undefined ? undefined : { what: "command", reason });
+                setRefusal(reason === undefined ? undefined : { what: "command", reason });
 
-              return reason;
-            }}
-            onError={(error: unknown) => {
-              onDiagnostic?.(
-                `the message composer acceptance failed: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
-              );
-            }}
-            context={open.context}
-            stats={open.stats}
-            translator={translator}
-          />
+                return reason;
+              }}
+              onError={(error: unknown) => {
+                onDiagnostic?.(
+                  `the message composer acceptance failed: ${
+                    error instanceof Error ? error.message : String(error)
+                  }`,
+                );
+              }}
+              context={open.context}
+              stats={open.stats}
+              translator={translator}
+            />
+          </>
         )}
       </div>
 

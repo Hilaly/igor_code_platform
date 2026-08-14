@@ -190,6 +190,42 @@ function chooseThinking(scope: HTMLElement, level: string): void {
 }
 
 describe("the session chat view", () => {
+  it("puts busy activity above and outside the composer surface", () => {
+    const busySummary = { ...summary, phase: "turn" as const };
+    const view = show(
+      openSession(busySummary, {
+        stats: { ...openSession(summary).stats!, totalTokens: 11_000 },
+      }),
+    );
+
+    const status = screen.getByRole("status", { name: /Идёт турн.*токенов/ });
+    const composerSurface = view.container.querySelector(".sessions-composer-surface");
+    const raisedSurface = view.container.querySelector(".sessions-composer");
+
+    expect(status.classList.contains("sessions-agent-activity")).toBe(true);
+    expect(status.parentElement?.classList.contains("sessions-chat-bottom")).toBe(true);
+    expect(status.nextElementSibling).toBe(composerSurface);
+    expect(composerSurface?.contains(status)).toBe(false);
+    expect(raisedSurface?.contains(status)).toBe(false);
+  });
+
+  it("leaves no activity row or gap owner while idle or archived", () => {
+    const idle = show(openSession(summary));
+    expect(idle.container.querySelector(".sessions-agent-activity")).toBeNull();
+
+    idle.rerender(
+      <ShellHeaderProvider description={{ title: "Сессии" }}>
+        <HeaderProbe />
+        <ChatView
+          {...idle.props}
+          open={openSession({ ...summary, archived: true, phase: "idle" })}
+        />
+      </ShellHeaderProvider>,
+    );
+    expect(idle.container.querySelector(".sessions-agent-activity")).toBeNull();
+    expect(idle.container.querySelector(".sessions-composer-surface")).toBeNull();
+  });
+
   it("puts the session identity and actions in a header above the only chat log", () => {
     const view = show(openSession(summary));
     const heading = screen.getByRole("heading", { level: 1, name: "План релиза" });

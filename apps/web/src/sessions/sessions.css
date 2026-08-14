@@ -114,6 +114,23 @@
 
 /* Composer -------------------------------------------------------------- */
 
+.sessions-agent-activity {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--sovereign-space-2);
+  width: min(calc(100% - 2 * var(--sovereign-space-3)), var(--sovereign-reading-width));
+  min-width: 0;
+  padding-inline: var(--sovereign-space-1);
+}
+
+.sessions-agent-activity-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sessions-composer-surface {
   align-self: center;
   width: min(calc(100% - 2 * var(--sovereign-space-3)), var(--sovereign-reading-width));
