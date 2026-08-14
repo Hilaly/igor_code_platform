@@ -6,9 +6,11 @@
  * же выбор агента и модели и то же дерево, которое человек может открыть и прочитать.
  */
 
-import { events, log, type PluginModule } from "@sovereign/sdk";
+import { contribute, events, log, type PluginModule } from "@sovereign/sdk";
 
 import { contributeTools } from "./tools.ts";
+import { contributeRoutes } from "./routes.ts";
+import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import { listRecords } from "./registry.ts";
 import { reconcile } from "./lifecycle.ts";
 
@@ -42,6 +44,28 @@ const sweep = (): Promise<void> => {
 
 export const activate: PluginModule["activate"] = async () => {
   await contributeTools();
+  await contributeRoutes();
+
+  await contribute.localeCatalog({
+    id: "messages-en",
+    namespace: messagesNamespace,
+    locale: "en",
+    messages: englishMessages,
+  });
+  await contribute.localeCatalog({
+    id: "messages-ru",
+    namespace: messagesNamespace,
+    locale: "ru",
+    messages: russianMessages,
+  });
+
+  await contribute.component({
+    id: "panel",
+    title: "Subagents",
+    placeId: "core.panel.tabs",
+    export: "SubagentsPanel",
+  });
+
   await events.subscribe(sessionsChanged, () => void sweep());
 
   // Память воркера теряется при перезагрузке плагина, а субагент к этому моменту мог закончить.

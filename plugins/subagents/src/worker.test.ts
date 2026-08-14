@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe("the subagents plugin", () => {
-  it("brings its tools and watches the sessions", async () => {
+  it("brings the tools, the routes, the panel and the catalogs of the panel", async () => {
     world = installWorld();
 
     // Порядок обязателен: сначала шов, потом импорт воркера (docs/plugins.md).
@@ -36,6 +36,18 @@ describe("the subagents plugin", () => {
         "subagent-stop",
       ],
     );
+    assert.deepEqual(
+      declared.filter(([kind]) => kind === "route").map(([, id]) => id),
+      ["list", "detail"],
+    );
+
+    const panel = world.host.contributions.find(
+      (contribution) => contribution.kind === "component",
+    );
+
+    assert.equal(panel?.kind === "component" ? panel.placeId : undefined, "core.panel.tabs");
+    assert.equal(panel?.kind === "component" ? panel.export : undefined, "SubagentsPanel");
+
     // Подписка на список сессий — единственный способ узнать, что субагент отработал: хук
     // `turn_finished` молчит на сорвавшемся и на прерванном турне.
     assert.deepEqual(world.host.subscriptions, ["core.sessions.changed"]);
