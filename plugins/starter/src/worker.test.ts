@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { installTestHost } from "@sovereign/sdk/testing";
+
+import { findJob, startJob } from "./bash.ts";
 
 describe("the starter plugin", () => {
   it("requires the model to read applicable project AGENTS.md files", () => {
@@ -14,7 +18,7 @@ describe("the starter plugin", () => {
     assert.match(prompt, /absent.*continue/isu);
   });
 
-  it("keeps activation as a lifecycle point without contributing programmatically", async () => {
+  it("contributes the bash tools and the session-close cleanup on activation", async () => {
     const host = installTestHost({ id: "starter", source: "builtin" });
 
     // Порядок обязателен: сначала шов, потом импорт воркера (docs/plugins.md).
@@ -22,8 +26,67 @@ describe("the starter plugin", () => {
 
     await activate?.();
 
-    assert.deepEqual(host.contributions, []);
+    const ids = host.contributions
+      .map((contribution) =>
+        contribution.kind === "tool"
+          ? `tool:${contribution.id}`
+          : contribution.kind === "hook"
+            ? `hook:${contribution.id}:${contribution.event}`
+            : contribution.kind,
+      )
+      .sort();
+
+    assert.deepEqual(ids, [
+      "hook:bash-jobs-session-close:session_closed",
+      "tool:bash",
+      "tool:job_kill",
+      "tool:job_output",
+    ]);
 
     host.restore();
   });
+
+  it("kills the process trees of background jobs on deactivation", async () => {
+    const host = installTestHost({ id: "starter", source: "builtin" });
+    const root = mkdtempSync(join(tmpdir(), "starter-deactivate-"));
+
+    try {
+      const { activate, deactivate } = await import("./worker.ts");
+
+      await activate?.();
+
+      const job = startJob({
+        command: "sleep 30",
+        cwd: root,
+        tmpDir: join(root, "tmp"),
+        sessionId: "s1",
+      });
+
+      await deactivate?.();
+
+      assert.equal(findJob(job.id), undefined, "реестр заданий пуст после выгрузки");
+      await assert.doesNotReject(async () => {
+        // SIGKILL группе уже отправлен: лидер дерева должен умереть в пределах grace.
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          if (!alive(job.handle.pid)) return;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.fail("процесс пережил выгрузку плагина");
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      host.restore();
+    }
+  });
 });
+
+/** Жив ли процесс: `kill(pid, 0)` бросает ESRCH для мёртвого. */
+function alive(pid: number | undefined): boolean {
+  if (pid === undefined) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
