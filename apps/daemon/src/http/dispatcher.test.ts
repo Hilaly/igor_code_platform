@@ -108,6 +108,9 @@ const echo = (path: string, method: Route["method"] = "GET"): Route => ({
 
 const withoutSession = { authenticate: (): Authentication => ({ kind: "none" }) };
 
+/** Для проверок, которые падают на сборке таблицы: журнал в них не участвует. */
+const silentLogger = () => createLogger({ source: "core", level: () => "error", write: () => {} });
+
 describe("createDispatcher", () => {
   it("picks the route by method and path", async () => {
     const { call } = await serve([echo("/api/health"), echo("/api/plugins", "PUT")]);
@@ -149,6 +152,54 @@ describe("createDispatcher", () => {
 
     assert.equal(answer.status, 405);
     assert.equal(answer.headers["allow"], "GET, PUT");
+  });
+
+  it("takes the whole tail with a wildcard route, including an empty one", async () => {
+    const { call } = await serve([echo("/*")]);
+
+    assert.equal((await call("GET", "/")).status, 200);
+    assert.equal((await call("GET", "/settings/plugins")).status, 200);
+    assert.equal((await call("GET", "/p/placed/log/entry/7?filter=warn")).status, 200);
+  });
+
+  it("lets any exact route win over a wildcard one, whatever their order", async () => {
+    const { call } = await serve([
+      echo("/*"),
+      {
+        method: "GET",
+        path: "/api/health",
+        handle: ({ response }) => respondWithJson(response, 200, { exact: true }),
+      },
+    ]);
+
+    assert.deepEqual(JSON.parse((await call("GET", "/api/health")).body), { exact: true });
+    assert.deepEqual(JSON.parse((await call("GET", "/api/other")).body).parameters, {});
+  });
+
+  it("keeps a wildcard route out of the allowed methods of a path", async () => {
+    const { call } = await serve([echo("/*"), echo("/api/plugins", "PUT")]);
+
+    // Хвостовая строка подходит к любому адресу, поэтому 405 от неё означал бы «такой адрес есть»
+    // про адрес, которого нет.
+    const unknown = await call("POST", "/api/nothing", "{}");
+
+    assert.equal(unknown.status, 404);
+    assert.equal(unknown.headers["allow"], undefined);
+
+    // На настоящем несовпадении метода `405` остаётся.
+    assert.equal((await call("DELETE", "/api/plugins")).status, 405);
+  });
+
+  it("refuses a wildcard anywhere but the last segment", () => {
+    assert.throws(
+      () =>
+        createDispatcher({
+          routes: [echo("/*/tail")],
+          logger: silentLogger(),
+          authenticate: () => ({ kind: "none" }),
+        }),
+      /may only use \* as its last segment/,
+    );
   });
 
   it("refuses a body larger than the limit before reading it whole", async () => {

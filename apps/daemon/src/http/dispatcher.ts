@@ -39,7 +39,15 @@ export type RouteHandler = (context: RequestContext) => void | Promise<void>;
 
 export type Route = {
   method: "GET" | "POST" | "PUT" | "DELETE";
-  /** Сегмент вида `:имя` попадает в `parameters`; остальные сравниваются буквально. */
+  /**
+   * Сегмент вида `:имя` попадает в `parameters`; остальные сравниваются буквально.
+   *
+   * Последним сегментом разрешён `*`: он берёт весь оставшийся хвост, в том числе пустой. Такая
+   * строка нужна ровно одному потребителю — отдаче фронтенда, у которого адреса задаёт свой
+   * маршрутизатор в браузере, а не таблица демона (docs/web-api.md). Считается она **слабее**
+   * любой точной строки и в набор разрешённых методов пути не входит: иначе `POST` по
+   * несуществующему адресу API отвечал бы `405` вместо `404`.
+   */
   path: string;
   /**
    * Кому маршрут отвечает. Поле необязательное, и его отсутствие значит «нужна сессия»: забытое
@@ -146,25 +154,35 @@ export function createDispatcher(
       route: Route;
       parameters: RouteParameters;
       specificity: number;
+      wildcard: boolean;
       order: number;
     }[] = [];
     const allowed = new Set<string>();
 
-    for (const { route, pattern, order } of [...table, ...pluginTable()]) {
+    for (const { route, pattern, wildcard, order } of [...table, ...pluginTable()]) {
       const parameters = matchRoute(pattern, segments);
 
       if (parameters === undefined) {
         continue;
       }
 
-      allowed.add(route.method);
+      // Хвостовая строка не объявляет, что метод у пути есть: она подходит к любому адресу, и
+      // `405` от неё означал бы «такой адрес существует» про адрес, которого нет.
+      if (!wildcard) {
+        allowed.add(route.method);
+      }
 
-      matches.push({ route, parameters, specificity: staticSegments(pattern), order });
+      matches.push({ route, parameters, specificity: staticSegments(pattern), wildcard, order });
     }
 
     const matched = matches
       .filter(({ route }) => route.method === request.method)
-      .sort((left, right) => right.specificity - left.specificity || left.order - right.order)[0];
+      .sort(
+        (left, right) =>
+          right.specificity - left.specificity ||
+          Number(left.wildcard) - Number(right.wildcard) ||
+          left.order - right.order,
+      )[0];
 
     if (matched === undefined) {
       // Путь есть, метод не тот — это не «нет такого адреса», и клиент имеет право знать разницу.
@@ -313,24 +331,40 @@ function segmentsOf(path: string): string[] {
   return path.split("/").filter((segment) => segment.length > 0);
 }
 
-type TableRow = { route: Route; pattern: string[]; order: number };
+type TableRow = { route: Route; pattern: string[]; wildcard: boolean; order: number };
+
+export const wildcardSegment = "*";
 
 function tableRow(route: Route, order: number): TableRow {
-  return { route, pattern: segmentsOf(route.path), order };
+  const pattern = segmentsOf(route.path);
+  const wildcard = pattern.at(-1) === wildcardSegment;
+
+  // Хвост на то и хвост: `*` в середине означал бы «пропусти сколько-нибудь сегментов», а это уже
+  // сопоставление с возвратом, которого у таблицы нет и заводить его не под что.
+  if (pattern.indexOf(wildcardSegment) !== -1 && !wildcard) {
+    throw new Error(`The route ${route.path} may only use ${wildcardSegment} as its last segment.`);
+  }
+
+  return { route, pattern, wildcard, order };
 }
 
 function staticSegments(pattern: string[]): number {
-  return pattern.filter((segment) => !segment.startsWith(":")).length;
+  return pattern.filter((segment) => !segment.startsWith(":") && segment !== wildcardSegment)
+    .length;
 }
 
 function matchRoute(pattern: string[], segments: string[]): RouteParameters | undefined {
-  if (pattern.length !== segments.length) {
+  const wildcard = pattern.at(-1) === wildcardSegment;
+  const compared = wildcard ? pattern.slice(0, -1) : pattern;
+
+  // Хвост бывает и пустым: `/*` обязан подходить к самому `/`, иначе корень остался бы без ответа.
+  if (wildcard ? segments.length < compared.length : pattern.length !== segments.length) {
     return undefined;
   }
 
   const parameters: RouteParameters = {};
 
-  for (const [index, expected] of pattern.entries()) {
+  for (const [index, expected] of compared.entries()) {
     const actual = segments[index] ?? "";
 
     if (!expected.startsWith(":")) {
