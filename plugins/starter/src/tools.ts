@@ -1,12 +1,12 @@
 /**
- * Инструменты bash/job_output/job_kill (docs/bash-tool.md).
+ * Инструменты bash/job-output/job-kill (docs/bash-tool.md).
  *
  * Bash переехал сюда из рантайма: исполнение команды — это лимиты (вывод, таймаут, дерево
  * процессов), и они живут рядом с инструментом, а не в ядре. Foreground-команда обязана уложиться
  * в таймаут вызова плагина (`callTimeoutMilliseconds` из invocation) — дольше только background.
  *
  * Фоновое задание — обычная команда без таймаута: bash с `run_in_background: true` возвращает
- * `jobId` сразу, job_output читает вывод дельтами, job_kill убивает дерево.
+ * `jobId` сразу, job-output читает вывод дельтами, job-kill убивает дерево.
  */
 
 import { join } from "node:path";
@@ -51,8 +51,8 @@ const bashParameters = z.object({
     .boolean()
     .optional()
     .describe(
-      "Run in the background: the call returns a job id immediately, then job_output reads the " +
-        "output and job_kill stops the command. Use it for anything that may outlive the cap.",
+      "Run in the background: the call returns a job id immediately, then job-output reads the " +
+        "output and job-kill stops the command. Use it for anything that may outlive the cap.",
     ),
 });
 
@@ -172,8 +172,8 @@ export async function contributeBashTools(): Promise<void> {
       "Execute a bash command in the project folder and return its stdout and stderr. " +
       "Output is truncated to its tail; the full output is saved to a file whose path is reported. " +
       "The timeout is capped by the platform — commands that may run longer must set " +
-      "`run_in_background: true`: the call returns a job id immediately, then job_output reads " +
-      "the output and job_kill stops the command.",
+      "`run_in_background: true`: the call returns a job id immediately, then job-output reads " +
+      "the output and job-kill stops the command.",
     parameters: bashParameters,
     invoke: async (arguments_, invocation) => {
       const { seconds, clamped } = commandTimeoutSeconds(arguments_.timeout, invocation);
@@ -191,7 +191,7 @@ export async function contributeBashTools(): Promise<void> {
         return [
           `background job ${job.id} started`,
           "",
-          `Poll it with job_output {jobId: "${job.id}"}, stop it with job_kill.`,
+          `Poll it with job-output {jobId: "${job.id}"}, stop it with job-kill.`,
         ].join("\n");
       }
 
@@ -212,7 +212,7 @@ export async function contributeBashTools(): Promise<void> {
   });
 
   await contribute.tool({
-    id: "job_output",
+    id: "job-output",
     title: "Read a background job output",
     description:
       "Read the output a background job (started with bash run_in_background: true) produced " +
@@ -233,7 +233,7 @@ export async function contributeBashTools(): Promise<void> {
   });
 
   await contribute.tool({
-    id: "job_kill",
+    id: "job-kill",
     title: "Stop a background job",
     description:
       "Stop a background job (started with bash run_in_background: true): the whole process " +

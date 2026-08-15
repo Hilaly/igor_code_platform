@@ -1,5 +1,5 @@
 /**
- * Инструменты bash/job_output/job_kill (docs/bash-tool.md): живые процессы, настоящие лимиты.
+ * Инструменты bash/job-output/job-kill (docs/bash-tool.md): живые процессы, настоящие лимиты.
  *
  * Каждый тест держит свой каталог данных: spill-файлы падают в `<root>/tmp`, и уборка не зависит
  * от реестра заданий.
@@ -155,7 +155,7 @@ describe("bash", () => {
   });
 });
 
-describe("job_output", () => {
+describe("job-output", () => {
   it("reads deltas and the final status of a background job", async () => {
     const { call } = await ready();
 
@@ -169,7 +169,7 @@ describe("job_output", () => {
     const seen: string[] = [];
     let status = "";
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const read = await call("job_output", { jobId });
+      const read = await call("job-output", { jobId });
       const content = asText(read);
       status = content.match(/\[status: ([a-z]+)\]/u)?.[1] ?? "";
       if (!/\(no new output\)/u.test(content)) seen.push(content);
@@ -188,7 +188,7 @@ describe("job_output", () => {
     const started = await call("bash", { command: "sleep 30", run_in_background: true });
     const jobId = jobIdOf(started)!;
 
-    const outcome = await call("job_output", { jobId }, { sessionId: "s2" });
+    const outcome = await call("job-output", { jobId }, { sessionId: "s2" });
 
     assert.equal(typeof outcome === "object" && outcome.isError, true);
     assert.match(asText(outcome), /belongs to another session/u);
@@ -197,14 +197,14 @@ describe("job_output", () => {
   it("names an unknown job instead of pretending", async () => {
     const { call } = await ready();
 
-    const outcome = await call("job_output", { jobId: "no-such-job" });
+    const outcome = await call("job-output", { jobId: "no-such-job" });
 
     assert.equal(typeof outcome === "object" && outcome.isError, true);
     assert.match(asText(outcome), /unknown job no-such-job/u);
   });
 });
 
-describe("job_kill", () => {
+describe("job-kill", () => {
   it("kills the whole tree of a running job", async () => {
     const { call } = await ready();
 
@@ -214,17 +214,17 @@ describe("job_kill", () => {
     });
     const jobId = jobIdOf(started)!;
 
-    // Детский pid приходит не в ответе на запуск, а первым выводом задания — через job_output.
+    // Детский pid приходит не в ответе на запуск, а первым выводом задания — через job-output.
     let childPid = NaN;
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const read = await call("job_output", { jobId });
+      const read = await call("job-output", { jobId });
       childPid = Number(asText(read).match(/^(\d+)$/mu)?.[1]);
       if (Number.isInteger(childPid) && childPid > 0) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.ok(Number.isInteger(childPid) && childPid > 0, "детский pid приходит выводом задания");
 
-    const killed = await call("job_kill", { jobId });
+    const killed = await call("job-kill", { jobId });
 
     assert.equal(typeof killed === "object" && killed.isError, false);
     assert.match(asText(killed), /killed job/u);
@@ -233,10 +233,10 @@ describe("job_kill", () => {
         if (!alive(childPid)) return;
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
-      assert.fail("спящий потомок пережил job_kill");
+      assert.fail("спящий потомок пережил job-kill");
     });
 
-    const read = await call("job_output", { jobId });
+    const read = await call("job-output", { jobId });
     assert.match(asText(read), /\[status: killed\]/u);
   });
 
@@ -248,12 +248,12 @@ describe("job_kill", () => {
 
     // Даём команде закончиться.
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const read = await call("job_output", { jobId });
+      const read = await call("job-output", { jobId });
       if (/\[status: completed\]/u.test(asText(read))) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    const killed = await call("job_kill", { jobId });
+    const killed = await call("job-kill", { jobId });
 
     assert.equal(typeof killed === "object" && killed.isError, false);
     assert.match(asText(killed), /already finished/u);

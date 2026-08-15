@@ -39,9 +39,18 @@ describe("the starter plugin", () => {
     assert.deepEqual(ids, [
       "hook:bash-jobs-session-close:session_closed",
       "tool:bash",
-      "tool:job_kill",
-      "tool:job_output",
+      "tool:job-kill",
+      "tool:job-output",
     ]);
+
+    // Идентификаторы вкладов обязаны проходить валидацию реестра демона
+    // (apps/daemon/src/plugins/contribution-registry.ts). Тестовый хост её не применяет — поэтому
+    // регрессия с недопустимым id не была бы поймана одним deepEqual выше; паттерн — публичный
+    // контракт платформы (docs/plugins.md).
+    const idPattern = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/u;
+    for (const contribution of host.contributions) {
+      assert.match(contribution.id, idPattern, contribution.id);
+    }
 
     host.restore();
   });

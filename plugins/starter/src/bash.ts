@@ -1,7 +1,7 @@
 /**
- * Исполнение команд для инструментов bash/job_output/job_kill (docs/bash-tool.md).
+ * Исполнение команд для инструментов bash/job-output/job-kill (docs/bash-tool.md).
  *
- * Всё исполнение — здесь, в воркере плагина. Причина — в рантайме bash не было ни лимита вывода
+ * Всё исполнение живёт здесь, в воркере плагина. Причина — в рантайме bash не было ни лимита вывода
  * (stdout копился в память без ограничений, пока жив процесс), ни потолка таймаута, ни убийства
  * дерева процессов; у плагина всё это есть. Вывод каждого потока держится bounded-хвостом в памяти,
  * переполнение уезжает в файл `<dataDirectory>/tmp`; команда живёт в своей process group
@@ -140,7 +140,7 @@ export class OutputCollector {
   }
 
   /**
-   * Дельта с байтовой позиции `from` (для job_output): текст, следующий сдвиг и признак, что
+   * Дельта с байтовой позиции `from` (для job-output): текст, следующий сдвиг и признак, что
    * прочитанное успело выпасть из памяти (тогда остаток — только в файле).
    */
   readFrom(from: number): { text: string; nextOffset: number; lossy: boolean; spillPath?: string } {
@@ -282,20 +282,20 @@ export class CommandHandle {
 /** Статус фонового задания для модели. */
 export type JobStatus = "running" | "completed" | "killed";
 
-/** Фоновое задание: команда без таймаута, чей вывод читается дельтами через job_output. */
+/** Фоновое задание: команда без таймаута, чей вывод читается дельтами через job-output. */
 export type BackgroundJob = {
   id: string;
-  /** Чья сессия запустила: чужой job_output/job_kill не увидит задание. */
+  /** Чья сессия запустила: чужой job-output/job-kill не увидит задание. */
   sessionId: string;
   status: JobStatus;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   stdout: OutputCollector;
   stderr: OutputCollector;
-  /** Позиции чтения: каждый job_output отдаёт дельту с прошлого раза. */
+  /** Позиции чтения: каждый job-output отдаёт дельту с прошлого раза. */
   stdoutOffset: number;
   stderrOffset: number;
-  /** Убийство начато нами (job_kill или уборка): исход помечается killed, а не completed. */
+  /** Убийство начато нами (job-kill или уборка): исход помечается killed, а не completed. */
   killed: boolean;
   handle: CommandHandle;
 };

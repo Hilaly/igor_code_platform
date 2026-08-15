@@ -1,6 +1,6 @@
-# Инструменты bash, job_output, job_kill
+# Инструменты bash, job-output, job-kill
 
-Bash — инструмент исполнения команд агента: `bash`, `job_output` и `job_kill` объявляет встроенный
+Bash — инструмент исполнения команд агента: `bash`, `job-output` и `job-kill` объявляет встроенный
 плагин `starter` (plugins/starter/src/tools.ts), исполнение живёт в его воркере
 (plugins/starter/src/bash.ts). Это **вклад плагина, а не инструмент рантайма**: выключил starter —
 bash пропал; заменил starter одноимённым плагином из директории данных — bash заменился, не трогая
@@ -47,18 +47,18 @@ bash пропал; заменил starter одноимённым плагино�
   или не указывает таймаут, исполняется с потолком; если модель просила больше — в результат
   добавляется `[timeout clamped to N seconds by the platform]`. Дольше потолка — только
   `run_in_background`.
-- **Убийство деревом.** Команда живёт в своей process group (`detached`); таймаут и `job_kill`
+- **Убийство деревом.** Команда живёт в своей process group (`detached`); таймаут и `job-kill`
   шлют SIGTERM всей группе, затем SIGKILL по grace 3 с. Потомок с унаследованным pipe не держит
   ожидание вечно: после `exit` закрытие канала ждётся тот же grace.
 
-### `job_output` и `job_kill`
+### `job-output` и `job-kill`
 
 - `bash` с `run_in_background: true` возвращает `background job <id> started` сразу; команда бежит
   без таймаута.
-- `job_output {jobId}` читает вывод **дельтой с прошлого раза** и статус:
+- `job-output {jobId}` читает вывод **дельтой с прошлого раза** и статус:
   `[status: running|completed|killed]`; для завершённых — маркеры исхода. Читать, пока не
   `completed`, — нормальный способ дождаться фоновой работы.
-- `job_kill {jobId}` убивает дерево задания (SIGTERM → SIGKILL). Повторный kill —
+- `job-kill {jobId}` убивает дерево задания (SIGTERM → SIGKILL). Повторный kill —
   `already finished`; чужое или неизвестное задание — ошибка.
 
 ## Жизненный цикл заданий
