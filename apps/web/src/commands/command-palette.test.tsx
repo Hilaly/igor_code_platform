@@ -4,7 +4,7 @@ import type { ContributionRegistration, PluginStatus } from "@sovereign/protocol
 import { coreEnglish, coreNamespace, createTranslator } from "@sovereign/ui-kit";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { BrowserRuntimeProvider } from "../places/place-host.tsx";
 import { defaultLayout, type ShellLayout } from "../shell/layout.ts";
@@ -58,17 +58,17 @@ function palette(
     pluginModule?: Record<string, unknown>;
     onDiagnostic?: (text: string) => void;
   } = {},
-): CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } {
+): CoreCommandHost & { navigate: Mock<CoreCommandHost["navigate"]> } {
   const ran = options.ran ?? [];
   const pluginModule =
     options.pluginModule ?? ({ RunCommand: { run: () => ran.push("plugin command") } } as const);
   const cached = options.cacheEmpty
     ? undefined
     : ({ kind: "loaded", module: pluginModule } as const);
-  const host: CoreCommandHost & { navigate: ReturnType<typeof vi.fn> } = {
+  const host: CoreCommandHost & { navigate: Mock<CoreCommandHost["navigate"]> } = {
     layout: options.layout ?? defaultLayout,
-    navigate: vi.fn(),
-    onLayoutChange: vi.fn(),
+    navigate: vi.fn<CoreCommandHost["navigate"]>(),
+    onLayoutChange: vi.fn<CoreCommandHost["onLayoutChange"]>(),
     rightUnavailable: false,
   };
 
