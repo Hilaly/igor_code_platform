@@ -11,8 +11,12 @@ import { renameSync, unlinkSync, writeFileSync } from "node:fs";
  * оборванная на середине запись не должна оставить файл битым (docs/data-directory.md).
  *
  * Режим `0600` — часть механизма: рядом с настройками лежат хеш пароля и хеши токенов сессий.
+ *
+ * Байты, а не только текст: тем же способом кладётся бутстрап воркера из нагрузки артефакта
+ * (docs/toolchain.md), а он приезжает уже собранным. Кодировка при этом игнорируется — она
+ * относится только к строке.
  */
-export function writeFileAtomically(path: string, text: string): void {
+export function writeFileAtomically(path: string, text: string | Uint8Array): void {
   const temporary = `${path}.${process.pid}.tmp`;
 
   try {

@@ -3,15 +3,16 @@
  * иначе в репозитории плагина лежал бы собранный код, а singleton-зависимости хоста пришлось бы
  * согласовывать честным словом.
  *
- * Модуль без состояния и без журнала: он отвечает исходом, а решает вызывающий, — как и сосед
- * `plugin-dependencies.ts`. Прошлые ревизии помнит хранилище, здесь памяти нет.
+ * Модуль без журнала: он отвечает исходом, а решает вызывающий, — как и установка зависимостей в
+ * `platform/npm-dependencies.ts`. Прошлые ревизии помнит хранилище, здесь памяти нет; единственное
+ * состояние — загруженный сборщик, потому что он один на процесс и держит дочерний процесс-сервис.
  */
 
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { build, formatMessages, stop, type Plugin } from "esbuild";
+import type { Plugin } from "esbuild";
 import {
   hostModuleRegistryKey,
   hostModuleSpecifiers,
@@ -32,12 +33,50 @@ export type BrowserBuildOutcome =
   /** Причина — текст esbuild с файлом и строкой: человеку чинить именно его. */
   | { kind: "failed"; reason: string };
 
+/** Ровно то, что нужно от esbuild. Шире брать незачем: подменять этот кусок должно быть дёшево. */
+export type Bundler = Pick<typeof import("esbuild"), "build" | "formatMessages" | "stop">;
+
+/**
+ * Откуда берётся сборщик. Функция, а не модуль: в разработке он лежит в зависимостях демона, а в
+ * артефакте приезжает в директорию данных **после** старта процесса, и статический импорт превратил
+ * бы «браузерную часть плагина не собрать» в «продукт не запускается»
+ * (runtime-checks.md, проверка 37).
+ */
+export type BundlerSource = () => Promise<Bundler>;
+
+const bundlerOfTheDaemon: BundlerSource = () => import("esbuild");
+
+/** Сборщик один на процесс: он держит дочерний процесс-сервис, и второго заводить незачем. */
+let loading: Promise<Bundler> | undefined;
+let running: Bundler | undefined;
+
+async function loadBundler(source: BundlerSource): Promise<Bundler> {
+  if (running !== undefined) {
+    return running;
+  }
+
+  loading ??= source();
+
+  try {
+    running = await loading;
+
+    return running;
+  } catch (cause) {
+    // Следующая сборка попробует снова: к первой сборщик мог ещё не доехать, а потом доехать.
+    loading = undefined;
+
+    throw cause;
+  }
+}
+
 export type BuildPluginBrowserOptions = {
   /** Едет в имена классов CSS Modules: между плагинами их разводит платформа, а не сборщик. */
   pluginKey: string;
   directory: string;
   /** Путь точки входа относительно папки плагина; его отсутствие — не ошибка. */
   browserEntry?: string;
+  /** Не сказано — сборщик берётся из зависимостей демона, то есть так, как это работает в разработке. */
+  bundler?: BundlerSource;
 };
 
 /**
@@ -61,8 +100,21 @@ export async function buildPluginBrowser(
     return { kind: "not-needed" };
   }
 
+  let bundler: Bundler;
+
   try {
-    const result = await build({
+    bundler = await loadBundler(options.bundler ?? bundlerOfTheDaemon);
+  } catch (cause) {
+    // Отдельный текст, а не общий отказ сборки: чинится он не в коде плагина, а установкой
+    // сборщика, и человек должен видеть разницу (docs/toolchain.md).
+    return {
+      kind: "failed",
+      reason: `the browser bundler is not available: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
+  }
+
+  try {
+    const result = await bundler.build({
       absWorkingDir: directory,
       entryPoints: [resolve(directory, browserEntry)],
       outdir: join(directory, outputDirectoryName),
@@ -97,7 +149,7 @@ export async function buildPluginBrowser(
 
     return { kind: "built", bundle: { revision: revisionOf(files), files } };
   } catch (cause) {
-    return { kind: "failed", reason: await describeBuildFailure(cause) };
+    return { kind: "failed", reason: await describeBuildFailure(bundler, cause) };
   }
 }
 
@@ -106,7 +158,10 @@ export async function buildPluginBrowser(
  * его же требует и остановка тестового прогона.
  */
 export function stopPluginBrowserBuilds(): void {
-  stop();
+  // Не загружали — и дочернего процесса нет: останавливать нечего.
+  running?.stop();
+  loading = undefined;
+  running = undefined;
 }
 
 /**
@@ -234,14 +289,14 @@ function revisionOf(files: ReadonlyMap<string, Uint8Array>): string {
   return digest.digest("base64url").slice(0, revisionLength);
 }
 
-async function describeBuildFailure(cause: unknown): Promise<string> {
+async function describeBuildFailure(bundler: Bundler, cause: unknown): Promise<string> {
   const errors = (cause as { errors?: unknown }).errors;
 
   if (!Array.isArray(errors) || errors.length === 0) {
     return cause instanceof Error ? cause.message : String(cause);
   }
 
-  const formatted = await formatMessages(errors, { kind: "error", color: false });
+  const formatted = await bundler.formatMessages(errors, { kind: "error", color: false });
 
   return formatted.join("\n").trim();
 }

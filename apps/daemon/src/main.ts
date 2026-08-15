@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-import { coreEventTypes, parseModelReference } from "@sovereign/protocol";
+import { coreEventTypes, parseModelReference, platformVersion } from "@sovereign/protocol";
 
 import {
   authenticationRoutes,
@@ -9,7 +9,12 @@ import {
   createLoginSessionStore,
   createSessionCheck,
 } from "./authentication/public.ts";
-import { artifactPayload, parseArguments } from "./platform/public.ts";
+import {
+  artifactPayload,
+  loadRuntimeModule,
+  parseArguments,
+  prepareRuntimeDirectory,
+} from "./platform/public.ts";
 import {
   createCredentialStore,
   createUserProviderStore,
@@ -141,6 +146,23 @@ const logger = createLogger({
 // Файлы читаются после создания логгера: диагностика первого чтения обязана в него попасть.
 settings.start(logger);
 
+/**
+ * То, что артефакту нужно на диске, чтобы работать: бутстрап воркера и зависимости, которые в один
+ * файл не вшиваются (docs/toolchain.md). Готовится до первого обхода плагинов и после захвата лока,
+ * поэтому одновременно этого не делают два процесса. Провалившаяся установка демон не роняет:
+ * плагины без браузерной части поднимутся, а с ней — получат отказ сборки с причиной.
+ */
+const runtime =
+  payload === undefined
+    ? undefined
+    : await prepareRuntimeDirectory({
+        dataDirectory: directory,
+        version: platformVersion,
+        workerBootstrap: payload.worker,
+        dependencies: payload.runtimeDependencies,
+        logger,
+      });
+
 // Один нормализатор на демон: складка пути обязана быть общей у стора и у маршрутов, иначе второй
 // проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
 const normalizeProjectFolder = createProjectPathNormalizer();
@@ -258,6 +280,13 @@ const plugins = createPluginSupervisor({
   logger,
   registry: contributions,
   bus,
+  // В разработке и то и другое лежит рядом с исходниками, поэтому строк здесь нет вовсе.
+  ...(runtime === undefined
+    ? {}
+    : {
+        workerBootstrapPath: runtime.workerBootstrap,
+        bundler: () => loadRuntimeModule(runtime.directory, "esbuild"),
+      }),
   publishContributionChanges,
   createPluginLogger: (source) =>
     createLogger({ source, level: () => settings.current().config.logLevel }),

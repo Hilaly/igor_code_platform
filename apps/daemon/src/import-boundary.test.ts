@@ -115,6 +115,18 @@ describe("the daemon area boundary", () => {
     );
   });
 
+  it("does not widen the runtime module exception to arbitrary computed imports", async () => {
+    assert.equal(
+      (
+        await messagesFor(
+          "apps/daemon/src/platform/runtime-directory.ts",
+          'const path = "../sessions/public.ts";\nconst module = import(path);\nvoid module;\n',
+        )
+      ).length,
+      1,
+    );
+  });
+
   it("lets the composition root import area facades", async () => {
     assert.deepEqual(
       await messagesFor(

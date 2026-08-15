@@ -14,6 +14,14 @@ export { createEventBus, type EventBus } from "./event-bus.ts";
 export { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 export { createLogger, type Logger } from "./logger.ts";
 export {
+  loadRuntimeModule,
+  prepareRuntimeDirectory,
+  runtimeDirectoryName,
+  runtimeModuleUrl,
+  workerBootstrapFileName,
+  type RuntimeDirectory,
+} from "./runtime-directory.ts";
+export {
   defaultInstallTimeoutMilliseconds,
   ensureInstalledDependencies,
   installStampFileName,

@@ -35,6 +35,7 @@ import {
   buildPluginBrowser,
   stopPluginBrowserBuilds,
   type BrowserBuildOutcome,
+  type BundlerSource,
   type PluginBrowserBundle,
 } from "./plugin-browser-build.ts";
 import { ensureInstalledDependencies, type DependencyOutcome } from "../platform/public.ts";
@@ -140,6 +141,17 @@ export type CreatePluginSupervisorOptions = {
    */
   buildBrowser?: (plugin: DiscoveredPlugin) => Promise<BrowserBuildOutcome>;
   /**
+   * Откуда брать сборщик браузерного кода. Не сказано — из зависимостей демона, то есть так, как
+   * это работает в разработке; артефакт даёт свой источник (docs/toolchain.md).
+   */
+  bundler?: BundlerSource;
+  /**
+   * Файл бутстрапа воркера. Не сказано — сосед этого модуля, то есть исходники репозитория. В
+   * артефакте кода на диске нет вовсе, и бутстрап приезжает распакованным в директорию данных, а
+   * `new Worker` принимает путь, а не код (docs/toolchain.md).
+   */
+  workerBootstrapPath?: string;
+  /**
    * Ответить на запрос плагина о провайдерах (`plugin-providers.ts`). Необязателен: супервизор
    * поднимает плагины и без каталога — тесты жизненного цикла о провайдерах не знают вовсе.
    *
@@ -164,7 +176,7 @@ const defaultRetryDelays = [1_000, 5_000, 15_000, 30_000, 60_000];
 const defaultDeactivateTimeout = 2_000;
 const defaultStability = 60_000;
 
-const bootstrapPath = join(import.meta.dirname, "plugin-worker.ts");
+const bootstrapInTheRepository = join(import.meta.dirname, "plugin-worker.ts");
 
 function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
   return left.size === right.size && [...left].every((value) => right.has(value));
@@ -221,6 +233,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
     options.ensureDependencies ??
     ((plugin: DiscoveredPlugin, onInstallStart: () => void) =>
       ensureInstalledDependencies({ directory: plugin.directory, logger, onInstallStart }));
+  const bootstrapPath = options.workerBootstrapPath ?? bootstrapInTheRepository;
   const buildBrowser =
     options.buildBrowser ??
     ((plugin: DiscoveredPlugin) =>
@@ -228,6 +241,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
         pluginKey: plugin.key,
         directory: plugin.directory,
         ...(plugin.manifest.browser === undefined ? {} : { browserEntry: plugin.manifest.browser }),
+        ...(options.bundler === undefined ? {} : { bundler: options.bundler }),
       }));
   const assets = createPluginAssetStore();
 

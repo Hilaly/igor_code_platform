@@ -335,6 +335,36 @@ describe("buildPluginBrowser", () => {
       assert.doesNotMatch(outcome.reason, /node_modules|plugin-browser-build/);
     });
 
+    it("names an unavailable bundler apart from a broken plugin", async () => {
+      // В артефакте сборщик приезжает в директорию данных после старта процесса, и его отсутствие
+      // чинится установкой, а не правкой кода плагина (runtime-checks.md, проверка 37).
+      //
+      // Сборщик один на процесс, и уже загруженный побеждает любой источник: соседние проверки
+      // выше его загрузили, поэтому здесь процесс возвращается в состояние «ещё не загружали».
+      stopPluginBrowserBuilds();
+
+      const outcome = await buildPluginBrowser({
+        pluginKey: "data:browsered",
+        directory: browsered,
+        browserEntry: "src/browser.tsx",
+        bundler: () => Promise.reject(new Error("Cannot find package 'esbuild'")),
+      });
+
+      assert.equal(outcome.kind, "failed");
+      assert.ok(outcome.kind === "failed");
+      assert.match(outcome.reason, /the browser bundler is not available/);
+      assert.match(outcome.reason, /Cannot find package 'esbuild'/);
+
+      // Неудачная загрузка не запоминается: следующая сборка берёт сборщик заново и собирает.
+      const again = await buildPluginBrowser({
+        pluginKey: "data:browsered",
+        directory: browsered,
+        browserEntry: "src/browser.tsx",
+      });
+
+      assert.equal(again.kind, "built");
+    });
+
     it("does not reach for a missing entry point outside the plugin folder", async () => {
       const outcome = await buildPluginBrowser({
         pluginKey: "data:browsered",
