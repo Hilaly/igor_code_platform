@@ -1,4 +1,5 @@
 export { parseArguments } from "./arguments.ts";
+export { artifactPayload, type ArtifactPayload, type PayloadFiles } from "./artifact-payload.ts";
 export { writeFileAtomically } from "./atomic-file.ts";
 export {
   archivedSessionsDirectoryName,
