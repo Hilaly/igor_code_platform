@@ -24,8 +24,9 @@ dev: node-version ## Поднять демон и веб-интерфейс с �
 catalog: node-version ## Поднять каталог компонентов UI-кита
 	pnpm --filter @sovereign/ui-kit run catalog
 
-build: node-version ## Собрать веб-интерфейс
-	pnpm --recursive run build
+build: node-version ## Собрать продакшн-артефакт
+	pnpm --filter @sovereign/web run build
+	pnpm --filter @sovereign/daemon run build
 
 check: typecheck lint fmt-check test ## Полная проверка: типы, линтер, формат, тесты
 

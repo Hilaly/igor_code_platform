@@ -8,7 +8,8 @@
     "seed-runbook": "node src/plugins/seed-runbook-fixtures.ts",
     "start": "node src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test \"src/**/*.test.ts\""
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+    "build": "node scripts/build-artifact.ts"
   },
   "dependencies": {
     "@sovereign/agent-runtime-pi": "workspace:*",
