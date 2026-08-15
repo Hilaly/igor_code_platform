@@ -766,7 +766,7 @@ describe("POST /api/sessions", () => {
       ...agent,
       instructions: "second instructions",
       location: undefined,
-      tools: { include: ["bash", "write"], exclude: ["write"] },
+      tools: { include: ["edit", "write"], exclude: ["write"] },
       skills: { include: ["deploy"], exclude: [] },
     };
     contributions = [agent, skill("deploy")];
@@ -776,7 +776,7 @@ describe("POST /api/sessions", () => {
 
     assert.equal(appliedInstructions.at(-1), "second instructions");
     assert.deepEqual(appliedAgentDirectories, ["/agents/first", undefined]);
-    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(appliedToolNames.at(-1), ["edit"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
       ["deploy"],
@@ -1145,7 +1145,7 @@ describe("running a turn over http", () => {
         ...baseAgent,
         instructions: "execution instructions",
         location: undefined,
-        tools: { include: ["bash", "write"], exclude: ["write"] },
+        tools: { include: ["edit", "write"], exclude: ["write"] },
         skills: { include: ["execution-skill"], exclude: [] },
       },
       skill("execution-skill"),
@@ -1177,7 +1177,7 @@ describe("running a turn over http", () => {
     ]);
     assert.equal(appliedInstructions.at(-1), "execution instructions");
     assert.deepEqual(appliedAgentDirectories.slice(-2), ["/agents/admission", undefined]);
-    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(appliedToolNames.at(-1), ["edit"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
       ["execution-skill"],
@@ -2189,7 +2189,7 @@ describe("compacting a session over http", () => {
       {
         ...baseAgent,
         instructions: "execution instructions",
-        tools: { include: ["bash", "write"], exclude: ["write"] },
+        tools: { include: ["edit", "write"], exclude: ["write"] },
         skills: { include: ["execution-skill"], exclude: [] },
       },
       skill("execution-skill"),
@@ -2208,7 +2208,7 @@ describe("compacting a session over http", () => {
       "compact",
     ]);
     assert.equal(appliedInstructions.at(-1), "execution instructions");
-    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(appliedToolNames.at(-1), ["edit"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
       ["execution-skill"],
@@ -2313,7 +2313,7 @@ describe("navigating the tree over http", () => {
       {
         ...baseAgent,
         instructions: "execution instructions",
-        tools: { include: ["bash", "write"], exclude: ["write"] },
+        tools: { include: ["edit", "write"], exclude: ["write"] },
         skills: { include: ["execution-skill"], exclude: [] },
       },
       skill("execution-skill"),
@@ -2332,7 +2332,7 @@ describe("navigating the tree over http", () => {
       "navigate",
     ]);
     assert.equal(appliedInstructions.at(-1), "execution instructions");
-    assert.deepEqual(appliedToolNames.at(-1), ["bash"]);
+    assert.deepEqual(appliedToolNames.at(-1), ["edit"]);
     assert.deepEqual(
       appliedSkills.at(-1)?.map(({ name }) => name),
       ["execution-skill"],
@@ -2896,7 +2896,7 @@ describe("a session that lost a tool or a model", () => {
     await call("POST", sessionTurnsPath(sessionId), { text: "первый" });
     await untilIdle(call, sessionId);
 
-    // Агенту оставили один инструмент из четырёх: остальные для сессии исчезли на ходу.
+    // Агенту оставили один инструмент из трёх: остальные для сессии исчезли на ходу.
     contributions = [{ ...baseAgent, tools: { include: ["read"], exclude: [] } }];
 
     await call("POST", sessionTurnsPath(sessionId), { text: "второй" });
@@ -2907,7 +2907,7 @@ describe("a session that lost a tool or a model", () => {
       .map((event) => (event.payload as { kind: string; name: string }).name)
       .sort();
 
-    assert.deepEqual(lost, ["bash", "edit", "write"]);
+    assert.deepEqual(lost, ["edit", "write"]);
 
     const page = (await call("GET", sessionEntriesPath(sessionId)))
       .body as unknown as SessionEntriesPage;
@@ -2918,14 +2918,14 @@ describe("a session that lost a tool or a model", () => {
       page.entries
         .filter((entry) => entry.kind === "custom")
         .map((entry) => (entry.kind === "custom" ? entry.type : "")),
-      ["sovereign.degraded", "sovereign.degraded", "sovereign.degraded"],
+      ["sovereign.degraded", "sovereign.degraded"],
     );
 
     // Повторный турн на том же наборе ничего не теряет — и ничего не повторяет.
     await call("POST", sessionTurnsPath(sessionId), { text: "третий" });
     await untilIdle(call, sessionId);
 
-    assert.equal(events.filter((event) => event.type === coreEventTypes.sessionDegraded).length, 3);
+    assert.equal(events.filter((event) => event.type === coreEventTypes.sessionDegraded).length, 2);
   });
 
   it("says the model went away instead of only refusing the turn", async () => {

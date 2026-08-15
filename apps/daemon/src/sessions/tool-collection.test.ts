@@ -92,7 +92,7 @@ describe("createToolCollector", () => {
 });
 
 describe("coreToolSource", () => {
-  it("gives the four tools that come from the runtime", async () => {
+  it("gives the three tools that come from the runtime", async () => {
     const collector = createToolCollector();
 
     collector.register(coreToolSource());
@@ -101,7 +101,7 @@ describe("coreToolSource", () => {
 
     assert.deepEqual(
       collected.tools.map((entry) => entry.name),
-      ["bash", "read", "write", "edit"],
+      ["read", "write", "edit"],
     );
     assert.equal(collected.tools.length, createCoreTools().length);
     assert.deepEqual(collected.problems, []);

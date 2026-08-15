@@ -17,7 +17,6 @@ import {
   AgentHarness,
   AgentHarnessError,
   compact as generateCompaction,
-  createBashTool,
   createEditTool,
   createReadTool,
   createWriteTool,
@@ -404,15 +403,16 @@ type SessionSeams = {
 };
 
 /**
- * Четыре инструмента поставки: они приходят из рантайма, а не из плагинов
- * (docs/agent-runtime-contract.md).
+ * Три инструмента поставки: они приходят из рантайма, а не из плагинов
+ * (docs/agent-runtime-contract.md). Bash среди них больше нет — он переехал в starter-плагин
+ * (docs/bash-tool.md): его исполнение требовало лимитов (вывод, таймаут, дерево процессов),
+ * которых у рантайма нет, а у плагина — есть.
  *
  * Папки среди аргументов нет намеренно: папку задаёт среда исполнения сессии, одним значением на
  * весь турн, а не флагом у каждого инструмента.
  */
 export function createCoreTools(): AgentTool[] {
   return [
-    { name: "bash", tool: createBashTool() },
     { name: "read", tool: createReadTool() },
     { name: "write", tool: createWriteTool() },
     { name: "edit", tool: createEditTool() },

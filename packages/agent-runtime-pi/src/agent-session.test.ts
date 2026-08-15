@@ -94,7 +94,7 @@ async function withStore(
     });
 
     assert.ok(!("kind" in created), "модель двойника обязана резолвиться");
-    await created.setTools(createCoreTools(), ["bash", "read", "write", "edit"]);
+    await created.setTools(createCoreTools(), ["read", "write", "edit"]);
 
     return created;
   };

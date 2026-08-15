@@ -1,9 +1,10 @@
 /**
  * Инструменты поставки как источник для `tools_collect` (docs/hooks.md).
  *
- * Они приходят из агентного рантайма, а не из плагинов: «агент из коробки умеет править файлы и
- * bash» — свойство рантайма (docs/agent-runtime-contract.md). Источником они оформлены затем, что
- * подписка плагина встаёт рядом вторым источником и ничего здесь не меняет.
+ * Они приходят из агентного рантайма, а не из плагинов: «агент из коробки умеет править файлы» —
+ * свойство рантайма (docs/agent-runtime-contract.md); bash приходит из starter-плагина
+ * (docs/bash-tool.md). Источником они оформлены затем, что подписка плагина встаёт рядом вторым
+ * источником и ничего здесь не меняет.
  */
 
 import { createCoreTools } from "@sovereign/agent-runtime-pi";
@@ -15,9 +16,9 @@ export const coreToolGroup = "core";
 
 /**
  * Порядок внутри группы задан явно, а не алфавитом: он определяет, в каком виде набор уезжает
- * модели, и «bash первым» — решение, а не следствие имени.
+ * модели, и «read первым» — решение, а не следствие имени.
  */
-const orders: Record<string, number> = { bash: 10, read: 20, write: 30, edit: 40 };
+const orders: Record<string, number> = { read: 20, write: 30, edit: 40 };
 
 export function coreToolSource(): ToolSource {
   return {
