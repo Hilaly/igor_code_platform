@@ -1010,7 +1010,15 @@ describe("a tool of a plugin", () => {
 
     // Обратный адрес: без него плагин знает только аргументы и не может довести работу до
     // вызвавшей сессии (docs/plugins.md).
-    assert.deepEqual(seen, [{ sessionId: "s1", projectId: "p1", folder: "/tmp/project" }]);
+    assert.deepEqual(seen, [
+      {
+        sessionId: "s1",
+        projectId: "p1",
+        folder: "/tmp/project",
+        dataDirectory: "/test-data",
+        callTimeoutMilliseconds: 120_000,
+      },
+    ]);
   });
 
   it("names the tool the core asked about but the plugin never declared", async () => {

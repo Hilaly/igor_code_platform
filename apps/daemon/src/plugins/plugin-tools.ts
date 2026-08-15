@@ -26,6 +26,11 @@ export type PluginToolSourceOptions = {
    * (docs/data-directory.md).
    */
   timeoutMilliseconds: () => number;
+  /**
+   * Каталог данных платформы: инструментам нужен путь к `<dataDirectory>/tmp` для временных файлов
+   * вывода, а воркер его не знает (docs/data-directory.md).
+   */
+  dataDirectory: () => string;
   logger: Logger;
 };
 
@@ -69,6 +74,8 @@ export function pluginToolSource(options: PluginToolSourceOptions): ToolSource {
               sessionId: context.sessionId,
               projectId: context.projectId,
               folder: context.folder,
+              dataDirectory: options.dataDirectory(),
+              callTimeoutMilliseconds: timeoutMilliseconds,
             },
           },
           { timeoutMilliseconds },

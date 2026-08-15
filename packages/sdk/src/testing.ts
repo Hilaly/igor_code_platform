@@ -236,6 +236,8 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
         sessionId: invocation?.sessionId ?? "test-session",
         projectId: invocation?.projectId ?? "test-project",
         folder: invocation?.folder ?? "/test-project",
+        dataDirectory: invocation?.dataDirectory ?? "/test-data",
+        callTimeoutMilliseconds: invocation?.callTimeoutMilliseconds ?? 120_000,
       }),
     callRoute: (declaredId, request) =>
       invokeRoute(

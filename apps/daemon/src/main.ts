@@ -434,6 +434,7 @@ toolCollector.register(
     plugins,
     // Живьём, как и остальные ключи `config.json`: правка применяется без перезапуска демона.
     timeoutMilliseconds: () => settings.current().config.pluginToolTimeoutMilliseconds,
+    dataDirectory: () => directory,
     logger,
   }),
 );

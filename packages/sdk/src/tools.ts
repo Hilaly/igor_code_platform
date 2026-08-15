@@ -18,12 +18,26 @@ export type PluginToolOutcome = string | { content: string; isError?: boolean };
  * Кто позвал инструмент. Набор собирается на каждый турн под конкретную сессию, и её идентичность
  * едет вместе с вызовом: иначе плагин, которому нужен обратный адрес — довести работу до вызвавшей
  * сессии, — не имеет его вовсе (docs/plugins.md).
+ *
+ * Каталог данных и таймаут вызова едут следом по той же причине: инструменту, который исполняет
+ * команды (bash в starter-плагине), нужен каталог для временных файлов вывода и верхняя граница
+ * foreground-команды, а ни того ни другого он не знает и узнать не может.
  */
 export type PluginToolInvocation = {
   sessionId: string;
   projectId: string;
   /** Папка проекта: рабочая директория вызова. */
   folder: string;
+  /**
+   * Каталог данных платформы. Временные файлы инструментов кладутся в `<dataDirectory>/tmp`
+   * (docs/bash-tool.md).
+   */
+  dataDirectory: string;
+  /**
+   * Таймаут вызова инструмента плагина (`pluginToolTimeoutMilliseconds` из `config.json`).
+   * Foreground-команда bash обязана уложиться в него с запасом — дольше только background.
+   */
+  callTimeoutMilliseconds: number;
 };
 
 export type PluginToolInvoke<Arguments> = (

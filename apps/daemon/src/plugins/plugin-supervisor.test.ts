@@ -1639,7 +1639,13 @@ describe("createPluginSupervisor", () => {
 
 describe("a call from the core into a plugin", () => {
   /** Обратный адрес вызова инструмента: его кладёт источник набора (docs/plugins.md). */
-  const invocation = { sessionId: "s1", projectId: "p1", folder: "/tmp/project" };
+  const invocation = {
+    sessionId: "s1",
+    projectId: "p1",
+    folder: "/tmp/project",
+    dataDirectory: "/test-data",
+    callTimeoutMilliseconds: 120_000,
+  };
   const callable = async (recorded: Journal, clock?: ReturnType<typeof manualClock>) => {
     const supervisor = createPluginSupervisor({
       logger: recorded.logger,

@@ -54,6 +54,7 @@ function world(answer: (call: PluginCall) => PluginCallOutcome, disabled: string
         },
       },
       timeoutMilliseconds: () => timeout,
+      dataDirectory: () => "/test-data",
       logger: createLogger({
         source: "core",
         level: () => "debug",
@@ -108,7 +109,13 @@ describe("the tools of a plugin as a source of the collection", () => {
           contributionId: "forecast",
           arguments: { city: "Тбилиси" },
           // Обратный адрес вызова: набор собран под сессию, и она едет вместе с вызовом.
-          invocation: { sessionId: "s1", projectId: "p1", folder: "/tmp/project" },
+          invocation: {
+            sessionId: "s1",
+            projectId: "p1",
+            folder: "/tmp/project",
+            dataDirectory: "/test-data",
+            callTimeoutMilliseconds: timeout,
+          },
         },
         timeoutMilliseconds: timeout,
       },
@@ -130,6 +137,8 @@ describe("the tools of a plugin as a source of the collection", () => {
       sessionId: "s2",
       projectId: "p2",
       folder: "/tmp/other",
+      dataDirectory: "/test-data",
+      callTimeoutMilliseconds: timeout,
     });
   });
 
