@@ -934,6 +934,39 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'esbuild' imported from …/so
 Мораль та же, что у проверки 36: **проверять надо и удачный путь, и отказ.** Удачный путь работал с
 первого раза, а нашлась ровно та ошибка, из-за которой продукт не запустился бы у человека без сети.
 
+## 38. Артефакт работает целиком, и первый запуск ставит себе сборщик
+
+Проверено на собранном `dist/sovereign.js` (9,1 МБ, 36 файлов фронтенда внутри) и свежей директории
+данных. Ни `apps/web/dist`, ни `node_modules` рядом с артефактом не участвуют.
+
+```
+первый запуск:   npm поставил esbuild@0.28.1 в runtime/0.1.0/ за 3,2 с; порт открылся после
+GET /:           200, text/html, форма «задай пароль» из памяти
+/assets/*.js:    200, cache-control public, max-age=31536000, immutable
+index.html:      cache-control no-cache
+GET /api/нет:    404 json; POST /api/нет: 404 (не 405) — хвостовая строка вне allowed
+адреса роутера:  /settings/plugins, /sessions/abc, /p/placed/log/entry/7 → 200, приложение
+/api/health:     отвечает без сессии; GET /api/plugins без cookie → 401
+плагин:          placed прошёл building → running, бандл собран за 15 мс тем самым esbuild
+```
+
+**Без `npm` в `PATH` продукт остаётся живым.** Отдельный прогон с `env -i` и `PATH` из одного `node`:
+
+```
+журнал:     error «the runtime dependencies of the artifact are not installed»,
+            reason «npm was not found in PATH»
+демон:      жив, GET / → 200, /api/health отвечает
+плагин:     failed, reason «the browser bundler is not available: Cannot find module 'esbuild'»
+```
+
+Это и есть цена решения «работа без сети не обязательна» ([toolchain.md](toolchain.md)): отказ
+локализован в плагине с браузерной частью и назван, а не превращён в неработающий продукт. До
+динамического импорта тот же случай давал `ERR_MODULE_NOT_FOUND` и код возврата 1 (проверка 37).
+
+**Dev-режим не изменился ни в чём.** Тем же прогоном на демоне из исходников: `GET /` отвечает
+json-отказом `404` (интерфейс отдаёт Vite), каталог `runtime/` не заводится вовсе, встроенные
+`starter` и `subagents` читаются из репозитория.
+
 ## Чего эти проверки не покрывают
 
 - Поведение при тысячах циклов `terminate`/`spawn` — утечки на длинной дистанции не измерялись.
