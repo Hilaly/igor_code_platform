@@ -20,6 +20,7 @@ const contents = (overrides: Partial<PayloadContents> = {}): PayloadContents => 
     ["index.html", Buffer.from("<!doctype html>", "utf8")],
     ["assets/main-a1b2c3.js", Buffer.from("export const app = 1;", "utf8")],
   ]),
+  builtin: new Map([["starter/package.json", Buffer.from('{"name":"starter"}', "utf8")]]),
   worker: Buffer.from("export const bootstrap = 1;", "utf8"),
   runtimeDependencies: { esbuild: "0.28.1" },
   ...overrides,
@@ -48,6 +49,10 @@ describe("payloadModuleSource", () => {
     assert.equal(
       Buffer.from(payload.web.get("assets/main-a1b2c3.js") ?? new Uint8Array()).toString("utf8"),
       "export const app = 1;",
+    );
+    assert.equal(
+      Buffer.from(payload.builtin.get("starter/package.json") ?? new Uint8Array()).toString("utf8"),
+      '{"name":"starter"}',
     );
     assert.equal(Buffer.from(payload.worker).toString("utf8"), "export const bootstrap = 1;");
     assert.deepEqual(payload.runtimeDependencies, { esbuild: "0.28.1" });
@@ -86,6 +91,14 @@ describe("payloadDigest", () => {
     assert.notEqual(
       digest,
       payloadDigest(contents({ web: new Map([["index.html", Buffer.from("<html>", "utf8")]]) })),
+    );
+    assert.notEqual(
+      digest,
+      payloadDigest(
+        contents({
+          builtin: new Map([["starter/package.json", Buffer.from('{"name":"other"}', "utf8")]]),
+        }),
+      ),
     );
   });
 });

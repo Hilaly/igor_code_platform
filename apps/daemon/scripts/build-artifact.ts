@@ -19,6 +19,7 @@ import {
   readDirectoryFiles,
   type PayloadContents,
 } from "./artifact-payload-module.ts";
+import { readBuiltinPlugins } from "./builtin-plugins-payload.ts";
 
 const daemonRoot = join(import.meta.dirname, "..");
 const repositoryRoot = join(daemonRoot, "..", "..");
@@ -123,6 +124,10 @@ function readWebOutput(): Map<string, Uint8Array> {
 
 const contents: PayloadContents = {
   web: readWebOutput(),
+  builtin: await readBuiltinPlugins({
+    pluginsRoot: join(repositoryRoot, "plugins"),
+    packagesRoot: join(repositoryRoot, "packages"),
+  }),
   worker: await bundleWorkerBootstrap(),
   runtimeDependencies: readRuntimeDependencies(),
 };
@@ -152,12 +157,18 @@ await build({
   ],
 });
 
+/** Первый сегмент пути — имя плагина: отчёт сборки называет то, что человек потом увидит в списке. */
+function builtinPluginNames(files: Map<string, Uint8Array>): string[] {
+  return [...new Set([...files.keys()].map((path) => path.split("/")[0] ?? ""))].sort();
+}
+
 const { size } = statSync(artifactPath);
 
 process.stdout.write(
   [
     `${artifactPath}`,
     `  ${(size / 1024 / 1024).toFixed(1)} MB, ${String(contents.web.size)} files of the frontend inside`,
+    `  builtin plugins: ${builtinPluginNames(contents.builtin).join(", ")}`,
     `  installed on the first run: ${Object.entries(contents.runtimeDependencies)
       .map(([name, version]) => `${name}@${version}`)
       .join(", ")}`,

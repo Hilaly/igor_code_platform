@@ -12,6 +12,8 @@ import { join, relative, sep } from "node:path";
 export type PayloadContents = {
   /** Вывод сборки фронтенда: путь от корня вывода → байты. */
   web: Map<string, Uint8Array>;
+  /** Встроенные плагины: путь от корня встроенных → байты. */
+  builtin: Map<string, Uint8Array>;
   /** Собранный бутстрап воркера плагина. */
   worker: Uint8Array;
   /** Зависимости, которые не вшиваются: их поставит `npm` в директорию данных. */
@@ -46,9 +48,11 @@ export function payloadDigest(contents: PayloadContents): string {
   const hash = createHash("sha256");
 
   // Порядок ключей фиксируется: перестановка в обходе каталога не должна выглядеть сменой нагрузки.
-  for (const path of [...contents.web.keys()].sort()) {
-    hash.update(path);
-    hash.update(contents.web.get(path) ?? new Uint8Array());
+  for (const files of [contents.web, contents.builtin]) {
+    for (const path of sortedPaths(files)) {
+      hash.update(path);
+      hash.update(files.get(path) ?? new Uint8Array());
+    }
   }
 
   hash.update(contents.worker);
@@ -62,15 +66,10 @@ export function payloadDigest(contents: PayloadContents): string {
  * шрифты и картинки фронтенда — двоичные.
  */
 export function payloadModuleSource(contents: PayloadContents): string {
-  const entries = [...contents.web.entries()]
-    .sort(([left], [right]) => (left < right ? -1 : 1))
-    .map(([path, bytes]) => `  [${JSON.stringify(path)}, ${base64Literal(bytes)}],`)
-    .join("\n");
-
   return `// Сгенерировано сборкой артефакта (apps/daemon/scripts/build-artifact.ts). Не редактировать.
-const web = new Map([
-${entries}
-]);
+const web = ${fileMapLiteral(contents.web)};
+
+const builtin = ${fileMapLiteral(contents.builtin)};
 
 const worker = ${base64Literal(contents.worker)};
 
@@ -79,9 +78,25 @@ const runtimeDependencies = ${JSON.stringify(contents.runtimeDependencies)};
 const digest = ${JSON.stringify(payloadDigest(contents))};
 
 export function artifactPayload() {
-  return { web, worker, runtimeDependencies, digest };
+  return { web, builtin, worker, runtimeDependencies, digest };
 }
 `;
+}
+
+function fileMapLiteral(files: Map<string, Uint8Array>): string {
+  const entries = sortedPaths(files)
+    .map(
+      (path) =>
+        `  [${JSON.stringify(path)}, ${base64Literal(files.get(path) ?? new Uint8Array())}],`,
+    )
+    .join("\n");
+
+  return `new Map([\n${entries}\n])`;
+}
+
+/** Один порядок обхода и у отпечатка, и у литерала: иначе они разошлись бы на пустом месте. */
+function sortedPaths(files: Map<string, Uint8Array>): string[] {
+  return [...files.keys()].sort();
 }
 
 function base64Literal(bytes: Uint8Array): string {
