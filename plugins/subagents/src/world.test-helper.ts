@@ -7,6 +7,10 @@
 import { installTestHost, type PluginTestHost } from "@sovereign/sdk/testing";
 import type {
   AgentSummary,
+  ModelSummary,
+  ProviderRequest,
+  ProviderResponse,
+  ProviderSummary,
   Session,
   SessionEntry,
   SessionRequest,
@@ -25,9 +29,23 @@ export type FakeSession = {
   entries: SessionEntry[];
 };
 
+/** Провайдер мира: модели — короткими записями, остальное — умолчания как у настоящих. */
+export type FakeModel = string | { id: string; input?: string[]; reasoning?: boolean };
+
+export type FakeProvider = {
+  id: string;
+  name?: string;
+  signedIn: boolean;
+  models: FakeModel[];
+  /** Каталог назвал провайдера, а список моделей не дал: проверка расхождения платформы. */
+  noModelList?: boolean;
+};
+
 export type World = {
   host: PluginTestHost;
   sessions: Map<string, FakeSession>;
+  /** Провайдеры каталога: подписка субагентов на модели спрашивает именно их. */
+  providers: FakeProvider[];
   /** Что платформа сделала с сессиями, в порядке вызова: по этому виден способ уведомления. */
   calls: SessionRequest[];
   /** Следующий идентификатор созданной сессии. */
@@ -87,12 +105,24 @@ export function agentMessage(
   };
 }
 
-export function installWorld(sessions: FakeSession[] = []): World {
+export function installWorld(
+  sessions: FakeSession[] = [],
+  catalogue: FakeProvider[] = [
+    { id: "scripted", name: "Scripted", signedIn: true, models: ["scripted/one", "scripted/two"] },
+    {
+      id: "example-vendor",
+      name: "Example Vendor",
+      signedIn: false,
+      models: ["example-vendor/big"],
+    },
+  ],
+): World {
   const host = installTestHost({ id: "subagents", source: "builtin" });
   const known = new Map(sessions.map((one) => [one.id, one]));
   const world: World = {
     host,
     sessions: known,
+    providers: catalogue,
     calls: [],
     nextId: ["s-new"],
     restore: () => host.restore(),
@@ -104,7 +134,65 @@ export function installWorld(sessions: FakeSession[] = []): World {
     return answer(world, request);
   });
 
+  host.answerProviders((request): ProviderResponse | Promise<ProviderResponse> => {
+    return answerProvider(world, request);
+  });
+
   return world;
+}
+
+function describeProvider(one: FakeProvider): ProviderSummary {
+  return {
+    id: one.id,
+    name: one.name ?? one.id,
+    logins: [],
+    auth: one.signedIn ? { kind: "configured", type: "api_key" } : { kind: "unconfigured" },
+    dynamic: false,
+    custom: false,
+    origin: "builtin",
+    modelCount: one.models.length,
+  };
+}
+
+function describeModel(providerId: string, entry: FakeModel): ModelSummary {
+  const id = typeof entry === "string" ? entry : entry.id;
+  const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
+  const details = typeof entry === "string" ? undefined : entry;
+
+  return {
+    id,
+    name: bare,
+    providerId,
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    reasoning: details?.reasoning ?? true,
+    input: details?.input ?? ["text"],
+    cost: { input: 1, output: 2 },
+  };
+}
+
+function answerProvider(
+  world: World,
+  request: ProviderRequest,
+): ProviderResponse | Promise<ProviderResponse> {
+  if (request.kind === "list") {
+    return { kind: "list", providers: world.providers.map(describeProvider) };
+  }
+
+  if (request.kind === "models") {
+    const named = world.providers.find((one) => one.id === request.providerId);
+
+    return {
+      kind: "models",
+      // `undefined` здесь — «провайдера нет», а расхождение каталога проверяется флагом.
+      models:
+        named === undefined || named.noModelList === true
+          ? undefined
+          : named.models.map((entry) => describeModel(named.id, entry)),
+    };
+  }
+
+  return { kind: "failed", reason: `the test world does not answer ${request.kind}` };
 }
 
 function describeSession(one: FakeSession): Session {

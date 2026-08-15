@@ -4,7 +4,13 @@ import { afterEach, describe, it } from "node:test";
 import { contributeTools } from "./tools.ts";
 import { settled, sweep } from "./lifecycle.ts";
 import { readRecord } from "./registry.ts";
-import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
+import {
+  agentMessage,
+  installWorld,
+  session,
+  type FakeProvider,
+  type World,
+} from "./world.test-helper.ts";
 
 let world: World | undefined;
 
@@ -17,8 +23,16 @@ afterEach(async () => {
 
 const parent = { sessionId: "s-parent", projectId: "p1", folder: "/tmp/project" };
 
-async function ready(sessions = [session({ id: "s-parent" })]): Promise<World> {
-  world = installWorld(sessions);
+const defaultProviders: FakeProvider[] = [
+  { id: "scripted", name: "Scripted", signedIn: true, models: ["scripted/one", "scripted/two"] },
+  { id: "example-vendor", name: "Example Vendor", signedIn: false, models: ["example-vendor/big"] },
+];
+
+async function ready(
+  sessions = [session({ id: "s-parent" })],
+  providers: FakeProvider[] = defaultProviders,
+): Promise<World> {
+  world = installWorld(sessions, providers);
   await contributeTools();
 
   return world;
@@ -172,6 +186,119 @@ describe("subagent-types", () => {
     // Агент из папки проекта обязан быть в списке выбора: сессия его принимает, и скрывать его от
     // модели значило бы предлагать ей меньше, чем платформа умеет.
     assert.match(outcome.content, /local\.specialist/u);
+  });
+});
+
+describe("subagent-models", () => {
+  it("lists the models of the signed-in providers with full ids", async () => {
+    const here = await ready();
+
+    const outcome = await here.host.callTool("subagent-models", {}, parent);
+
+    assert.equal(outcome.isError, false);
+    assert.match(outcome.content, /scripted \(Scripted, 2 models\):/u);
+    assert.match(
+      outcome.content,
+      /scripted\/one \| one \| context=128000 \| maxTokens=8192 \| reasoning=yes/u,
+    );
+    // Провайдер без входа в списке выбора не участвует: его модели не запустятся.
+    assert.doesNotMatch(outcome.content, /example-vendor/u);
+  });
+
+  it("marks models that accept images", async () => {
+    const here = await ready(
+      [session({ id: "s-parent" })],
+      [
+        {
+          id: "zai",
+          name: "Z.AI",
+          signedIn: true,
+          models: ["zai/glm-5.2", { id: "zai/glm-4.6v", input: ["text", "image"] }],
+        },
+      ],
+    );
+
+    const outcome = await here.host.callTool("subagent-models", {}, parent);
+
+    assert.match(outcome.content, /zai\/glm-4\.6v .*\| image input/u);
+    assert.doesNotMatch(outcome.content, /zai\/glm-5\.2 \|.*image input/u);
+  });
+
+  it("narrows to one provider when asked", async () => {
+    const here = await ready(
+      [session({ id: "s-parent" })],
+      [
+        { id: "zai", name: "Z.AI", signedIn: true, models: ["zai/glm-5.2"] },
+        {
+          id: "anthropic",
+          name: "Anthropic",
+          signedIn: true,
+          models: ["anthropic/claude-opus-5"],
+        },
+      ],
+    );
+
+    const outcome = await here.host.callTool("subagent-models", { provider: "zai" }, parent);
+
+    assert.match(outcome.content, /zai \(Z\.AI, 1 models\):/u);
+    assert.match(outcome.content, /zai\/glm-5\.2/u);
+    assert.doesNotMatch(outcome.content, /anthropic/u);
+  });
+
+  it("names a provider nobody has, with the signed-in ones to choose from", async () => {
+    const here = await ready();
+
+    const outcome = await here.host.callTool(
+      "subagent-models",
+      { provider: "never-declared" },
+      parent,
+    );
+
+    assert.equal(outcome.isError, true);
+    assert.match(
+      outcome.content,
+      /there is no provider never-declared; the signed-in providers are scripted/u,
+    );
+  });
+
+  it("says so when the named provider is not signed in", async () => {
+    const here = await ready();
+
+    const outcome = await here.host.callTool(
+      "subagent-models",
+      { provider: "example-vendor" },
+      parent,
+    );
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /the provider example-vendor is not signed in/u);
+  });
+
+  it("says when no provider is signed in at all", async () => {
+    const here = await ready(
+      [session({ id: "s-parent" })],
+      [{ id: "scripted", signedIn: false, models: ["scripted/one"] }],
+    );
+
+    const outcome = await here.host.callTool("subagent-models", {}, parent);
+
+    assert.equal(outcome.isError, false);
+    assert.equal(outcome.content, "No provider is signed in, so there is no model to choose from.");
+  });
+
+  it("does not invent models when the platform gave no list for a named provider", async () => {
+    const here = await ready(
+      [session({ id: "s-parent" })],
+      [{ id: "scripted", signedIn: true, models: ["scripted/one"], noModelList: true }],
+    );
+
+    const outcome = await here.host.callTool("subagent-models", { provider: "scripted" }, parent);
+
+    assert.equal(outcome.isError, true);
+    assert.match(
+      outcome.content,
+      /the platform named the provider scripted but gave no model list/u,
+    );
   });
 });
 

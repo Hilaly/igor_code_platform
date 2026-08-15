@@ -1,13 +1,14 @@
 /**
- * Инструменты управления субагентами (docs/subagents.md). Шесть штук: запустить, посмотреть, из чего
- * выбирать, прочитать итог, дописать задание, остановить.
+ * Инструменты управления субагентами (docs/subagents.md). Семь штук: запустить, посмотреть, из чего
+ * выбирать агентов и модели, прочитать итог, дописать задание, остановить.
  *
  * Запуск **фоновый**. Ждать субагента внутри вызова нельзя: инструмент плагина мерится своим
  * таймаутом, а ожидающий вызов вдобавок держит слот турна родителя, которых на всю платформу
  * четыре. Поэтому `subagent-spawn` возвращается сразу, а итог доезжает до родителя сам.
  */
 
-import { contribute, sessions, thinkingLevels, z } from "@sovereign/sdk";
+import { contribute, providers, sessions, thinkingLevels, z } from "@sovereign/sdk";
+import type { ModelSummary, ProviderSummary } from "@sovereign/sdk";
 
 import { answerOf, launch, stop } from "./lifecycle.ts";
 import { listRecords, readRecord, type SubagentRecord } from "./registry.ts";
@@ -31,6 +32,28 @@ function line(record: SubagentRecord): string {
 
   if (record.failure !== undefined) {
     parts.push(`failure: ${record.failure}`);
+  }
+
+  return parts.join(" | ");
+}
+
+/** Шапка провайдера: выбор идёт по провайдеру не меньше, чем по модели, и голове нужен якорь. */
+function providerLine(provider: ProviderSummary, count: number): string {
+  return `${provider.id} (${provider.name}, ${count} models):`;
+}
+
+/** Строка модели: то, что subagent-spawn принимает в `model`, плюс то, что влияет на выбор. */
+function modelLine(model: ModelSummary): string {
+  const parts = [
+    model.id,
+    model.name,
+    `context=${model.contextWindow}`,
+    `maxTokens=${model.maxTokens}`,
+    `reasoning=${model.reasoning ? "yes" : "no"}`,
+  ];
+
+  if (model.input.includes("image")) {
+    parts.push("image input");
   }
 
   return parts.join(" | ");
@@ -179,6 +202,72 @@ export async function contributeTools(): Promise<void> {
   });
 
   await contribute.tool({
+    id: "subagent-models",
+    title: "List the models a subagent can run on",
+    description:
+      "List the models that subagent-spawn accepts in its model parameter, as `<provider>/<model>` " +
+      "values with context window, output limit and reasoning flag. Only signed-in providers are " +
+      "listed: a model of a provider nobody signed in to cannot run. Narrow to one provider with " +
+      "the provider option.",
+    parameters: z.object({
+      provider: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Only the models of this one provider, by its id (for example `zai`)."),
+    }),
+    invoke: async (given) => {
+      const catalogue = await providers.list();
+      // Настроенные — значит «может работать»: у остальных моделей сколько угодно, но ни один турн
+      // на них не пойдёт, и список для выбора они не наполняют.
+      const signedIn = catalogue.filter((one) => one.auth.kind === "configured");
+
+      if (given.provider !== undefined) {
+        const named = catalogue.find((one) => one.id === given.provider);
+
+        if (named === undefined) {
+          return failed(
+            `there is no provider ${given.provider}; the signed-in providers are ` +
+              (signedIn.length === 0 ? "none" : signedIn.map((one) => one.id).join(", ")),
+          );
+        }
+
+        if (named.auth.kind !== "configured") {
+          return failed(
+            `the provider ${given.provider} is not signed in, so its models cannot run`,
+          );
+        }
+
+        const models = await providers.models(named.id);
+
+        if (models === undefined) {
+          return failed(modelsOfFailure(named.id));
+        }
+
+        return [providerLine(named, models.length), ...models.map(modelLine)].join("\n");
+      }
+
+      if (signedIn.length === 0) {
+        return "No provider is signed in, so there is no model to choose from.";
+      }
+
+      const sections: string[] = [];
+
+      for (const provider of signedIn) {
+        const models = await providers.models(provider.id);
+
+        if (models === undefined) {
+          return failed(modelsOfFailure(provider.id));
+        }
+
+        sections.push([providerLine(provider, models.length), ...models.map(modelLine)].join("\n"));
+      }
+
+      return sections.join("\n\n");
+    },
+  });
+
+  await contribute.tool({
     id: "subagent-list",
     title: "List subagents",
     description:
@@ -316,6 +405,10 @@ export async function contributeTools(): Promise<void> {
     },
   });
 }
+
+/** Каталог назвал провайдера, а моделей не дал — это расхождение платформы, а не «пусто». */
+const modelsOfFailure = (providerId: string) =>
+  `the platform named the provider ${providerId} but gave no model list`;
 
 /** Необязательное поле кладётся только когда оно есть: `undefined` в теле — это не «не сказано». */
 function pick<Key extends string, Value>(

@@ -33,6 +33,7 @@ describe("the subagents plugin", () => {
       [
         "subagent-spawn",
         "subagent-types",
+        "subagent-models",
         "subagent-list",
         "subagent-output",
         "subagent-message",
