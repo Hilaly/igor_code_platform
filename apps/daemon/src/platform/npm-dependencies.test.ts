@@ -7,12 +7,12 @@ import { after, describe, it } from "node:test";
 
 import { createLogger, type Logger } from "../platform/public.ts";
 import {
-  ensurePluginDependencies,
+  ensureInstalledDependencies,
   installStampFileName,
   type InstallRun,
-} from "./plugin-dependencies.ts";
+} from "./npm-dependencies.ts";
 
-const workspace = mkdtempSync(join(tmpdir(), "sovereign-plugin-dependencies-"));
+const workspace = mkdtempSync(join(tmpdir(), "sovereign-npm-dependencies-"));
 let created = 0;
 
 after(() => rmSync(workspace, { recursive: true, force: true }));
@@ -56,12 +56,12 @@ function pluginFolder(options: PluginFolderOptions = {}): string {
 
 const succeeds = async (): Promise<InstallRun> => ({ ok: true, output: "added 1 package" });
 
-describe("ensurePluginDependencies", () => {
+describe("ensureInstalledDependencies", () => {
   it("installs nothing when the plugin declares no dependencies", async () => {
     const directory = pluginFolder();
     let called = false;
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => {
@@ -79,7 +79,7 @@ describe("ensurePluginDependencies", () => {
     const directory = pluginFolder({ dependencies: { left: "^1.0.0" }, modules: "brought-along" });
     let called = false;
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => {
@@ -97,7 +97,7 @@ describe("ensurePluginDependencies", () => {
     const directory = pluginFolder({ dependencies: { left: "^1.0.0" } });
     let installStarted = false;
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async (target) => {
@@ -114,7 +114,7 @@ describe("ensurePluginDependencies", () => {
     assert.equal(installStarted, true);
 
     // Второй заход по тому же манифесту ничего не переустанавливает: штамп совпал.
-    const again = await ensurePluginDependencies({
+    const again = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => {
@@ -133,7 +133,7 @@ describe("ensurePluginDependencies", () => {
     });
     let called = false;
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => {
@@ -154,7 +154,7 @@ describe("ensurePluginDependencies", () => {
       stamp: JSON.stringify({ left: "^1.0.0", right: "^1.0.0" }),
     });
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => {
@@ -168,7 +168,7 @@ describe("ensurePluginDependencies", () => {
   it("reports a failed install with the installer output", async () => {
     const directory = pluginFolder({ dependencies: { left: "^1.0.0" } });
 
-    const outcome = await ensurePluginDependencies({
+    const outcome = await ensureInstalledDependencies({
       directory,
       logger: silent,
       runInstall: async () => ({ ok: false, output: "npm error code E404" }),
@@ -180,7 +180,7 @@ describe("ensurePluginDependencies", () => {
   it("refuses a manifest whose dependencies are not an object", async () => {
     const directory = pluginFolder({ dependencies: "all of them" });
 
-    const outcome = await ensurePluginDependencies({ directory, logger: silent });
+    const outcome = await ensureInstalledDependencies({ directory, logger: silent });
 
     assert.equal(outcome.kind, "failed");
   });
@@ -205,7 +205,7 @@ describe("ensurePluginDependencies", () => {
     process.env.PATH = `${bin}:${previousPath ?? ""}`;
 
     try {
-      const outcome = await ensurePluginDependencies({
+      const outcome = await ensureInstalledDependencies({
         directory,
         logger: silent,
         installTimeoutMilliseconds: 300,

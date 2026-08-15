@@ -13,3 +13,10 @@ export {
 export { createEventBus, type EventBus } from "./event-bus.ts";
 export { acquireInstanceLock, InstanceLockError } from "./instance-lock.ts";
 export { createLogger, type Logger } from "./logger.ts";
+export {
+  defaultInstallTimeoutMilliseconds,
+  ensureInstalledDependencies,
+  installStampFileName,
+  type DependencyOutcome,
+  type InstallRun,
+} from "./npm-dependencies.ts";

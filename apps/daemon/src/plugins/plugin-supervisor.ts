@@ -37,7 +37,7 @@ import {
   type BrowserBuildOutcome,
   type PluginBrowserBundle,
 } from "./plugin-browser-build.ts";
-import { ensurePluginDependencies, type DependencyOutcome } from "./plugin-dependencies.ts";
+import { ensureInstalledDependencies, type DependencyOutcome } from "../platform/public.ts";
 import { publicContributions } from "./public-contributions.ts";
 import { resolvePluginEnablement } from "./plugin-enablement.ts";
 import { createPluginEvents } from "./plugin-events.ts";
@@ -220,7 +220,7 @@ export function createPluginSupervisor(options: CreatePluginSupervisorOptions): 
   const ensureDependencies =
     options.ensureDependencies ??
     ((plugin: DiscoveredPlugin, onInstallStart: () => void) =>
-      ensurePluginDependencies({ directory: plugin.directory, logger, onInstallStart }));
+      ensureInstalledDependencies({ directory: plugin.directory, logger, onInstallStart }));
   const buildBrowser =
     options.buildBrowser ??
     ((plugin: DiscoveredPlugin) =>

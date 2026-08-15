@@ -1,6 +1,11 @@
 /**
- * Зависимости внешнего плагина (docs/plugins.md): привезённые не трогаем, недостающие ставим `npm` из
- * `PATH`. Своего установщика не пишем — lock-файлы, кеш и целостность это отдельный продукт.
+ * Установка npm-зависимостей каталога, объявившего их своим `package.json`. Привезённые не трогаем,
+ * недостающие ставим `npm` из `PATH`. Своего установщика не пишем — lock-файлы, кеш и целостность
+ * это отдельный продукт.
+ *
+ * Потребителей два, и оба про чужой или сгенерированный каталог: зависимости внешнего плагина
+ * (docs/plugins.md) и рантайм-зависимости артефакта в директории данных (docs/toolchain.md).
+ * Поэтому модуль живёт в `platform` и ничего не знает ни про плагины, ни про артефакт.
  *
  * «Переустановка при изменении манифеста» и «привезённое не трогаем» противоречат друг другу, пока
  * нельзя отличить одно от другого. Отличает файл-штамп внутри `node_modules`: он появляется вместе с
@@ -13,7 +18,7 @@ import { join } from "node:path";
 
 import { manifestFileName } from "@sovereign/protocol";
 
-import type { Logger } from "../platform/public.ts";
+import type { Logger } from "./logger.ts";
 
 export const installStampFileName = ".sovereign-install.json";
 
@@ -27,7 +32,7 @@ export const defaultInstallTimeoutMilliseconds = 120_000;
 
 export type DependencyOutcome =
   | { kind: "not-needed" }
-  /** `node_modules` привезли вместе с плагином: содержимое не сверяется с манифестом. */
+  /** `node_modules` привезли вместе с каталогом: содержимое не сверяется с манифестом. */
   | { kind: "brought-along" }
   | { kind: "already-installed" }
   | { kind: "installed" }
@@ -39,7 +44,7 @@ export type InstallRun = {
   output: string;
 };
 
-export type EnsurePluginDependenciesOptions = {
+export type EnsureInstalledDependenciesOptions = {
   directory: string;
   logger: Logger;
   /** Запуск установщика внедряется: иначе тест зависит от сети и от установленного npm. */
@@ -53,8 +58,8 @@ export type EnsurePluginDependenciesOptions = {
   installTimeoutMilliseconds?: number;
 };
 
-export async function ensurePluginDependencies(
-  options: EnsurePluginDependenciesOptions,
+export async function ensureInstalledDependencies(
+  options: EnsureInstalledDependenciesOptions,
 ): Promise<DependencyOutcome> {
   const { directory, logger } = options;
   const runInstall =
@@ -92,7 +97,7 @@ export async function ensurePluginDependencies(
     }
   }
 
-  logger.info("installing the plugin dependencies", {
+  logger.info("installing the declared dependencies", {
     directory,
     dependencies: Object.keys(declared),
   });
@@ -152,7 +157,7 @@ function readStamp(path: string): string | undefined {
 
 function runNpmInstall(directory: string, timeoutMilliseconds: number): Promise<InstallRun> {
   return new Promise((resolve) => {
-    // Только заявленные зависимости: инструменты разработки автора плагину в работе не нужны.
+    // Только заявленные зависимости: инструменты разработки в работе не нужны никому.
     const npm = spawn("npm", ["install", "--omit=dev", "--no-audit", "--no-fund"], {
       cwd: directory,
       stdio: ["ignore", "pipe", "pipe"],
@@ -186,7 +191,7 @@ function runNpmInstall(directory: string, timeoutMilliseconds: number): Promise<
         ok: false,
         output:
           cause.code === "ENOENT"
-            ? "npm was not found in PATH: a plugin with dependencies needs either an installer in the system or node_modules brought along"
+            ? "npm was not found in PATH: declared dependencies need either an installer in the system or node_modules brought along"
             : cause.message,
       });
     });
