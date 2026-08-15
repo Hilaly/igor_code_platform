@@ -14,6 +14,7 @@ import {
   loadRuntimeModule,
   parseArguments,
   prepareRuntimeDirectory,
+  unpackBuiltinPlugins,
 } from "./platform/public.ts";
 import {
   createCredentialStore,
@@ -163,6 +164,22 @@ const runtime =
         logger,
       });
 
+/**
+ * Встроенные плагины артефакта: они вшиты в один файл, а читаются с диска, потому что воркер плагина
+ * это отдельный поток со своим разрешением модулей (docs/toolchain.md). Распаковка идёт там же, где
+ * подготовка рантайма, — после лока и до первого обхода плагинов.
+ */
+const builtinDirectory =
+  payload === undefined
+    ? undefined
+    : unpackBuiltinPlugins({
+        dataDirectory: directory,
+        version: platformVersion,
+        digest: payload.digest,
+        files: payload.builtin,
+        logger,
+      });
+
 // Один нормализатор на демон: складка пути обязана быть общей у стора и у маршрутов, иначе второй
 // проект встанет на ту же папку, что первый (docs/sessions-and-projects.md).
 const normalizeProjectFolder = createProjectPathNormalizer();
@@ -208,7 +225,7 @@ const projectAvailability = createProjectAvailabilityWatcher({
 // Корни перестали быть константой: папки проектов появляются и исчезают на живом демоне
 // (docs/plugins.md). Считаются они каждый раз заново — набор проектов между обходами меняется.
 const pluginRoots = (): PluginRoot[] => [
-  ...defaultPluginRoots(directory),
+  ...defaultPluginRoots(directory, builtinDirectory),
   ...projectPluginRoots(projects.list(), (project) => projectAvailability.of(project.id)),
 ];
 

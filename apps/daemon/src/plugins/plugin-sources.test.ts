@@ -235,6 +235,18 @@ describe("defaultPluginRoots", () => {
     );
     assert.deepEqual(discovery.refused, []);
   });
+
+  it("takes the builtin root from the caller when it is given one", () => {
+    // В артефакте встроенные лежат распакованными в директории данных, а не рядом с исходниками
+    // (docs/toolchain.md). Меняется только место: источник и ключ остаются прежними, поэтому
+    // данные встроенного плагина переживают переход с исходников на артефакт.
+    const unpacked = freshRoot();
+
+    assert.deepEqual(defaultPluginRoots(freshRoot(), unpacked)[0], {
+      source: "builtin",
+      directory: unpacked,
+    });
+  });
 });
 
 describe("projectPluginRoots", () => {

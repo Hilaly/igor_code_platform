@@ -77,16 +77,18 @@ export function pluginKey(source: PluginSource, id: string): string {
   return `${source}:${id}`;
 }
 
+/** В разработке встроенные плагины читаются прямо из репозитория (docs/repository-structure.md). */
+const builtinInTheRepository = join(import.meta.dirname, "..", "..", "..", "..", "plugins");
+
 /**
- * Встроенный источник — каталог `plugins/` репозитория (docs/repository-structure.md). В продакшн-сборке он приедет
- * распакованным артефактом, но сборки ещё нет, поэтому путь считается от исходников.
+ * Встроенный источник живёт в двух местах, и выбирает между ними точка композиции: в разработке это
+ * `plugins/` репозитория, в артефакте — каталог, распакованный из нагрузки (docs/toolchain.md).
+ * Меняется только место на диске: источник, ранг специфичности, ключи включения и хранилища у
+ * встроенного плагина те же, поэтому его данные переживают переход с исходников на артефакт.
  */
-export function defaultPluginRoots(dataDirectory: string): PluginRoot[] {
+export function defaultPluginRoots(dataDirectory: string, builtinDirectory?: string): PluginRoot[] {
   return [
-    {
-      source: "builtin",
-      directory: join(import.meta.dirname, "..", "..", "..", "..", "plugins"),
-    },
+    { source: "builtin", directory: builtinDirectory ?? builtinInTheRepository },
     { source: "data", directory: join(dataDirectory, "plugins") },
   ];
 }
