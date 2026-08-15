@@ -11,3 +11,4 @@ export { createEventStream, type EventStream } from "./event-stream.ts";
 export { filesystemRoutes } from "./filesystem.ts";
 export { healthRoute } from "./health.ts";
 export { createDaemonServer } from "./server.ts";
+export { staticAssetsRoute } from "./static-assets.ts";

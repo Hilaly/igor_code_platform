@@ -9,7 +9,7 @@ import {
   createLoginSessionStore,
   createSessionCheck,
 } from "./authentication/public.ts";
-import { parseArguments } from "./platform/public.ts";
+import { artifactPayload, parseArguments } from "./platform/public.ts";
 import {
   createCredentialStore,
   createUserProviderStore,
@@ -75,7 +75,7 @@ import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./pr
 import { createProviderLogins } from "./providers/public.ts";
 import { providersRoutes } from "./providers/public.ts";
 import { userProviderRoutes } from "./providers/public.ts";
-import { createDaemonServer } from "./http/public.ts";
+import { createDaemonServer, staticAssetsRoute } from "./http/public.ts";
 import {
   appearancePreferencesRoutes,
   configRoutes,
@@ -98,6 +98,13 @@ if (parsed.kind === "error") {
 
 const { dataDirectory, port } = parsed.options;
 const directory = ensureDataDirectory(dataDirectory);
+
+/**
+ * Единственный признак того, что это продакшн-артефакт, а не запуск из исходников
+ * (docs/toolchain.md): нагрузка вшита или её нет. В разработке интерфейс отдаёт Vite, поэтому
+ * маршрута статики в таблице не появляется вовсе.
+ */
+const payload = artifactPayload();
 
 const lock = (() => {
   try {
@@ -516,6 +523,9 @@ const server = createDaemonServer({
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     ...filesystemRoutes(),
     events.route(),
+    // Последней строкой и хвостовой: она подходит к любому адресу, и всё, что объявлено выше,
+    // обязано разбираться раньше неё (docs/web-api.md).
+    ...(payload === undefined ? [] : [staticAssetsRoute(payload.web)]),
   ],
 });
 
