@@ -285,6 +285,25 @@
   text-overflow: ellipsis;
 }
 
+/**
+ * То же для id вклада в строке: гибкая мета с переносом ломала длинный идентификатор на два ряда,
+ * и поиск вклада по строке читался как две подписи.
+ */
+.plugin-detail-contribution-id,
+.plugin-detail-contribution-id > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.plugin-detail-contribution-id code {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .plugin-detail-section {
   display: flex;
   flex-direction: column;

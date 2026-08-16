@@ -33,7 +33,7 @@ import {
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
-import { shortenPath } from "../projects/path-shorten.ts";
+import { shortenPath, shortenPathMiddle } from "../projects/path-shorten.ts";
 import { pluginPageAddress, routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
@@ -310,7 +310,16 @@ export function PluginDetailView({
                       label={registration.title ?? registration.declaredId}
                       description={
                         <div className="plugin-detail-contribution-meta">
-                          <Code>{registration.id}</Code>
+                          {/*
+                            Длинный id вклада ломался в два ряда гибкой вёрсткой меты. Середина
+                            сворачивается тем же серединным усечением, что и папка проекта в сайдбаре,
+                            а полный id остаётся в подсказке и в DOM.
+                          */}
+                          <span className="plugin-detail-contribution-id">
+                            <Tooltip content={registration.id} side="bottom">
+                              <Code>{shortenPathMiddle(registration.id)}</Code>
+                            </Tooltip>
+                          </span>
                           {off ? (
                             <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
                           ) : undefined}
