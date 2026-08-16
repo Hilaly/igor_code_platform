@@ -234,6 +234,15 @@ function answer(world: World, request: SessionRequest): SessionResponse | Promis
         thinkingLevel: "high",
         skills: { include: [], exclude: [] },
       },
+      // Без собственного уровня: проверка фолбэка `subagent-spawn` на `high`.
+      {
+        id: "starter.nothinking",
+        ownership: "plugin",
+        pluginKey: "builtin:starter",
+        source: "builtin",
+        model: "scripted/one",
+        skills: { include: [], exclude: [] },
+      },
     ];
 
     // Как у платформы: агент из папки проекта есть только в каталоге, спрошенном по проекту.

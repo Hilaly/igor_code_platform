@@ -162,6 +162,23 @@ describe("subagent-spawn", () => {
     );
   });
 
+  it("defaults the reasoning level to high when neither the caller nor the agent names one", async () => {
+    const here = await ready();
+
+    await here.host.callTool(
+      "subagent-spawn",
+      { description: "check", prompt: "do it", agent: "starter.nothinking" },
+      parent,
+    );
+
+    const created = here.calls.find((call) => call.kind === "session-create");
+
+    assert.equal(
+      created?.kind === "session-create" ? created.draft.thinkingLevel : undefined,
+      "high",
+    );
+  });
+
   it("names an agent that does not exist instead of starting something else", async () => {
     const here = await ready();
 

@@ -97,7 +97,11 @@ export async function contributeTools(): Promise<void> {
         .describe("`<provider>/<model>`. Omitted — the default of the chosen agent."),
       thinkingLevel: thinkingLevel
         .optional()
-        .describe("How much the subagent reasons. Omitted — the default of the chosen agent."),
+        .describe(
+          "How much the subagent reasons: one of off, minimal, low, medium, high, xhigh, max. " +
+            "Omitted — the agent's own default, as subagent-types shows it; if the agent names " +
+            "none, high.",
+        ),
     }),
     invoke: async (given, invocation) => {
       const parent = (await sessions.list(invocation.projectId)).find(
@@ -123,7 +127,9 @@ export async function contributeTools(): Promise<void> {
         agentId,
         hidden: true,
         ...pick("model", given.model ?? agent.model),
-        ...pick("thinkingLevel", given.thinkingLevel ?? agent.thinkingLevel),
+        // Фолбэк уровня: названное вызывающим, затем дефолт агента, затем `high`. `off` здесь не
+        // годится: субагент, запущенный без слова про ризонинг, молча терял бы его целиком.
+        ...pick("thinkingLevel", given.thinkingLevel ?? agent.thinkingLevel ?? "high"),
       });
 
       // Отказ подписчика на `before_session_start` — исход по делу, а не сбой: он уезжает модели
