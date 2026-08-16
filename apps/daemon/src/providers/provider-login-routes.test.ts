@@ -207,6 +207,17 @@ describe("POST /api/provider-logins", () => {
     assert.equal((await start({ ...startBody, target: { kind: "магия" } })).status, 400);
   });
 
+  it("refuses a target naming a key the provider does not have", async () => {
+    const { start, logins, credentials } = await serve();
+    const answer = await start({ ...startBody, target: { kind: "existing", keyId: "key-9" } });
+
+    assert.equal(answer.status, 404);
+    // Диалог не начат и на диске ничего не появилось: цель, в которую нечем писать, — не вход.
+    assert.deepEqual(logins.list(), []);
+    assert.deepEqual(credentials.keys("scripted"), []);
+    assert.equal(credentials.problem(), undefined);
+  });
+
   it("puts the credential into the key the body named", async () => {
     const { start, answer, untilAsked, credentials } = await serve();
 

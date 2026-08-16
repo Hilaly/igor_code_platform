@@ -523,6 +523,52 @@ describe("the key set of a provider", () => {
     ]);
   });
 
+  it("refuses a login into a key the provider does not have", async () => {
+    const { store: credentials, directory } = store();
+
+    await assert.rejects(
+      credentials.withKeyTarget("anthropic", { kind: "existing", keyId: "key-9" }, () =>
+        credentials.modify("anthropic", async () => apiKey("ghost")),
+      ),
+      /key-9/,
+    );
+
+    assert.deepEqual(credentials.keys("anthropic"), []);
+    // Набор без ключей и с именем выбранного — негодный файл: перезапуск отказал бы по нему всем
+    // провайдерам сразу, а чинилось бы это только правкой руками.
+    assert.equal(
+      statSync(join(directory, credentialsFileName), { throwIfNoEntry: false }),
+      undefined,
+    );
+  });
+
+  it("writes nothing when the key of a running login is removed under it", async () => {
+    const { store: credentials, directory } = store();
+
+    await credentials.withKeyTarget("anthropic", { kind: "new", label: "первый" }, () =>
+      credentials.modify("anthropic", async () => apiKey("one")),
+    );
+    await credentials.withKeyTarget("anthropic", { kind: "new", label: "второй" }, () =>
+      credentials.modify("anthropic", async () => apiKey("two")),
+    );
+
+    await assert.rejects(
+      credentials.withKeyTarget("anthropic", { kind: "existing", keyId: "key-2" }, async () => {
+        await credentials.removeKey("anthropic", "key-2");
+
+        return credentials.modify("anthropic", async () => apiKey("two-again"));
+      }),
+      /key-2/,
+    );
+
+    // Файл остался годным: оставшийся ключ читается перезапуском, а не уносит с собой весь файл.
+    const reopened = reopen(directory);
+
+    assert.equal(reopened.problem(), undefined);
+    assert.deepEqual(reopened.keys("anthropic"), [{ id: "key-1", label: "первый" }]);
+    assert.deepEqual(await reopened.read("anthropic"), apiKey("one"));
+  });
+
   it("writes nothing when the named key is gone", async () => {
     const { store: credentials } = store();
 

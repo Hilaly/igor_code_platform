@@ -65,6 +65,8 @@ export type CredentialStore = {
   /**
    * Провести вход так, чтобы его запись ушла в названную цель. Возвращает идентификатор ключа, в
    * который записали, — или `undefined`, если вход не записал ничего.
+   *
+   * Цель `existing`, не указывающая на живой ключ, — ошибка, и диалог по ней не начинается.
    */
   withKeyTarget: <Result>(
     providerId: string,
@@ -142,6 +144,18 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
     credentials.get(providerId)?.keys.find((key) => key.id === keyId);
 
   /**
+   * Цель, в которую есть чем писать. `existing` без живого ключа — отказ, а не «положим куда-нибудь»:
+   * записанный по такой цели набор получился бы пустым и с именем выбранного ключа, а это ровно тот
+   * негодный файл, из-за которого демон после перезапуска отказывает по всем провайдерам сразу.
+   * Инвариант модуля — негодный файл бывает только от правки руками, — и держится он здесь.
+   */
+  const refuseUnknownTarget = (providerId: string, target: CredentialKeyTarget): void => {
+    if (target.kind === "existing" && keyOf(providerId, target.keyId) === undefined) {
+      throw new Error(`${providerId} has no key ${target.keyId}`);
+    }
+  };
+
+  /**
    * Запись набора целиком. Снимок собирается рядом и подменяет память только после удачной записи:
    * упавшая запись не должна оставить память и диск разными.
    */
@@ -201,6 +215,9 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
     write: CredentialWriter,
   ): Promise<unknown> => {
     refuseWhenUnreadable();
+    // Проверяется здесь, а не только на старте входа: ключ могли убрать, пока диалог шёл, и до
+    // записи доходит уже несуществующая цель.
+    refuseUnknownTarget(providerId, target);
 
     const current = target.kind === "new" ? undefined : keyOf(providerId, target.keyId)?.credential;
     const written = await write(current);
@@ -254,6 +271,11 @@ export function createCredentialStore(options: CreateCredentialStoreOptions): Cr
           : writeStep(providerId, { kind: "existing", keyId }, write);
       }),
     withKeyTarget: async (providerId, target, run) => {
+      refuseWhenUnreadable();
+      // Отказ до диалога, а не после: спрашивать у человека ключ, которому заведомо некуда лечь, —
+      // то же самое, что начинать вход поверх негодного файла.
+      refuseUnknownTarget(providerId, target);
+
       const active: ActiveTarget = { target };
 
       // Вход в одного провайдера идёт по одному (docs/models-and-providers.md), поэтому цель не
