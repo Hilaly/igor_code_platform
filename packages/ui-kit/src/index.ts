@@ -47,6 +47,7 @@ export type {
 export * from "./components/next-turn-picker.tsx";
 export * from "./components/multi-select.tsx";
 export * from "./components/notice.tsx";
+export * from "./components/card.tsx";
 export * from "./components/panel.tsx";
 export * from "./components/popover.tsx";
 export * from "./components/progress.tsx";

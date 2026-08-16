@@ -66,31 +66,27 @@ const snapshot: PluginsSnapshot = {
 
 it("shows plugin facts, controls each contribution, and exposes technical data", () => {
   const onSwitch = vi.fn();
-  const onBack = vi.fn();
   const onOpenPage = vi.fn();
   const { container } = render(
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={onBack}
       onSwitch={onSwitch}
       onOpenPage={onOpenPage}
       translator={translator}
     />,
   );
 
-  expect(screen.getByText("example")).toBeTruthy();
   expect(screen.getByText("Running")).toBeTruthy();
-  expect(screen.getByText("/plugins/example")).toBeTruthy();
+  // Короткий путь показан целиком, а подсказка повторяет его полностью.
+  expect(screen.getAllByText("/plugins/example")).toHaveLength(2);
   expect(screen.getByText("bad contribution")).toBeTruthy();
   expect(screen.getByText("missing.id")).toBeTruthy();
-  expect(screen.getByRole("group", { name: "example" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Lifecycle" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Source" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
   expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
   const contributions = screen.getByRole("region", { name: "Contributions · 2" });
   expect(within(contributions).getAllByRole("listitem")).toHaveLength(2);
@@ -115,8 +111,71 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   });
   fireEvent.click(screen.getByText("Payload schema"));
   expect(screen.getByText(/"type": "object"/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Back to plugins" }));
-  expect(onBack).toHaveBeenCalled();
+});
+
+/** Путь глубокой папки не разваливает строку фактов: в ней хвост, а полный путь — в подсказке. */
+it("shortens a deep plugin folder and keeps the full path in a tooltip", () => {
+  const deep = "/Users/human/Library/Application Support/sovereign/plugins/example";
+
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: { ...snapshot, plugins: [{ ...snapshot.plugins[0]!, directory: deep }] },
+        stale: false,
+      }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const path = screen.getByRole("group", { name: "Path" });
+  const shown = path.querySelector("code")?.textContent ?? "";
+
+  expect(shown).not.toBe(deep);
+  // Голова и хвост целы, свёрнута середина: имя папки плагина опознаётся без подсказки.
+  expect(shown).toBe("/Users/…/sovereign/plugins/example");
+  expect(within(path).getByRole("tooltip", { name: deep })).toBeTruthy();
+});
+
+/**
+ * Включённость и то, чем она кончилась, — один факт: переключатель стоит в строке жизненного цикла,
+ * а не в отдельной карточке над заголовком раздела.
+ */
+it("keeps the plugin switch in the lifecycle row of the plugin facts", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const lifecycle = screen.getByRole("group", { name: "Lifecycle" });
+
+  expect(within(lifecycle).getByText("Running")).toBeTruthy();
+  expect(within(lifecycle).getByRole("checkbox", { name: "Switched on" })).toBeTruthy();
+});
+
+/**
+ * Возврат к списку даёт запись `Plugins` локальной навигации настроек: своя кнопка «назад» повторяла
+ * её и занимала верх страницы.
+ */
+it("leaves the way back to the local Settings navigation", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.queryByRole("button", { name: /back to plugins/i })).toBeNull();
 });
 
 const tool = (declaredId: string): ContributionRegistration => ({
@@ -146,7 +205,6 @@ it("splits contributions into a section per kind, interface first", () => {
     <PluginDetailView
       state={{ snapshot: mixed, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -154,9 +212,12 @@ it("splits contributions into a section per kind, interface first", () => {
   );
 
   const contributions = screen.getByRole("region", { name: "Contributions · 5" });
-  const labels = [...contributions.querySelectorAll(".plugin-detail-kind-label")].map(
-    (label) => label.textContent,
-  );
+  // Имя списку даёт ярлык его карточки: видимый текст, а не второй, невидимый.
+  const labels = within(contributions)
+    .getAllByRole("list")
+    .map(
+      (list) => document.getElementById(list.getAttribute("aria-labelledby") ?? "")?.textContent,
+    );
 
   expect(labels).toEqual(["Pages · 1", "Tools · 2", "Skills · 1", "Events · 1"]);
 
@@ -180,7 +241,6 @@ it("does not add a nested page heading when embedded under Settings", () => {
       headingLevel={2}
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -195,7 +255,6 @@ it("shows a not-found state for an unknown plugin key", () => {
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:nope"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -209,14 +268,12 @@ it("does not claim a stale missing plugin is authoritatively absent", () => {
     <PluginDetailView
       state={{ snapshot: { ...snapshot, plugins: [] }, stale: true }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
   expect(screen.getByText("What you see may be out of date")).toBeTruthy();
   expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
   expect(screen.getByText("Loading…")).toBeTruthy();
@@ -228,14 +285,12 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
     <PluginDetailView
       state={{ snapshot: { ...snapshot, plugins: [] }, stale: false, failure: "snapshot failed" }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
   expect(screen.getByText("The plugins could not be read: snapshot failed")).toBeTruthy();
   expect(screen.queryByText(/plugin not found/i)).toBeNull();
 
@@ -243,14 +298,13 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
   expect(screen.queryByText("The plugins could not be read: snapshot failed")).toBeNull();
 });
 
@@ -259,7 +313,6 @@ it("keeps stale and write-failure notices visible on the detail route", () => {
     <PluginDetailView
       state={{ snapshot, stale: true, failure: "write failed" }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -276,7 +329,6 @@ it("shows a stale warning while the first detail snapshot is still loading", () 
     <PluginDetailView
       state={{ stale: true }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -312,7 +364,6 @@ it("names the kind of a public route and shows the address it answers at", () =>
     <PluginDetailView
       state={{ snapshot: withRoute, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -376,7 +427,6 @@ const showPlaces = (next: PluginsSnapshot): void => {
     <PluginDetailView
       state={{ snapshot: next, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -436,7 +486,6 @@ it("says which places the plugin holds and why a claim did not apply", () => {
         stale: false,
       }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -472,7 +521,6 @@ it("names the plugin that took the place instead", () => {
         stale: false,
       }}
       pluginKey="builtin:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -562,7 +610,6 @@ it("lists a declared page with its address and opens it", () => {
     <PluginDetailView
       state={{ snapshot: withPlaces([page("log")]), stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={onOpenPage}
       translator={translator}
@@ -585,7 +632,6 @@ it("shows a switched-off page as switched off instead of offering to open it", (
         stale: false,
       }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}

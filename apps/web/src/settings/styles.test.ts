@@ -33,17 +33,14 @@ describe("settings and plugin layout styles", () => {
     expect(styles).toMatch(
       /\.plugins,\s*\.plugin-detail\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;[^}]*container-type:\s*inline-size;/s,
     );
-    expect(styles).toMatch(
-      /\.plugin-detail-header-card\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);[^}]*border:/s,
-    );
+    // Карточки-шапки над заголовком «Плагин» больше нет: переключатель стоит в самих фактах плагина.
+    expect(styles).not.toMatch(/\.plugin-detail-header-card|\.plugin-detail-back/);
     expect(styles).toMatch(
       /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.plugin-detail-contribution-controls\s*\{[^}]*align-items:\s*flex-start;/s,
     );
     expect(styles).not.toMatch(/\.project-detail-surface|\.plugin-detail-(?:surface|hero|facts)/);
-    // Подпись вида — ярлык раздела: свой кегль секции прикладной CSS не назначает (docs/ui-kit.md).
-    expect(styles).toMatch(
-      /\.plugin-detail-kind-label\s*\{[^}]*color:\s*var\(--sovereign-text-subtle\);[^}]*font-size:\s*var\(--sovereign-font-size-xs\);/s,
-    );
+    // Поверхность группы и её ярлык принадлежат киту (`Card`): прикладной CSS их не рисует.
+    expect(styles).not.toMatch(/\.plugin-detail-kind/);
     expect(styles).not.toMatch(
       /\[role="listitem"\]\s*\+\s*\[role="listitem"\][^{]*border-block-start:\s*0/s,
     );

@@ -444,7 +444,6 @@ export const coreRussian: CatalogRegistration = {
     "projects.stale.hint": "Список запрошен заново.",
     "projects.write.failed": "Не удалось записать: {reason}",
     "plugins.attempt": "попытка {count}",
-    "plugins.detail.back": "Назад к плагинам",
     "plugins.detail.open": "Открыть",
     "plugins.detail.notfound": "Плагин не найден: {key}",
     "plugins.detail.plugin": "Плагин",

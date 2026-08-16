@@ -17,6 +17,7 @@ import {
 import {
   Badge,
   Button,
+  Card,
   Code,
   CodeBlock,
   Disclosure,
@@ -27,17 +28,18 @@ import {
   Spinner,
   Text,
   Toggle,
+  Tooltip,
   type BadgeTone,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
+import { shortenPath } from "../projects/path-shorten.ts";
 import { pluginPageAddress, routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
   headingLevel?: 1 | 2;
   state: PluginsState;
   pluginKey: string;
-  onBack: () => void;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
   /** Открыть страницу плагина. Адрес строит маршрутизатор, а не эта разметка. */
   onOpenPage: (pluginId: string, pageId: string) => void;
@@ -123,7 +125,6 @@ const claimTones: Record<PlaceClaimOutcome, "success" | "muted" | "warning"> = {
 export function PluginDetailView({
   state,
   pluginKey,
-  onBack,
   onSwitch,
   onOpenPage,
   translator,
@@ -137,7 +138,6 @@ export function PluginDetailView({
   if (snapshot === undefined) {
     return (
       <div className="plugin-detail">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>
             {t("plugins.stale.hint")}
@@ -158,7 +158,6 @@ export function PluginDetailView({
 
     return (
       <div className="plugin-detail">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>
             {t("plugins.stale.hint")}
@@ -201,10 +200,6 @@ export function PluginDetailView({
 
   return (
     <div className="plugin-detail">
-      <div className="plugin-detail-back">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
-      </div>
-
       <div className="plugins-notices">
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>
@@ -216,28 +211,30 @@ export function PluginDetailView({
         )}
       </div>
 
-      <section className="plugin-detail-header-card" aria-label={status.id ?? status.key}>
-        <SettingsRow label={status.id ?? status.key} description={<Code>{status.key}</Code>}>
-          <Toggle
-            checked={preferences?.enabled ?? false}
-            disabled={preferences === undefined}
-            onChange={(enabled) =>
-              preferences === undefined
-                ? undefined
-                : onSwitch(status.key, { ...preferences, enabled })
-            }
-            label={t("plugins.toggle.plugin")}
-            labelDisplay="tooltip"
-            {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
-          />
-        </SettingsRow>
-      </section>
-
       <section className="plugin-detail-section" aria-label={t("plugins.detail.plugin")}>
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
-        <div className="plugin-detail-rows">
+        <Card>
+          {/*
+            Переключатель стоит рядом с состоянием жизненного цикла, а не в своей карточке над
+            заголовком: включённость и то, чем она кончилась, — один факт, и человек читает их вместе.
+            Имя плагина карточка повторяла за заголовком страницы, и без неё оно не теряется.
+          */}
           <SettingsRow label={t("plugins.detail.lifecycle")}>
-            <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+            <div className="plugin-detail-state">
+              <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+              <Toggle
+                checked={preferences?.enabled ?? false}
+                disabled={preferences === undefined}
+                onChange={(enabled) =>
+                  preferences === undefined
+                    ? undefined
+                    : onSwitch(status.key, { ...preferences, enabled })
+                }
+                label={t("plugins.toggle.plugin")}
+                labelDisplay="tooltip"
+                {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
+              />
+            </div>
           </SettingsRow>
           <SettingsRow label={t("plugins.detail.source")}>
             <Text>
@@ -245,14 +242,23 @@ export function PluginDetailView({
             </Text>
           </SettingsRow>
           <SettingsRow label={t("plugins.detail.path")}>
-            <Code>{status.directory}</Code>
+            {/*
+              Путь папки длиннее строки почти всегда, и перенос превращал его в два-три ряда
+              моноширинного текста. Сокращается середина, хвост с именем папки плагина остаётся
+              целиком, а полный путь даёт подсказка и сам DOM.
+            */}
+            <span className="plugin-detail-path">
+              <Tooltip content={status.directory} side="bottom">
+                <Code>{shortenPath(status.directory)}</Code>
+              </Tooltip>
+            </span>
           </SettingsRow>
           {status.attempt === undefined ? undefined : (
             <SettingsRow label={t("plugins.detail.attempt")}>
               <Text>{String(status.attempt)}</Text>
             </SettingsRow>
           )}
-        </div>
+        </Card>
       </section>
 
       {status.reason === undefined && status.contributionProblems === undefined ? undefined : (
@@ -283,14 +289,16 @@ export function PluginDetailView({
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (
           groupsByKind(declared).map(({ kind, entries }) => (
-            <div className="plugin-detail-kind" key={kind}>
-              {/*
-                Вид назван один раз на группу, а не значком в каждой строке: у плагина с десятком
-                инструментов повторённая подпись «инструмент» занимала место и ничего не различала.
-              */}
-              <div className="plugin-detail-kind-label" id={`${groupLabelId}-${kind}`}>
-                {t(`plugins.kind.${kind}`)} · {entries.length}
-              </div>
+            /*
+              Вид назван один раз ярлыком карточки, а не значком в каждой строке: у плагина с десятком
+              инструментов повторённая подпись «инструмент» занимала место и ничего не различала.
+              Своя поверхность у каждой группы — чтобы список вкладов не читался одним сплошным текстом.
+            */
+            <Card
+              key={kind}
+              label={`${t(`plugins.kind.${kind}`)} · ${entries.length}`}
+              labelId={`${groupLabelId}-${kind}`}
+            >
               <div
                 className="plugin-detail-contributions"
                 role="list"
@@ -323,7 +331,7 @@ export function PluginDetailView({
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           ))
         )}
       </section>
@@ -335,47 +343,54 @@ export function PluginDetailView({
             Автоматической записи в левой панели у страницы нет: её кладёт туда сам плагин. Здесь —
             гарантия, что объявленная страница видна и достижима, а не только заявлена.
           */}
-          <div className="plugin-detail-rows" role="list">
-            {pages.map(({ registration, off }) => (
-              <div role="listitem" key={registration.id}>
-                <SettingsRow
-                  label={registration.title}
-                  description={<Code>{pluginPageAddress(registration)}</Code>}
-                >
-                  {off ? (
-                    <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
-                  ) : (
-                    <Button
-                      tone="secondary"
-                      onClick={() => onOpenPage(registration.pluginId, registration.declaredId)}
-                    >
-                      {t("plugins.pages.open")}
-                    </Button>
-                  )}
-                </SettingsRow>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <div role="list">
+              {pages.map(({ registration, off }) => (
+                <div role="listitem" key={registration.id}>
+                  <SettingsRow
+                    label={registration.title}
+                    description={<Code>{pluginPageAddress(registration)}</Code>}
+                  >
+                    {off ? (
+                      <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                    ) : (
+                      <Button
+                        tone="secondary"
+                        onClick={() => onOpenPage(registration.pluginId, registration.declaredId)}
+                      >
+                        {t("plugins.pages.open")}
+                      </Button>
+                    )}
+                  </SettingsRow>
+                </div>
+              ))}
+            </div>
+          </Card>
         </section>
       )}
 
       {claims.length === 0 ? undefined : (
         <section className="plugin-detail-section">
           <Heading level={3}>{t("plugins.places.title")}</Heading>
-          <div className="plugin-detail-rows" role="list">
-            {claims.map(({ registration, outcome, holder }) => (
-              <div role="listitem" key={registration.id}>
-                <SettingsRow
-                  label={registration.placeId}
-                  description={<Code>{registration.id}</Code>}
-                >
-                  <Text tone={claimTones[outcome]}>
-                    {t(`plugins.places.${outcome}`, holder === undefined ? undefined : { holder })}
-                  </Text>
-                </SettingsRow>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <div role="list">
+              {claims.map(({ registration, outcome, holder }) => (
+                <div role="listitem" key={registration.id}>
+                  <SettingsRow
+                    label={registration.placeId}
+                    description={<Code>{registration.id}</Code>}
+                  >
+                    <Text tone={claimTones[outcome]}>
+                      {t(
+                        `plugins.places.${outcome}`,
+                        holder === undefined ? undefined : { holder },
+                      )}
+                    </Text>
+                  </SettingsRow>
+                </div>
+              ))}
+            </div>
+          </Card>
         </section>
       )}
 
