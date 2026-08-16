@@ -8,6 +8,7 @@ import {
 } from "./model.ts";
 
 const keyFor = (sessionId: string) => `mission.${sessionId}`;
+const writes = new Map<string, Promise<unknown>>();
 
 export async function readMission(sessionId: string): Promise<MissionSnapshot | undefined> {
   const value = await storage.get(keyFor(sessionId));
@@ -16,15 +17,24 @@ export async function readMission(sessionId: string): Promise<MissionSnapshot | 
 }
 
 export async function writeMission(sessionId: string, value: unknown): Promise<MissionSnapshot> {
-  const input: MissionInput = validateMissionInput(value);
-  const previous = await readMission(sessionId);
-  const snapshot: MissionSnapshot = {
-    ...input,
-    revision: (previous?.revision ?? 0) + 1,
-    updatedAt: new Date().toISOString(),
-  };
-
-  await storage.set(keyFor(sessionId), snapshot);
-
-  return snapshot;
+  const previous = writes.get(sessionId) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      const input: MissionInput = validateMissionInput(value);
+      const stored = await readMission(sessionId);
+      const snapshot: MissionSnapshot = {
+        ...input,
+        revision: (stored?.revision ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      await storage.set(keyFor(sessionId), snapshot);
+      return snapshot;
+    });
+  writes.set(sessionId, current);
+  try {
+    return await current;
+  } finally {
+    if (writes.get(sessionId) === current) writes.delete(sessionId);
+  }
 }

@@ -99,6 +99,8 @@ export type PluginTestHost = {
    * и тут же прочитал, обязан проверяться этим же способом, а тест вправе подложить значение сам.
    */
   stored: Map<string, unknown>;
+  /** Makes the next storage operation fail, for write-before-publish regression tests. */
+  failNextStorage: (reason?: string) => void;
   /** Чем шов отвечает на запрос своей папки. Файлов он не создаёт: их создаёт платформа. */
   answerStorageDirectory: (path: string) => void;
   /** Снимает шов, подписки и таблицы обработчиков. Без этого следующий тест увидит чужой хост. */
@@ -119,6 +121,7 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
   const logins: LoginInput[] = [];
   const loginAnswers: string[] = [];
   const stored = new Map<string, unknown>();
+  let storageFailure: string | undefined;
 
   let storageDirectory = `/tmp/sovereign-plugin-${resolved.source}-${resolved.id}`;
   let loginScript: { steps?: LoginStep[]; conclusion?: LoginConclusion } = {};
@@ -173,6 +176,11 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
       return answerSessionRequest(request);
     },
     storage: async (request) => {
+      if (storageFailure !== undefined) {
+        const reason = storageFailure;
+        storageFailure = undefined;
+        throw new Error(reason);
+      }
       switch (request.kind) {
         case "storage-get":
           // Значения нет — поля нет: так же отвечает и настоящее хранилище.
@@ -246,6 +254,9 @@ export function installTestHost(identity: Partial<PluginIdentity> = {}): PluginT
         request,
       ),
     stored,
+    failNextStorage: (reason = "storage failure") => {
+      storageFailure = reason;
+    },
     answerStorageDirectory: (path) => {
       storageDirectory = path;
     },

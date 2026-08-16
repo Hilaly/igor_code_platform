@@ -46,4 +46,21 @@ describe("mission-update", () => {
     assert.equal(host.stored.size, 0);
     assert.deepEqual(host.published, []);
   });
+
+  it("does not publish when storage fails", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    host.failNextStorage("disk full");
+
+    const outcome = await host.callTool(
+      "mission-update",
+      { mission: "Ship", plan: [{ step: "Test", status: "pending" }] },
+      { sessionId: "s" },
+    );
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /disk full/u);
+    assert.equal(host.stored.size, 0);
+    assert.deepEqual(host.published, []);
+  });
 });

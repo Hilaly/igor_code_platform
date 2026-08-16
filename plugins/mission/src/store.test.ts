@@ -39,4 +39,27 @@ describe("mission storage", () => {
 
     assert.deepEqual([...host.stored.keys()], ["mission.s-1"]);
   });
+
+  it("serializes concurrent writes for one session", async () => {
+    host = installTestHost({ id: "mission" });
+    const [first, second] = await Promise.all([
+      writeMission("same", input("First")),
+      writeMission("same", input("Second")),
+    ]);
+
+    assert.deepEqual([first.revision, second.revision].sort(), [1, 2]);
+    assert.equal((await readMission("same"))?.revision, 2);
+  });
+
+  it("continues a session queue after an earlier write fails", async () => {
+    host = installTestHost({ id: "mission" });
+    host.failNextStorage("disk full");
+
+    const failed = writeMission("same", input("Failed"));
+    const recovered = writeMission("same", input("Recovered"));
+
+    await assert.rejects(failed, /disk full/u);
+    assert.equal((await recovered).revision, 1);
+    assert.equal((await readMission("same"))?.mission, "Recovered");
+  });
 });

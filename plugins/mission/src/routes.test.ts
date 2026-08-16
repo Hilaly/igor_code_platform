@@ -47,4 +47,21 @@ describe("mission snapshot route", () => {
     assert.equal(response.status, 404);
     assert.match(String(response.body), /there is no mission/u);
   });
+
+  it("declares a protected GET route with a session parameter", async () => {
+    host = installTestHost({ id: "mission" });
+
+    await contributeRoutes();
+
+    assert.deepEqual(host.contributions, [
+      {
+        kind: "route",
+        id: "snapshot",
+        title: "Mission snapshot",
+        description: "Read the mission snapshot for the requested session.",
+        method: "GET",
+        path: ":sessionId",
+      },
+    ]);
+  });
 });
