@@ -42,6 +42,7 @@ import {
 import { availableLocales, pluginCatalogs, shippedCatalogs } from "./catalogs.ts";
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
+import { createBrowserEventBridge } from "./events/browser-bridge.ts";
 import { connectEventStream, type StreamStatus } from "./events/stream.ts";
 import { LoginView } from "./login/login-view.tsx";
 import { CommandPalette, useCommandPaletteShortcut } from "./commands/command-palette.tsx";
@@ -117,6 +118,7 @@ export function App() {
       }),
     [diagnostics],
   );
+  const browserEventBridge = useMemo(() => createBrowserEventBridge(bus), [bus]);
   const navigation = useMemo(() => createNavigation(), []);
 
   const [reported, setReported] = useState<Diagnostic[]>([]);
@@ -238,7 +240,10 @@ export function App() {
 
     const connection = connectEventStream({
       bus,
-      onStatus: setStream,
+      onStatus: (status) => {
+        setStream(status);
+        if (status === "open") browserEventBridge.recover();
+      },
       onDiagnostic: diagnostics.record,
       onLoginStep: (frame) => loginStep.current(frame),
       onSessionDelta: (frame) => sessionDelta.current(frame),
@@ -264,7 +269,7 @@ export function App() {
       // «переподключаемся» о потоке, которого уже нет.
       setStream("connecting");
     };
-  }, [bus, diagnostics, authenticated]);
+  }, [bus, browserEventBridge, diagnostics, authenticated]);
 
   // Время работы спрашивается на подъёме соединения: пока поток жив, спрашивать незачем.
   useEffect(() => {
@@ -643,7 +648,7 @@ export function App() {
       contributions={placeContributions}
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
-      events={bus}
+      events={browserEventBridge.events}
     >
       <ShellWithPlaceTabs
         tabsContext={pageContext}

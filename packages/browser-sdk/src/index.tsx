@@ -13,7 +13,12 @@ import { usePageNavigation, type PageNavigateOptions, type PageNavigation } from
 import type { PlaceContext, PlaceProps } from "./runtime-context.tsx";
 import { PluginPlaceTabs } from "./tabs.tsx";
 import { BrowserRuntimeContext } from "./runtime-context.tsx";
-export type { BrowserEvent, BrowserEventBridge, BrowserEventListener } from "./runtime-context.tsx";
+export type {
+  BrowserEvent,
+  BrowserEventBridge,
+  BrowserEventListener,
+  BrowserRecoveryListener,
+} from "./runtime-context.tsx";
 
 export type {
   Command,

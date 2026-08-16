@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import type { PlaceContext as ProtocolPlaceContext } from "@sovereign/protocol";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
+import { useEffect } from "react";
 
 import * as browserSdk from "./index.tsx";
+import { BrowserRuntimeProvider } from "./host.tsx";
 import {
   Place,
   PlaceCollection,
@@ -33,25 +35,63 @@ it("exports only the public browser SDK surface at runtime", () => {
 
 it("exports a host event bridge hook that subscribes and cleans up", () => {
   const listeners = new Set<(event: BrowserEvent) => void>();
+  const recoveryListeners = new Set<() => void>();
   const events = {
     subscribe(listener: (event: BrowserEvent) => void) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    subscribeRecovery(listener: () => void) {
+      recoveryListeners.add(listener);
+      return () => recoveryListeners.delete(listener);
+    },
   };
-  const seen: BrowserEvent[] = [];
+  const seen: string[] = [];
   function Probe() {
     const bridge = browserSdk.useSovereignEvents();
-    bridge.subscribe((event) => seen.push(event));
+    useEffect(() => {
+      const unsubscribeEvent = bridge.subscribe((event) => seen.push(event.type));
+      const unsubscribeRecovery = bridge.subscribeRecovery?.(() => seen.push("recovery"));
+      return () => {
+        unsubscribeEvent();
+        unsubscribeRecovery?.();
+      };
+    }, [bridge]);
     return null;
   }
+  const view = render(
+    <BrowserRuntimeProvider
+      contributions={[]}
+      plugins={[]}
+      onDiagnostic={() => {}}
+      events={events}
+      createCache={createCache}
+    >
+      <Probe />
+    </BrowserRuntimeProvider>,
+  );
 
-  // The provider test exercises the lifecycle; this assertion verifies the public hook is
-  // available from the package root and can be consumed by a plugin component.
-  expect(events.subscribe).toBeTypeOf("function");
-  expect(seen).toEqual([]);
-  expect(Probe).toBeTypeOf("function");
+  act(() => {
+    for (const listener of listeners) listener({ type: "core.stream.gap" } as BrowserEvent);
+    for (const listener of recoveryListeners) listener();
+  });
+  expect(seen).toEqual(["core.stream.gap", "recovery"]);
+
+  view.unmount();
+  expect(listeners.size).toBe(0);
+  expect(recoveryListeners.size).toBe(0);
 });
+
+function createCache() {
+  return {
+    load: () => ({ kind: "loading" as const }),
+    peek: () => undefined,
+    version: () => 0,
+    retain: () => {},
+    subscribe: () => () => {},
+    dispose: () => {},
+  };
+}
 
 it("exports every public navigation destination from the browser SDK root", () => {
   const sections: SettingsSection[] = [

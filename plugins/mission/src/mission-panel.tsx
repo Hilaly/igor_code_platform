@@ -59,6 +59,7 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
   );
   useEffect(() => {
     highestRevision.current = 0;
+    setState(sessionId === undefined ? { kind: "empty" } : { kind: "loading" });
     const controller = new AbortController();
     reload(controller.signal);
     return () => {
@@ -69,11 +70,20 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
   useEffect(() => {
     if (sessionId === undefined) return;
     return events.subscribe((event) => {
+      if (event.type === "core.stream.gap") {
+        reload();
+        return;
+      }
       if (event.type !== "mission.changed" || !isMissionChanged(event.payload)) return;
       if (event.payload.sessionId !== sessionId || event.payload.revision < highestRevision.current)
         return;
+      highestRevision.current = event.payload.revision;
       reload();
     });
+  }, [events, reload, sessionId]);
+  useEffect(() => {
+    if (sessionId === undefined) return;
+    return events.subscribeRecovery?.(() => reload());
   }, [events, reload, sessionId]);
   return (
     <section className="mission-panel" aria-label="Mission">
@@ -99,6 +109,7 @@ function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): React
       {snapshot.explanation === undefined ? undefined : (
         <Text tone="muted">{snapshot.explanation}</Text>
       )}
+      <Text tone="muted">Updated {formatUpdatedAt(snapshot.updatedAt)}</Text>
       <Progress label="Mission progress" value={completed / snapshot.plan.length} />
       {active === undefined ? undefined : <Badge tone="neutral">{"Current: " + active.step}</Badge>}
       <List>
@@ -113,6 +124,13 @@ function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): React
       </List>
     </div>
   );
+}
+
+function formatUpdatedAt(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function isMissionChanged(value: unknown): value is { sessionId: string; revision: number } {

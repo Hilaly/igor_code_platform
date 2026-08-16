@@ -15,8 +15,11 @@ export type PlaceProps = {
 
 export type BrowserEvent = BusStreamEvent;
 export type BrowserEventListener = (event: BrowserEvent) => void;
+export type BrowserRecoveryListener = () => void;
 export type BrowserEventBridge = {
   subscribe(listener: BrowserEventListener): () => void;
+  /** Runs when the host's existing stream opens or reopens and snapshots should be recovered. */
+  subscribeRecovery?(listener: BrowserRecoveryListener): () => void;
 };
 
 export type BrowserRuntime = {
