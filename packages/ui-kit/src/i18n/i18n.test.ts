@@ -220,7 +220,8 @@ describe("the shipped catalogs", () => {
 
   it("name every kind of contribution the platform knows", () => {
     // Новый вид вклада добавляется в четырёх местах, и подпись во вью — последнее из них: без неё
-    // человек видит в карточке плагина `plugins.kind.color-scheme` вместо слова.
+    // человек видит в карточке плагина `plugins.kind.color-scheme` вместо имени раздела. Подпись
+    // называет группу вкладов одного вида, поэтому она во множественном числе.
     for (const catalog of [coreEnglish, coreRussian]) {
       const missing = contributionKinds
         .map((kind) => `plugins.kind.${kind}`)

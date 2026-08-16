@@ -119,6 +119,61 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   expect(onBack).toHaveBeenCalled();
 });
 
+const tool = (declaredId: string): ContributionRegistration => ({
+  kind: "tool",
+  ownership: "plugin",
+  pluginKey: "data:example",
+  pluginId: "example",
+  source: "data",
+  id: `example.${declaredId}`,
+  declaredId,
+  title: `Example ${declaredId}`,
+  description: `runs ${declaredId}`,
+  parameters: { type: "object" },
+});
+
+/**
+ * Вперемешку список вкладов читается как реестр: чтобы найти инструменты плагина, приходится
+ * просматривать его целиком. Разделы по видам отвечают на «что этот плагин приносит» сразу.
+ */
+it("splits contributions into a section per kind, interface first", () => {
+  const mixed: PluginsSnapshot = {
+    ...snapshot,
+    contributions: [tool("second"), page("log"), snapshot.contributions[0]!, tool("first")],
+  };
+
+  const { container } = render(
+    <PluginDetailView
+      state={{ snapshot: mixed, stale: false }}
+      pluginKey="data:example"
+      onBack={vi.fn()}
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const contributions = screen.getByRole("region", { name: "Contributions · 5" });
+  const labels = [...contributions.querySelectorAll(".plugin-detail-kind-label")].map(
+    (label) => label.textContent,
+  );
+
+  expect(labels).toEqual(["Pages · 1", "Tools · 2", "Skills · 1", "Events · 1"]);
+
+  const tools = within(contributions).getByRole("list", { name: "Tools · 2" });
+
+  // Внутри вида порядок прежний, по идентификатору вклада.
+  expect(
+    within(tools)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual([expect.stringContaining("example.first"), expect.stringContaining("example.second")]);
+  // Вид назван подписью группы, и значка вида у строки больше нет.
+  expect(container.querySelector(".plugin-detail-contribution-meta")?.textContent).not.toMatch(
+    /tool/,
+  );
+});
+
 it("does not add a nested page heading when embedded under Settings", () => {
   render(
     <PluginDetailView
@@ -264,7 +319,7 @@ it("names the kind of a public route and shows the address it answers at", () =>
     />,
   );
 
-  expect(screen.getByText("public route")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Public routes · 1" })).toBeTruthy();
   expect(screen.getByText(/"path": "webhooks\/github"/)).toBeTruthy();
   // Адрес целиком: по нему маршрут зовут снаружи, а объявленный путь без префикса не набрать.
   expect(screen.getByText(/\/p\/example\/webhooks\/github/)).toBeTruthy();
@@ -443,7 +498,7 @@ const runCommand: ContributionRegistration = {
 it("shows a command by its kind and by its technical data", () => {
   showPlaces(withPlaces([runCommand]));
 
-  expect(screen.getByText("command")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Commands · 1" })).toBeTruthy();
   expect(screen.getByText(/"export": "RunCommand"/)).toBeTruthy();
   expect(screen.getByText(/"placeId": "core.view.header.actions"/)).toBeTruthy();
 });
@@ -481,7 +536,7 @@ it("leaves a command without a place out of the places section", () => {
   showPlaces(withPlaces([placeless]));
 
   expect(screen.queryByRole("group", { name: "core.view.header.actions" })).toBeNull();
-  expect(screen.getByText("command")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Commands · 1" })).toBeTruthy();
 });
 
 const page = (declaredId: string): ContributionRegistration => ({
