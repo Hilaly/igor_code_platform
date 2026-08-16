@@ -79,7 +79,8 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
 
   expect(screen.getByText("data:example")).toBeTruthy();
   expect(screen.getByText("Running")).toBeTruthy();
-  expect(screen.getByText("/plugins/example")).toBeTruthy();
+  // Короткий путь показан целиком, а подсказка повторяет его полностью.
+  expect(screen.getAllByText("/plugins/example")).toHaveLength(2);
   expect(screen.getByText("bad contribution")).toBeTruthy();
   expect(screen.getByText("missing.id")).toBeTruthy();
   expect(screen.getByRole("group", { name: "Key" })).toBeTruthy();
@@ -112,6 +113,32 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   });
   fireEvent.click(screen.getByText("Payload schema"));
   expect(screen.getByText(/"type": "object"/)).toBeTruthy();
+});
+
+/** Путь глубокой папки не разваливает строку фактов: в ней хвост, а полный путь — в подсказке. */
+it("shortens a deep plugin folder and keeps the full path in a tooltip", () => {
+  const deep = "/Users/human/Library/Application Support/sovereign/plugins/example";
+
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: { ...snapshot, plugins: [{ ...snapshot.plugins[0]!, directory: deep }] },
+        stale: false,
+      }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const path = screen.getByRole("group", { name: "Path" });
+  const shown = path.querySelector("code")?.textContent ?? "";
+
+  expect(shown).not.toBe(deep);
+  // Голова и хвост целы, свёрнута середина: имя папки плагина опознаётся без подсказки.
+  expect(shown).toBe("/Users/…/sovereign/plugins/example");
+  expect(within(path).getByRole("tooltip", { name: deep })).toBeTruthy();
 });
 
 /**

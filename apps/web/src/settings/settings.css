@@ -267,6 +267,25 @@
   font-size: var(--sovereign-font-size-xs);
 }
 
+/**
+ * Путь папки плагина живёт одной строкой: сокращение середины делает разметка, а всё, что не влезло
+ * и после него, дорезает многоточие. Перенос давал два-три ряда моноширинного текста в строке фактов.
+ */
+.plugin-detail-path,
+.plugin-detail-path > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.plugin-detail-path code {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .plugin-detail-kind {
   display: flex;
   flex-direction: column;

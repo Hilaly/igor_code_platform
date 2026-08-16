@@ -27,10 +27,12 @@ import {
   Spinner,
   Text,
   Toggle,
+  Tooltip,
   type BadgeTone,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
 
+import { shortenPath } from "../projects/path-shorten.ts";
 import { pluginPageAddress, routeAddress, type PluginsState } from "./state.ts";
 
 export type PluginDetailViewProps = {
@@ -242,7 +244,16 @@ export function PluginDetailView({
             </Text>
           </SettingsRow>
           <SettingsRow label={t("plugins.detail.path")}>
-            <Code>{status.directory}</Code>
+            {/*
+              Путь папки длиннее строки почти всегда, и перенос превращал его в два-три ряда
+              моноширинного текста. Сокращается середина, хвост с именем папки плагина остаётся
+              целиком, а полный путь даёт подсказка и сам DOM.
+            */}
+            <span className="plugin-detail-path">
+              <Tooltip content={status.directory} side="bottom">
+                <Code>{shortenPath(status.directory)}</Code>
+              </Tooltip>
+            </span>
           </SettingsRow>
           {status.attempt === undefined ? undefined : (
             <SettingsRow label={t("plugins.detail.attempt")}>
