@@ -3,10 +3,10 @@
  * воркер вкладом `contribute.localeCatalog`, а браузерная половина ничего отсюда не импортирует:
  * каталог доезжает до неё снимком вкладов (docs/ui-kit.md, «Язык окна»).
  *
- * Неймспейс — id плагина: contribution-registry.ts принимает только `core` или `plugin.id`.
+ * Неймспейс каталога — общий для воркера и браузерной половины `namespace.ts`.
  */
 
-export const messagesNamespace = "starter";
+export { messagesNamespace } from "./namespace.ts";
 
 export const englishMessages: Record<string, string> = {
   "tool.status.running": "Running",
@@ -23,6 +23,9 @@ export const englishMessages: Record<string, string> = {
   "tool.truncated": "Output truncated",
   "tool.stderrTruncated": "Stderr truncated",
   "tool.failure": "Could not read the tool call: {reason}",
+  "tool.noData": "Call not found in the records yet",
+  "tool.exitCode": "exit {code}",
+  "tool.exitZero": "exit 0",
 };
 
 export const russianMessages: Record<string, string> = {
@@ -40,4 +43,7 @@ export const russianMessages: Record<string, string> = {
   "tool.truncated": "Вывод усечён",
   "tool.stderrTruncated": "stderr усечён",
   "tool.failure": "Не удалось прочитать вызов: {reason}",
+  "tool.noData": "Вызов пока не найден в записях",
+  "tool.exitCode": "exit {code}",
+  "tool.exitZero": "exit 0",
 };

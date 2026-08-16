@@ -11,11 +11,12 @@ import type {
 import type { SessionEntriesPage, SessionEntry } from "@sovereign/sdk";
 
 import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
-import { BashToolCall } from "./bash-tool-call.tsx";
+import { BashToolCall, NO_DATA_RETRY_ATTEMPTS, NO_DATA_RETRY_DELAY_MS } from "./bash-tool-call.tsx";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 function event(type: string, payload: unknown = {}): BrowserEvent {
@@ -167,6 +168,33 @@ it("shows a compact card while the call is not in the records yet", async () => 
   expect(screen.getByText("Выполняется")).toBeTruthy();
 });
 
+it("shows a no-data badge once the retry budget is exhausted", async () => {
+  vi.useFakeTimers();
+  installFetch([]);
+  renderCard(bridge());
+  // До первого выбора вызов уже виден как bash без данных — ретраи ещё не исчерпаны.
+  await act(async () => {});
+  // 20 ретраев по 1 с: каждый таймер запускает следующий через микрозадачу, поэтому гоман таймеры
+  // с промывкой очереди микрозадач, а не одним синхронным скачком.
+  for (let attempt = 0; attempt < NO_DATA_RETRY_ATTEMPTS; attempt += 1) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(NO_DATA_RETRY_DELAY_MS);
+    });
+  }
+  // Последний таймер запустил 21-ю загрузку: ретраи исчерпаны, вызов не найден — показываем badge.
+  // В свёрнутом виде он тоже виден: ищем его среди узлов summary-строки, а не только в теле.
+  const noData = screen.getAllByText("Вызов пока не найден в записях");
+  expect(noData.some((node) => node.closest("summary") !== null)).toBe(true);
+});
+
+it("shows a danger badge when fetching the entries fails", async () => {
+  installFetch([]);
+  vi.mocked(globalThis.fetch).mockRejectedValue(new Error("boom"));
+  renderCard(bridge());
+  const badges = await screen.findAllByText(/Не удалось прочитать вызов/);
+  expect(badges.some((node) => node.closest("summary") !== null)).toBe(true);
+});
+
 it("is collapsed by default and shows output, stderr and the exit badge when expanded", async () => {
   installFetch([
     callEntry("c1", "bash", { command: "pnpm test" }),
@@ -201,6 +229,42 @@ it("shows the failed state with the whole result in the stderr section", async (
   await expand("job-kill j9");
   expect(await screen.findByText("unknown job j9")).toBeTruthy();
   expect(screen.getByText("Не удалось")).toBeTruthy();
+});
+
+it("does not show an exit 0 badge for a successful job-kill", async () => {
+  installFetch([
+    callEntry("c1", "job-kill", { jobId: "j9" }),
+    resultEntry("c1", "killed job j9", false),
+  ]);
+  renderCard(bridge(), "job-kill", "c1");
+  await screen.findByText("job-kill j9");
+  await expand("job-kill j9");
+  expect(await screen.findByText("killed job j9")).toBeTruthy();
+  expect(screen.getByText("Готово")).toBeTruthy();
+  expect(screen.queryByText("exit 0")).toBeNull();
+});
+
+it("does not show an exit 0 badge for a backgrounded bash", async () => {
+  installFetch([
+    callEntry("c1", "bash", { command: "sleep 60", run_in_background: true }),
+    resultEntry("c1", "background job j9 started", false),
+  ]);
+  renderCard(bridge());
+  await screen.findByText("sleep 60");
+  await expand("sleep 60");
+  expect(await screen.findByText("background job j9 started")).toBeTruthy();
+  expect(screen.getByText("Готово")).toBeTruthy();
+  expect(screen.queryByText("exit 0")).toBeNull();
+});
+
+it("shows the killed badge for job-output with a killed status", async () => {
+  installFetch([
+    callEntry("c1", "job-output", { jobId: "j9" }),
+    resultEntry("c1", "(no new output)\n[status: killed]", false),
+  ]);
+  renderCard(bridge(), "job-output", "c1");
+  expect(await screen.findByText("job-output j9")).toBeTruthy();
+  expect(screen.getByText("Остановлено")).toBeTruthy();
 });
 
 it("reflects the job status from the result text for job-output", async () => {

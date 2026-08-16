@@ -12,7 +12,8 @@
 import { contribute, log, toolCallPlaceId, type PluginModule } from "@sovereign/sdk";
 
 import { killAllJobs, killJobsOfSession } from "./bash.ts";
-import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
+import { englishMessages, russianMessages } from "./messages.ts";
+import { messagesNamespace } from "./namespace.ts";
 import { contributeBashTools } from "./tools.ts";
 
 export const activate: PluginModule["activate"] = async () => {

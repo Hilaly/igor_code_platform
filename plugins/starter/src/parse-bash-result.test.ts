@@ -50,6 +50,19 @@ describe("parseBashResult", () => {
     assert.equal(parsed.truncatedPath, "/tmp/bash-1.log");
   });
 
+  it("keeps the stderr-section truncation marker as its own path", () => {
+    const parsed = parseBashResult(
+      "out\n[stderr]\nerr\n[output truncated; full output: /tmp/bash-1.stderr.log]",
+    );
+    assert.equal(parsed.stdout, "out");
+    assert.equal(parsed.stderrTruncatedPath, "/tmp/bash-1.stderr.log");
+  });
+
+  it("parses the killed job status", () => {
+    const parsed = parseBashResult("(no new output)\n[status: killed]");
+    assert.equal(parsed.jobStatus, "killed");
+  });
+
   it("treats an empty body as no output", () => {
     const parsed = parseBashResult("(no output)");
     assert.equal(parsed.noOutput, true);

@@ -9,9 +9,10 @@
 
 import { useSovereignEvents, useTranslator, type PlaceContext } from "@sovereign/browser-sdk";
 import { Badge, Code, CodeBlock, Disclosure, Notice, Text } from "@sovereign/ui-kit";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { fetchEntries, findToolCall, type ToolCallData } from "./entries.ts";
+import { messagesNamespace } from "./namespace.ts";
 import { parseBashResult, type ParsedBashResult } from "./parse-bash-result.ts";
 import "./bash-tool-call.css";
 
@@ -19,8 +20,8 @@ type CardStatus = "running" | "done" | "failed";
 type BadgeTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 /** Сколько раз перечитывать записи, пока вызова в них нет (доли секунды после вызова модели). */
-const NO_DATA_RETRY_ATTEMPTS = 20;
-const NO_DATA_RETRY_DELAY_MS = 1_000;
+export const NO_DATA_RETRY_ATTEMPTS = 20;
+export const NO_DATA_RETRY_DELAY_MS = 1_000;
 
 /**
  * Подпись и тон карточки. Статус задания из текста (`[status: …]`) важнее факта ответа тула:
@@ -55,13 +56,6 @@ function isBackground(input: unknown): boolean {
   return (input as { run_in_background?: unknown } | null | undefined)?.run_in_background === true;
 }
 
-/**
- * Неймспейс каталога. Тот же, что объявляет воркер, — по протоколу это идентификатор плагина, и
- * другого он объявить не может. Строки сюда не импортируются намеренно: каталог приезжает снимком,
- * и второй его экземпляр в бандле разошёлся бы с объявленным.
- */
-const messagesNamespace = "starter";
-
 export function BashToolCall({ context }: { context: PlaceContext }): ReactNode {
   const sessionId = context.subject?.sessionId;
   const toolCallId = context.subject?.toolCallId;
@@ -70,6 +64,7 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   const events = useSovereignEvents();
   const [data, setData] = useState<ToolCallData | undefined>(undefined);
   const [refusal, setRefusal] = useState<string | undefined>(undefined);
+  const [gaveUp, setGaveUp] = useState(false);
   const retries = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const disposed = useRef(false);
@@ -81,6 +76,7 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
 
     disposed.current = false;
     retries.current = 0;
+    setGaveUp(false);
 
     const load = (): void => {
       void fetchEntries(sessionId)
@@ -93,6 +89,8 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
             if (retries.current < NO_DATA_RETRY_ATTEMPTS) {
               retries.current += 1;
               retryTimer.current = setTimeout(load, NO_DATA_RETRY_DELAY_MS);
+            } else {
+              setGaveUp(true);
             }
             return;
           }
@@ -112,11 +110,13 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
       // перечитать записи; догон потока — то же самое, на другой стороне моста.
       if (event.type === "core.sessions.changed" || event.type === "core.stream.gap") {
         retries.current = 0;
+        setGaveUp(false);
         load();
       }
     });
     const unsubscribeRecovery = events.subscribeRecovery?.(() => {
       retries.current = 0;
+      setGaveUp(false);
       load();
     });
 
@@ -134,7 +134,12 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   const t = translator.t;
   const status: CardStatus =
     data?.result === undefined ? "running" : data.result.failed ? "failed" : "done";
-  const parsed = data?.result === undefined ? undefined : parseBashResult(data.result.text);
+  // Разбор результата — один раз на результат: тело бывает большим, а переразбор на каждом рендере
+  // (переводы, события) тратил бы время впустую. Ключ — идентичность объекта результата.
+  const parsed = useMemo(
+    () => (data?.result === undefined ? undefined : parseBashResult(data.result.text)),
+    [data?.result],
+  );
   const { key: statusKey, tone } = statusOf(status, parsed?.jobStatus);
   const title = data === undefined ? toolName : toolTitle(toolName, data.input);
 
@@ -148,10 +153,13 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   if (parsed?.exitCode !== undefined) {
     badges.push(
       <Badge key="exit" tone="danger">
-        {`exit ${parsed.exitCode}`}
+        {t("tool.exitCode", { code: parsed.exitCode })}
       </Badge>,
     );
   } else if (
+    toolName === "bash" &&
+    data !== undefined &&
+    !isBackground(data.input) &&
     parsed !== undefined &&
     !failed &&
     parsed.timedOut !== true &&
@@ -161,7 +169,7 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   ) {
     badges.push(
       <Badge key="exit" tone="success">
-        exit 0
+        {t("tool.exitZero")}
       </Badge>,
     );
   }
@@ -211,6 +219,10 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
             </span>
             <span className="sbtc-outcome">
               <Badge tone={tone}>{t(statusKey)}</Badge>
+              {refusal === undefined ? undefined : (
+                <Badge tone="danger">{t("tool.failure", { reason: refusal })}</Badge>
+              )}
+              {gaveUp ? <Badge tone="warning">{t("tool.noData")}</Badge> : undefined}
             </span>
           </span>
         }
@@ -241,6 +253,7 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
         {refusal === undefined ? undefined : (
           <Notice tone="danger" title={t("tool.failure", { reason: refusal })} />
         )}
+        {gaveUp ? <Notice tone="warning" title={t("tool.noData")} /> : undefined}
       </Disclosure>
     </div>
   );

@@ -39,7 +39,10 @@ const outcomeMarkerPatterns = [
 const truncatedMarkerPattern =
   /^\[(?:output truncated|some output was dropped from memory); full output: (.+)\]$/;
 
-/** Секция без пометок усечения: сами пометки — структура, а не содержимое. */
+/**
+ * Секция без пометок усечения: сами пометки — структура, а не содержимое. tools.ts кладёт в одну
+ * секцию не более одной пометки, поэтому последняя вхождения побеждает, а список не нужен.
+ */
 function section(text: string): { text: string; truncatedPath?: string } {
   let truncatedPath: string | undefined;
   const kept: string[] = [];
@@ -49,7 +52,7 @@ function section(text: string): { text: string; truncatedPath?: string } {
     if (match === null) {
       kept.push(line);
     } else {
-      truncatedPath = truncatedPath === undefined ? match[1] : `${truncatedPath}, ${match[1]}`;
+      truncatedPath = match[1];
     }
   }
 
