@@ -14,6 +14,9 @@
 - [Встроенный плагин Mission и bridge событий браузерного SDK](superpowers/specs/2026-08-16-mission-plugin-and-browser-event-bridge-design.md) — утверждённый дизайн per-session миссии, инструмента `mission-update`, правой панели и доставки через общий SSE/frontend bus.
 - [Встроенный плагин Superpowers](superpowers/specs/2026-08-16-superpowers-built-in-port-design.md) — утверждённый дизайн полного английского порта Superpowers 6.2.0 в skills-only built-in plugin с адаптацией к Sovereign.
 - [Обновление starter skills для Mission и расширенного SDK](superpowers/specs/2026-08-16-starter-sdk-skills-update-design.md) — обновление навыков написания backend и browser-плагинов после добавления `mission-update` и browser event bridge; polling отвергнут в пользу событий и snapshot routes.
+- [План Mission plugin и browser event bridge](superpowers/plans/2026-08-16-mission-plugin-and-browser-bridge.md) — TDD-задачи для per-session snapshots, `mission-update`, единого SSE bridge, правой панели и artifact dependencies.
+- [План обновления starter plugin skills](superpowers/plans/2026-08-16-starter-plugin-sdk-skills.md) — два plugin skills, которые документируют route + event snapshot pattern и запрещают polling/второй SSE.
+- [План встроенного Superpowers port](superpowers/plans/2026-08-16-superpowers-built-in-port.md) — TDD-задачи для полного английского порта 14 skills, Sovereign adaptation map, discovery и artifact payload.
 
 - [master-spec.md](master-spec.md) — оглавление спецификации и статус каждого раздела.
   Точка входа: отсюда видно, что решено, что обсуждается, чего ещё нет.
