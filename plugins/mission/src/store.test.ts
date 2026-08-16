@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import { installTestHost, type PluginTestHost } from "@sovereign/sdk/testing";
 
-import { readMission, writeMission } from "./store.ts";
+import { MissionConflictError, readMission, writeMission } from "./store.ts";
 
 let host: PluginTestHost | undefined;
 
@@ -74,5 +74,58 @@ describe("mission storage", () => {
 
     assert.deepEqual((await readMission("s"))?.plan, written.plan);
     assert.equal((await readMission("s"))?.outcome?.kind, "failed");
+  });
+
+  it("does not keep expectedRevision in the stored snapshot", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const written = await writeMission("s", { ...input("A"), expectedRevision: 0 });
+
+    assert.equal("expectedRevision" in written, false);
+    assert.equal("expectedRevision" in (host.stored.get("mission.s") as object), false);
+  });
+
+  it("refuses a write whose expectedRevision lost the race and keeps the stored snapshot", async () => {
+    host = installTestHost({ id: "mission" });
+    await writeMission("s", input("First"));
+    await writeMission("s", input("Second"));
+
+    const refused = writeMission("s", { ...input("Third"), expectedRevision: 1 });
+
+    await assert.rejects(refused, (cause: unknown) => {
+      assert.ok(cause instanceof MissionConflictError);
+      assert.equal(cause.expectedRevision, 1);
+      assert.equal(cause.current?.revision, 2);
+      assert.equal(cause.current?.mission, "Second");
+
+      return true;
+    });
+    assert.equal((await readMission("s"))?.mission, "Second");
+    assert.equal((await readMission("s"))?.revision, 2);
+  });
+
+  it("treats expectedRevision 0 as a claim that no mission exists", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const first = await writeMission("s", { ...input("First"), expectedRevision: 0 });
+    const second = writeMission("s", { ...input("Second"), expectedRevision: 0 });
+
+    assert.equal(first.revision, 1);
+    await assert.rejects(second, MissionConflictError);
+  });
+
+  it("refuses a non-zero expectedRevision when there is no mission yet", async () => {
+    host = installTestHost({ id: "mission" });
+
+    await assert.rejects(
+      writeMission("s", { ...input("First"), expectedRevision: 3 }),
+      (cause: unknown) => {
+        assert.ok(cause instanceof MissionConflictError);
+        assert.equal(cause.current, undefined);
+
+        return true;
+      },
+    );
+    assert.equal(host.stored.size, 0);
   });
 });

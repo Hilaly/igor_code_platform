@@ -2,7 +2,7 @@ import { contribute, defineEvent, z, type PluginToolInvocation } from "@sovereig
 
 import { missionInputSchema } from "./model.ts";
 import { renderSnapshot } from "./render.ts";
-import { readMission, writeMission } from "./store.ts";
+import { MissionConflictError, readMission, writeMission } from "./store.ts";
 
 export const changed = defineEvent(
   "changed",
@@ -33,7 +33,7 @@ const readDescription = [
   "",
   "Call it when the current mission and plan are no longer in front of you — after a long stretch of work, or when picking a session back up — before continuing or updating them. The mission lives outside the conversation and outlives it, so the stored snapshot is the source of truth and your recollection is not.",
   "",
-  "It returns the same text mission-update returns.",
+  "It returns the same text mission-update returns, including the revision to pass back as expectedRevision.",
 ].join("\n");
 
 export async function contributeTools(): Promise<void> {
@@ -49,6 +49,10 @@ export async function contributeTools(): Promise<void> {
 
         return renderSnapshot(snapshot);
       } catch (cause) {
+        if (cause instanceof MissionConflictError) {
+          return { content: describeConflict(cause), isError: true };
+        }
+
         return {
           content: `Mission update failed: ${cause instanceof Error ? cause.message : String(cause)}`,
           isError: true,
@@ -67,7 +71,7 @@ export async function contributeTools(): Promise<void> {
         const snapshot = await readMission(invocation.sessionId);
 
         return snapshot === undefined
-          ? "There is no mission for this session yet. Call mission-update to record one."
+          ? "There is no mission for this session yet. Call mission-update with expectedRevision 0 to record one."
           : renderSnapshot(snapshot);
       } catch (cause) {
         return {
@@ -77,4 +81,12 @@ export async function contributeTools(): Promise<void> {
       }
     },
   });
+}
+
+function describeConflict(conflict: MissionConflictError): string {
+  const head = `Mission update refused: ${conflict.message}. The mission changed under you; nothing was written.`;
+
+  return conflict.current === undefined
+    ? `${head} Call mission-update again without expectedRevision to record the first mission.`
+    : `${head} Merge your changes into the stored snapshot below and call mission-update again with expectedRevision ${conflict.current.revision}.\n\n${renderSnapshot(conflict.current)}`;
 }

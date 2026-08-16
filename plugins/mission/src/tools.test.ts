@@ -52,6 +52,34 @@ describe("mission-update", () => {
     assert.match(outcome.content, /^ {2}2\. \[blocked\] Push \(reason: no credentials\)$/mu);
   });
 
+  it("refuses a stale expectedRevision and returns the snapshot to merge into", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    await host.callTool(
+      "mission-update",
+      { mission: "First", plan: [{ step: "Build", status: "pending" }] },
+      { sessionId: "s" },
+    );
+
+    const outcome = await host.callTool(
+      "mission-update",
+      {
+        mission: "Second",
+        plan: [{ step: "Build", status: "completed" }],
+        expectedRevision: 7,
+      },
+      { sessionId: "s" },
+    );
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /Mission update refused/u);
+    assert.match(outcome.content, /expectedRevision 1/u);
+    assert.match(outcome.content, /^Goal: First$/mu);
+    // Отказ ничего не пишет и никого не будит: снимок прежний, событие одно — от первой записи.
+    assert.equal((host.stored.get("mission.s") as { mission: string }).mission, "First");
+    assert.equal(host.published.length, 1);
+  });
+
   it("rejects invalid input before writing or publishing", async () => {
     host = installTestHost({ id: "mission" });
     await contributeTools();

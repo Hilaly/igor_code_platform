@@ -44,7 +44,8 @@ const missionOutcomeSchema = z.strictObject({
     .describe("The result if it succeeded, or what stopped it if it failed."),
 });
 
-export const missionInputSchema = z.strictObject({
+/** Содержание миссии: то, что хранится и показывается. `expectedRevision` сюда не входит. */
+const missionContentSchema = z.strictObject({
   mission: z
     .string()
     .trim()
@@ -65,11 +66,27 @@ export const missionInputSchema = z.strictObject({
     .describe("Set this only when the mission is over. Leave it out while work continues."),
 });
 
+export const missionInputSchema = missionContentSchema.extend({
+  /**
+   * Защита от затирания. Необязательна: у первой записи сравнивать не с чем, а вызов без поля
+   * остаётся прежней безусловной заменой.
+   */
+  expectedRevision: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "The revision you are replacing, from the last mission-update or mission-read. Pass it to be told about a competing write instead of silently overwriting it. Use 0 when you expect no mission yet.",
+    ),
+});
+
 export type MissionStep = z.infer<typeof missionStepSchema>;
 export type MissionOutcome = z.infer<typeof missionOutcomeSchema>;
+export type MissionContent = z.infer<typeof missionContentSchema>;
 export type MissionInput = z.infer<typeof missionInputSchema>;
 
-export const missionSnapshotSchema = missionInputSchema.extend({
+export const missionSnapshotSchema = missionContentSchema.extend({
   revision: z.number().int().positive(),
   updatedAt: z.string().datetime(),
 });
