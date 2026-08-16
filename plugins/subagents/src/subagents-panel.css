@@ -1,0 +1,47 @@
+/*
+ * Раскладка вкладки субагентов. Кегль, цвет и поверхности приходят от кита и от правой панели
+ * (docs/ui-extension-model.md) — здесь только геометрия: что за чем и через какой отступ.
+ *
+ * Без неё размеченные в `browser.tsx` контейнеры оставались строчными `span` без отступов, и строка
+ * списка склеивалась в один поток: статус, описание, модель, идентификатор агента и выдержка ответа
+ * шли подряд без единого пробела между ними.
+ */
+
+.subagents-panel,
+.subagents-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+/* Строка списка: три яруса сверху вниз. Панель узкая, в строку они не помещаются никогда. */
+.subagents-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  width: 100%;
+  min-width: 0;
+  text-align: start;
+}
+
+.subagents-row-head,
+.subagents-row-facts,
+.subagents-detail-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+/*
+ * Описание субагента и выдержка его ответа — единственный в панели текст произвольной длины, и
+ * приходит он от модели: ни переносов, ни пробелов в нём может не быть вовсе. Рвётся он по любому
+ * месту, иначе одно длинное слово растягивает строку списка шире панели.
+ */
+.subagents-row > :last-child,
+.subagents-row-head,
+.subagents-row-facts {
+  overflow-wrap: anywhere;
+}

@@ -28,6 +28,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import "./subagents-panel.css";
 import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { SubagentDetail, SubagentListed } from "./routes.ts";
 import { isWorking, type SubagentState } from "./state.ts";
