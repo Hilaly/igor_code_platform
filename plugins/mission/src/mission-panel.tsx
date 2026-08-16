@@ -10,10 +10,13 @@ import {
   Spinner,
   StatusDot,
   Text,
+  createTranslator,
+  type ScopedTranslator,
   type StatusDotTone,
 } from "@sovereign/ui-kit";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
+import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { MissionSnapshot, MissionStep } from "./model.ts";
 import "./mission-panel.css";
 
@@ -86,17 +89,22 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
     if (sessionId === undefined) return;
     return events.subscribeRecovery?.(() => reload());
   }, [events, reload, sessionId]);
+  const translator = useTranslator();
   return (
-    <section className="mission-panel" aria-label="Mission">
-      <Heading level={2}>Mission</Heading>
-      {state.kind === "loading" ? <Spinner label="Loading mission" /> : undefined}
+    <section className="mission-panel" aria-label={translator.t("panel.title")}>
+      <Heading level={2}>{translator.t("panel.title")}</Heading>
+      {state.kind === "loading" ? <Spinner label={translator.t("panel.loading")} /> : undefined}
       {state.kind === "empty" ? (
-        <EmptyState title={sessionId === undefined ? "No active session" : "No mission yet"} />
+        <EmptyState
+          title={translator.t(sessionId === undefined ? "panel.empty.session" : "panel.empty")}
+        />
       ) : undefined}
       {state.kind === "error" ? (
-        <Notice tone="danger" title={`Could not read mission: ${state.reason}`} />
+        <Notice tone="danger" title={translator.t("panel.failure", { reason: state.reason })} />
       ) : undefined}
-      {state.kind === "ready" ? <MissionSnapshotView snapshot={state.snapshot} /> : undefined}
+      {state.kind === "ready" ? (
+        <MissionSnapshotView snapshot={state.snapshot} translator={translator} />
+      ) : undefined}
     </section>
   );
 }
@@ -108,19 +116,19 @@ const stepTones: Record<MissionStep["status"], StatusDotTone> = {
   pending: "neutral",
 };
 
-const stepLabels: Record<MissionStep["status"], string> = {
-  completed: "Done",
-  in_progress: "In progress",
-  pending: "Not started",
-};
-
 /**
  * Три яруса вместо ровного столбца абзацев: сама миссия, её пояснение и план. Раньше миссия,
  * пояснение, время правки и шаги шли одним кеглем и различались только цветом — прочесть, где
  * задание, а где примечание к нему, было нельзя. Время правки уехало вниз служебной строкой: это
  * сведения о записи, а не её содержание.
  */
-function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): ReactNode {
+function MissionSnapshotView({
+  snapshot,
+  translator,
+}: {
+  snapshot: MissionSnapshot;
+  translator: ScopedTranslator;
+}): ReactNode {
   const completed = snapshot.plan.filter((step) => step.status === "completed").length;
 
   return (
@@ -133,10 +141,12 @@ function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): React
       )}
       <div className="mission-plan">
         <div className="mission-plan-head">
-          <Text tone="muted">Steps</Text>
-          <Text tone="muted">{`${completed} of ${snapshot.plan.length}`}</Text>
+          <Text tone="muted">{translator.t("plan.label")}</Text>
+          <Text tone="muted">
+            {translator.t("plan.count", { completed, total: snapshot.plan.length })}
+          </Text>
         </div>
-        <Progress label="Mission progress" value={completed / snapshot.plan.length} />
+        <Progress label={translator.t("plan.progress")} value={completed / snapshot.plan.length} />
         <List>
           {/*
             Подсветку текущего шага рисует сама строка списка: заливкой строк владеет кит, и
@@ -146,7 +156,10 @@ function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): React
           {snapshot.plan.map((step, index) => (
             <ListRow key={`${index}-${step.step}`} selected={step.status === "in_progress"}>
               <span className="mission-step" data-status={step.status}>
-                <StatusDot tone={stepTones[step.status]} label={stepLabels[step.status]} />
+                <StatusDot
+                  tone={stepTones[step.status]}
+                  label={translator.t(`state.${step.status}`)}
+                />
                 <Text tone={step.status === "completed" ? "muted" : "normal"}>{step.step}</Text>
               </span>
             </ListRow>
@@ -154,9 +167,59 @@ function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): React
         </List>
       </div>
       <p className="mission-updated">
-        <Text tone="muted">Updated {formatUpdatedAt(snapshot.updatedAt)}</Text>
+        <Text tone="muted">
+          {translator.t("panel.updated", { time: formatUpdatedAt(snapshot.updatedAt) })}
+        </Text>
       </p>
     </div>
+  );
+}
+
+/**
+ * Переводчик панели. Локаль спрашивается у платформы: своей настройки языка у плагина нет и быть не
+ * должно — человек выбирает язык один раз на всё окно. Хук повторяет тот, что живёт у subagents:
+ * браузерного API локали в SDK пока нет, и заводить общий модуль ради двух копий рано — сначала
+ * решение, где этой локали жить (docs/backlog.md).
+ */
+function useTranslator(): ScopedTranslator {
+  const [locale, setLocale] = useState("en");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const answer = await fetch("/api/preferences", { signal: controller.signal });
+
+        if (answer.ok) {
+          const body = (await answer.json()) as { locale?: string };
+
+          if (typeof body.locale === "string") {
+            setLocale(body.locale);
+          }
+        }
+      } catch {
+        // Локаль не прочиталась — панель говорит по-английски. Ронять её из-за этого нечего.
+      }
+    })();
+
+    return () => controller.abort();
+  }, []);
+
+  return useMemo(
+    () =>
+      createTranslator({
+        locale,
+        namespace: messagesNamespace,
+        catalogs: [
+          { namespace: messagesNamespace, locale: "en", messages: englishMessages },
+          { namespace: messagesNamespace, locale: "ru", messages: russianMessages },
+        ],
+        // Дырка в собственном каталоге — ошибка автора плагина, и видно её должно быть в консоли,
+        // а не в тексте панели.
+        onDiagnostic: (diagnostic) => console.warn(`[mission] ${diagnostic}`),
+      }),
+    [locale],
   );
 }
 
