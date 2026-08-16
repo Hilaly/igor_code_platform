@@ -220,17 +220,51 @@ export function stop(sessionId: string): Promise<StopOutcome> {
 }
 
 /**
+ * Обход, уже поставленный в очередь и ещё не начатый. Событие «сессии изменились» приходит на
+ * **каждое** изменение любой сессии, а обход всегда читает все записи заново — значит второй такой
+ * же обход рядом с первым не узнает ничего нового, а работу сделает всю.
+ */
+let pending: Promise<void> | undefined;
+
+export type SweepOptions = ReconcileOptions & {
+  /**
+   * Схлопывать со стоящим в очереди обходом. Просит об этом только подписка на шину: её обход
+   * ничем не примечателен и легко заменяется чужим. Обход после запуска схлопывать нельзя — ему
+   * нужен свой, идущий **после** трёх записей запуска, а стоящий в очереди прошёл бы до них.
+   */
+  coalesce?: boolean;
+};
+
+/**
  * Обойти записи одной очередью. Сорвавшийся обход не снимает подписку и не роняет вызвавшего:
  * следующее событие шины попробует снова.
  */
-export function sweep(options: ReconcileOptions = {}): Promise<void> {
-  return serialize(async () => {
+export function sweep(options: SweepOptions = {}): Promise<void> {
+  const coalesce = options.coalesce === true;
+
+  if (coalesce && pending !== undefined) {
+    return pending;
+  }
+
+  const run = serialize(async () => {
+    // Флаг снимается **в начале** тела, а не в конце: обход, уже начавший читать записи, изменения
+    // после себя не увидит, и следующему событию нужен свой собственный.
+    if (coalesce) {
+      pending = undefined;
+    }
+
     try {
       await reconcile(await listRecords(), new Date().toISOString(), options);
     } catch (cause) {
       await log.warn("a sweep over the subagents failed", { reason: describe(cause) });
     }
   });
+
+  if (coalesce) {
+    pending = run;
+  }
+
+  return run;
 }
 
 export type ReconcileOptions = {

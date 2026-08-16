@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { lastAgentText, launch, reconcile, settled, stop } from "./lifecycle.ts";
+import { lastAgentText, launch, reconcile, settled, stop, sweep } from "./lifecycle.ts";
 import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
 import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
 
@@ -31,6 +31,22 @@ function record(overrides: Partial<SubagentRecord> = {}): SubagentRecord {
     startedAt: "2026-08-14T09:00:00.000Z",
     ...overrides,
   };
+}
+
+const listed = (): number =>
+  (world?.calls ?? []).filter((call) => call.kind === "session-list").length;
+
+/** Дождаться наблюдаемого шага платформы вместо сна на глазок: иначе тест меряет скорость машины. */
+async function until(kind: string): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (world?.calls.some((call) => call.kind === kind) === true) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+
+  assert.fail(`the platform never saw ${kind}`);
 }
 
 describe("lastAgentText", () => {
@@ -249,6 +265,65 @@ describe("reconcile", () => {
     // а спрашивать его больше некому.
     assert.equal(settled?.state, "finished");
     assert.equal(settled?.lastResponse, "all green");
+  });
+});
+
+describe("sweep", () => {
+  it("keeps one pending sweep instead of one per session change", async () => {
+    // Событие шины приходит на каждое изменение любой сессии. Обход всегда читает все записи
+    // заново, поэтому второй такой же рядом со стоящим не узнал бы ничего нового.
+    world = installWorld([session({ id: "s-parent" }), session({ id: "s-child", phase: "turn" })]);
+    await writeRecord(record());
+    world.calls.length = 0;
+
+    const first = sweep({ coalesce: true });
+
+    assert.equal(sweep({ coalesce: true }), first);
+    assert.equal(sweep({ coalesce: true }), first);
+
+    await settled();
+
+    assert.equal(listed(), 1);
+  });
+
+  it("takes a new sweep for what changed after the current one started reading", async () => {
+    // Флаг снимается в начале тела: обход, уже читающий записи, изменения после себя не увидит.
+    world = installWorld([
+      session({ id: "s-parent" }),
+      session({
+        id: "s-child",
+        phase: "idle",
+        entries: [agentMessage("e1", "all green", answered)],
+      }),
+    ]);
+    world.branchDelayMilliseconds = 5;
+    await writeRecord(record());
+    world.calls.length = 0;
+
+    const first = sweep({ coalesce: true });
+
+    await until("session-branch");
+
+    assert.notEqual(sweep({ coalesce: true }), first);
+
+    await settled();
+  });
+
+  it("does not swallow the sweep of a launch into a sweep that runs before it", async () => {
+    // Обход запуска идёт **после** его трёх записей и заменяться стоящим в очереди не вправе:
+    // тот прошёл бы до них и оставил бы субагента идущим навсегда.
+    world = installWorld([
+      session({ id: "s-parent" }),
+      session({ id: "s-child", phase: "idle", hidden: true }),
+    ]);
+    world.answerAtOnce = "done before you looked";
+    world.calls.length = 0;
+
+    void sweep({ coalesce: true });
+    await launch(record({ state: "starting" }), "run the tests");
+    await settled();
+
+    assert.equal((await readRecord("s-child"))?.state, "finished");
   });
 });
 
