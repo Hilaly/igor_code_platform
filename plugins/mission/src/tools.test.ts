@@ -31,6 +31,27 @@ describe("mission-update", () => {
     assert.equal((host.stored.get("mission.session-42") as { mission: string }).mission, "Ship");
   });
 
+  it("hands the stored snapshot back so the writer sees what was written", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+
+    const outcome = await host.callTool(
+      "mission-update",
+      {
+        mission: "Ship",
+        plan: [
+          { step: "Build", status: "completed" },
+          { step: "Push", status: "blocked", reason: "no credentials" },
+        ],
+      },
+      { sessionId: "s" },
+    );
+
+    assert.match(outcome.content, /^Goal: Ship$/mu);
+    assert.match(outcome.content, /^ {2}1\. \[completed\] Build$/mu);
+    assert.match(outcome.content, /^ {2}2\. \[blocked\] Push \(reason: no credentials\)$/mu);
+  });
+
   it("rejects invalid input before writing or publishing", async () => {
     host = installTestHost({ id: "mission" });
     await contributeTools();
@@ -62,5 +83,49 @@ describe("mission-update", () => {
     assert.match(outcome.content, /disk full/u);
     assert.equal(host.stored.size, 0);
     assert.deepEqual(host.published, []);
+  });
+});
+
+describe("mission-read", () => {
+  it("returns the snapshot stored for the calling session", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    await host.callTool(
+      "mission-update",
+      { mission: "Ship", plan: [{ step: "Build", status: "in_progress" }] },
+      { sessionId: "mine" },
+    );
+
+    const outcome = await host.callTool("mission-read", {}, { sessionId: "mine" });
+
+    assert.equal(outcome.isError, false);
+    assert.match(outcome.content, /^Goal: Ship$/mu);
+    assert.match(outcome.content, /revision 1/u);
+  });
+
+  it("does not read another session's mission", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    await host.callTool(
+      "mission-update",
+      { mission: "Ship", plan: [{ step: "Build", status: "in_progress" }] },
+      { sessionId: "theirs" },
+    );
+
+    const outcome = await host.callTool("mission-read", {}, { sessionId: "mine" });
+
+    assert.equal(outcome.isError, false);
+    assert.match(outcome.content, /no mission for this session yet/u);
+  });
+
+  it("reports a storage failure instead of pretending there is no mission", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    host.failNextStorage("disk gone");
+
+    const outcome = await host.callTool("mission-read", {}, { sessionId: "s" });
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /Mission read failed: .*disk gone/u);
   });
 });
