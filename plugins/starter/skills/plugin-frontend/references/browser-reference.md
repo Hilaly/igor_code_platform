@@ -21,6 +21,36 @@ import {
 Host и plugin получают один runtime-экземпляр browser SDK, поэтому React context общий. Не передавай
 plugin identity вручную и не импортируй внутренний host subpath.
 
+## Event bridge и session snapshots
+
+Host уже подписан на единый `/api/events` SSE и передаёт события через frontend bus. Plugin получает
+readonly-подписку через `useSovereignEvents()` из публичного `@sovereign/browser-sdk`:
+
+```tsx
+import { useEffect } from "react";
+import { useSovereignEvents, type PlaceContext } from "@sovereign/browser-sdk";
+
+export function SessionBoard({ context }: { context: PlaceContext }) {
+  const events = useSovereignEvents();
+
+  useEffect(() => {
+    const sessionId = context.subject?.["sessionId"];
+    if (sessionId === undefined) return;
+    return events.subscribe("board.changed", (event) => {
+      if (event.payload.sessionId !== sessionId) return;
+      // Re-fetch the snapshot route and ignore stale revisions.
+    });
+  }, [context.subject, events]);
+
+  return null;
+}
+```
+
+Компонент должен получить snapshot при mount и смене `sessionId`, а также после reconnect или
+обнаруженного разрыва последовательности событий. Событие содержит только ключ инвалидации
+(`sessionId`, `revision`); не держи в нём полное состояние. Не создавай второй `EventSource`, не
+вызывай `/api/events` напрямую и не используй polling — bus уже разделяется между host и plugins.
+
 ## Core places
 
 | Place                       | Cardinality | Replaceable | Context              |

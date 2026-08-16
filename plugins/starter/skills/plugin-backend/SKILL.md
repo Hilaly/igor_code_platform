@@ -26,12 +26,19 @@ description: Use when creating or changing a Sovereign plugin worker, package ma
    ещё не действует. Публикуй из route, tool, hook или другого обработчика, вызванного позже.
 5. **Не держи важное состояние в памяти worker.** Используй `storage` для JSON-совместимых значений
    и `storage.directory()` для файлов.
-6. **Ограничь внешнюю поверхность.** Предпочитай session-protected `contribute.route`;
+6. **Для изменяемого состояния используй route как источник истины и событие как invalidation.**
+   Обработчик сначала записывает новый snapshot в `storage`, затем публикует событие с минимальным
+   payload (обычно `sessionId` и `revision`). Клиент после события перечитывает snapshot через route;
+   событие не дублирует состояние.
+7. **Не добавляй polling API.** Объяви session-protected GET route для snapshot и событие изменения.
+   Публикуй событие только после успешной записи; при ошибке записи состояние и событие не должны
+   измениться.
+8. **Ограничь внешнюю поверхность.** Предпочитай session-protected `contribute.route`;
    `publicRoute` требует собственной аутентификации, валидации и защиты от повторов.
-7. **Добавляй browser-вклады только вместе с `sovereign.browser`.** `place`, `component`, `command`
+9. **Добавляй browser-вклады только вместе с `sovereign.browser`.** `place`, `component`, `command`
    и `page` требуют browser bundle. Вклад `command` объявляется здесь, но его обработчик не живёт
    в worker: за browser export обратись к `starter.plugin-frontend`.
-8. **Проверь плагин.** Запусти его tests/typecheck, включи источник, дождись состояния running и
+10. **Проверь плагин.** Запусти его tests/typecheck, включи источник, дождись состояния running и
    проверь contributions и diagnostics.
 
 ## Минимальный manifest

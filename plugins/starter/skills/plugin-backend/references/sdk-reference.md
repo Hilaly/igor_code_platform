@@ -193,6 +193,47 @@ Event declaration начинает действовать после `activate`;
 Подписка использует полное имя события без wildcard. Чужой payload непрозрачен, если подписчик не
 импортировал и не применил schema publisher’а.
 
+### Snapshot route и invalidation event
+
+Для изменяемого состояния разделяй запись и уведомление: mutation tool/route сначала валидирует вход
+и записывает полный JSON snapshot с монотонным `revision`, затем публикует событие только с ключом
+инвалидации:
+
+```ts
+const changed = defineEvent(
+  "board.changed",
+  z.object({ sessionId: z.string(), revision: z.number().int().nonnegative() }),
+);
+
+await contribute.event(changed);
+await contribute.route({
+  id: "snapshot",
+  method: "GET",
+  path: "snapshot/:sessionId",
+  handle: async ({ parameters }) => {
+    const snapshot = await storage.get(`board.${parameters.sessionId}`);
+    if (snapshot === undefined) return { status: 404, body: { error: "not_found" } };
+    return { status: 200, body: snapshot };
+  },
+});
+```
+
+Route остаётся единственным источником истины и переживает потерю/слияние событий. Не публикуй
+событие до успешной записи и не добавляй polling endpoint. Для tool session id берётся из
+`PluginToolInvocation`, а не из параметров модели:
+
+```ts
+await contribute.tool({
+  id: "board-update",
+  description: "Replace the current session board snapshot",
+  parameters: z.object({ snapshot: z.record(z.string(), z.unknown()) }),
+  invoke: async ({ snapshot }, { sessionId }) => {
+    // validate, write `board.${sessionId}`, then publish `changed`
+    return "updated";
+  },
+});
+```
+
 ## Contributions
 
 Ядро добавляет namespace ко всем declared ids: `board` плагина `task-plugin` становится

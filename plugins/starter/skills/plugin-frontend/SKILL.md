@@ -31,11 +31,18 @@ worker и lifecycle.
    - Command — объект `Command` с методом `run`, не React component.
 5. **Передай context.** Компоненты places получают `PlaceContext`; вложенные places вызывай с тем
    же релевантным context.
-6. **Используй browser SDK.** `Place`, `PlaceCollection`, `PlaceTabs`, `useCommands`,
+6. **Подписывайся на host event bridge, а не создавай transport.** Используй `useSovereignEvents()`
+   для подписки на уже существующую frontend bus. Host держит ровно один `/api/events` SSE; plugin
+   не создаёт свой `EventSource` и не опрашивает route по таймеру.
+7. **После события перечитывай snapshot через route.** Фильтруй событие по текущему
+   `context.subject?.sessionId`, игнорируй revision не новее локальной и после mount, смены сессии,
+   reconnect или обнаруженного gap выполняй GET snapshot. Route — источник истины, событие лишь
+   invalidation.
+8. **Используй browser SDK.** `Place`, `PlaceCollection`, `PlaceTabs`, `useCommands`,
    `usePageNavigation` импортируются из `@sovereign/browser-sdk`.
-7. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
+9. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
    отображаться как diagnostics/outcome, а не маскироваться пустым UI.
-8. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
+10. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
    вызови каждую command минимум один раз.
 
 ## Manifest
