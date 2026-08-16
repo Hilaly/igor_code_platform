@@ -23,6 +23,7 @@ describe("mission worker", () => {
         ["event", "changed"],
         ["tool", "mission-update"],
         ["route", "snapshot"],
+        ["component", "panel"],
       ],
     );
   });
