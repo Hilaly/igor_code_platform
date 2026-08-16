@@ -35,7 +35,7 @@ import {
   type Translator,
 } from "@sovereign/ui-kit";
 import { useCommands } from "@sovereign/browser-sdk";
-import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
+import { contributionTitle, useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchProjectFiles, type NavigationOutcome } from "./api.ts";
@@ -173,9 +173,9 @@ export function ChatView(props: ChatViewProps) {
         .filter(({ registration }) => registration.placeId === slashPlaceId)
         .map(({ registration }) => ({
           name: registration.id,
-          description: registration.title,
+          description: contributionTitle(registration, translator),
         })),
-    [placedCommands],
+    [placedCommands, translator],
   );
 
   /**

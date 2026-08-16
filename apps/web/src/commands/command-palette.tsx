@@ -11,7 +11,7 @@
  */
 
 import { useCommands, type PlaceContext } from "@sovereign/browser-sdk";
-import { useHostCommandCatalog } from "@sovereign/browser-sdk/host";
+import { contributionTitle, useHostCommandCatalog } from "@sovereign/browser-sdk/host";
 import {
   CommandList,
   Dialog,
@@ -123,7 +123,7 @@ export function CommandPalette({
           : translator.t("commands.group.plugins");
       const item = {
         id: registration.id,
-        label: registration.title,
+        label: contributionTitle(registration, translator),
         icon: <PluginIcon size="sm" />,
         disabled,
       };

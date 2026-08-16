@@ -30,7 +30,7 @@ import {
 } from "./runtime-context.tsx";
 
 export { useHostCommandCatalog, type HostCommandCatalogEntry } from "./commands.tsx";
-export { pluginCatalogs } from "./i18n.ts";
+export { contributionTitle, pluginCatalogs } from "./i18n.ts";
 export { isSettingsSection } from "./navigation.ts";
 export { normalizePagePath } from "./page-path.ts";
 export { HostPluginPage, type HostPageNavigation, type HostPluginPageProps } from "./page.tsx";

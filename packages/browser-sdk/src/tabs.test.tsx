@@ -104,6 +104,7 @@ function provider(
     plugins?: readonly PluginStatus[];
     cache?: PluginModuleCache;
     onDiagnostic?: (text: string) => void;
+    locale?: string;
   } = {},
 ) {
   return (
@@ -112,7 +113,7 @@ function provider(
       plugins={options.plugins ?? [placed]}
       onDiagnostic={options.onDiagnostic ?? (() => {})}
       events={{ subscribe: () => () => {} }}
-      locale="en"
+      locale={options.locale ?? "en"}
       createCache={() => cache().cache}
       cache={options.cache}
     >
@@ -138,7 +139,48 @@ function HostStrip({ id = "core.panel.tabs", open }: { id?: string; open?: strin
   );
 }
 
+/** Каталог плагина, приехавший снимком: подпись вкладки платформа ищет в нём. */
+const catalog = (locale: string, messages: Record<string, string>): ContributionRegistration => ({
+  ownership: "plugin",
+  pluginKey: placed.key,
+  pluginId: "placed",
+  source: "data",
+  kind: "locale-catalog",
+  id: `placed.messages-${locale}`,
+  declaredId: `messages-${locale}`,
+  namespace: "placed",
+  locale,
+  messages,
+});
+
 describe("useHostPlaceTabs", () => {
+  /**
+   * Заголовок из манифеста — английский текст, написанный автором плагина. На языке окна вкладка
+   * говорит только через каталог, который тот же плагин объявил воркером.
+   */
+  it("takes the label from the catalogue of the plugin in the language of the window", () => {
+    render(
+      provider(<HostStrip />, {
+        locale: "ru",
+        contributions: [tab("board"), catalog("ru", { "component.board.title": "Доска" })],
+      }),
+    );
+
+    expect(screen.getByRole("listitem").textContent).toBe("Доска");
+  });
+
+  /** Переводить своё название плагин не обязан: заголовок объявления остаётся запасной ступенью. */
+  it("keeps the declared title when the catalogue has no name for the contribution", () => {
+    render(
+      provider(<HostStrip />, {
+        locale: "ru",
+        contributions: [tab("board"), catalog("ru", { "panel.title": "Панель" })],
+      }),
+    );
+
+    expect(screen.getByRole("listitem").textContent).toBe("Board");
+  });
+
   it("labels every tab from the snapshot, in the order of the contributions", () => {
     render(
       provider(<HostStrip />, {

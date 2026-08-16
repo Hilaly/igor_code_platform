@@ -1,13 +1,13 @@
 /**
- * Строки панели. Один модуль на обе половины плагина: воркер объявляет их вкладом
- * `contribute.localeCatalog`, браузерная часть строит из них переводчик кита.
- *
- * Держать их в двух местах нельзя — расхождение поймал бы только человек, читающий панель.
+ * Строки плагина. Объявляет их воркер вкладом `contribute.localeCatalog`, а браузерная половина
+ * ничего отсюда не импортирует: каталог доезжает до неё снимком, и переводчик собирает хост
+ * (docs/ui-kit.md). Заголовок вкладки платформа ищет здесь же — по ключу `component.<id>.title`.
  */
 
 export const messagesNamespace = "subagents";
 
 export const englishMessages: Record<string, string> = {
+  "component.panel.title": "Subagents",
   "panel.scope.session": "This session",
   "panel.scope.all": "All",
   "panel.scope.label": "Which subagents to show",
@@ -34,6 +34,7 @@ export const englishMessages: Record<string, string> = {
 };
 
 export const russianMessages: Record<string, string> = {
+  "component.panel.title": "Субагенты",
   "panel.scope.session": "Эта сессия",
   "panel.scope.all": "Все",
   "panel.scope.label": "Каких субагентов показывать",

@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 
 import { useDiagnosticVoice } from "./diagnostics.ts";
 import type { LoadedPluginModule, PluginModuleCache } from "./host.tsx";
+import { useContributionTitle } from "./i18n.ts";
 import {
   BrowserRuntimeContext,
   type BrowserRuntime,
@@ -343,6 +344,7 @@ export function CommandButton({ registration, context }: CommandButtonProps): Re
   const runtime = useContext(BrowserRuntimeContext);
   const { invoke } = useCommands();
   const say = useDiagnosticVoice(runtime);
+  const titleOf = useContributionTitle();
   const cacheVersion = useCacheVersion(runtime);
   const availability = useMemo(
     () => cachedAvailability(runtime, registration, context),
@@ -364,7 +366,7 @@ export function CommandButton({ registration, context }: CommandButtonProps): Re
         void invoke(registration.id, context);
       }}
     >
-      {registration.title}
+      {titleOf(registration)}
     </Button>
   );
 }
