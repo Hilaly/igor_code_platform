@@ -26,14 +26,6 @@ const expectedSkills = [
   "writing-plans",
   "writing-skills",
 ] as const;
-const coreSkills = [
-  "brainstorming",
-  "systematic-debugging",
-  "test-driven-development",
-  "using-superpowers",
-  "verification-before-completion",
-  "writing-plans",
-] as const;
 
 describe("the built-in Superpowers plugin", () => {
   it("declares the skills-only plugin and the complete upstream inventory", () => {
@@ -50,8 +42,8 @@ describe("the built-in Superpowers plugin", () => {
     assert.deepEqual(skillDirectories, [...expectedSkills].sort());
   });
 
-  it("parses the planning and quality skills and resolves their relative Markdown links", () => {
-    for (const name of coreSkills) {
+  it("parses every skill and resolves its relative Markdown links", () => {
+    for (const name of expectedSkills) {
       const directory = join(skillsRoot, name);
       const entryPath = join(directory, "SKILL.md");
       const text = readFileSync(entryPath, "utf8");
