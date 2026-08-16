@@ -252,6 +252,12 @@ export default tseslint.config(
       "**/build/**",
       "**/dist/**",
       "**/node_modules/**",
+      // Nested git worktree checkouts (.worktrees/, .claude/worktrees/) sit inside the
+      // repository but belong to their own branches: their copies of workspace files fall
+      // outside the root-anchored blocks below, so they lint as strangers to the config and
+      // light up with errors the real files do not have. Git ignores them for the same reason.
+      ".worktrees/**",
+      ".claude/**",
       // Superpowers helpers are shipped skill resources for browser/CommonJS execution, not
       // workspace modules. Their runtime is documented and tested by the skills that bundle them.
       "plugins/superpowers/skills/**/scripts/**",
