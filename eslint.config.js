@@ -256,6 +256,7 @@ export default tseslint.config(
       // workspace modules. Their runtime is documented and tested by the skills that bundle them.
       "plugins/superpowers/skills/**/scripts/**",
       "plugins/superpowers/skills/writing-skills/render-graphs.js",
+      "plugins/superpowers/skills/writing-skills/render-graphs.cjs",
     ],
   },
   js.configs.recommended,
