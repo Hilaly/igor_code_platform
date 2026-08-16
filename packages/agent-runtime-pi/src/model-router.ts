@@ -9,8 +9,9 @@
  * соседняя идёт в тот же отказ следом.
  */
 
-import type { Api, Model, Models } from "@earendil-works/pi-ai";
+import type { Models } from "@earendil-works/pi-ai";
 import type { Candidate, KeyPool } from "@sovereign/model-routing";
+import { aliasProviderId } from "@sovereign/protocol";
 
 import type { CredentialVault } from "./credentials.ts";
 import { processEnvironment, type Environment } from "./environment.ts";
@@ -25,10 +26,10 @@ export type CreateModelRouterOptions = {
   /** По умолчанию — настоящее окружение процесса. Подменяется только тестами. */
   environment?: Environment;
   /**
-   * Чем можно заменить модель, если она отказала. Не названо — заменять нечем, и сессия перебирает
-   * только ключи её провайдера.
+   * Кандидаты алиаса по порядку. `undefined` — такого алиаса нет; тогда сессия перебирает только
+   * ключи провайдера самой модели.
    */
-  candidatesFor?: (model: Model<Api>) => Candidate[];
+  aliasCandidates?: (aliasId: string) => Candidate[] | undefined;
   /** Сессия взялась за следующую попытку. Наблюдение: в дерево сессии это не пишется. */
   onSwitch?: SessionRouter["onSwitch"];
 };
@@ -37,8 +38,17 @@ export function createModelRouter(options: CreateModelRouterOptions): SessionRou
   const environment = options.environment ?? processEnvironment();
 
   return {
-    candidatesFor: (model) =>
-      options.candidatesFor?.(model) ?? [{ providerId: model.provider, modelId: model.id }],
+    candidatesFor: (model) => {
+      const itself = [{ providerId: model.provider, modelId: model.id }];
+
+      if (model.provider !== aliasProviderId) {
+        return itself;
+      }
+
+      // Алиас без кандидатов не подменяется на себя же: попытка сходить в псевдо-провайдера
+      // кончится названным отказом, а не молчаливым запросом в никуда.
+      return options.aliasCandidates?.(model.id) ?? itself;
+    },
     keysOf: (providerId) =>
       options.pool.usable(
         providerId,

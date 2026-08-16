@@ -82,6 +82,7 @@ import { filesystemRoutes } from "./http/public.ts";
 import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./providers/public.ts";
 import { createProviderLogins } from "./providers/public.ts";
 import { providersRoutes } from "./providers/public.ts";
+import { modelAliasRoutes, createModelAliasStore } from "./providers/public.ts";
 import { userProviderRoutes } from "./providers/public.ts";
 import { createDaemonServer, staticAssetsRoute } from "./http/public.ts";
 import {
@@ -214,6 +215,7 @@ const modelRouter = createModelRouter({
   credentials,
   pool: createKeyPool(),
   environment: processEnvironment(),
+  aliasCandidates: (aliasId) => providers.aliasCandidates(aliasId),
   onSwitch: (from, to, reason) =>
     logger.info("a session moved on to the next key", {
       providerId: from.candidate.providerId,
@@ -224,6 +226,14 @@ const modelRouter = createModelRouter({
       reason,
     }),
 });
+
+/**
+ * Алиасы моделей (docs/model-routing.md). Применяются к каталогу сразу при старте: сессия, открытая
+ * на `alias/…`, обязана резолвиться до первого запроса человека, а не после первой правки списка.
+ */
+const modelAliases = createModelAliasStore({ directory, logger });
+
+providers.setAliases(modelAliases.list());
 
 const userProviderStore = createUserProviderStore({ directory, logger });
 let hasActiveProviderSession: (providerId: string) => boolean = () => false;
@@ -591,6 +601,7 @@ const server = createDaemonServer({
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...userProviderRoutes({ providers: userProviders, logger, bus }),
+    ...modelAliasRoutes({ store: modelAliases, catalogue: providers, logger, bus }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     ...filesystemRoutes(),
     events.route(),

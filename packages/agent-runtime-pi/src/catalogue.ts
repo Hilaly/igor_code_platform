@@ -8,10 +8,13 @@
 
 import type { MutableModels, Provider, ProviderModelsStore } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
+import { aliasProviderId } from "@sovereign/protocol";
 import type {
   CustomProviderDefinition,
   CustomProviderOutcome,
   LoginKeyTarget,
+  ModelAlias,
+  ModelAliasCandidate,
   ModelSummary,
   ProviderAuthState,
   ProvidersSnapshot,
@@ -22,6 +25,7 @@ import type {
   UserProviderDefinition,
 } from "@sovereign/protocol";
 
+import { createAliasProvider } from "./alias-provider.ts";
 import { describeKeys, toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
 import { toRuntimeProvider, toRuntimeUserProvider } from "./custom-provider.ts";
 import { describeModels, describeProvider } from "./describe.ts";
@@ -99,6 +103,13 @@ export type ProviderCatalogue = {
   restoreProvider: (providerId: string, origin: "plugin" | "user") => Promise<boolean>;
   /** Источник записи, если она добавлена поверх встроенного каталога. */
   customProviderOrigin: (providerId: string) => "plugin" | "user" | undefined;
+  /**
+   * Заменить набор алиасов моделей (docs/model-routing.md). Пустой список убирает провайдера
+   * алиасов из каталога целиком: строка, за которой ничего нет, человеку не нужна.
+   */
+  setAliases: (aliases: readonly ModelAlias[]) => void;
+  /** Кандидаты алиаса по порядку. `undefined` — такого алиаса нет. */
+  aliasCandidates: (aliasId: string) => ModelAliasCandidate[] | undefined;
 };
 
 export type LoginRequest = {
@@ -150,8 +161,11 @@ export function createProviderCatalogue(
    */
   const custom = new Map<string, "plugin" | "user">();
   const userDefinitions = new Map<string, UserProviderDefinition>();
+  /** Алиасы моделей. Провайдер под них собирается заново на каждую замену набора. */
+  const aliases = new Map<string, ModelAlias>();
 
-  const originOf = (providerId: string): ProviderOrigin => custom.get(providerId) ?? "builtin";
+  const originOf = (providerId: string): ProviderOrigin =>
+    providerId === aliasProviderId ? "alias" : (custom.get(providerId) ?? "builtin");
   const setCustom = (
     definition: CustomProviderDefinition | UserProviderDefinition,
     origin: "plugin" | "user",
@@ -296,6 +310,24 @@ export function createProviderCatalogue(
       return true;
     },
     customProviderOrigin: (providerId) => custom.get(providerId),
+    setAliases: (next) => {
+      aliases.clear();
+
+      for (const alias of next) {
+        aliases.set(alias.id, alias);
+      }
+
+      const provider = createAliasProvider({ aliases: next, models });
+
+      if (provider === undefined) {
+        models.deleteProvider(aliasProviderId);
+
+        return;
+      }
+
+      models.setProvider(provider);
+    },
+    aliasCandidates: (aliasId) => aliases.get(aliasId)?.candidates.map((one) => ({ ...one })),
     login: async (input) => {
       const written = await options.credentials.withKeyTarget(
         input.providerId,

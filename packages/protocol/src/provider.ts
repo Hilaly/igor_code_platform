@@ -86,7 +86,12 @@ export type ProviderAuthState =
   | { kind: "unconfigured" }
   | { kind: "unknown" };
 
-export type ProviderOrigin = "builtin" | "plugin" | "user";
+/**
+ * Кто владеет жизненным циклом провайдера. `alias` — псевдо-провайдер платформы, чьи модели задал
+ * человек списком совместимых (docs/model-routing.md): входить в него нечем, и правится он своим
+ * редактором, а не входом.
+ */
+export type ProviderOrigin = "builtin" | "plugin" | "user" | "alias";
 
 /**
  * Ключ провайдера глазами вью: подпись, которую дал человек, и способ авторизации. Значение креда

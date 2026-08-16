@@ -364,3 +364,68 @@ describe("the models collection of a session", () => {
     assert.equal(sessionModels.getModel("openai", model.id), undefined);
   });
 });
+
+describe("a session over a list of candidates", () => {
+  const second = { ...model, id: "gpt-5", provider: "openai" } as Model<Api>;
+
+  function twoModels(script: Script[]) {
+    const built = collection(script);
+    const models = {
+      ...built.models,
+      getModel: (providerId: string, modelId: string) =>
+        providerId === model.provider && modelId === model.id
+          ? model
+          : providerId === second.provider && modelId === second.id
+            ? second
+            : undefined,
+    } as unknown as Models;
+
+    return { models, calls: built.calls };
+  }
+
+  const chain: Partial<SessionRouter> = {
+    candidatesFor: () => [
+      { providerId: model.provider, modelId: model.id },
+      { providerId: second.provider, modelId: second.id },
+    ],
+  };
+
+  it("moves on to the next model when the first one is not to blame on the key", async () => {
+    const { models, calls } = twoModels([
+      { kind: "refuses", message: "404 model not found" },
+      { kind: "answers" },
+    ]);
+    const sessionModels = createSessionModels({
+      models,
+      router: router(["key-1"], chain),
+    });
+
+    const events = await drain(sessionModels.streamSimple(model, context));
+
+    assert.deepEqual(
+      calls.map((call) => call.model.provider),
+      ["anthropic", "openai"],
+    );
+    assert.equal(events.at(-1)?.type, "done");
+  });
+
+  it("walks every key of a model before it takes the next model", async () => {
+    const { models, calls } = twoModels([
+      { kind: "refuses", message: "429 slow down" },
+      { kind: "refuses", message: "429 slow down" },
+      { kind: "answers" },
+    ]);
+    const sessionModels = createSessionModels({
+      models,
+      router: router(["key-1", "key-2"], chain),
+    });
+
+    await drain(sessionModels.streamSimple(model, context));
+
+    // Порядок обхода: ключи текущей модели, потом следующая модель (docs/model-routing.md).
+    assert.deepEqual(
+      calls.map((call) => `${call.model.provider}/${call.apiKey ?? ""}`),
+      ["anthropic/sk-key-1", "anthropic/sk-key-2", "openai/sk-key-1"],
+    );
+  });
+});
