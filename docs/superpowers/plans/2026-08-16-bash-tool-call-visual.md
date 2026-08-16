@@ -189,7 +189,8 @@ const outcomeMarkerPatterns = [
 ];
 
 /** Пометка усечения внутри секции: `[output truncated; full output: …]` и job-вариант. */
-const truncatedMarkerPattern = /^\[(?:output truncated|some output was dropped from memory); full output: (.+)\]$/;
+const truncatedMarkerPattern =
+  /^\[(?:output truncated|some output was dropped from memory); full output: (.+)\]$/;
 
 /** Секция без пометок усечения: сами пометки — структура, а не содержимое. */
 function section(text: string): { text: string; truncatedPath?: string } {
@@ -216,7 +217,10 @@ export function parseBashResult(text: string): ParsedBashResult {
   const markers: string[] = [];
 
   // Маркеры исхода — последние строки результата; отделяются от тела с конца.
-  while (lines.length > 0 && outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1]))) {
+  while (
+    lines.length > 0 &&
+    outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1]))
+  ) {
     markers.unshift(lines.pop() as string);
   }
 
@@ -473,7 +477,10 @@ export async function fetchEntries(sessionId: string): Promise<SessionEntriesPag
 }
 
 /** Найти вызов по идентификатору: input — из блока сообщения, результат — отдельной записью. */
-export function findToolCall(entries: SessionEntry[], toolCallId: string): ToolCallData | undefined {
+export function findToolCall(
+  entries: SessionEntry[],
+  toolCallId: string,
+): ToolCallData | undefined {
   let input: unknown | undefined;
   for (const entry of entries) {
     if (entry.kind !== "message") {
@@ -827,7 +834,10 @@ const NO_DATA_RETRY_DELAY_MS = 1_000;
  * Подпись и тон карточки. Статус задания из текста (`[status: …]`) важнее факта ответа тула:
  * job-output отвечает успешно, даже когда задание ещё бежит.
  */
-function statusOf(status: CardStatus, jobStatus: ParsedBashResult["jobStatus"]): {
+function statusOf(
+  status: CardStatus,
+  jobStatus: ParsedBashResult["jobStatus"],
+): {
   key: string;
   tone: BadgeTone;
 } {
@@ -939,8 +949,8 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   const failed = status === "failed";
   const rawOutput = data?.result?.text ?? "";
   // Упавший результат без маркеров — это текст ошибки целиком: он идёт в stderr-секцию.
-  const stdout = failed && parsed?.stderr === "" ? "" : parsed?.stdout ?? "";
-  const stderr = failed && parsed?.stderr === "" ? rawOutput : parsed?.stderr ?? "";
+  const stdout = failed && parsed?.stderr === "" ? "" : (parsed?.stdout ?? "");
+  const stderr = failed && parsed?.stderr === "" ? rawOutput : (parsed?.stderr ?? "");
 
   const badges: ReactNode[] = [];
   if (parsed?.exitCode !== undefined) {
@@ -1021,7 +1031,9 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
           </div>
         )}
         {parsed?.noOutput === true ? (
-          <Text tone="muted">{t(toolName === "job-output" ? "tool.noNewOutput" : "tool.noOutput")}</Text>
+          <Text tone="muted">
+            {t(toolName === "job-output" ? "tool.noNewOutput" : "tool.noOutput")}
+          </Text>
         ) : undefined}
         {badges.length === 0 ? undefined : <div className="sbtc-footer">{badges}</div>}
         {parsed?.truncatedPath === undefined ? undefined : (
@@ -1176,52 +1188,49 @@ git commit -m "feat(starter): render bash family tool calls with a dedicated car
 В `plugins/starter/src/worker.test.ts` заменить список ожидаемых вкладов в тесте «contributes the bash tools and the session-close cleanup on activation»:
 
 ```ts
-    assert.deepEqual(ids, [
-      "component",
-      "component",
-      "component",
-      "hook:bash-jobs-session-close:session_closed",
-      "locale-catalog",
-      "locale-catalog",
-      "tool:bash",
-      "tool:job-kill",
-      "tool:job-output",
-    ]);
+assert.deepEqual(ids, [
+  "component",
+  "component",
+  "component",
+  "hook:bash-jobs-session-close:session_closed",
+  "locale-catalog",
+  "locale-catalog",
+  "tool:bash",
+  "tool:job-kill",
+  "tool:job-output",
+]);
 
-    const isComponent = (
-      contribution: PluginContribution,
-    ): contribution is Extract<PluginContribution, { kind: "component" }> =>
-      contribution.kind === "component";
-    const components = host.contributions.filter(isComponent);
-    assert.deepEqual(
-      components.map((contribution) => ({
-        id: contribution.id,
-        placeId: contribution.placeId,
-        export: contribution.export,
-      })),
-      [
-        { id: "starter-bash-tool-call", placeId: toolCallPlaceId("bash"), export: "BashToolCall" },
-        {
-          id: "starter-job-output-tool-call",
-          placeId: toolCallPlaceId("job-output"),
-          export: "BashToolCall",
-        },
-        {
-          id: "starter-job-kill-tool-call",
-          placeId: toolCallPlaceId("job-kill"),
-          export: "BashToolCall",
-        },
-      ],
-    );
+const isComponent = (
+  contribution: PluginContribution,
+): contribution is Extract<PluginContribution, { kind: "component" }> =>
+  contribution.kind === "component";
+const components = host.contributions.filter(isComponent);
+assert.deepEqual(
+  components.map((contribution) => ({
+    id: contribution.id,
+    placeId: contribution.placeId,
+    export: contribution.export,
+  })),
+  [
+    { id: "starter-bash-tool-call", placeId: toolCallPlaceId("bash"), export: "BashToolCall" },
+    {
+      id: "starter-job-output-tool-call",
+      placeId: toolCallPlaceId("job-output"),
+      export: "BashToolCall",
+    },
+    {
+      id: "starter-job-kill-tool-call",
+      placeId: toolCallPlaceId("job-kill"),
+      export: "BashToolCall",
+    },
+  ],
+);
 
-    const catalogs = host.contributions.filter(
-      (contribution): contribution is Extract<PluginContribution, { kind: "locale-catalog" }> =>
-        contribution.kind === "locale-catalog",
-    );
-    assert.deepEqual(
-      catalogs.map((contribution) => contribution.locale).sort(),
-      ["en", "ru"],
-    );
+const catalogs = host.contributions.filter(
+  (contribution): contribution is Extract<PluginContribution, { kind: "locale-catalog" }> =>
+    contribution.kind === "locale-catalog",
+);
+assert.deepEqual(catalogs.map((contribution) => contribution.locale).sort(), ["en", "ru"]);
 ```
 
 В шапку импортов теста добавить:

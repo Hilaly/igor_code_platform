@@ -28,7 +28,10 @@ export async function fetchEntries(sessionId: string): Promise<SessionEntriesPag
 }
 
 /** Найти вызов по идентификатору: input — из блока сообщения, результат — отдельной записью. */
-export function findToolCall(entries: SessionEntry[], toolCallId: string): ToolCallData | undefined {
+export function findToolCall(
+  entries: SessionEntry[],
+  toolCallId: string,
+): ToolCallData | undefined {
   let input: unknown | undefined;
   for (const entry of entries) {
     if (entry.kind !== "message") {

@@ -176,11 +176,15 @@ it("is collapsed by default and shows output, stderr and the exit badge when exp
   await screen.findByText("pnpm test");
   // Свёрнуто по умолчанию: зажат нативный <details> без `open` (ui-kit Disclosure). Содержимое
   // нативного <details> остаётся в DOM и в свёрнутом виде, поэтому свёрнутость проверяем по атрибуту.
-  expect((screen.getByText("pnpm test").closest("details") as HTMLElement)?.hasAttribute("open")).toBe(false);
+  expect(
+    (screen.getByText("pnpm test").closest("details") as HTMLElement)?.hasAttribute("open"),
+  ).toBe(false);
   await expand("pnpm test");
   // Раскрытие нативного <details> атрибутом `open`, а не появлением текста: содержимое нативного
   // <details> остаётся в DOM и в свёрнутом виде, поэтому наличие текста раскрытие не доказывает.
-  expect((screen.getByText("pnpm test").closest("details") as HTMLElement)?.hasAttribute("open")).toBe(true);
+  expect(
+    (screen.getByText("pnpm test").closest("details") as HTMLElement)?.hasAttribute("open"),
+  ).toBe(true);
   expect(await screen.findByText("ok")).toBeTruthy();
   expect(screen.getByText("warn")).toBeTruthy();
   expect(screen.getByText("exit 0")).toBeTruthy();

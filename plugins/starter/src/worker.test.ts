@@ -95,10 +95,7 @@ describe("the starter plugin", () => {
       (contribution): contribution is Extract<PluginContribution, { kind: "locale-catalog" }> =>
         contribution.kind === "locale-catalog",
     );
-    assert.deepEqual(
-      catalogs.map((contribution) => contribution.locale).sort(),
-      ["en", "ru"],
-    );
+    assert.deepEqual(catalogs.map((contribution) => contribution.locale).sort(), ["en", "ru"]);
 
     // Идентификаторы вкладов обязаны проходить валидацию реестра демона
     // (apps/daemon/src/plugins/contribution-registry.ts). Тестовый хост её не применяет — поэтому

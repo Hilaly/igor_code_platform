@@ -36,7 +36,8 @@ const outcomeMarkerPatterns = [
 ];
 
 /** Пометка усечения внутри секции: `[output truncated; full output: …]` и job-вариант. */
-const truncatedMarkerPattern = /^\[(?:output truncated|some output was dropped from memory); full output: (.+)\]$/;
+const truncatedMarkerPattern =
+  /^\[(?:output truncated|some output was dropped from memory); full output: (.+)\]$/;
 
 /** Секция без пометок усечения: сами пометки — структура, а не содержимое. */
 function section(text: string): { text: string; truncatedPath?: string } {
@@ -63,7 +64,10 @@ export function parseBashResult(text: string): ParsedBashResult {
   const markers: string[] = [];
 
   // Маркеры исхода — последние строки результата; отделяются от тела с конца.
-  while (lines.length > 0 && outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1] as string))) {
+  while (
+    lines.length > 0 &&
+    outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1] as string))
+  ) {
     markers.unshift(lines.pop() as string);
   }
 

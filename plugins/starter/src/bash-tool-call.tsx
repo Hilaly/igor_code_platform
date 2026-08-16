@@ -26,7 +26,10 @@ const NO_DATA_RETRY_DELAY_MS = 1_000;
  * Подпись и тон карточки. Статус задания из текста (`[status: …]`) важнее факта ответа тула:
  * job-output отвечает успешно, даже когда задание ещё бежит.
  */
-function statusOf(status: CardStatus, jobStatus: ParsedBashResult["jobStatus"]): {
+function statusOf(
+  status: CardStatus,
+  jobStatus: ParsedBashResult["jobStatus"],
+): {
   key: string;
   tone: BadgeTone;
 } {
@@ -138,8 +141,8 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
   const failed = status === "failed";
   const rawOutput = data?.result?.text ?? "";
   // Упавший результат без маркеров — это текст ошибки целиком: он идёт в stderr-секцию.
-  const stdout = failed && parsed?.stderr === "" ? "" : parsed?.stdout ?? "";
-  const stderr = failed && parsed?.stderr === "" ? rawOutput : parsed?.stderr ?? "";
+  const stdout = failed && parsed?.stderr === "" ? "" : (parsed?.stdout ?? "");
+  const stderr = failed && parsed?.stderr === "" ? rawOutput : (parsed?.stderr ?? "");
 
   const badges: ReactNode[] = [];
   if (parsed?.exitCode !== undefined) {
@@ -220,7 +223,9 @@ export function BashToolCall({ context }: { context: PlaceContext }): ReactNode 
           </div>
         )}
         {parsed?.noOutput === true ? (
-          <Text tone="muted">{t(toolName === "job-output" ? "tool.noNewOutput" : "tool.noOutput")}</Text>
+          <Text tone="muted">
+            {t(toolName === "job-output" ? "tool.noNewOutput" : "tool.noOutput")}
+          </Text>
         ) : undefined}
         {badges.length === 0 ? undefined : <div className="sbtc-footer">{badges}</div>}
         {parsed?.truncatedPath === undefined ? undefined : (
