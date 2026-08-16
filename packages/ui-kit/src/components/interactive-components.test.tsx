@@ -256,6 +256,7 @@ describe("interactive components", () => {
     ["positive", "Daemon connected"],
     ["pending", "Daemon reconnecting"],
     ["danger", "Daemon unavailable"],
+    ["neutral", "Step not started"],
   ] as const)("names the %s status dot without exposing color as meaning", (tone, label) => {
     render(<StatusDot tone={tone} label={label} />);
 

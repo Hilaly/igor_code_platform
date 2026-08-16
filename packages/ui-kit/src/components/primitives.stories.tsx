@@ -482,6 +482,7 @@ export const States = () => (
       <StatusDot tone="positive" label="Подключено" />
       <StatusDot tone="pending" label="Подключение" />
       <StatusDot tone="danger" label="Соединение потеряно" />
+      <StatusDot tone="neutral" label="Не начато" />
     </div>
     <EmptyState title="Плагинов нет" hint="Положите папку плагина в plugins/ директории данных" />
     <Spinner label="Снимок состояния запрашивается" />
