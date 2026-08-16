@@ -14,9 +14,9 @@
 
 Изменяются только Markdown skills и соседние references:
 
-| Skill | Изменение |
-| --- | --- |
-| `plugin-backend` | Полный workflow для session-scoped `mission-update`, storage snapshot, event invalidation и route как источника истины. |
+| Skill             | Изменение                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `plugin-backend`  | Полный workflow для session-scoped `mission-update`, storage snapshot, event invalidation и route как источника истины.           |
 | `plugin-frontend` | Полный workflow для `useSovereignEvents`, host-provided frontend bus, `core.panel.tabs`, session filtering и revision-safe fetch. |
 
 Публичный SDK-код и два новых плагина реализуются отдельными задачами; этот срез не добавляет worker,

@@ -23,6 +23,7 @@
 ### Task 1: Define the browser event bridge contract
 
 **Files:**
+
 - Modify: `packages/browser-sdk/src/runtime-context.tsx`
 - Modify: `packages/browser-sdk/src/host.tsx`
 - Modify: `packages/browser-sdk/src/index.tsx`
@@ -33,6 +34,7 @@
 - Modify: `packages/browser-sdk/src/page.test.tsx`
 
 **Interfaces:**
+
 - Produce `BrowserEvent`/listener types representing the existing `BusStreamEvent` shape and a readonly `subscribe` function.
 - Extend `BrowserRuntimeProviderProps` with a required readonly `events` bridge; update every existing provider test fixture to pass the fake bridge.
 - Export `useSovereignEvents(): { subscribe(listener): () => void }` from the public root.
@@ -47,12 +49,14 @@
 ### Task 2: Pass the existing frontend bus through the web host
 
 **Files:**
+
 - Modify: `apps/web/src/places/place-host.tsx`
 - Modify: `apps/web/src/App.tsx`
 - Test: `apps/web/src/App.test.tsx`
 - Test: `apps/web/src/places/place-host.test.tsx`
 
 **Interfaces:**
+
 - `BrowserRuntimeProvider` wrapper accepts `events: Pick<FrontendBus, "subscribe">`.
 - `App` passes the existing `bus` instance to the provider exactly once.
 
@@ -65,6 +69,7 @@
 ### Task 3: Add Mission snapshot validation and storage service
 
 **Files:**
+
 - Create: `plugins/mission/package.json`
 - Create: `plugins/mission/tsconfig.json`
 - Create: `plugins/mission/src/model.ts`
@@ -73,6 +78,7 @@
 - Test: `plugins/mission/src/store.test.ts`
 
 **Interfaces:**
+
 - `MissionStep`, `MissionInput`, `MissionSnapshot` types.
 - `validateMissionInput(value: unknown): MissionInput` trims strings and rejects empty mission/steps, empty plan, unknown keys/statuses, and more than one `in_progress`.
 - `readMission(sessionId): Promise<MissionSnapshot | undefined>` and `writeMission(sessionId, input): Promise<MissionSnapshot>` use `@sovereign/sdk` storage keys `mission.<sessionId>`.
@@ -90,6 +96,7 @@
 ### Task 4: Add Mission tool, route, event, and worker lifecycle
 
 **Files:**
+
 - Create: `plugins/mission/src/tools.ts`
 - Create: `plugins/mission/src/routes.ts`
 - Create: `plugins/mission/src/worker.ts`
@@ -98,6 +105,7 @@
 - Test: `plugins/mission/src/worker.test.ts`
 
 **Interfaces:**
+
 - Tool `mission-update` accepts `MissionInput`; its invocation context supplies `sessionId`.
 - Route `GET /api/p/mission/:sessionId` returns `200` JSON snapshot or `404` JSON error.
 - Event descriptor `changed` has schema `{ sessionId: z.string(), revision: z.number().int().positive() }`.
@@ -117,6 +125,7 @@
 ### Task 5: Build the Mission panel with event-driven refresh
 
 **Files:**
+
 - Create: `plugins/mission/src/browser.tsx`
 - Create: `plugins/mission/src/mission-panel.tsx`
 - Create: `plugins/mission/src/api.ts`
@@ -124,6 +133,7 @@
 - Test: `plugins/mission/src/mission-panel.test.tsx`
 
 **Interfaces:**
+
 - Browser export `MissionPanel({ context: PlaceContext }): ReactNode`.
 - `fetchMission(sessionId): Promise<MissionSnapshot | undefined>` maps `404` to empty state and other failures to error state.
 - Panel uses `useSovereignEvents`, filters `mission.changed` by `context.subject?.sessionId`, then refetches.
@@ -140,11 +150,13 @@
 ### Task 6: Verify new built-ins in artifact payload
 
 **Files:**
+
 - Test: `apps/daemon/scripts/builtin-plugins-payload.test.ts`
 - Test: `apps/daemon/src/platform/builtin-plugins.test.ts`
 - Modify: `docs/toolchain.md`
 
 **Interfaces:**
+
 - Mission declares only `@sovereign/sdk` as a runtime dependency; `@sovereign/browser-sdk` and `@sovereign/ui-kit` remain browser host/dev dependencies, matching `subagents` and `hostModuleSpecifiers`.
 - Existing discovery-based payload assembly must include `mission` and its worker/browser sources without a second built-in root or special-case loader.
 
@@ -158,6 +170,7 @@
 ### Task 7: Verify Mission integration and document its public contract
 
 **Files:**
+
 - Modify: `docs/plugins.md`
 - Modify: `docs/event-bus.md`
 - Modify: `docs/ui-extension-model.md`

@@ -36,19 +36,34 @@ it("renders a mission snapshot and reloads after a matching event", async () => 
   const events = {
     subscribe(next: (event: BrowserEvent) => void) {
       listener = next;
-      return () => { listener = undefined; };
+      return () => {
+        listener = undefined;
+      };
     },
   };
   const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
     ok: true,
     status: 200,
-    json: async () => ({ mission: "Ship it", plan: [{ step: "Test", status: "completed" }], revision: 1, updatedAt: new Date().toISOString() }),
+    json: async () => ({
+      mission: "Ship it",
+      plan: [{ step: "Test", status: "completed" }],
+      revision: 1,
+      updatedAt: new Date().toISOString(),
+    }),
   } as Response);
 
   renderPanel(events);
   await screen.findByText("Ship it");
   expect(fetchMock).toHaveBeenCalledTimes(1);
 
-  await act(async () => listener?.({ type: "mission.changed", index: 2, time: new Date().toISOString(), plugin: { key: "builtin:mission", id: "mission", source: "builtin" }, payload: { sessionId: "s1", revision: 2 } }));
+  await act(async () =>
+    listener?.({
+      type: "mission.changed",
+      index: 2,
+      time: new Date().toISOString(),
+      plugin: { key: "builtin:mission", id: "mission", source: "builtin" },
+      payload: { sessionId: "s1", revision: 2 },
+    }),
+  );
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });

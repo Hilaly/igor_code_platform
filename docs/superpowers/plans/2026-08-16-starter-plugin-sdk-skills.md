@@ -21,6 +21,7 @@
 ### Task 1: Update backend plugin authoring guidance
 
 **Files:**
+
 - Modify: `plugins/starter/skills/plugin-backend/SKILL.md`
 - Modify: `plugins/starter/skills/plugin-backend/references/sdk-reference.md`
 - Test: `docs/superpowers/specs/2026-08-16-starter-sdk-skills-update-design.md` (manual checklist; no source test)
@@ -36,6 +37,7 @@
 ### Task 2: Update frontend plugin authoring guidance
 
 **Files:**
+
 - Modify: `plugins/starter/skills/plugin-frontend/SKILL.md`
 - Modify: `plugins/starter/skills/plugin-frontend/references/browser-reference.md`
 
@@ -50,6 +52,7 @@
 ### Task 3: Run the complete starter-skill documentation verification
 
 **Files:**
+
 - Test: `plugins/starter/skills/plugin-backend/SKILL.md`
 - Test: `plugins/starter/skills/plugin-frontend/SKILL.md`
 - Test: both `references/` trees

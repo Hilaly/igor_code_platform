@@ -39,7 +39,7 @@ description: Use when creating or changing a Sovereign plugin worker, package ma
    и `page` требуют browser bundle. Вклад `command` объявляется здесь, но его обработчик не живёт
    в worker: за browser export обратись к `starter.plugin-frontend`.
 10. **Проверь плагин.** Запусти его tests/typecheck, включи источник, дождись состояния running и
-   проверь contributions и diagnostics.
+    проверь contributions и diagnostics.
 
 ## Минимальный manifest
 

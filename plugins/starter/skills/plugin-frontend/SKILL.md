@@ -43,7 +43,7 @@ worker и lifecycle.
 9. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
    отображаться как diagnostics/outcome, а не маскироваться пустым UI.
 10. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
-   вызови каждую command минимум один раз.
+    вызови каждую command минимум один раз.
 
 ## Manifest
 

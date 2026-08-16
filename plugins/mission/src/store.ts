@@ -15,10 +15,7 @@ export async function readMission(sessionId: string): Promise<MissionSnapshot | 
   return value === undefined ? undefined : parseMissionSnapshot(value);
 }
 
-export async function writeMission(
-  sessionId: string,
-  value: unknown,
-): Promise<MissionSnapshot> {
+export async function writeMission(sessionId: string, value: unknown): Promise<MissionSnapshot> {
   const input: MissionInput = validateMissionInput(value);
   const previous = await readMission(sessionId);
   const snapshot: MissionSnapshot = {

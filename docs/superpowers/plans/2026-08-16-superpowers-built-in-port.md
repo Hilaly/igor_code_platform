@@ -23,6 +23,7 @@
 ### Task 1: Scaffold the built-in plugin and establish source inventory
 
 **Files:**
+
 - Create: `plugins/superpowers/package.json`
 - Create: `plugins/superpowers/tsconfig.json`
 - Create: `plugins/superpowers/src/worker.ts`
@@ -40,6 +41,7 @@
 ### Task 2: Port the core planning and quality skills
 
 **Files:**
+
 - Create: `plugins/superpowers/skills/brainstorming/**`
 - Create: `plugins/superpowers/skills/using-superpowers/**`
 - Create: `plugins/superpowers/skills/writing-plans/**`
@@ -58,6 +60,7 @@
 ### Task 3: Port collaboration, branch, and skill-authoring skills
 
 **Files:**
+
 - Create: `plugins/superpowers/skills/dispatching-parallel-agents/**`
 - Create: `plugins/superpowers/skills/subagent-driven-development/**`
 - Create: `plugins/superpowers/skills/requesting-code-review/**`
@@ -79,6 +82,7 @@
 ### Task 4: Validate all 14 file resources and plugin-qualified discovery
 
 **Files:**
+
 - Modify: `apps/daemon/src/plugins/superpowers-skills.test.ts`
 - Test: `apps/daemon/src/plugins/file-resources.integration.test.ts` (modify only when the focused discovery assertions require the shared integration harness)
 - Modify: `plugins/superpowers/UPSTREAM-ADAPTATION.md`
@@ -93,6 +97,7 @@
 ### Task 5: Include Superpowers in artifact payload
 
 **Files:**
+
 - Modify: `apps/daemon/scripts/builtin-plugins-payload.test.ts`
 - Modify: `docs/toolchain.md`
 - Modify: `docs/roadmap.md`
@@ -107,6 +112,7 @@
 ### Task 6: Perform final port audit and documentation handoff
 
 **Files:**
+
 - Modify: `docs/README.md`
 - Modify: `docs/file-resources.md`
 - Modify: `docs/plugins.md`
