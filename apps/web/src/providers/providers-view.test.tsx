@@ -97,6 +97,8 @@ function show(state: ProvidersState, providerId?: string, headingLevel: 1 | 2 = 
     onRenameKey: vi.fn(async () => undefined),
     onSelectKey: vi.fn(async () => undefined),
     onRemoveKey: vi.fn(async () => undefined),
+    onSaveAlias: vi.fn(async () => undefined),
+    onRemoveAlias: vi.fn(async () => undefined),
     actionFailure: undefined,
   };
 

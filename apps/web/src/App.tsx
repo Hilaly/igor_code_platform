@@ -1042,6 +1042,8 @@ export function App() {
                       onRenameKey={providers.renameKey}
                       onSelectKey={providers.selectKey}
                       onRemoveKey={providers.removeKey}
+                      onSaveAlias={providers.saveAlias}
+                      onRemoveAlias={providers.removeAlias}
                       translator={translator}
                     />
                   }

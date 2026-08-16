@@ -349,6 +349,28 @@ export const coreRussian: CatalogRegistration = {
       "Кред платформе не принадлежит: убирать здесь было нечего, и провайдер остался настроенным.",
     "providers.logout.stubborn.source":
       "Кред приходит из {source} и платформе не принадлежит: убирать здесь было нечего. Убери его из окружения и перезапусти демон.",
+    "aliases.title": "Алиасы моделей",
+    "aliases.hint":
+      "Алиас — имя со списком совместимых моделей. Сессия идёт по списку сверху вниз: отказала первая — берётся следующая.",
+    "aliases.problem": "Алиасы не читаются",
+    "aliases.empty": "Алиасов пока нет",
+    "aliases.new": "Новый алиас",
+    "aliases.edit": "Редактировать",
+    "aliases.remove": "Удалить",
+    "aliases.remove.title": "Удалить алиас {name}?",
+    "aliases.remove.hint": "Сессии, открытые на этом алиасе, останутся без модели.",
+    "aliases.id": "Идентификатор",
+    "aliases.id.hint": "Строчные латинские буквы, цифры, точка, дефис или подчёркивание.",
+    "aliases.name": "Название",
+    "aliases.candidates": "Модели по порядку",
+    "aliases.candidates.hint":
+      "По одной ссылке вида provider/model. Первая — предпочтительная; следующая берётся после отказа.",
+    "aliases.candidate": "Модель {number}",
+    "aliases.candidate.up": "Поднять модель {number}",
+    "aliases.candidate.down": "Опустить модель {number}",
+    "aliases.candidate.remove": "Убрать модель {number}",
+    "aliases.candidate.add": "Добавить модель",
+    "aliases.save": "Сохранить алиас",
     "providers.keys.title": "Ключи: {name}",
     "providers.keys.empty": "Сохранённых ключей нет",
     "providers.keys.hint":

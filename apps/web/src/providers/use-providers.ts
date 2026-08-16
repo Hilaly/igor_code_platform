@@ -10,7 +10,12 @@
  * восстанавливается снимком, а не окном догона.
  */
 
-import type { LoginKeyTarget, LoginStepFrame, ProviderAuthType } from "@sovereign/protocol";
+import type {
+  LoginKeyTarget,
+  LoginStepFrame,
+  ModelAlias,
+  ProviderAuthType,
+} from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FrontendBus } from "../events/bus.ts";
@@ -18,12 +23,15 @@ import type { StreamStatus } from "../events/stream.ts";
 import {
   answerLoginStep,
   cancelProviderLogin,
+  deleteModelAlias,
   fetchLoginAttempts,
+  fetchModelAliases,
   fetchProviderModels,
   fetchProvidersSnapshot,
   fetchUserProviders,
   logOutProvider,
   removeProviderKey,
+  saveModelAlias,
   startProviderLogin,
   updateProviderKey,
 } from "./api.ts";
@@ -41,6 +49,7 @@ import {
   type LoginsState,
 } from "./login-state.ts";
 import {
+  applyAliasesSnapshot,
   applyFailure,
   applyModels,
   applyModelsFailure,
@@ -83,6 +92,9 @@ export type ProvidersController = {
   selectKey: (providerId: string, keyId: string) => Promise<void>;
   /** Убрать один ключ. Остальные остаются, и провайдер остаётся настроенным. */
   removeKey: (providerId: string, keyId: string) => Promise<void>;
+  /** Завести алиас или заменить существующий (docs/model-routing.md). */
+  saveAlias: (alias: ModelAlias, existing: boolean) => Promise<void>;
+  removeAlias: (aliasId: string) => Promise<void>;
   /** Кадр шага входа из потока. Не событие шины (docs/models-and-providers.md). */
   receiveLoginStep: (frame: LoginStepFrame) => void;
 };
@@ -125,10 +137,14 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     void Promise.all([
       fetchProvidersSnapshot(controller.signal),
       fetchUserProviders(controller.signal),
+      fetchModelAliases(controller.signal),
     ])
-      .then(([snapshot, userProviders]) =>
+      .then(([snapshot, userProviders, aliases]) =>
         apply((current) =>
-          applyUserProvidersSnapshot(applySnapshot(current, snapshot), userProviders),
+          applyAliasesSnapshot(
+            applyUserProvidersSnapshot(applySnapshot(current, snapshot), userProviders),
+            aliases,
+          ),
         ),
       )
       .catch((cause: unknown) => {
@@ -364,6 +380,22 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [changeKey],
   );
 
+  /**
+   * Правка алиаса. Список провайдеров перезапрашивается следом: алиас — модель каталога, и её
+   * появление или исчезновение меняет пикер моделей.
+   */
+  const saveAlias = useCallback(
+    (alias: ModelAlias, existing: boolean) =>
+      changeKey(() => saveModelAlias(alias, existing), `saving the alias ${alias.id}`),
+    [changeKey],
+  );
+
+  const removeAlias = useCallback(
+    (aliasId: string) =>
+      changeKey(() => deleteModelAlias(aliasId), `removing the alias ${aliasId}`),
+    [changeKey],
+  );
+
   const receiveLoginStep = useCallback(
     (frame: LoginStepFrame) => {
       const outcome = applyLoginStep(latest.current.logins, frame);
@@ -387,6 +419,8 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     renameKey,
     selectKey,
     removeKey,
+    saveAlias,
+    removeAlias,
     receiveLoginStep,
   };
 }

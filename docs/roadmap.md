@@ -171,6 +171,12 @@
   ([model-routing.md](model-routing.md), [runtime-checks.md](runtime-checks.md),
   [repository-structure.md](repository-structure.md)).
 
+- **Срез 17c — алиасы моделей.** Имя со списком совместимых моделей, живущее в `model-aliases.json`
+  и видимое системе как модель провайдера `alias`; сессия идёт по списку сверху вниз, перебирая
+  внутри каждой модели её ключи; маршруты и редактор на странице провайдеров
+  ([model-routing.md](model-routing.md), [data-directory.md](data-directory.md),
+  [web-api.md](web-api.md), [ui-kit.md](ui-kit.md)).
+
 ## Дальше
 
 **Порядок до среза 13 утверждён владельцем продукта 2026-07-28, продолжение — 2026-08-09.**

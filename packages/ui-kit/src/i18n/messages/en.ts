@@ -354,6 +354,28 @@ export const coreEnglish: CatalogRegistration = {
       "The credential does not belong to the platform: there was nothing here to remove, and the provider is still configured.",
     "providers.logout.stubborn.source":
       "The credential comes from {source} and does not belong to the platform: there was nothing here to remove. Take it out of the environment and restart the daemon.",
+    "aliases.title": "Model aliases",
+    "aliases.hint":
+      "An alias is a name with a list of compatible models. A session walks the list top down: the first one refuses, the next one takes over.",
+    "aliases.problem": "The aliases cannot be read",
+    "aliases.empty": "No aliases yet",
+    "aliases.new": "New alias",
+    "aliases.edit": "Edit",
+    "aliases.remove": "Delete",
+    "aliases.remove.title": "Delete the alias {name}?",
+    "aliases.remove.hint": "Sessions opened on this alias will be left without a model.",
+    "aliases.id": "Identifier",
+    "aliases.id.hint": "Lowercase letters, digits, dot, dash or underscore.",
+    "aliases.name": "Name",
+    "aliases.candidates": "Models in order",
+    "aliases.candidates.hint":
+      "One provider/model reference per line. The first one is preferred; the next one takes over after a refusal.",
+    "aliases.candidate": "Model {number}",
+    "aliases.candidate.up": "Move model {number} up",
+    "aliases.candidate.down": "Move model {number} down",
+    "aliases.candidate.remove": "Remove model {number}",
+    "aliases.candidate.add": "Add a model",
+    "aliases.save": "Save the alias",
     "providers.keys.title": "Keys: {name}",
     "providers.keys.empty": "No stored keys",
     "providers.keys.hint":

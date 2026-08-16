@@ -11,6 +11,8 @@
  */
 
 import {
+  modelAliasPath,
+  modelAliasesPath,
   providerCredentialPath,
   providerKeyPath,
   providerLoginAnswerPath,
@@ -25,6 +27,9 @@ import {
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
   type LoginStart,
+  type ModelAlias,
+  type ModelAliasDeleted,
+  type ModelAliasesSnapshot,
   type ProviderKeyUpdate,
   type ProviderModels,
   type ProviderSummary,
@@ -119,6 +124,44 @@ async function writeUserProvider(
   });
   if (!response.ok) throw new Error(await reasonOf(response));
   return (await response.json()) as UserProviderDetails;
+}
+
+export async function fetchModelAliases(signal?: AbortSignal): Promise<ModelAliasesSnapshot> {
+  const response = await fetch(modelAliasesPath, signal === undefined ? {} : { signal });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAliasesSnapshot;
+}
+
+/** Новый алиас или замена существующего. Идентификатор у замены не меняется — маршрут откажет. */
+export async function saveModelAlias(alias: ModelAlias, existing: boolean): Promise<ModelAlias> {
+  const response = await fetch(existing ? modelAliasPath(alias.id) : modelAliasesPath, {
+    method: existing ? "PUT" : "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(alias),
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAlias;
+}
+
+export async function deleteModelAlias(aliasId: string): Promise<ModelAliasDeleted> {
+  const response = await fetch(modelAliasPath(aliasId), {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAliasDeleted;
 }
 
 /**
