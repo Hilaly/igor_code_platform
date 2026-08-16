@@ -2,6 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { BrowserRuntimeProvider } from "@sovereign/browser-sdk/host";
+import type { BrowserEvent, BrowserEventBridge } from "@sovereign/browser-sdk";
 import { MissionPanel } from "./mission-panel.tsx";
 
 afterEach(() => {
@@ -9,7 +10,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderPanel(events: { subscribe(listener: (event: unknown) => void): () => void }) {
+function renderPanel(events: BrowserEventBridge) {
   return render(
     <BrowserRuntimeProvider
       contributions={[]}
@@ -31,9 +32,9 @@ function renderPanel(events: { subscribe(listener: (event: unknown) => void): ()
 }
 
 it("renders a mission snapshot and reloads after a matching event", async () => {
-  let listener: ((event: unknown) => void) | undefined;
+  let listener: ((event: BrowserEvent) => void) | undefined;
   const events = {
-    subscribe(next: (event: unknown) => void) {
+    subscribe(next: (event: BrowserEvent) => void) {
       listener = next;
       return () => { listener = undefined; };
     },
