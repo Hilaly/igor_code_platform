@@ -551,6 +551,7 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.write.failed": "The choice was not written: {reason}",
     "panel.left": "Navigation",
     "panel.right": "Side panel",
+    "panel.tabs": "Side panel tabs",
     "panel.tabs.empty": "No tabs: a plugin will bring them",
     "panel.left.hide": "Hide navigation",
     "panel.right.hide": "Hide the side panel",

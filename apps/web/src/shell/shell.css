@@ -173,8 +173,12 @@
   display: flex;
   flex: 0 0 auto;
   min-width: 0;
-  flex-wrap: wrap;
-  gap: var(--sovereign-space-2);
+}
+
+/* Дорожка переключателя занимает всю ширину панели: вкладки делят её поровну, как полоса табов. */
+.shell-tabs > * {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .shell-tab-body {
@@ -250,10 +254,6 @@
   .shell-left,
   .shell-right {
     padding-inline: var(--sovereign-space-2);
-  }
-
-  .shell-tabs {
-    gap: var(--sovereign-space-1);
   }
 }
 

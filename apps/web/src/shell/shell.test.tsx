@@ -28,6 +28,7 @@ beforeEach(() => {
 const labels = {
   left: "левая панель",
   right: "правая панель",
+  tabs: "вкладки панели",
   emptyTabs: "вкладок нет",
   hideLeft: "скрыть левую",
   hideRight: "скрыть правую",
@@ -475,28 +476,62 @@ describe("hiding and restoring the panels", () => {
   });
 
   /**
-   * Полоса не объявляет себя вкладками ARIA: у тех выбрана ровно одна, а здесь повторный щелчок
-   * закрывает открытую. Кнопки-переключатели описывают это честно, а `role="tab"` — нет.
+   * Полоса — одна группа с ровно одним выбором, а не россыпь независимых тумблеров. Именно это
+   * говорит переключатель вида из кита, и `aria-checked` объявляет выбор скринридеру.
    */
-  it("announces the tab strip as toggle buttons, not as an ARIA tablist", () => {
+  it("announces the tab strip as one group with exactly one choice", () => {
     show({
       layout: rightVisible,
-      tabs: [{ id: "appearance", label: "Вид", content: <div>вид</div> }],
+      tabs: [
+        { id: "appearance", label: "Вид", content: <div>вид</div> },
+        { id: "mission", label: "Миссия", content: <div>миссия</div> },
+      ],
     });
 
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.getByRole("button", { name: "Вид" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("radiogroup", { name: "вкладки панели" })).toBeDefined();
+    expect(screen.getByRole("radio", { name: "Вид" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Миссия" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+  });
+
+  /** Выбор вкладки запоминается раскладкой; закрывает панель кнопка шапки, а не повторный щелчок. */
+  it("opens the tab that was chosen and leaves closing to the panel toggle", () => {
+    const tabs = [
+      { id: "appearance", label: "Вид", content: <div>вид</div> },
+      { id: "mission", label: "Миссия", content: <div>миссия</div> },
+    ];
+    const { onLayoutChange } = show({ layout: rightVisible, tabs });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Миссия" }));
+
+    expect(onLayoutChange).toHaveBeenLastCalledWith({ ...rightVisible, openTab: "mission" });
+  });
+
+  /** Открытая панель не бывает без вкладки: полоса объявляет выбранной ровно одну. */
+  it("opens the first tab when the layout remembers none", () => {
+    show({
+      layout: { ...rightVisible, openTab: undefined },
+      tabs: [
+        { id: "appearance", label: "Вид", content: <div>вид</div> },
+        { id: "mission", label: "Миссия", content: <div>миссия</div> },
+      ],
+    });
+
+    expect(screen.getByRole("radio", { name: "Вид" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("вид")).toBeDefined();
   });
 
   /**
    * Вклад исчезает из снимка на каждой пересборке плагина. Стереть забытый идентификатор значило бы
-   * закрывать вкладку человека при каждой правке исходников, поэтому раскладка не трогается, а
-   * панель показывает заглушку и возвращает ту же вкладку, когда вклад вернулся.
+   * закрывать вкладку человека при каждой правке исходников, поэтому раскладка не трогается: пока
+   * вкладов нет вовсе — заглушка, а вернувшийся вклад забирает своё место обратно.
    */
   it("keeps the remembered tab while its contribution is gone", () => {
     const { onLayoutChange, again } = show({ layout: rightVisible, tabs: [] });
 
     expect(screen.getByText("вкладок нет")).toBeDefined();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(onLayoutChange).not.toHaveBeenCalled();
 
     again(rightVisible, {
