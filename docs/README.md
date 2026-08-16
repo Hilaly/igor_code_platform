@@ -17,6 +17,7 @@
 - [План Mission plugin и browser event bridge](superpowers/plans/2026-08-16-mission-plugin-and-browser-bridge.md) — TDD-задачи для per-session snapshots, `mission-update`, единого SSE bridge, правой панели и artifact dependencies.
 - [План обновления starter plugin skills](superpowers/plans/2026-08-16-starter-plugin-sdk-skills.md) — два plugin skills, которые документируют route + event snapshot pattern и запрещают polling/второй SSE.
 - [План встроенного Superpowers port](superpowers/plans/2026-08-16-superpowers-built-in-port.md) — TDD-задачи для полного английского порта 14 skills, Sovereign adaptation map, discovery и artifact payload.
+- [Pressure-аудит встроенных Superpowers](superpowers/2026-08-16-pressure-audit.md) — RED-находки независимых аудиторов, GREEN-исправления, команды проверки и границы исторических ресурсов.
 
 - [master-spec.md](master-spec.md) — оглавление спецификации и статус каждого раздела.
   Точка входа: отсюда видно, что решено, что обсуждается, чего ещё нет.

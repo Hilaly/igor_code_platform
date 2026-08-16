@@ -69,13 +69,13 @@ Each agent gets:
 
 ### 3. Dispatch in Parallel
 
-Use `subagent-types` and `subagent-models` to select supported identifiers, then issue all three
-`subagent-spawn` calls in the same response, up to the currently available slot count:
+Discover a supported agent type and model with `subagent-types` and `subagent-models`, record the
+selected identifiers, then issue all calls with the actual schema (`description` and `prompt` fields):
 
 ```text
-subagent-spawn: "Fix agent-tool-abort.test.ts failures"
-subagent-spawn: "Fix batch-completion-behavior.test.ts failures"
-subagent-spawn: "Fix tool-approval-race-conditions.test.ts failures"
+subagent-spawn({ agent: "<discovered-agent>", model: "<discovered-model>", description: "Fix abort tests", prompt: "Fix agent-tool-abort.test.ts failures; return root cause and verification." })
+subagent-spawn({ agent: "<discovered-agent>", model: "<discovered-model>", description: "Fix batch tests", prompt: "Fix batch-completion-behavior.test.ts failures; return root cause and verification." })
+subagent-spawn({ agent: "<discovered-agent>", model: "<discovered-model>", description: "Fix race tests", prompt: "Fix tool-approval-race-conditions.test.ts failures; return root cause and verification." })
 # All three run concurrently.
 ```
 

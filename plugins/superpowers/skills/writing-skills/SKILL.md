@@ -730,7 +730,7 @@ evidence survives the session.
 
 **Deployment:**
 
-- [ ] Commit skill to git and push to your fork (if configured)
+- [ ] Commit skill to git. Push only when the user explicitly authorizes publication; otherwise leave the commit local.
 - [ ] Consider contributing back via PR (if broadly useful)
 
 ## Discovery Workflow

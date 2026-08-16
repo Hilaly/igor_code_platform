@@ -13,8 +13,8 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 ## Step 1: Verify Tests
 
-Run the project's documented full test suite through `bash` (`npm test` / `cargo test` / `pytest` /
-`go test ./...`, or the command in its repository instructions).
+Run the project's documented full test suite through `bash` (for example, `make test`, `pnpm test`,
+`cargo test`, `pytest`, or `go test ./...`; use the command in the repository instructions).
 
 **If tests fail**, report the failures and stop — the menu comes after a green suite:
 

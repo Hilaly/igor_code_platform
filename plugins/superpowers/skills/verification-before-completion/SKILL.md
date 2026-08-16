@@ -5,9 +5,10 @@ description: Use when about to claim work is complete, fixed, or passing, before
 
 # Verification Before Completion
 
-Run the repository's real verification commands through `bash`; use `job-output` and `job-kill` for
-commands started in the background. Keep any active multi-step verification reflected through
-`mission-update`.
+Run the repository's documented verification commands through Sovereign `bash`; use `job-output` and
+`job-kill` for commands started in the background. Bash returns bounded output: if it reports
+`[output truncated; full output: <path>]`, read that job-output log before deciding. Keep any active
+multi-step verification reflected through `mission-update`.
 
 ## Overview
 
@@ -121,7 +122,7 @@ Skip any step = lying, not verifying
 - ANY positive statement about work state
 - Committing, PR creation, task completion
 - Moving to next task
-- Delegating to agents
+- Delegating to agents (delegation itself is not a completion claim; verify the delegated result before reporting it)
 
 **Rule applies to:**
 

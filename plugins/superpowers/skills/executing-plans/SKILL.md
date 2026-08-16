@@ -48,9 +48,9 @@ After all tasks complete and verified:
 - Hit a blocker (missing dependency, test fails, instruction unclear)
 - Plan has critical gaps preventing starting
 - You don't understand an instruction
-- Verification fails repeatedly
+- A verification failure remains unresolved after one focused investigation, or is a genuine blocker
 
-**Ask for clarification rather than guessing.**
+**Investigate a failed verification once, using its full output and the repository guidance. If that investigation resolves the cause, apply the smallest correction and rerun the command. If the cause remains unresolved or blocks safe progress, stop and ask for clarification rather than guessing. Do not use an arbitrary repeat count as the stopping rule.**
 
 ## When to Revisit Earlier Steps
 

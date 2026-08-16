@@ -139,6 +139,22 @@ describe("the built-in Superpowers plugin", () => {
     assert.match(liveInstructions, /\bmission-update\b/u);
     assert.match(liveInstructions, /\bsubagent-spawn\b/u);
   });
+
+  it("keeps Sovereign live guidance free of known pressure regressions", () => {
+    const liveInstructions = walkFiles(skillsRoot)
+      .filter((path) => !path.endsWith("CREATION-LOG.md") && !path.includes("/examples/"))
+      .filter((path) => /\.(?:md|yaml|sh|js|cjs)$/u.test(path))
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
+
+    assert.doesNotMatch(liveInstructions, /git rev-parse HEAD~1/u);
+    assert.doesNotMatch(liveInstructions, /subagent-spawn:\s*["']/u);
+    assert.doesNotMatch(liveInstructions, /`npm test`/u);
+    assert.doesNotMatch(liveInstructions, /skills\/debugging\/systematic-debugging/u);
+    assert.doesNotMatch(liveInstructions, /~\/\.claude/u);
+    assert.match(liveInstructions, /push only when the user explicitly authorizes/u);
+    assert.match(liveInstructions, /BRANCH_NAME/iu);
+  });
 });
 
 function markdownLinks(markdown: string): string[] {

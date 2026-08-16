@@ -83,7 +83,12 @@ git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/d
 #### Create the Worktree
 
 ```bash
-# Determine path based on chosen location
+# Determine and validate the branch name before using it in a path or git command.
+: "${BRANCH_NAME:=$(git branch --show-current)}"
+if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "HEAD" ]; then
+  echo "Set BRANCH_NAME to a non-empty branch name before creating a worktree." >&2
+  exit 1
+fi
 path="$LOCATION/$BRANCH_NAME"
 
 git worktree add "$path" -b "$BRANCH_NAME"
@@ -117,8 +122,8 @@ if [ -f go.mod ]; then go mod download; fi
 Run tests to ensure workspace starts clean:
 
 ```bash
-# Use project-appropriate command
-npm test / cargo test / pytest / go test ./...
+# Use the project's documented test command (for example, `make test`, `pnpm test`, `cargo test`,
+# `pytest`, or `go test ./...`); do not assume a universal package-manager command.
 ```
 
 **If tests fail:** Report failures, ask whether to proceed or investigate.

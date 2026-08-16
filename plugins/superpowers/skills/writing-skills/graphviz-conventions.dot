@@ -27,7 +27,7 @@ digraph STYLE_GUIDE {
         // Examples of each
         "Is test passing?" [shape=diamond];
         "Write test first" [shape=box];
-        "npm test" [shape=plaintext];
+        "<TEST_COMMAND> (repository documented)" [shape=plaintext];
         "I am stuck" [shape=ellipse];
         "NEVER use git add -A" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
     }
@@ -77,7 +77,7 @@ digraph STYLE_GUIDE {
         // Commands are literal
         "grep -r 'pattern' .";
         "git status";
-        "npm run build";
+        "<BUILD_COMMAND> (repository documented)";
 
         // States describe situation
         "Test is failing";
@@ -152,12 +152,12 @@ digraph STYLE_GUIDE {
         "Test failed" [shape=ellipse];
         "Read error message" [shape=box];
         "Can reproduce?" [shape=diamond];
-        "git diff HEAD~1" [shape=plaintext];
+        "git diff <RECORDED_BASE>" [shape=plaintext];
         "NEVER ignore errors" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
 
         "Test failed" -> "Read error message";
         "Read error message" -> "Can reproduce?";
-        "Can reproduce?" -> "git diff HEAD~1" [label="yes"];
+        "Can reproduce?" -> "git diff <RECORDED_BASE>" [label="yes"];
 
         // Bad: vague and wrong shapes
         bad_1 [label="Something wrong", shape=box];  // Should be ellipse (state)
