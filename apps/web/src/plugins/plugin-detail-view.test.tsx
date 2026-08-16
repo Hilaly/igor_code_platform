@@ -161,6 +161,42 @@ it("keeps the plugin switch in the lifecycle row of the plugin facts", () => {
 });
 
 /**
+ * Длинный id вклада не разваливает строку на два ряда: в строке середина с многоточием, полный id
+ * остаётся в тултипе. Короткий id сокращению не подлежит — он и есть подпись вклада.
+ */
+it("shortens a long contribution id and keeps the full id in a tooltip", () => {
+  const longId = "a-very-long-plugin-name.contribution-with-an-extremely-long-identifier";
+
+  render(
+    <PluginDetailView
+      state={{
+        snapshot: {
+          ...snapshot,
+          contributions: [tool("short"), { ...tool("long"), id: longId }],
+        },
+        stale: false,
+      }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const shortRow = screen.getByRole("group", { name: "Example short" });
+  // Короткий id не трогается, и подсказка повторяет его полностью.
+  expect(shortRow.querySelector("code")?.textContent).toBe("example.short");
+  expect(within(shortRow).getByRole("tooltip", { name: "example.short" })).toBeTruthy();
+
+  const longRow = screen.getByRole("group", { name: "Example long" });
+  const shown = longRow.querySelector("code")?.textContent ?? "";
+  expect(shown).not.toBe(longId);
+  // Голова и хвост целы, свёрнута середина: имя вклада опознаётся без подсказки.
+  expect(shown).toContain("…");
+  expect(within(longRow).getByRole("tooltip", { name: longId })).toBeTruthy();
+});
+
+/**
  * Возврат к списку даёт запись `Plugins` локальной навигации настроек: своя кнопка «назад» повторяла
  * её и занимала верх страницы.
  */

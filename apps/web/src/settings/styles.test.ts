@@ -41,6 +41,12 @@ describe("settings and plugin layout styles", () => {
     expect(styles).not.toMatch(/\.project-detail-surface|\.plugin-detail-(?:surface|hero|facts)/);
     // Поверхность группы и её ярлык принадлежат киту (`Card`): прикладной CSS их не рисует.
     expect(styles).not.toMatch(/\.plugin-detail-kind/);
+    // Длинный id вклада держится одной строкой и дорезается многоточием, а не гибкой вёрткой,
+    // которая ломала его на два ряда.
+    expect(styles).toMatch(/\.plugin-detail-contribution-id[\s\S]*?\{[^}]*min-width:\s*0;[^}]*}/s);
+    expect(styles).toMatch(
+      /\.plugin-detail-contribution-id\s+code\s*\{[^}]*white-space:\s*nowrap;[^}]*text-overflow:\s*ellipsis;[^}]*}/s,
+    );
     expect(styles).not.toMatch(
       /\[role="listitem"\]\s*\+\s*\[role="listitem"\][^{]*border-block-start:\s*0/s,
     );
