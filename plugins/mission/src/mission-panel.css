@@ -1,17 +1,77 @@
-.mission-panel {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.75rem;
-}
+/*
+ * Раскладка вкладки миссии. Кегль панели задаёт оболочка (docs/ui-extension-model.md), цвет — кит;
+ * здесь геометрия и та разница в весе и размере, которая разводит три яруса: задание, пояснение к
+ * нему, план.
+ */
+
+.mission-panel,
 .mission-content {
-  display: grid;
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
 }
+
+/*
+ * Само задание — ведущая строка панели: чуть крупнее и плотнее остального. Раньше оно шло тем же
+ * кеглем, что и примечание к нему, и отличалось только цветом.
+ */
+.mission-statement {
+  min-width: 0;
+  font-size: var(--sovereign-font-size-md);
+  font-weight: var(--sovereign-font-weight-medium);
+  line-height: var(--sovereign-line-height-snug);
+  overflow-wrap: anywhere;
+}
+
+.mission-explanation {
+  min-width: 0;
+  line-height: var(--sovereign-line-height-snug);
+  overflow-wrap: anywhere;
+}
+
+.mission-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+}
+
+/* Подписанный счётчик вместо безымянной полосы: «сколько из скольких» — это и есть её значение. */
+.mission-plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  font-size: var(--sovereign-font-size-xs);
+}
+
+/*
+ * Состояние шага стоит слева отдельной колонкой, а не словом у правого края: в узкой панели тот
+ * отрывался от своего шага и переносился на вторую строку.
+ */
 .mission-step {
   display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
+  align-items: baseline;
+  gap: var(--sovereign-space-2);
+  width: 100%;
+  min-width: 0;
+  /* Жёлоб под заливку текущей строки: рисует её список кита, но своих отступов у строки нет. */
+  padding-inline: var(--sovereign-space-2);
+  padding-block: var(--sovereign-space-1);
+  line-height: var(--sovereign-line-height-snug);
+  text-align: start;
+  overflow-wrap: anywhere;
 }
-.mission-step-completed {
-  opacity: 0.7;
+
+.mission-step[data-status="in_progress"] {
+  font-weight: var(--sovereign-font-weight-medium);
+}
+
+.mission-updated {
+  min-width: 0;
+  padding-block-start: var(--sovereign-space-2);
+  font-size: var(--sovereign-font-size-xs);
+  border-block-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }

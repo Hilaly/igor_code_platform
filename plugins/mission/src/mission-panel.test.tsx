@@ -33,7 +33,19 @@ function snapshot(mission: string, revision: number, updatedAt = "2026-08-16T12:
   };
 }
 
-function response(value: ReturnType<typeof snapshot>): Response {
+const planned = {
+  mission: "Ship the panel",
+  explanation: "Context gathered",
+  plan: [
+    { step: "Read the code", status: "completed" as const },
+    { step: "Redraw the panel", status: "in_progress" as const },
+    { step: "Check by running", status: "pending" as const },
+  ],
+  revision: 1,
+  updatedAt: "2026-08-16T12:30:00.000Z",
+};
+
+function response(value: ReturnType<typeof snapshot> | typeof planned): Response {
   return { ok: true, status: 200, json: async () => value } as Response;
 }
 
@@ -163,6 +175,33 @@ it("clears the old session immediately and ignores its late response", async () 
   expect(fetchMock).toHaveBeenCalledTimes(2);
   await act(async () => resolveSecond?.(response(snapshot("Session two", 1))));
   await screen.findByText("Session two");
+});
+
+/**
+ * Три яруса вместо ровного столбца абзацев: задание, пояснение и план. Состояние каждого шага
+ * названо словом — цвет точки его дублирует, но не заменяет.
+ */
+it("separates the mission, its explanation, and the named state of every step", async () => {
+  const channel = bridge();
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response(planned));
+  renderPanel(channel.events);
+
+  await screen.findByText("Ship the panel");
+  expect(screen.getByText("Context gathered")).not.toBeNull();
+
+  // Счётчик подписывает полосу: без него доля выполненного нигде не названа.
+  expect(screen.getByText("Steps")).not.toBeNull();
+  expect(screen.getByText("1 of 3")).not.toBeNull();
+  expect(
+    screen.getByRole("progressbar", { name: "Mission progress" }).getAttribute("aria-valuenow"),
+  ).toBe("33");
+
+  expect(screen.getByRole("status", { name: "Done" })).not.toBeNull();
+  expect(screen.getByRole("status", { name: "In progress" })).not.toBeNull();
+  expect(screen.getByRole("status", { name: "Not started" })).not.toBeNull();
+
+  // Сырое машинное значение статуса в панель больше не попадает.
+  expect(screen.queryByText("in progress")).toBeNull();
 });
 
 it("shows updated time and unsubscribes from events and recovery", async () => {

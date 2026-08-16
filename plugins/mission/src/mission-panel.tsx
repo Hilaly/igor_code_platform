@@ -1,7 +1,6 @@
 import type { PlaceContext } from "@sovereign/browser-sdk";
 import { useSovereignEvents } from "@sovereign/browser-sdk";
 import {
-  Badge,
   EmptyState,
   Heading,
   List,
@@ -9,11 +8,13 @@ import {
   Notice,
   Progress,
   Spinner,
+  StatusDot,
   Text,
+  type StatusDotTone,
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
-import type { MissionSnapshot } from "./model.ts";
+import type { MissionSnapshot, MissionStep } from "./model.ts";
 import "./mission-panel.css";
 
 type PanelState =
@@ -100,28 +101,61 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
   );
 }
 
+/** Состояние шага цветом не сообщается: точка кита несёт его словом в `aria-label` и подсказке. */
+const stepTones: Record<MissionStep["status"], StatusDotTone> = {
+  completed: "positive",
+  in_progress: "pending",
+  pending: "neutral",
+};
+
+const stepLabels: Record<MissionStep["status"], string> = {
+  completed: "Done",
+  in_progress: "In progress",
+  pending: "Not started",
+};
+
+/**
+ * Три яруса вместо ровного столбца абзацев: сама миссия, её пояснение и план. Раньше миссия,
+ * пояснение, время правки и шаги шли одним кеглем и различались только цветом — прочесть, где
+ * задание, а где примечание к нему, было нельзя. Время правки уехало вниз служебной строкой: это
+ * сведения о записи, а не её содержание.
+ */
 function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): ReactNode {
   const completed = snapshot.plan.filter((step) => step.status === "completed").length;
-  const active = snapshot.plan.find((step) => step.status === "in_progress");
+
   return (
     <div className="mission-content">
-      <Text>{snapshot.mission}</Text>
+      <p className="mission-statement">{snapshot.mission}</p>
       {snapshot.explanation === undefined ? undefined : (
-        <Text tone="muted">{snapshot.explanation}</Text>
+        <p className="mission-explanation">
+          <Text tone="muted">{snapshot.explanation}</Text>
+        </p>
       )}
-      <Text tone="muted">Updated {formatUpdatedAt(snapshot.updatedAt)}</Text>
-      <Progress label="Mission progress" value={completed / snapshot.plan.length} />
-      {active === undefined ? undefined : <Badge tone="neutral">{"Current: " + active.step}</Badge>}
-      <List>
-        {snapshot.plan.map((step, index) => (
-          <ListRow key={`${index}-${step.step}`}>
-            <span className={`mission-step mission-step-${step.status}`}>
-              <Text>{step.step}</Text>
-              <Text tone="muted">{step.status.replace("_", " ")}</Text>
-            </span>
-          </ListRow>
-        ))}
-      </List>
+      <div className="mission-plan">
+        <div className="mission-plan-head">
+          <Text tone="muted">Steps</Text>
+          <Text tone="muted">{`${completed} of ${snapshot.plan.length}`}</Text>
+        </div>
+        <Progress label="Mission progress" value={completed / snapshot.plan.length} />
+        <List>
+          {/*
+            Подсветку текущего шага рисует сама строка списка: заливкой строк владеет кит, и
+            собственный фон здесь разошёлся бы с ним при первой правке палитры. Состояние при этом
+            сообщается не только цветом — точка несёт его словом.
+          */}
+          {snapshot.plan.map((step, index) => (
+            <ListRow key={`${index}-${step.step}`} selected={step.status === "in_progress"}>
+              <span className="mission-step" data-status={step.status}>
+                <StatusDot tone={stepTones[step.status]} label={stepLabels[step.status]} />
+                <Text tone={step.status === "completed" ? "muted" : "normal"}>{step.step}</Text>
+              </span>
+            </ListRow>
+          ))}
+        </List>
+      </div>
+      <p className="mission-updated">
+        <Text tone="muted">Updated {formatUpdatedAt(snapshot.updatedAt)}</Text>
+      </p>
     </div>
   );
 }
