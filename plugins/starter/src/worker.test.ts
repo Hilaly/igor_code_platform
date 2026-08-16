@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { toolCallPlaceId, type PluginContribution } from "@sovereign/sdk";
 import { installTestHost } from "@sovereign/sdk/testing";
 
 import { findJob, startJob } from "./bash.ts";
@@ -53,11 +54,51 @@ describe("the starter plugin", () => {
       .sort();
 
     assert.deepEqual(ids, [
+      "component",
+      "component",
+      "component",
       "hook:bash-jobs-session-close:session_closed",
+      "locale-catalog",
+      "locale-catalog",
       "tool:bash",
       "tool:job-kill",
       "tool:job-output",
     ]);
+
+    const isComponent = (
+      contribution: PluginContribution,
+    ): contribution is Extract<PluginContribution, { kind: "component" }> =>
+      contribution.kind === "component";
+    const components = host.contributions.filter(isComponent);
+    assert.deepEqual(
+      components.map((contribution) => ({
+        id: contribution.id,
+        placeId: contribution.placeId,
+        export: contribution.export,
+      })),
+      [
+        { id: "starter-bash-tool-call", placeId: toolCallPlaceId("bash"), export: "BashToolCall" },
+        {
+          id: "starter-job-output-tool-call",
+          placeId: toolCallPlaceId("job-output"),
+          export: "BashToolCall",
+        },
+        {
+          id: "starter-job-kill-tool-call",
+          placeId: toolCallPlaceId("job-kill"),
+          export: "BashToolCall",
+        },
+      ],
+    );
+
+    const catalogs = host.contributions.filter(
+      (contribution): contribution is Extract<PluginContribution, { kind: "locale-catalog" }> =>
+        contribution.kind === "locale-catalog",
+    );
+    assert.deepEqual(
+      catalogs.map((contribution) => contribution.locale).sort(),
+      ["en", "ru"],
+    );
 
     // Идентификаторы вкладов обязаны проходить валидацию реестра демона
     // (apps/daemon/src/plugins/contribution-registry.ts). Тестовый хост её не применяет — поэтому
