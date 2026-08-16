@@ -7,11 +7,14 @@
 import type { ProviderCatalogue } from "@sovereign/agent-runtime-pi";
 import {
   coreEventTypes,
+  parseProviderKeyUpdate,
   providerCredentialPathPattern,
+  providerKeyPathPattern,
   providerModelsPathPattern,
   providersPath,
   providersRefreshPath,
   type ProviderModels,
+  type ProviderSummary,
 } from "@sovereign/protocol";
 
 import type { CredentialStore } from "./credential-store.ts";
@@ -89,16 +92,84 @@ export function providersRoutes(options: ProvidersRouteOptions): Route[] {
 
         // Кред из окружения выходом не убрать: он не наш. Провайдер останется настроенным, и вью
         // обязано сказать об этом — здесь для этого отдаётся его нынешний статус.
-        const snapshot = await catalogue.snapshot();
-        const summary = snapshot.providers.find((provider) => provider.id === providerId);
+        await respondWithProvider(response, catalogue, providerId);
+      },
+    },
+    {
+      method: "PUT",
+      path: providerKeyPathPattern,
+      handle: async ({ response, body, parameters }) => {
+        const providerId = parameters["providerId"] ?? "";
+        const keyId = parameters["keyId"] ?? "";
+        const problem = options.credentials.problem();
 
-        if (summary === undefined) {
+        if (problem !== undefined) {
+          respondWithError(response, 409, problem);
+
+          return;
+        }
+
+        const parsed = parseProviderKeyUpdate(body);
+
+        if (parsed.kind === "rejected") {
+          respondWithError(response, 400, parsed.diagnostics.join("; "));
+
+          return;
+        }
+
+        // Подпись меняется раньше выбора: обе правки идут одним телом, и отказ на второй не должен
+        // оставлять первую применённой молча.
+        if (parsed.value.label !== undefined) {
+          if (!(await catalogue.renameKey(providerId, keyId, parsed.value.label))) {
+            respondWithError(response, 404, "not found");
+
+            return;
+          }
+        }
+
+        if (parsed.value.selected === true && !(await catalogue.selectKey(providerId, keyId))) {
           respondWithError(response, 404, "not found");
 
           return;
         }
 
-        respondWithJson(response, 200, summary);
+        options.bus.publish(coreEventTypes.providersChanged, {});
+        options.logger.info("a provider key was changed", { providerId, keyId });
+        await respondWithProvider(response, catalogue, providerId);
+      },
+    },
+    {
+      method: "DELETE",
+      path: providerKeyPathPattern,
+      handle: async ({ response, parameters }) => {
+        const providerId = parameters["providerId"] ?? "";
+        const keyId = parameters["keyId"] ?? "";
+        const problem = options.credentials.problem();
+
+        if (problem !== undefined) {
+          respondWithError(response, 409, problem);
+
+          return;
+        }
+
+        // Идущий вход дописал бы ключ обратно уже после удаления — ровно как при выходе целиком.
+        const running = options.logins.runningFor(providerId);
+
+        if (running !== undefined) {
+          options.logins.cancel(running.attemptId);
+        }
+
+        if (!(await catalogue.removeKey(providerId, keyId))) {
+          respondWithError(response, 404, "not found");
+
+          return;
+        }
+
+        // Событие то же, что у выхода: ушёл последний ключ — провайдер стал ненастроенным, и для
+        // слушающего это тот же факт.
+        options.bus.publish(coreEventTypes.providerLogout, { providerId });
+        options.logger.info("a provider key was removed", { providerId, keyId });
+        await respondWithProvider(response, catalogue, providerId);
       },
     },
     {
@@ -120,4 +191,28 @@ export function providersRoutes(options: ProvidersRouteOptions): Route[] {
       },
     },
   ];
+}
+
+/**
+ * Ответ правящего маршрута — нынешнее состояние провайдера целиком. Вью показывает и статус, и
+ * набор ключей, и после правки они обязаны быть согласованы между собой: два запроса вместо одного
+ * дали бы вкладке состояние, которого на сервере не было ни в один момент.
+ */
+async function respondWithProvider(
+  response: Parameters<typeof respondWithJson>[0],
+  catalogue: Pick<ProviderCatalogue, "snapshot">,
+  providerId: string,
+): Promise<void> {
+  const snapshot = await catalogue.snapshot();
+  const summary: ProviderSummary | undefined = snapshot.providers.find(
+    (provider) => provider.id === providerId,
+  );
+
+  if (summary === undefined) {
+    respondWithError(response, 404, "not found");
+
+    return;
+  }
+
+  respondWithJson(response, 200, summary);
 }

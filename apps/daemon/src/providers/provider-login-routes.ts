@@ -68,6 +68,7 @@ export function providerLoginRoutes(options: ProviderLoginRoutesOptions): Route[
           method: parsed.value.method,
           origin: "session",
           owner: session?.id ?? "",
+          ...(parsed.value.target === undefined ? {} : { target: parsed.value.target }),
         });
 
         if (outcome.kind === "taken") {

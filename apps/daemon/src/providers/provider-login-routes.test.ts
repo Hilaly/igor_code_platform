@@ -8,11 +8,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { createProviderCatalogue } from "@sovereign/agent-runtime-pi";
-import {
-  emptyEnvironment,
-  inMemoryVault,
-  scriptedProvider,
-} from "@sovereign/agent-runtime-pi/testing";
+import { emptyEnvironment, scriptedProvider } from "@sovereign/agent-runtime-pi/testing";
 import {
   coreEventTypes,
   providerLoginAnswerPath,
@@ -75,7 +71,8 @@ async function serve(options: { contents?: string; questions?: number } = {}) {
     ],
   });
   const catalogue = createProviderCatalogue({
-    credentials: inMemoryVault(),
+    // Хранилище то же, что у маршрутов: иначе не видно, куда лёг кред удавшегося входа.
+    credentials,
     environment: emptyEnvironment(),
     additionalProviders: [scripted.provider],
   });
@@ -149,6 +146,7 @@ async function serve(options: { contents?: string; questions?: number } = {}) {
     emitted,
     published,
     logins,
+    credentials,
     untilAsked,
     list: () => call("GET", providerLoginsPath),
     start: (body: unknown) => call("POST", providerLoginsPath, body),
@@ -206,8 +204,58 @@ describe("POST /api/provider-logins", () => {
 
     assert.equal((await start({ providerId: "scripted", method: "магия" })).status, 400);
     assert.equal((await start({ method: "api_key" })).status, 400);
+    assert.equal((await start({ ...startBody, target: { kind: "магия" } })).status, 400);
+  });
+
+  it("puts the credential into the key the body named", async () => {
+    const { start, answer, untilAsked, credentials } = await serve();
+
+    await credentials.withKeyTarget("scripted", { kind: "new", label: "личный" }, () =>
+      credentials.modify("scripted", async () => ({ type: "api_key", key: "первый" })),
+    );
+
+    await start({ ...startBody, target: { kind: "new", label: "рабочий" } });
+
+    const attempt = await untilAsked();
+
+    await answer(attempt.attemptId, {
+      stepId: attempt.pending?.stepId,
+      value: "sk-от-человека",
+    });
+    await untilSettled(credentials, "scripted", 2);
+
+    assert.deepEqual(credentials.keys("scripted"), [
+      { id: "key-1", label: "личный" },
+      { id: "key-2", label: "рабочий" },
+    ]);
+    // Рабочий ключ не тронут: вход добавил второй, а не переписал первый.
+    assert.deepEqual(await credentials.readKey("scripted", "key-1"), {
+      type: "api_key",
+      key: "первый",
+    });
+    assert.deepEqual(await credentials.readKey("scripted", "key-2"), {
+      type: "api_key",
+      key: "sk-написанный-сценарием",
+    });
   });
 });
+
+/** Ждёт, пока вход допишет кред: маршрут отвечает раньше, чем рантайм доходит до записи. */
+async function untilSettled(
+  credentials: { keys: (providerId: string) => unknown[] },
+  providerId: string,
+  count: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (credentials.keys(providerId).length >= count) {
+      return;
+    }
+
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  throw new Error("вход не дошёл до записи креда");
+}
 
 describe("POST /api/provider-logins/:attemptId/answer", () => {
   it("carries the answer to the step that is waiting", async () => {
