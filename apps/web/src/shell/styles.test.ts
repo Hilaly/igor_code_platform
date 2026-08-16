@@ -338,6 +338,17 @@ describe("the style sheets of the application", () => {
     expect(shell).toMatch(/\.shell-panel-toggle-right\s*\{[^}]*inset-inline-end:\s*0;/s);
   });
 
+  /**
+   * Свободную высоту правой панели забирает тело вкладки, и только оно. Растущая полоса вкладок
+   * делила бы эту высоту с телом поровну — вкладка начиналась бы с середины панели.
+   */
+  it("gives the free height of the right panel to the open tab, not to the tab strip", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-tabs\s*\{[^}]*flex:\s*0 0 auto;/s);
+    expect(shell).toMatch(/\.shell-tab-body\s*\{[^}]*flex:\s*1 1 auto;/s);
+  });
+
   it("centers page route children while contained content remains full width", () => {
     const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
 
