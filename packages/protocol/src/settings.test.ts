@@ -221,6 +221,28 @@ describe("parseConfig", () => {
     }
   });
 
+  it("reads the share of the limit that agent sessions may take", () => {
+    assert.equal(parsedConfig({ maxConcurrentAgentTurns: 2 }).maxConcurrentAgentTurns, 2);
+    // Доля выше общего предела — не отказ: она часть его, и очередь берёт меньшее из двух.
+    // Отказывать здесь значило бы требовать порядка правки двух ключей в одном файле.
+    assert.equal(
+      parsedConfig({ maxConcurrentTurns: 2, maxConcurrentAgentTurns: 9 }).maxConcurrentAgentTurns,
+      9,
+    );
+  });
+
+  it("refuses a share that would let no subagent run", () => {
+    // Ноль осмыслен как число, но не как настройка: субагенты стояли бы в очереди вечно, и
+    // запустивший их не узнал бы об этом ниоткуда.
+    for (const value of [0, -1, 2.5, "2", null]) {
+      assert.equal(
+        parseConfig({ maxConcurrentAgentTurns: value }).kind,
+        "rejected",
+        String(value),
+      );
+    }
+  });
+
   it("reads the two waits of a plugin separately", () => {
     // Величины разные по природе: хук ждут внутри турна, инструмент модель зовёт как работу
     // (docs/hooks.md). Одно значение на оба заставило бы поднять и то, которое держит турн.

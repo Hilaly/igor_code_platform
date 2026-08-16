@@ -571,6 +571,9 @@ export const coreEnglish: CatalogRegistration = {
     "settings.config.hint.logLevel": "How much the daemon writes to its journal",
     "settings.config.key.maxConcurrentTurns": "Concurrent turns",
     "settings.config.hint.maxConcurrentTurns": "How many sessions may reach a model at once",
+    "settings.config.key.maxConcurrentAgentTurns": "Of them, agent sessions",
+    "settings.config.hint.maxConcurrentAgentTurns":
+      "How many of those slots subagents may take; the rest stays yours",
     "settings.config.key.compactionThreshold": "Compaction threshold",
     "settings.config.hint.compactionThreshold":
       "Share of the context window after which compaction starts by itself; 0 turns it off",

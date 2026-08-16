@@ -291,7 +291,7 @@ describe("file resources end to end", () => {
         forProject: (id) => registry.resolvedForProject(id),
       },
       tools,
-      queue: createTurnQueue({ limit: () => 1 }),
+      queue: createTurnQueue({ limit: () => 1, agentLimit: () => 1 }),
       bus,
       emitDelta: () => {},
       logger,

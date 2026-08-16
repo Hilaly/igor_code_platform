@@ -25,6 +25,16 @@ export type Config = {
    */
   maxConcurrentTurns: number;
   /**
+   * Сколько из этих слотов вправе занять **агентские** сессии — заведённые не человеком, а другим
+   * агентом (docs/architecture.md). Человеку всегда остаётся `maxConcurrentTurns` минус это число:
+   * разлёт субагентов не имеет права отодвинуть его сообщение в конец очереди.
+   *
+   * Подлимит внутри общего предела, а не вторая независимая очередь: общий предел стоит здесь
+   * из-за денег и частоты запросов у провайдера, а это свойство глобальное — двумя очередями оно
+   * молча удвоилось бы у всех, кто уже написал себе `config.json`.
+   */
+  maxConcurrentAgentTurns: number;
+  /**
    * Доля контекстного окна модели, после которой компакция запускается сама. `0` — выключено, и это
    * умолчание: компакция стоит денег и необратимо меняет разговор, поэтому её включает человек
    * (docs/roadmap.md, срез 10b).
@@ -143,6 +153,8 @@ export type AppearancePreferences = {
 export const defaultConfig: Config = {
   logLevel: "info",
   maxConcurrentTurns: 4,
+  // Три из четырёх: разлёт субагентов широкий, но один слот человеку остаётся при любом их числе.
+  maxConcurrentAgentTurns: 3,
   compactionThreshold: 0,
   // Совпадают с зашитыми в Pi: своя компакция заведена ради управляемости, а не ради других чисел.
   compactionReserveTokens: 16384,
@@ -187,6 +199,7 @@ export type SettingsParseResult<Value> =
 const everyConfigKey = {
   logLevel: true,
   maxConcurrentTurns: true,
+  maxConcurrentAgentTurns: true,
   compactionThreshold: true,
   compactionReserveTokens: true,
   compactionKeepRecentTokens: true,
@@ -319,6 +332,22 @@ function parseConfigFields(
     }
 
     value.maxConcurrentTurns = maxConcurrentTurns as number;
+  }
+
+  const maxConcurrentAgentTurns = fields["maxConcurrentAgentTurns"];
+
+  if (maxConcurrentAgentTurns !== undefined) {
+    // Ноль не принимается, хотя как число он осмыслен: субагенты просто перестали бы ходить к
+    // модели и стояли бы в очереди вечно, а запустивший их об этом не узнал бы ниоткуда.
+    if (!Number.isInteger(maxConcurrentAgentTurns) || (maxConcurrentAgentTurns as number) < 1) {
+      diagnostics.push(
+        `${configFileName}: maxConcurrentAgentTurns must be an integer above zero, got ${JSON.stringify(maxConcurrentAgentTurns)}`,
+      );
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    value.maxConcurrentAgentTurns = maxConcurrentAgentTurns as number;
   }
 
   const threshold = fields["compactionThreshold"];
