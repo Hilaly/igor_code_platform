@@ -102,9 +102,8 @@ describe("the built-in Superpowers plugin", () => {
 
   it("does not instruct agents to call unsupported runtime tools", () => {
     const liveInstructions = walkFiles(skillsRoot)
-      .filter((path) =>
-        /(?:SKILL\.md|prompt\.md|visual-companion\.md|sovereign-tools\.md)$/u.test(path),
-      )
+      .filter((path) => !path.endsWith("CREATION-LOG.md") && !path.includes("/examples/"))
+      .filter((path) => /\.(?:md|yaml|sh|js|cjs)$/u.test(path))
       .map((path) => readFileSync(path, "utf8"))
       .join("\n");
 
