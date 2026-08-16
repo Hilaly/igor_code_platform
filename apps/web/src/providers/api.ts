@@ -12,6 +12,7 @@
 
 import {
   providerCredentialPath,
+  providerKeyPath,
   providerLoginAnswerPath,
   providerLoginPath,
   providerLoginsPath,
@@ -24,6 +25,7 @@ import {
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
   type LoginStart,
+  type ProviderKeyUpdate,
   type ProviderModels,
   type ProviderSummary,
   type ProvidersSnapshot,
@@ -220,6 +222,45 @@ export async function logOutProvider(providerId: string): Promise<ProviderSummar
   const response = await fetch(providerCredentialPath(providerId), {
     method: "DELETE",
     headers: { "content-type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ProviderSummary;
+}
+
+/**
+ * Правка ключа: подпись или выбор. Ответ — провайдер целиком, а не сам ключ: статус и набор вью
+ * показывает рядом, и разъехаться им нельзя (docs/web-api.md).
+ */
+export async function updateProviderKey(
+  providerId: string,
+  keyId: string,
+  update: ProviderKeyUpdate,
+): Promise<ProviderSummary> {
+  return writeProviderKey(providerId, keyId, "PUT", update);
+}
+
+/** Убрать один ключ. Ушёл последний — провайдер станет ненастроенным, и это видно в ответе. */
+export async function removeProviderKey(
+  providerId: string,
+  keyId: string,
+): Promise<ProviderSummary> {
+  return writeProviderKey(providerId, keyId, "DELETE");
+}
+
+async function writeProviderKey(
+  providerId: string,
+  keyId: string,
+  method: "PUT" | "DELETE",
+  update?: ProviderKeyUpdate,
+): Promise<ProviderSummary> {
+  const response = await fetch(providerKeyPath(providerId, keyId), {
+    method,
+    headers: { "content-type": "application/json" },
+    ...(update === undefined ? {} : { body: JSON.stringify(update) }),
   });
 
   if (!response.ok) {

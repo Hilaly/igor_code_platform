@@ -1,5 +1,6 @@
 import {
   providerCredentialPath,
+  providerKeyPath,
   providerLoginAnswerPath,
   providerLoginPath,
   providerLoginsPath,
@@ -28,7 +29,9 @@ import {
   refreshUserProvider,
   updateUserProvider,
   logOutProvider,
+  removeProviderKey,
   startProviderLogin,
+  updateProviderKey,
 } from "./api.ts";
 
 const userProvider: UserProviderDefinition = {
@@ -256,6 +259,43 @@ describe("logOutProvider", () => {
     daemon({ status: 409, body: { error: "credentials.json is not valid json" } });
 
     await expect(logOutProvider("anthropic")).rejects.toThrow("credentials.json is not valid json");
+  });
+});
+
+describe("the keys of a provider", () => {
+  it("renames a key and gives back the provider, not the key", async () => {
+    // Статус и набор вью показывает рядом, и разъехаться им нельзя (docs/web-api.md).
+    const calls = daemon({ status: 200, body: summary });
+
+    await expect(updateProviderKey("anthropic", "key-2", { label: "рабочий" })).resolves.toEqual(
+      summary,
+    );
+    expect(calls[0]?.url).toBe(providerKeyPath("anthropic", "key-2"));
+    expect(calls[0]?.init?.method).toBe("PUT");
+    expect(calls[0]?.init?.body).toBe(JSON.stringify({ label: "рабочий" }));
+  });
+
+  it("asks for the key to become the selected one", async () => {
+    const calls = daemon({ status: 200, body: summary });
+
+    await updateProviderKey("anthropic", "key-2", { selected: true });
+
+    expect(calls[0]?.init?.body).toBe(JSON.stringify({ selected: true }));
+  });
+
+  it("removes one key without a body", async () => {
+    const calls = daemon({ status: 200, body: summary });
+
+    await expect(removeProviderKey("anthropic", "key-2")).resolves.toEqual(summary);
+    expect(calls[0]?.url).toBe(providerKeyPath("anthropic", "key-2"));
+    expect(calls[0]?.init?.method).toBe("DELETE");
+    expect(calls[0]?.init?.body).toBeUndefined();
+  });
+
+  it("carries the refusal of a key nobody has", async () => {
+    daemon({ status: 404, body: { error: "not found" } });
+
+    await expect(removeProviderKey("anthropic", "key-9")).rejects.toThrow("not found");
   });
 });
 

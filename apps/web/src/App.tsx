@@ -1039,6 +1039,9 @@ export function App() {
                       onCancelLogin={providers.cancelLogin}
                       onCloseLogin={providers.closeLogin}
                       onLogOut={providers.logOut}
+                      onRenameKey={providers.renameKey}
+                      onSelectKey={providers.selectKey}
+                      onRemoveKey={providers.removeKey}
                       translator={translator}
                     />
                   }

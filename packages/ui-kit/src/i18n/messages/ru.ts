@@ -349,6 +349,23 @@ export const coreRussian: CatalogRegistration = {
       "Кред платформе не принадлежит: убирать здесь было нечего, и провайдер остался настроенным.",
     "providers.logout.stubborn.source":
       "Кред приходит из {source} и платформе не принадлежит: убирать здесь было нечего. Убери его из окружения и перезапусти демон.",
+    "providers.keys.title": "Ключи: {name}",
+    "providers.keys.empty": "Сохранённых ключей нет",
+    "providers.keys.hint":
+      "Выбранным ключом провайдер представлен целиком: им проверяется авторизация и обновляется список моделей.",
+    "providers.key.unnamed": "Без подписи",
+    "providers.key.selected": "выбранный",
+    "providers.key.unreadable": "кред не разобран",
+    "providers.key.select": "Сделать выбранным",
+    "providers.key.rename": "Переименовать",
+    "providers.key.rename.label": "Подпись ключа {id}",
+    "providers.key.rename.save": "Сохранить",
+    "providers.key.rename.cancel": "Отмена",
+    "providers.key.replace": "Заменить",
+    "providers.key.remove": "Убрать",
+    "providers.key.remove.title": "Убрать ключ {name}?",
+    "providers.key.remove.hint":
+      "Кред этого ключа исчезнет. Остальные ключи провайдера останутся на месте.",
     "providers.model.context": "Контекст: {count} токенов",
     "providers.model.cost": "За 1M токенов: ${input} на вход, ${output} на выход",
     "providers.models.count.one": "{count} модель",

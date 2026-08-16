@@ -354,6 +354,23 @@ export const coreEnglish: CatalogRegistration = {
       "The credential does not belong to the platform: there was nothing here to remove, and the provider is still configured.",
     "providers.logout.stubborn.source":
       "The credential comes from {source} and does not belong to the platform: there was nothing here to remove. Take it out of the environment and restart the daemon.",
+    "providers.keys.title": "Keys: {name}",
+    "providers.keys.empty": "No stored keys",
+    "providers.keys.hint":
+      "The selected key represents the provider as a whole: it checks the auth and refreshes the model list.",
+    "providers.key.unnamed": "No label",
+    "providers.key.selected": "selected",
+    "providers.key.unreadable": "credential not understood",
+    "providers.key.select": "Make it the selected one",
+    "providers.key.rename": "Rename",
+    "providers.key.rename.label": "Label of the key {id}",
+    "providers.key.rename.save": "Save",
+    "providers.key.rename.cancel": "Cancel",
+    "providers.key.replace": "Replace",
+    "providers.key.remove": "Remove",
+    "providers.key.remove.title": "Remove the key {name}?",
+    "providers.key.remove.hint":
+      "The credential of this key goes away. The other keys of the provider stay where they are.",
     "providers.model.context": "Context: {count} tokens",
     "providers.model.cost": "Per 1M tokens: ${input} in, ${output} out",
     "providers.models.count.one": "{count} model",

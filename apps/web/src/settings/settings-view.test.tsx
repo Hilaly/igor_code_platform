@@ -112,6 +112,9 @@ it.each([
         onCancelLogin={vi.fn()}
         onCloseLogin={vi.fn()}
         onLogOut={vi.fn()}
+        onRenameKey={vi.fn(async () => undefined)}
+        onSelectKey={vi.fn(async () => undefined)}
+        onRemoveKey={vi.fn(async () => undefined)}
         translator={translator}
       />
     ),
