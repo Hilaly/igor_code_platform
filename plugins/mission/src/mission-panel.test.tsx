@@ -267,9 +267,12 @@ it("separates the mission, its explanation, and the named state of every step", 
     screen.getByRole("progressbar", { name: "Mission progress" }).getAttribute("aria-valuenow"),
   ).toBe("33");
 
-  expect(screen.getByRole("status", { name: "Done" })).not.toBeNull();
-  expect(screen.getByRole("status", { name: "In progress" })).not.toBeNull();
-  expect(screen.getByRole("status", { name: "Not started" })).not.toBeNull();
+  expect(screen.getByText("Done")).not.toBeNull();
+  expect(screen.getByText("In progress")).not.toBeNull();
+  expect(screen.getByText("Not started")).not.toBeNull();
+
+  // Видимый текст — единственный источник статуса для accessibility tree: точка декоративна.
+  expect(screen.queryAllByRole("status")).toHaveLength(0);
 
   // Сырое машинное значение статуса в панель больше не попадает.
   expect(screen.queryByText("in progress")).toBeNull();
@@ -286,8 +289,8 @@ it("names why a step stalled and how the mission ended", async () => {
 
   await screen.findByText("Merge the branch");
 
-  expect(screen.getByRole("status", { name: "Blocked" })).not.toBeNull();
-  expect(screen.getByRole("status", { name: "Skipped" })).not.toBeNull();
+  expect(screen.getByText("Blocked")).not.toBeNull();
+  expect(screen.getByText("Skipped")).not.toBeNull();
   expect(screen.getByText("no credentials in this worktree")).not.toBeNull();
   expect(screen.getByText("the owner keeps it")).not.toBeNull();
 
@@ -308,7 +311,7 @@ it("speaks the language of the window", async () => {
   await screen.findByRole("heading", { name: "Миссия" });
   expect(screen.getByText("Шаги")).not.toBeNull();
   expect(screen.getByText("1 из 3")).not.toBeNull();
-  expect(screen.getByRole("status", { name: "В работе" })).not.toBeNull();
+  expect(screen.getByText("В работе")).not.toBeNull();
   // Дата в русской строке тоже русская: локаль браузера её больше не решает.
   expect(screen.getByText(/Обновлено 16 авг\./u)).not.toBeNull();
 });

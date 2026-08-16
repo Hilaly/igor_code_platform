@@ -111,9 +111,11 @@ function warnAboutMissing(written: MissionWriteResult): string[] {
 }
 
 function describeConflict(conflict: MissionConflictError): string {
+  if (conflict.current === undefined) {
+    return `Mission update refused: ${conflict.message}. No mission is stored yet, so nothing was written. Call mission-update again with expectedRevision 0 to record the first mission.`;
+  }
+
   const head = `Mission update refused: ${conflict.message}. The mission changed under you; nothing was written.`;
 
-  return conflict.current === undefined
-    ? `${head} Call mission-update again without expectedRevision to record the first mission.`
-    : `${head} Merge your changes into the stored snapshot below and call mission-update again with expectedRevision ${conflict.current.revision}.\n\n${renderSnapshot(conflict.current)}`;
+  return `${head} Merge your changes into the stored snapshot below and call mission-update again with expectedRevision ${conflict.current.revision}.\n\n${renderSnapshot(conflict.current)}`;
 }

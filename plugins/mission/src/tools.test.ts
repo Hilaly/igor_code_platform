@@ -106,6 +106,29 @@ describe("mission-update", () => {
     assert.equal(host.published.length, 1);
   });
 
+  it("advises retrying with expectedRevision 0 when no mission exists", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+
+    const outcome = await host.callTool(
+      "mission-update",
+      {
+        mission: "First",
+        plan: [{ step: "Build", status: "pending" }],
+        expectedRevision: 3,
+      },
+      { sessionId: "new" },
+    );
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /expectedRevision 0/u);
+    assert.match(outcome.content, /no mission yet/u);
+    assert.doesNotMatch(outcome.content, /changed under you/u);
+    assert.doesNotMatch(outcome.content, /without expectedRevision\b/u);
+    assert.equal(host.stored.size, 0);
+    assert.deepEqual(host.published, []);
+  });
+
   it("rejects invalid input before writing or publishing", async () => {
     host = installTestHost({ id: "mission" });
     await contributeTools();

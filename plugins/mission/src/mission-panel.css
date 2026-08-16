@@ -58,8 +58,9 @@
 }
 
 /*
- * Состояние шага стоит слева отдельной колонкой, а не словом у правого края: в узкой панели тот
- * отрывался от своего шага и переносился на вторую строку.
+ * Состояние стоит слева рядом со своей точкой и не сжимается; текст шага занимает остаток ширины и
+ * переносится внутри себя. Поэтому даже в узкой панели маркер не отрывается от слова, которое
+ * объясняет его цвет.
  */
 .mission-step {
   display: flex;
@@ -75,9 +76,19 @@
   overflow-wrap: anywhere;
 }
 
+.mission-step-state {
+  display: inline-flex;
+  align-items: baseline;
+  flex: none;
+  gap: var(--sovereign-space-1);
+  font-size: var(--sovereign-font-size-xs);
+  white-space: nowrap;
+}
+
 /* Шаг и причина под ним — колонка: причина принадлежит шагу, а не соседствует с ним в строке. */
 .mission-step-body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--sovereign-space-1);
   min-width: 0;

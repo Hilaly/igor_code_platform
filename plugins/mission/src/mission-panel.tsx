@@ -116,7 +116,7 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
   );
 }
 
-/** Состояние шага цветом не сообщается: точка кита несёт его словом в `aria-label` и подсказке. */
+/** Состояние шага всегда названо видимым словом; точка лишь дублирует его цветом. */
 const stepTones: Record<MissionStep["status"], StatusDotTone> = {
   completed: "positive",
   in_progress: "pending",
@@ -182,15 +182,21 @@ function MissionSnapshotView({
           {/*
             Подсветку текущего шага рисует сама строка списка: заливкой строк владеет кит, и
             собственный фон здесь разошёлся бы с ним при первой правке палитры. Состояние при этом
-            сообщается не только цветом — точка несёт его словом.
+            названо видимым словом; точка скрыта от accessibility tree, чтобы скринридер не озвучивал
+            то же слово дважды.
           */}
           {snapshot.plan.map((step, index) => (
             <ListRow key={`${index}-${step.step}`} selected={step.status === "in_progress"}>
               <span className="mission-step" data-status={step.status}>
-                <StatusDot
-                  tone={stepTones[step.status]}
-                  label={translator.t(`state.${step.status}`)}
-                />
+                <span className="mission-step-state">
+                  <span aria-hidden="true">
+                    <StatusDot
+                      tone={stepTones[step.status]}
+                      label={translator.t(`state.${step.status}`)}
+                    />
+                  </span>
+                  <Text tone="muted">{translator.t(`state.${step.status}`)}</Text>
+                </span>
                 <span className="mission-step-body">
                   <Text tone={settledTones.has(step.status) ? "muted" : "normal"}>{step.step}</Text>
                   {/*

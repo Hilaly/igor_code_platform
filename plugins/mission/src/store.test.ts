@@ -51,6 +51,22 @@ describe("mission storage", () => {
     assert.equal((await readMission("same"))?.revision, 2);
   });
 
+  it("rejects concurrent writes with the same expectedRevision", async () => {
+    host = installTestHost({ id: "mission" });
+    const [first, second] = await Promise.allSettled([
+      writeMission("same", { ...input("First"), expectedRevision: 0 }),
+      writeMission("same", { ...input("Second"), expectedRevision: 0 }),
+    ]);
+
+    assert.equal(first.status, "fulfilled");
+    assert.equal(first.value.snapshot.revision, 1);
+    assert.equal(second.status, "rejected");
+    assert.ok(second.reason instanceof MissionConflictError);
+    assert.equal(second.reason.expectedRevision, 0);
+    assert.equal(second.reason.current?.revision, 1);
+    assert.equal((await readMission("same"))?.revision, 1);
+  });
+
   it("continues a session queue after an earlier write fails", async () => {
     host = installTestHost({ id: "mission" });
     host.failNextStorage("disk full");
