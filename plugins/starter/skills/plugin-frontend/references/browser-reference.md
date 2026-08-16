@@ -36,10 +36,24 @@ export function SessionBoard({ context }: { context: PlaceContext }) {
   useEffect(() => {
     const sessionId = context.subject?.["sessionId"];
     if (sessionId === undefined) return;
-    return events.subscribe("board.changed", (event) => {
+    const reload = () => {
+      // Re-fetch the snapshot route and ignore responses below the required revision.
+    };
+    const unsubscribeEvent = events.subscribe((event) => {
+      if (event.type === "core.stream.gap") {
+        reload();
+        return;
+      }
+      if (event.type !== "board.changed") return;
       if (event.payload.sessionId !== sessionId) return;
-      // Re-fetch the snapshot route and ignore stale revisions.
+      // Raise the required revision to event.payload.revision before re-fetching.
+      reload();
     });
+    const unsubscribeRecovery = events.subscribeRecovery?.(reload);
+    return () => {
+      unsubscribeEvent();
+      unsubscribeRecovery?.();
+    };
   }, [context.subject, events]);
 
   return null;

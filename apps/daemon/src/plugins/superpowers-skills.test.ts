@@ -43,7 +43,7 @@ describe("the built-in Superpowers plugin", () => {
     assert.deepEqual(skillDirectories, [...expectedSkills].sort());
   });
 
-  it("parses every skill and resolves its relative Markdown links", () => {
+  it("parses every skill and resolves Markdown links in every bundled resource", () => {
     for (const name of expectedSkills) {
       const directory = join(skillsRoot, name);
       const entryPath = join(directory, "SKILL.md");
@@ -55,13 +55,32 @@ describe("the built-in Superpowers plugin", () => {
         assert.deepEqual(parsed.diagnostics, [], name);
         assert.match(parsed.definition.description, /^Use when\b/u, name);
       }
+    }
 
+    for (const path of walkFiles(skillsRoot).filter(
+      (candidate) =>
+        candidate.endsWith(".md") &&
+        !candidate.includes("/examples/") &&
+        !candidate.endsWith("/anthropic-best-practices.md"),
+    )) {
+      const text = readFileSync(path, "utf8");
       for (const link of markdownLinks(text)) {
         if (link.startsWith("#") || /^[a-z][a-z0-9+.-]*:/iu.test(link)) continue;
-        const target = resolve(directory, link.split("#", 1)[0] ?? "");
-        assert.equal(statSync(target).isFile(), true, `${name} links to missing ${link}`);
+        const target = resolve(dirname(path), link.split("#", 1)[0] ?? "");
+        assert.equal(statSync(target).isFile(), true, `${path} links to missing ${link}`);
       }
     }
+  });
+
+  it("keeps live script invocations executable without relying on file mode", () => {
+    const liveInstructions = walkFiles(skillsRoot)
+      .filter((path) => path.endsWith(".md") && !path.includes("/examples/"))
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
+
+    assert.doesNotMatch(liveInstructions, /^\s*(?:\.\/)?[^\s`]+\.(?:sh|js)\s/mu);
+    assert.match(liveInstructions, /bash scripts\/start-server\.sh/u);
+    assert.match(liveInstructions, /node render-graphs\.cjs/u);
   });
 
   it("discovers exactly 14 qualified skills without invalid resources", () => {

@@ -35,7 +35,7 @@ The server watches a directory for HTML files and serves the newest one to the b
 ```bash
 # Start AFTER the user approves the companion. --open auto-opens their browser on
 # the first screen; --project-dir persists mockups and enables same-port restart.
-scripts/start-server.sh --project-dir /path/to/project --open
+bash scripts/start-server.sh --project-dir /path/to/project --open
 
 # Returns: {"type":"server-started","port":52341,
 #           "url":"http://localhost:52341/?key=ab12…",
@@ -62,7 +62,7 @@ without repeating it.
 Run the script through `bash`. The default detached mode normally survives across turns:
 
 ```bash
-scripts/start-server.sh --project-dir /path/to/project --open
+bash scripts/start-server.sh --project-dir /path/to/project --open
 ```
 
 If the environment reaps detached processes, add `--foreground` and call `bash` with
@@ -71,7 +71,7 @@ If the environment reaps detached processes, add `--foreground` and call `bash` 
 If the URL is unreachable from your browser (common in remote/containerized setups), bind a non-loopback host:
 
 ```bash
-scripts/start-server.sh \
+bash scripts/start-server.sh \
   --project-dir /path/to/project \
   --host 0.0.0.0 \
   --url-host localhost
@@ -274,7 +274,7 @@ If `$STATE_DIR/events` doesn't exist, the user didn't interact with the browser 
 ## Cleaning Up
 
 ```bash
-scripts/stop-server.sh $SESSION_DIR
+bash scripts/stop-server.sh $SESSION_DIR
 ```
 
 If the session used `--project-dir`, mockup files persist in `.superpowers/brainstorm/` for later reference. Only `/tmp` sessions get deleted on stop.

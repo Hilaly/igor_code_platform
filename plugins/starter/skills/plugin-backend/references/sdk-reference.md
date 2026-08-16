@@ -193,7 +193,7 @@ Event declaration начинает действовать после `activate`;
 Подписка использует полное имя события без wildcard. Чужой payload непрозрачен, если подписчик не
 импортировал и не применил schema publisher’а.
 
-### Snapshot route и invalidation event
+### Snapshot route, session-scoped mutation и invalidation event
 
 Для изменяемого состояния разделяй запись и уведомление: mutation tool/route сначала валидирует вход
 и записывает полный JSON snapshot с монотонным `revision`, затем публикует событие только с ключом
@@ -205,13 +205,25 @@ const changed = defineEvent(
   z.object({ sessionId: z.string(), revision: z.number().int().nonnegative() }),
 );
 
+type BoardSnapshot = {
+  title: string;
+  revision: number;
+  updatedAt: string;
+};
+
+const keyFor = (sessionId: string) => `board.${sessionId}`;
+
+async function readBoard(sessionId: string): Promise<BoardSnapshot | undefined> {
+  return (await storage.get(keyFor(sessionId))) as BoardSnapshot | undefined;
+}
+
 await contribute.event(changed);
 await contribute.route({
   id: "snapshot",
   method: "GET",
   path: "snapshot/:sessionId",
   handle: async ({ parameters }) => {
-    const snapshot = await storage.get(`board.${parameters.sessionId}`);
+    const snapshot = await readBoard(parameters.sessionId ?? "");
     if (snapshot === undefined) return { status: 404, body: { error: "not_found" } };
     return { status: 200, body: snapshot };
   },
@@ -226,13 +238,25 @@ Route остаётся единственным источником истин�
 await contribute.tool({
   id: "board-update",
   description: "Replace the current session board snapshot",
-  parameters: z.object({ snapshot: z.record(z.string(), z.unknown()) }),
-  invoke: async ({ snapshot }, { sessionId }) => {
-    // validate, write `board.${sessionId}`, then publish `changed`
-    return "updated";
+  parameters: z.strictObject({ title: z.string().trim().min(1) }),
+  invoke: async ({ title }, { sessionId }) => {
+    const previous = await readBoard(sessionId);
+    const snapshot: BoardSnapshot = {
+      title,
+      revision: (previous?.revision ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await storage.set(keyFor(sessionId), snapshot);
+    await changed.publish({ sessionId, revision: snapshot.revision });
+    return `updated revision ${snapshot.revision}`;
   },
 });
 ```
+
+В production-коде сериализуй read–increment–write отдельно для каждого `sessionId`, чтобы два
+одновременных вызова не получили одну revision. Если `storage.set` отклонён, `changed.publish` не
+выполняется. Route объявлен через `contribute.route`, поэтому host защищает его обычной сессией;
+`sessionId` mutation всегда приходит из invocation context, а route читает его из path parameter.
 
 ## Contributions
 

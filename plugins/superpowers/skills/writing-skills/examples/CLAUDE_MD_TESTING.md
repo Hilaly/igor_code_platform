@@ -1,4 +1,8 @@
-# Testing CLAUDE.md Skills Documentation
+# Historical Upstream Example: Testing CLAUDE.md Skills Documentation
+
+> Historical reference only. The paths and Claude-specific wording below preserve an upstream
+> experiment and are not runnable Sovereign instructions. For live Sovereign skill testing, use
+> `subagent-spawn`, `mission-update`, and the discovery workflow in the parent `SKILL.md`.
 
 Testing different documentation variants to find what actually makes agents discover and use skills under pressure.
 
