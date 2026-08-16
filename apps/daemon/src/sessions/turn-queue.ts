@@ -137,7 +137,7 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
    * заведены. Порядок внутри полосы это не нарушает — обгоняется только чужая.
    */
   const drain = (): void => {
-    for (let index = 0; index < waiting.length; ) {
+    for (let index = 0; index < waiting.length;) {
       const next = waiting[index];
 
       if (next === undefined || next.cancelled) {

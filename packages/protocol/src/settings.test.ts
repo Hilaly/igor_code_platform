@@ -235,11 +235,7 @@ describe("parseConfig", () => {
     // Ноль осмыслен как число, но не как настройка: субагенты стояли бы в очереди вечно, и
     // запустивший их не узнал бы об этом ниоткуда.
     for (const value of [0, -1, 2.5, "2", null]) {
-      assert.equal(
-        parseConfig({ maxConcurrentAgentTurns: value }).kind,
-        "rejected",
-        String(value),
-      );
+      assert.equal(parseConfig({ maxConcurrentAgentTurns: value }).kind, "rejected", String(value));
     }
   });
 

@@ -380,11 +380,10 @@ describe("createTurnQueue: полосы", () => {
     const queue = createTurnQueue({ limit: () => 2, agentLimit: () => 1 });
     const order: string[] = [];
     const started = [pending(), pending(), pending()];
-    const note =
-      (name: string, work: ReturnType<typeof pending>) => async (): Promise<void> => {
-        order.push(name);
-        await work.run();
-      };
+    const note = (name: string, work: ReturnType<typeof pending>) => async (): Promise<void> => {
+      order.push(name);
+      await work.run();
+    };
 
     queue.submit(job("a1", note("a1", started[0]!), "agent"));
     queue.submit(job("a2", note("a2", started[1]!), "agent"));
