@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { validateMissionInput } from "./model.ts";
+import { missingCompletedSteps, validateMissionInput } from "./model.ts";
 
 describe("mission input", () => {
   it("trims the mission, explanation, and steps", () => {
@@ -131,5 +131,48 @@ describe("mission input", () => {
 
     assert.equal(failed.outcome?.kind, "failed");
     assert.equal(succeeded.outcome?.kind, "succeeded");
+  });
+});
+
+describe("missing completed steps", () => {
+  const snapshot = (plan: { step: string; status: "completed" | "pending" }[]) => ({
+    mission: "Ship",
+    plan,
+    revision: 1,
+    updatedAt: "2026-08-16T08:00:00.000Z",
+  });
+
+  it("has nothing to compare against the first write", () => {
+    assert.deepEqual(
+      missingCompletedSteps(undefined, {
+        mission: "Ship",
+        plan: [{ step: "a", status: "pending" }],
+      }),
+      [],
+    );
+  });
+
+  it("stays quiet when a completed step is only walked back", () => {
+    // Готовых стало меньше, но текст на месте: это исправление статуса, а не потеря шага.
+    assert.deepEqual(
+      missingCompletedSteps(snapshot([{ step: "a", status: "completed" }]), {
+        mission: "Ship",
+        plan: [{ step: "a", status: "pending" }],
+      }),
+      [],
+    );
+  });
+
+  it("names every completed step whose text is gone", () => {
+    assert.deepEqual(
+      missingCompletedSteps(
+        snapshot([
+          { step: "a", status: "completed" },
+          { step: "b", status: "completed" },
+        ]),
+        { mission: "Ship", plan: [{ step: "c", status: "pending" }] },
+      ),
+      ["a", "b"],
+    );
   });
 });

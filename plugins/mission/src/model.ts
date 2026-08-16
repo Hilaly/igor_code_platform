@@ -146,3 +146,31 @@ export function validateMissionInput(value: unknown): MissionInput {
 export function parseMissionSnapshot(value: unknown): MissionSnapshot {
   return missionSnapshotSchema.parse(value);
 }
+
+/**
+ * Готовые шаги, пропавшие при перезаписи. Инструмент заменяет план целиком, поэтому потерять шаг
+ * можно молча — и заметно это только по сравнению с предыдущим снимком.
+ *
+ * Сравнение начинается со счёта, а не с текстов: переформулировка готового шага не должна выглядеть
+ * потерей, а она текст меняет. Если готовых стало не меньше, ничего не потеряно; если меньше —
+ * названы те, чьего текста в новом плане нет вовсе.
+ */
+export function missingCompletedSteps(
+  previous: MissionSnapshot | undefined,
+  next: MissionContent,
+): string[] {
+  if (previous === undefined) {
+    return [];
+  }
+
+  const completedBefore = previous.plan.filter((step) => step.status === "completed");
+  const completedAfter = next.plan.filter((step) => step.status === "completed").length;
+
+  if (completedAfter >= completedBefore.length) {
+    return [];
+  }
+
+  const texts = new Set(next.plan.map((step) => step.step));
+
+  return completedBefore.filter((step) => !texts.has(step.step)).map((step) => step.step);
+}

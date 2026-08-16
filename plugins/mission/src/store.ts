@@ -1,6 +1,11 @@
 import { storage } from "@sovereign/sdk";
 
-import { parseMissionSnapshot, validateMissionInput, type MissionSnapshot } from "./model.ts";
+import {
+  missingCompletedSteps,
+  parseMissionSnapshot,
+  validateMissionInput,
+  type MissionSnapshot,
+} from "./model.ts";
 
 const keyFor = (sessionId: string) => `mission.${sessionId}`;
 const writes = new Map<string, Promise<unknown>>();
@@ -26,6 +31,12 @@ export class MissionConflictError extends Error {
   }
 }
 
+export type MissionWriteResult = {
+  snapshot: MissionSnapshot;
+  /** Готовые шаги, исчезнувшие в этой записи. Не ошибка: план имеет право меняться, но молча — нет. */
+  missingCompletedSteps: string[];
+};
+
 export async function readMission(sessionId: string): Promise<MissionSnapshot | undefined> {
   const value = await storage.get(keyFor(sessionId));
 
@@ -38,7 +49,7 @@ export async function readMission(sessionId: string): Promise<MissionSnapshot | 
  * `expectedRevision`: с ним разошедшаяся запись становится отказом, который видно, а без него —
  * молчаливым затиранием чужого плана.
  */
-export async function writeMission(sessionId: string, value: unknown): Promise<MissionSnapshot> {
+export async function writeMission(sessionId: string, value: unknown): Promise<MissionWriteResult> {
   const previous = writes.get(sessionId) ?? Promise.resolve();
   const current = previous
     .catch(() => undefined)
@@ -56,7 +67,8 @@ export async function writeMission(sessionId: string, value: unknown): Promise<M
         updatedAt: new Date().toISOString(),
       };
       await storage.set(keyFor(sessionId), snapshot);
-      return snapshot;
+
+      return { snapshot, missingCompletedSteps: missingCompletedSteps(stored, content) };
     });
   writes.set(sessionId, current);
   try {

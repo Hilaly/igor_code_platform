@@ -52,6 +52,32 @@ describe("mission-update", () => {
     assert.match(outcome.content, /^ {2}2\. \[blocked\] Push \(reason: no credentials\)$/mu);
   });
 
+  it("warns when the rewrite drops steps that were completed", async () => {
+    host = installTestHost({ id: "mission" });
+    await contributeTools();
+    await host.callTool(
+      "mission-update",
+      {
+        mission: "Ship",
+        plan: [
+          { step: "Build", status: "completed" },
+          { step: "Test", status: "completed" },
+        ],
+      },
+      { sessionId: "s" },
+    );
+
+    const outcome = await host.callTool(
+      "mission-update",
+      { mission: "Ship", plan: [{ step: "Build", status: "completed" }] },
+      { sessionId: "s" },
+    );
+
+    assert.equal(outcome.isError, false);
+    assert.match(outcome.content, /Warning: 1 step\(s\) completed in revision 1 are gone/u);
+    assert.match(outcome.content, /"Test"/u);
+  });
+
   it("refuses a stale expectedRevision and returns the snapshot to merge into", async () => {
     host = installTestHost({ id: "mission" });
     await contributeTools();

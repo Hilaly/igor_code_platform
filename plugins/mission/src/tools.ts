@@ -2,7 +2,12 @@ import { contribute, defineEvent, z, type PluginToolInvocation } from "@sovereig
 
 import { missionInputSchema } from "./model.ts";
 import { renderSnapshot } from "./render.ts";
-import { MissionConflictError, readMission, writeMission } from "./store.ts";
+import {
+  MissionConflictError,
+  readMission,
+  writeMission,
+  type MissionWriteResult,
+} from "./store.ts";
 
 export const changed = defineEvent(
   "changed",
@@ -44,10 +49,13 @@ export async function contributeTools(): Promise<void> {
     parameters: missionInputSchema,
     invoke: async (input, invocation: PluginToolInvocation) => {
       try {
-        const snapshot = await writeMission(invocation.sessionId, input);
-        await changed.publish({ sessionId: invocation.sessionId, revision: snapshot.revision });
+        const written = await writeMission(invocation.sessionId, input);
+        await changed.publish({
+          sessionId: invocation.sessionId,
+          revision: written.snapshot.revision,
+        });
 
-        return renderSnapshot(snapshot);
+        return [renderSnapshot(written.snapshot), ...warnAboutMissing(written)].join("\n\n");
       } catch (cause) {
         if (cause instanceof MissionConflictError) {
           return { content: describeConflict(cause), isError: true };
@@ -81,6 +89,25 @@ export async function contributeTools(): Promise<void> {
       }
     },
   });
+}
+
+/**
+ * Пропажа готовых шагов — предупреждение, а не отказ: план имеет право перестраиваться, и запретить
+ * это значило бы запретить признавать ошибку в плане. Но происходить молча оно не должно, иначе
+ * пройденная работа исчезает вместе со свидетельством, что она была.
+ */
+function warnAboutMissing(written: MissionWriteResult): string[] {
+  const missing = written.missingCompletedSteps;
+
+  if (missing.length === 0) {
+    return [];
+  }
+
+  const listed = missing.map((step) => `"${step}"`).join(", ");
+
+  return [
+    `Warning: ${missing.length} step(s) completed in revision ${written.snapshot.revision - 1} are gone from this plan: ${listed}. Put them back if dropping them was a slip, or say in the explanation why they no longer belong.`,
+  ];
 }
 
 function describeConflict(conflict: MissionConflictError): string {
