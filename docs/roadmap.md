@@ -165,6 +165,12 @@
   ([models-and-providers.md](models-and-providers.md), [data-directory.md](data-directory.md),
   [web-api.md](web-api.md), [ui-kit.md](ui-kit.md)).
 
+- **Срез 17b — маршрутизация запросов сессии.** Пакет `@sovereign/model-routing` с правилами выбора
+  ключа и классификацией отказов; коллекция моделей на сессию, подставляющая её ключ и берущаяся за
+  следующий после отказа до первого содержательного события; пул здоровья ключей на демон
+  ([model-routing.md](model-routing.md), [runtime-checks.md](runtime-checks.md),
+  [repository-structure.md](repository-structure.md)).
+
 ## Дальше
 
 **Порядок до среза 13 утверждён владельцем продукта 2026-07-28, продолжение — 2026-08-09.**

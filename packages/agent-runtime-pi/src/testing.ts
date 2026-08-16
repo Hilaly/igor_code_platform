@@ -29,10 +29,12 @@ import {
   type AgentSessionStore,
   type CompactionTuning,
 } from "./agent-session.ts";
+import { createKeyPool } from "@sovereign/model-routing";
 import type { LoginKeyTarget } from "@sovereign/protocol";
 
 import type { CredentialVault } from "./credentials.ts";
 import type { Environment } from "./environment.ts";
+import type { SessionRouter } from "./session-models.ts";
 
 /**
  * Хранилище кредов в памяти. Тот же контракт, что у файла демона, без файла: набор именованных
@@ -296,6 +298,12 @@ export type ScriptedTurn = {
   text?: string;
   toolCalls?: ScriptedToolCall[];
   /**
+   * Отказать до первого содержательного события — так отвечает провайдер, у которого кончился лимит
+   * ключа. Именно этот отказ сессия имеет право переиграть другим ключом
+   * (docs/model-routing.md).
+   */
+  refuse?: string;
+  /**
    * Сколько это обращение «стоило». Не названо — ноль: сложение нулей неотличимо от потерянной траты,
    * поэтому тесту учёта нужен способ назвать разные величины на разные обращения.
    */
@@ -416,6 +424,16 @@ function playTurn(
 
   events.push({ type: "start", partial: { ...message } });
 
+  if (turn.refuse !== undefined) {
+    events.push({
+      type: "error",
+      reason: "error",
+      error: { ...message, stopReason: "error", errorMessage: turn.refuse },
+    });
+
+    return;
+  }
+
   let contentIndex = 0;
 
   if (turn.text !== undefined) {
@@ -496,6 +514,11 @@ export function scriptedSessionStore(options: {
   compactionSettings?: () => CompactionTuning;
   /** Что двойник модели принимает на вход. По умолчанию только текст. */
   input?: ("text" | "image")[];
+  /**
+   * Ключи двойника провайдера. Названы — сессия ходит набором ключей и после отказа берётся за
+   * следующий (docs/model-routing.md); не названы — маршрутизатора нет вовсе, как было раньше.
+   */
+  keys?: string[];
 }): {
   store: AgentSessionStore;
   model: string;
@@ -505,12 +528,36 @@ export function scriptedSessionStore(options: {
   restoreModel: () => void;
   /** Контексты, отправленные двойнику модели; интеграционные тесты проверяют реальный prompt/tool flow. */
   requests: Context[];
+  /** Ключи, которыми двойник провайдера отвечал, в порядке обращений. */
+  keysUsed: string[];
 } {
   const scripted = scriptedModelProvider({
     turns: options.turns ?? [],
     ...(options.input === undefined ? {} : { input: options.input }),
   });
   const models = createModels();
+  const keysUsed: string[] = [];
+  const pool = createKeyPool();
+  const keys = options.keys ?? [];
+  const router: SessionRouter = {
+    candidatesFor: (model) => [{ providerId: model.provider, modelId: model.id }],
+    keysOf: (providerId) => pool.usable(providerId, keys),
+    lease: (providerId) => pool.lease(providerId, keys),
+    authFor: (attempt) => {
+      if (attempt.keyId !== undefined) {
+        keysUsed.push(attempt.keyId);
+      }
+
+      return Promise.resolve(
+        attempt.keyId === undefined ? undefined : { apiKey: `sk-${attempt.keyId}` },
+      );
+    },
+    report: (attempt, verdict) => {
+      if (attempt.keyId !== undefined && verdict !== "success") {
+        pool.report(attempt.candidate.providerId, attempt.keyId, verdict);
+      }
+    },
+  };
 
   models.setProvider(scripted.provider);
 
@@ -522,7 +569,9 @@ export function scriptedSessionStore(options: {
       archivedDirectory: options.archivedDirectory ?? `${options.directory}-archived`,
       compactionSettings:
         options.compactionSettings ?? (() => ({ reserveTokens: 16384, keepRecentTokens: 20000 })),
+      ...(options.keys === undefined ? {} : { router }),
     }),
+    keysUsed,
     model: `${scripted.model.provider}/${scripted.model.id}`,
     requests: scripted.requests,
     contextWindow: scripted.model.contextWindow,

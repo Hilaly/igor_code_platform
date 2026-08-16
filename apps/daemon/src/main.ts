@@ -30,9 +30,11 @@ import {
 import { createEventBus } from "./platform/public.ts";
 import {
   createAgentSessionStore,
+  createModelRouter,
   createProviderCatalogue,
   processEnvironment,
 } from "@sovereign/agent-runtime-pi";
+import { createKeyPool } from "@sovereign/model-routing";
 
 import { createEventStream } from "./http/public.ts";
 import { healthRoute } from "./http/public.ts";
@@ -201,6 +203,27 @@ const providers = createProviderCatalogue({
 // Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
 // пережить не может (docs/models-and-providers.md).
 const providerLogins = createProviderLogins({ runner: providers, logger });
+
+/**
+ * Здоровье ключей и выбор ключа сессии (docs/model-routing.md). Пул один на демон: иначе одна
+ * сессия учится на отказе ключа, а соседняя идёт в тот же отказ следом. Состояние в памяти — отказ
+ * ключа это факт про сейчас, и после перезапуска он проверяется заново.
+ */
+const modelRouter = createModelRouter({
+  models: providers.models,
+  credentials,
+  pool: createKeyPool(),
+  environment: processEnvironment(),
+  onSwitch: (from, to, reason) =>
+    logger.info("a session moved on to the next key", {
+      providerId: from.candidate.providerId,
+      modelId: from.candidate.modelId,
+      from: from.keyId,
+      to: to.keyId,
+      nextModelId: to.candidate.modelId,
+      reason,
+    }),
+});
 
 const userProviderStore = createUserProviderStore({ directory, logger });
 let hasActiveProviderSession: (providerId: string) => boolean = () => false;
@@ -452,6 +475,7 @@ const sessions = createSessionService({
       keepRecentTokens: settings.current().config.compactionKeepRecentTokens,
     }),
     hooks: createRuntimeHookSeam(hookDispatcher),
+    router: modelRouter,
   }),
   projects,
   commandsDirectory: join(directory, commandsDirectoryName),
