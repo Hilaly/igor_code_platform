@@ -18,6 +18,22 @@ describe("the starter plugin", () => {
     assert.match(prompt, /absent.*continue/isu);
   });
 
+  it("requires the model to load every applicable skill before acting", () => {
+    const prompt = readFileSync(new URL("../agents/generic/AGENT.md", import.meta.url), "utf8");
+
+    assert.match(prompt, /<available_skills>/u);
+    assert.match(prompt, /before any response or action/iu);
+    assert.match(prompt, /clarifying question/iu);
+    assert.match(prompt, /tool call/iu);
+    assert.match(prompt, /user (?:names|requests)[\s\S]*skill/iu);
+    assert.match(prompt, /matches[\s\S]*description/iu);
+    assert.match(prompt, /read[\s\S]*complete[\s\S]*SKILL\.md[\s\S]*location/iu);
+    assert.match(prompt, /current[\s\S]*SKILL\.md/iu);
+    assert.match(prompt, /follow[\s\S]*instructions/iu);
+    assert.match(prompt, /relative[\s\S]*skill(?:'s)?[\s\S]*directory/iu);
+    assert.match(prompt, /process[\s\S]*before[\s\S]*(?:implementation|domain)/iu);
+  });
+
   it("contributes the bash tools and the session-close cleanup on activation", async () => {
     const host = installTestHost({ id: "starter", source: "builtin" });
 
