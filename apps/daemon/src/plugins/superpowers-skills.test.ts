@@ -152,7 +152,7 @@ describe("the built-in Superpowers plugin", () => {
     assert.doesNotMatch(liveInstructions, /`npm test`/u);
     assert.doesNotMatch(liveInstructions, /skills\/debugging\/systematic-debugging/u);
     assert.doesNotMatch(liveInstructions, /~\/\.claude/u);
-    assert.match(liveInstructions, /push only when the user explicitly authorizes/u);
+    assert.match(liveInstructions, /push only when the user explicitly authorizes/iu);
     assert.match(liveInstructions, /BRANCH_NAME/iu);
   });
 });
