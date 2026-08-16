@@ -6,7 +6,7 @@
 
 **Architecture:** Плагин `starter` получает браузерную часть (`sovereign.browser`), воркер регистрирует три component-вклада в `toolCallPlaceId("bash")`, `toolCallPlaceId("job-output")`, `toolCallPlaceId("job-kill")` с одним export `BashToolCall`. Данные компонент берёт из публичного маршрута `GET /api/sessions/:id/entries` (input виден во время турна — рантайм пишет записи прогрессивно), статусы перечитывает по событиям. Ядро и встроенный `ToolCall` не трогаются.
 
-**Tech Stack:** TypeScript, React 19, `@sovereign/sdk` (воркер), `@sovereign/browser-sdk` (браузерный контекст), `@sovereign/ui-kit` (Badge, Code, CodeBlock, Disclosure, Notice, Text, createTranslator), vitest + jsdom + @testing-library/react (компонентные тесты), `node --test` (unit-тесты).
+**Tech Stack:** TypeScript, React 19, `@sovereign/sdk` (воркер), `@sovereign/browser-sdk` (браузерный контекст: события + `useTranslator`), `@sovereign/ui-kit` (Badge, Code, CodeBlock, Disclosure, Notice, Text), vitest + jsdom + @testing-library/react (компонентные тесты), `node --test` (unit-тесты).
 
 ## Global Constraints
 
@@ -14,7 +14,11 @@
 - **Один export на три вклада.** Компонент называется `BashToolCall`, имя тула читает из `context.subject.toolName`.
 - **Свёрнуто по умолчанию всегда** — поведение как у всех тулколов, авторазворота нет.
 - **Статус задания — из текста результата** (`[status: running|completed|killed]`), а не из фазы сессии.
-- **Хардкод строк запрещён.** Строки — каталоги `messages.ts` + `contribute.localeCatalog` (en/ru), хук `useTranslator` — дословная копия миссийного (fetch `/api/preferences` → `createTranslator`).
+- **Хардкод строк запрещён.** Строки — каталоги `messages.ts` + `contribute.localeCatalog`
+  (en/ru); переводчик — хук `useTranslator(namespace)` из `@sovereign/browser-sdk`, каталоги
+  приезжают снимком вкладов, строк в бандле нет (docs/ui-extension-model.md, «Язык окна»).
+- **Неймспейс каталога — id плагина.** contribution-registry.ts принимает только `core` или
+  `plugin.id`: у starter это `"starter"`, а не `starter-bash`.
 - **Установка зависимостей** — только `env -u WATCH_REPORT_DEPENDENCIES pnpm install` (CLAUDE.md: переменная из окружения dev-демона ломает воркер-протокол pnpm).
 - Идентификаторы вкладов проходят паттерн реестра `^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$` (проверяется в worker.test.ts).
 - Коммиты — Conventional Commits, по-английски, атомарные; каждый оставляет репозиторий зелёным.
@@ -518,6 +522,7 @@ import type {
 } from "@sovereign/browser-sdk";
 import type { SessionEntriesPage, SessionEntry } from "@sovereign/sdk";
 
+import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import { BashToolCall } from "./bash-tool-call.tsx";
 
 afterEach(() => {
@@ -583,11 +588,48 @@ function response(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
 
-/** Мок fetch: локализация, записи сессии, всё остальное — 404. */
+/** Язык окна. Своей настройки языка у плагина нет: её задаёт рантайм браузерного SDK. */
+let windowLocale = "ru";
+
+afterEach(() => {
+  windowLocale = "ru";
+});
+
+/**
+ * Каталоги приезжают снимком вкладов — ровно как в живом окне: воркер объявляет их
+ * `contribute.localeCatalog`, а компонент ничего не импортирует и ничего не спрашивает.
+ */
+const catalogs = [
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "starter.bash-messages-en",
+    declaredId: "bash-messages-en",
+    pluginKey: "builtin:starter",
+    pluginId: "starter",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "en",
+    messages: englishMessages,
+  },
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "starter.bash-messages-ru",
+    declaredId: "bash-messages-ru",
+    pluginKey: "builtin:starter",
+    pluginId: "starter",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "ru",
+    messages: russianMessages,
+  },
+] as const;
+
+/** Мок fetch: записи сессии, всё остальное — 404. Локаль плагин не спрашивает: её даёт рантайм. */
 function installFetch(entries: SessionEntry[]) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === "/api/preferences") return response({ locale: "ru" });
     if (url === "/api/sessions/s1/entries") return response(page(entries));
     return { ok: false, status: 404 } as Response;
   });
@@ -604,9 +646,10 @@ function renderCard(channel: ReturnType<typeof bridge>, toolName = "bash", toolC
   };
   return render(
     <BrowserRuntimeProvider
-      contributions={[]}
+      contributions={catalogs}
       plugins={[]}
       onDiagnostic={() => {}}
+      locale={windowLocale}
       events={channel.events}
       cache={cache}
       createCache={() => cache}
@@ -709,12 +752,14 @@ Expected: FAIL — `bash-tool-call.tsx` не найден.
 
 ```ts
 /**
- * Строки карточки bash-семейства. Один модуль на обе половины плагина: воркер объявляет каталоги
- * вкладом `contribute.localeCatalog`, браузерная часть строит из них переводчик кита
- * (спека 2026-08-16-bash-tool-call-visual-design.md).
+ * Строки карточки bash-семейства (спека 2026-08-16-bash-tool-call-visual-design.md). Объявляет их
+ * воркер вкладом `contribute.localeCatalog`, а браузерная половина ничего отсюда не импортирует:
+ * каталог доезжает до неё снимком вкладов (docs/ui-kit.md, «Язык окна»).
+ *
+ * Неймспейс — id плагина: contribution-registry.ts принимает только `core` или `plugin.id`.
  */
 
-export const messagesNamespace = "starter-bash";
+export const messagesNamespace = "starter";
 
 export const englishMessages: Record<string, string> = {
   "tool.status.running": "Running",
@@ -763,21 +808,11 @@ Create `plugins/starter/src/bash-tool-call.tsx`:
  * «записей ещё нет».
  */
 
-import { useSovereignEvents, type PlaceContext } from "@sovereign/browser-sdk";
-import {
-  Badge,
-  Code,
-  CodeBlock,
-  Disclosure,
-  Notice,
-  Text,
-  createTranslator,
-  type Translator,
-} from "@sovereign/ui-kit";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSovereignEvents, useTranslator, type PlaceContext } from "@sovereign/browser-sdk";
+import { Badge, Code, CodeBlock, Disclosure, Notice, Text } from "@sovereign/ui-kit";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { fetchEntries, findToolCall, type ToolCallData } from "./entries.ts";
-import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import { parseBashResult, type ParsedBashResult } from "./parse-bash-result.ts";
 import "./bash-tool-call.css";
 
@@ -818,52 +853,18 @@ function isBackground(input: unknown): boolean {
   return (input as { run_in_background?: unknown } | null | undefined)?.run_in_background === true;
 }
 
-/** Хук переводчика — дословная копия миссийного: общего модуля в SDK нет (docs/backlog.md). */
-function useTranslator(): Translator {
-  const [locale, setLocale] = useState("en");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const answer = await fetch("/api/preferences", { signal: controller.signal });
-
-        if (answer.ok) {
-          const body = (await answer.json()) as { locale?: string };
-
-          if (typeof body.locale === "string") {
-            setLocale(body.locale);
-          }
-        }
-      } catch {
-        // Локаль не прочиталась — карточка говорит по-английски. Ронять её из-за этого нечего.
-      }
-    })();
-
-    return () => controller.abort();
-  }, []);
-
-  return useMemo(
-    () =>
-      createTranslator({
-        locale,
-        namespace: messagesNamespace,
-        catalogs: [
-          { namespace: messagesNamespace, locale: "en", messages: englishMessages },
-          { namespace: messagesNamespace, locale: "ru", messages: russianMessages },
-        ],
-        onDiagnostic: (diagnostic) => console.warn(`[starter] ${diagnostic}`),
-      }),
-    [locale],
-  );
-}
+/**
+ * Неймспейс каталога. Тот же, что объявляет воркер, — по протоколу это идентификатор плагина, и
+ * другого он объявить не может. Строки сюда не импортируются намеренно: каталог приезжает снимком,
+ * и второй его экземпляр в бандле разошёлся бы с объявленным.
+ */
+const messagesNamespace = "starter";
 
 export function BashToolCall({ context }: { context: PlaceContext }): ReactNode {
   const sessionId = context.subject?.sessionId;
   const toolCallId = context.subject?.toolCallId;
   const toolName = context.subject?.toolName ?? "bash";
-  const translator = useTranslator();
+  const translator = useTranslator(messagesNamespace);
   const events = useSovereignEvents();
   const [data, setData] = useState<ToolCallData | undefined>(undefined);
   const [refusal, setRefusal] = useState<string | undefined>(undefined);
