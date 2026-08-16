@@ -49,6 +49,6 @@ it("renders a mission snapshot and reloads after a matching event", async () => 
   await screen.findByText("Ship it");
   expect(fetchMock).toHaveBeenCalledTimes(1);
 
-  await act(async () => listener?.({ type: "mission.changed", payload: { sessionId: "s1", revision: 2 } }));
+  await act(async () => listener?.({ type: "mission.changed", index: 2, time: new Date().toISOString(), plugin: { key: "builtin:mission", id: "mission", source: "builtin" }, payload: { sessionId: "s1", revision: 2 } }));
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
