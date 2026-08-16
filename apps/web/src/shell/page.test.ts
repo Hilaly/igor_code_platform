@@ -77,6 +77,7 @@ describe("route header descriptions", () => {
       baseUrl: "http://localhost:11434",
       logins: [],
       auth: { kind: "unconfigured" },
+      keys: [],
       dynamic: false,
       custom: false,
       origin: "user",

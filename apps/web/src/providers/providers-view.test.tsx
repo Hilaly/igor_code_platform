@@ -61,6 +61,7 @@ const provider = (id: string, overrides: Partial<ProviderSummary> = {}): Provide
   name: named(id),
   logins: [{ type: "api_key", label: `${id} API key` }],
   auth: { kind: "unconfigured" },
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",

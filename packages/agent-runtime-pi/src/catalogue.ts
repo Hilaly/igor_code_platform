@@ -11,6 +11,7 @@ import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type {
   CustomProviderDefinition,
   CustomProviderOutcome,
+  LoginKeyTarget,
   ModelSummary,
   ProviderAuthState,
   ProvidersSnapshot,
@@ -21,7 +22,7 @@ import type {
   UserProviderDefinition,
 } from "@sovereign/protocol";
 
-import { toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
+import { describeKeys, toRuntimeCredentialStore, type CredentialVault } from "./credentials.ts";
 import { toRuntimeProvider, toRuntimeUserProvider } from "./custom-provider.ts";
 import { describeModels, describeProvider } from "./describe.ts";
 import { processEnvironment, toRuntimeAuthContext, type Environment } from "./environment.ts";
@@ -55,10 +56,19 @@ export type ProviderCatalogue = {
   /**
    * Провести вход. Диалог ведёт вызывающий: платформа спрашивает человека или плагин, а кред
    * записывает рантайм — сам, тем же сериализованным путём, что и обновление токена.
+   *
+   * Отвечает идентификатором ключа, в который лёг кред, или `undefined`, если вход не записал
+   * ничего.
    */
-  login: (input: LoginRequest) => Promise<void>;
+  login: (input: LoginRequest) => Promise<string | undefined>;
   /** Выход. Ambient-кред этим не убрать: он не наш, и провайдер останется настроенным. */
   logout: (providerId: string) => Promise<void>;
+  /** Убрать один ключ. `false` — такого ключа нет. Остальные ключи провайдера остаются. */
+  removeKey: (providerId: string, keyId: string) => Promise<boolean>;
+  /** Сделать ключ выбранным. `false` — такого ключа нет. */
+  selectKey: (providerId: string, keyId: string) => Promise<boolean>;
+  /** Переименовать ключ. `false` — такого ключа нет. */
+  renameKey: (providerId: string, keyId: string, label: string) => Promise<boolean>;
   /**
    * Добавить провайдера из данных (docs/models-and-providers.md). Занятый идентификатор —
    * отказ: `setProvider` у рантайма перезаписывает по `id`, и встроенный подменился бы молча.
@@ -95,6 +105,11 @@ export type LoginRequest = {
   providerId: string;
   method: "api_key" | "oauth";
   dialogue: LoginDialogue;
+  /**
+   * В какой ключ ляжет кред. Не названа — вход добавляет ключ: у провайдера их может быть
+   * несколько, и молчаливая замена стоила бы человеку рабочего ключа.
+   */
+  target?: LoginKeyTarget;
   /** Гасит вход целиком: отмена попытки человеком, выход из платформы, выгрузка плагина. */
   signal?: AbortSignal;
 };
@@ -166,8 +181,19 @@ export function createProviderCatalogue(
             problem === undefined
               ? await authStateOf(models, provider.id)
               : ({ kind: "unknown" } as const);
+          // Над нечитаемым файлом ключей не показываем вовсе: их набор оттуда и берётся, и
+          // придуманный пустой список выглядел бы как «человек нигде не залогинен».
+          const keys =
+            problem === undefined ? await describeKeys(options.credentials, provider.id) : [];
 
-          return describeProvider(provider, { auth, origin: originOf(provider.id) });
+          return describeProvider(provider, {
+            auth,
+            origin: originOf(provider.id),
+            keys,
+            ...(problem === undefined
+              ? { selectedKey: options.credentials.selected(provider.id) }
+              : {}),
+          });
         }),
       );
 
@@ -271,13 +297,23 @@ export function createProviderCatalogue(
     },
     customProviderOrigin: (providerId) => custom.get(providerId),
     login: async (input) => {
-      await models.login(
+      const written = await options.credentials.withKeyTarget(
         input.providerId,
-        input.method,
-        toRuntimeInteraction(input.dialogue, input.signal),
+        input.target ?? { kind: "new", label: "" },
+        () =>
+          models.login(
+            input.providerId,
+            input.method,
+            toRuntimeInteraction(input.dialogue, input.signal),
+          ),
       );
+
+      return written.keyId;
     },
     logout: (providerId) => models.logout(providerId),
+    removeKey: (providerId, keyId) => options.credentials.removeKey(providerId, keyId),
+    selectKey: (providerId, keyId) => options.credentials.select(providerId, keyId),
+    renameKey: (providerId, keyId, label) => options.credentials.rename(providerId, keyId, label),
     setCustomProvider: (definition, origin = "plugin") => {
       // Занятость проверяется по всей коллекции, а не только по добавленным: спорят они за один и
       // тот же ключ, и встроенный проигрывать не должен.

@@ -133,6 +133,157 @@ describe("logging into a provider", () => {
 
     await assert.rejects(catalogue.login({ providerId: "scripted", method: "oauth", dialogue }));
   });
+
+  it("adds a key instead of writing over the one that already works", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "api_key", key: "первый" } });
+    const { catalogue } = withProvider({ key: "второй", script: [] }, credentials);
+    const { dialogue } = recorder();
+
+    const keyId = await catalogue.login({
+      providerId: "scripted",
+      method: "api_key",
+      dialogue,
+      target: { kind: "new", label: "рабочий" },
+    });
+
+    assert.equal(keyId, "key-2");
+    assert.deepEqual(credentials.keys("scripted"), [
+      { id: "key-1", label: "" },
+      { id: "key-2", label: "рабочий" },
+    ]);
+    // Выбранный не перехватывается: провайдер целиком по-прежнему представлен первым ключом.
+    assert.deepEqual(await credentials.read("scripted"), { type: "api_key", key: "первый" });
+    assert.deepEqual(await credentials.readKey("scripted", "key-2"), {
+      type: "api_key",
+      key: "второй",
+    });
+  });
+
+  it("writes over the named key when the login replaces one", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "api_key", key: "протухший" } });
+    const { catalogue } = withProvider({ key: "свежий", script: [] }, credentials);
+    const { dialogue } = recorder();
+
+    const keyId = await catalogue.login({
+      providerId: "scripted",
+      method: "api_key",
+      dialogue,
+      target: { kind: "existing", keyId: "key-1" },
+    });
+
+    assert.equal(keyId, "key-1");
+    assert.deepEqual(credentials.keys("scripted"), [{ id: "key-1", label: "" }]);
+    assert.deepEqual(await credentials.read("scripted"), { type: "api_key", key: "свежий" });
+  });
+
+  it("names no key when the login wrote nothing", async () => {
+    const { catalogue, credentials } = withProvider({ script: [{ fail: "провайдер отказал" }] });
+    const { dialogue } = recorder();
+
+    await assert.rejects(
+      catalogue.login({
+        providerId: "scripted",
+        method: "api_key",
+        dialogue,
+        target: { kind: "new", label: "рабочий" },
+      }),
+    );
+    assert.deepEqual(credentials.keys("scripted"), []);
+  });
+
+  it("shows the keys of a provider in the snapshot, without their values", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "api_key", key: "s3cret" } });
+    const { catalogue } = withProvider({ key: "второй", script: [] }, credentials);
+    const { dialogue } = recorder();
+
+    await catalogue.login({
+      providerId: "scripted",
+      method: "api_key",
+      dialogue,
+      target: { kind: "new", label: "рабочий" },
+    });
+
+    const summary = (await catalogue.snapshot()).providers.find(
+      (provider) => provider.id === "scripted",
+    );
+
+    assert.deepEqual(summary?.keys, [
+      { id: "key-1", label: "", type: "api_key" },
+      { id: "key-2", label: "рабочий", type: "api_key" },
+    ]);
+    assert.equal(summary?.selectedKey, "key-1");
+    assert.ok(!JSON.stringify(summary).includes("s3cret"), "значение ключа уехало во вью");
+  });
+});
+
+describe("the keys of a provider", () => {
+  it("changes the key the provider is represented by", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "api_key", key: "первый" } });
+    const { catalogue } = withProvider({ key: "второй", script: [] }, credentials);
+    const { dialogue } = recorder();
+
+    await catalogue.login({
+      providerId: "scripted",
+      method: "api_key",
+      dialogue,
+      target: { kind: "new", label: "" },
+    });
+
+    assert.equal(await catalogue.selectKey("scripted", "key-2"), true);
+    assert.deepEqual(await credentials.read("scripted"), { type: "api_key", key: "второй" });
+    assert.equal(await catalogue.selectKey("scripted", "key-9"), false);
+  });
+
+  it("renames a key and removes one without touching the rest", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "api_key", key: "первый" } });
+    const { catalogue } = withProvider({ key: "второй", script: [] }, credentials);
+    const { dialogue } = recorder();
+
+    await catalogue.login({
+      providerId: "scripted",
+      method: "api_key",
+      dialogue,
+      target: { kind: "new", label: "" },
+    });
+
+    assert.equal(await catalogue.renameKey("scripted", "key-2", "рабочий"), true);
+    assert.equal(await catalogue.removeKey("scripted", "key-1"), true);
+
+    assert.deepEqual(credentials.keys("scripted"), [{ id: "key-2", label: "рабочий" }]);
+    // Ушёл выбранный — выбранным стал оставшийся, и провайдер остался настроенным.
+    assert.deepEqual(await credentials.read("scripted"), { type: "api_key", key: "второй" });
+    assert.deepEqual(
+      (await catalogue.snapshot()).providers.find((provider) => provider.id === "scripted")?.auth,
+      { kind: "configured", type: "api_key", source: "stored credential" },
+    );
+  });
+
+  it("says nothing about a key whose credential it cannot read", async () => {
+    const credentials = inMemoryVault({ scripted: { type: "магия" } });
+    const { catalogue } = withProvider({}, credentials);
+    const summary = (await catalogue.snapshot()).providers.find(
+      (provider) => provider.id === "scripted",
+    );
+
+    // Один непонятный кред не прячет от человека остальные ключи и сам ключ тоже не прячет.
+    assert.deepEqual(summary?.keys, [{ id: "key-1", label: "" }]);
+    assert.deepEqual(summary?.auth, { kind: "unknown" });
+  });
+
+  it("shows no keys over a credentials file that cannot be read", async () => {
+    const broken: CredentialVault = {
+      ...inMemoryVault({ scripted: { type: "api_key", key: "s3cret" } }),
+      problem: () => "credentials.json is not valid json",
+    };
+    const { catalogue } = withProvider({}, broken);
+    const summary = (await catalogue.snapshot()).providers.find(
+      (provider) => provider.id === "scripted",
+    );
+
+    // Набор ключей берётся оттуда же, откуда статус: придуманный список выглядел бы как правда.
+    assert.deepEqual(summary?.keys, []);
+    assert.equal(summary?.selectedKey, undefined);
+  });
 });
 
 describe("logging out of a provider", () => {

@@ -4,9 +4,14 @@ import { describe, it } from "node:test";
 import {
   defaultModelsUrl,
   defaultUserModelDefinition,
+  parseProviderKeyUpdate,
   parseUserProviderDraft,
   providerCredentialPath,
   providerCredentialPathPattern,
+  providerKeyPath,
+  providerKeyPathPattern,
+  providerKeysPath,
+  providerKeysPathPattern,
   providerModelsPath,
   providerModelsPathPattern,
   providersPath,
@@ -36,6 +41,45 @@ describe("provider paths", () => {
   it("encodes an identifier so it cannot open a second path segment", () => {
     // Идентификатор кастомного провайдера приносит плагин, и он не обязан быть безобидным.
     assert.equal(providerModelsPath("a/b"), "/api/providers/a%2Fb/models");
+  });
+
+  it("addresses one key of a provider", () => {
+    assert.equal(providerKeysPathPattern, `${providersPath}/:providerId/keys`);
+    assert.equal(providerKeyPathPattern, `${providersPath}/:providerId/keys/:keyId`);
+
+    assert.equal(providerKeysPath("anthropic"), "/api/providers/anthropic/keys");
+    assert.equal(providerKeyPath("anthropic", "key-2"), "/api/providers/anthropic/keys/key-2");
+    assert.equal(providerKeyPath("a/b", "k/1"), "/api/providers/a%2Fb/keys/k%2F1");
+  });
+});
+
+describe("parseProviderKeyUpdate", () => {
+  it("takes a new label, an empty one included", () => {
+    const named = parseProviderKeyUpdate({ label: "рабочий" });
+    const cleared = parseProviderKeyUpdate({ label: "" });
+
+    assert.ok(named.kind === "parsed");
+    assert.deepEqual(named.value, { label: "рабочий" });
+    // Пустая подпись — «убрать подпись», а не «не менять»: различие держится отсутствием поля.
+    assert.ok(cleared.kind === "parsed");
+    assert.deepEqual(cleared.value, { label: "" });
+  });
+
+  it("takes the choice of the selected key", () => {
+    const result = parseProviderKeyUpdate({ selected: true });
+
+    assert.ok(result.kind === "parsed");
+    assert.deepEqual(result.value, { selected: true });
+  });
+
+  it("refuses to unselect a key instead of replacing it", () => {
+    assert.equal(parseProviderKeyUpdate({ selected: false }).kind, "rejected");
+  });
+
+  it("refuses a body that changes nothing", () => {
+    for (const raw of [{}, undefined, "key-1", { unknown: 1 }]) {
+      assert.equal(parseProviderKeyUpdate(raw).kind, "rejected", `${JSON.stringify(raw)} прошёл`);
+    }
   });
 });
 

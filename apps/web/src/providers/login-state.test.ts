@@ -58,6 +58,7 @@ const provider = (auth: ProviderSummary["auth"]): ProviderSummary => ({
   name: "Anthropic",
   logins: [{ type: "oauth", label: "Sign in" }],
   auth,
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",

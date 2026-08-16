@@ -147,6 +147,8 @@ function describeProvider(one: FakeProvider): ProviderSummary {
     name: one.name ?? one.id,
     logins: [],
     auth: one.signedIn ? { kind: "configured", type: "api_key" } : { kind: "unconfigured" },
+    keys: one.signedIn ? [{ id: "key-1", label: "", type: "api_key" }] : [],
+    ...(one.signedIn ? { selectedKey: "key-1" } : {}),
     dynamic: false,
     custom: false,
     origin: "builtin",

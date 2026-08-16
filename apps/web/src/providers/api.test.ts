@@ -153,6 +153,7 @@ const summary: ProviderSummary = {
   name: "Anthropic",
   logins: [{ type: "oauth", label: "Sign in" }],
   auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",

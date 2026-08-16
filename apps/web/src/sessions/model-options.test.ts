@@ -9,6 +9,7 @@ const anthropic: ProviderSummary = {
   name: "Anthropic",
   logins: [],
   auth: { kind: "configured", type: "api_key" },
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",

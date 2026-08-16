@@ -38,6 +38,7 @@ const provider: ProviderSummary = {
   name: "Anthropic",
   logins: [{ type: "oauth", label: "Sign in" }],
   auth: { kind: "unconfigured" },
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",
