@@ -15,6 +15,24 @@
 > Точка входа — [docs/master-spec.md](docs/master-spec.md), порядок оставшейся работы —
 > [docs/roadmap.md](docs/roadmap.md).
 
+### Установка зависимостей
+
+Агентские команды bash наследуют окружение dev-процесса демона, запущенного как
+`node --watch src/main.ts`, поэтому в них стоит `WATCH_REPORT_DEPENDENCIES=1`. Эта переменная
+включает watch-протокол Node для `worker_threads`: воркер при старте шлёт служебное сообщение
+`{"watch:require":[...]}`, и pnpm (WorkerPool в `readPkgFromCafs`) принимает его за ответ на задачу
+и падает с `Cannot destructure property 'verified' of '(intermediate value)' as it is undefined`.
+Баг окружения, а не pnpm: воспроизводится на 10.x и 11.x одинаково.
+
+Устанавливать зависимости так:
+
+```
+env -u WATCH_REPORT_DEPENDENCIES pnpm install
+```
+
+То же для любого процесса, создающего воркеры (тесты, сборки), если он падает с ошибкой
+деструктуризации из воркера.
+
 ## 1. Главный принцип
 
 **Знание, не записанное в репозиторий, считается утерянным.**
