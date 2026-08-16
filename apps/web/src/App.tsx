@@ -1085,9 +1085,6 @@ export function App() {
                           headingLevel={2}
                           state={plugins.state}
                           pluginKey={page.pluginKey}
-                          onBack={() =>
-                            navigation.navigate({ kind: "settings", section: "plugins" })
-                          }
                           onSwitch={plugins.switchPlugin}
                           onOpenPage={(pluginId, pageId) =>
                             navigation.navigate(

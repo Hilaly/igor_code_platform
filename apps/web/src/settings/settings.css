@@ -285,13 +285,6 @@
   text-transform: uppercase;
 }
 
-.plugin-detail-back {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-width: 0;
-}
-
 .plugin-detail-header-card {
   min-width: 0;
   padding: var(--sovereign-space-2) var(--sovereign-space-4);

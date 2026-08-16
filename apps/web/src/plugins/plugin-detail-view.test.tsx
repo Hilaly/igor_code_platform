@@ -66,13 +66,11 @@ const snapshot: PluginsSnapshot = {
 
 it("shows plugin facts, controls each contribution, and exposes technical data", () => {
   const onSwitch = vi.fn();
-  const onBack = vi.fn();
   const onOpenPage = vi.fn();
   const { container } = render(
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={onBack}
       onSwitch={onSwitch}
       onOpenPage={onOpenPage}
       translator={translator}
@@ -115,8 +113,24 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   });
   fireEvent.click(screen.getByText("Payload schema"));
   expect(screen.getByText(/"type": "object"/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Back to plugins" }));
-  expect(onBack).toHaveBeenCalled();
+});
+
+/**
+ * Возврат к списку даёт запись `Plugins` локальной навигации настроек: своя кнопка «назад» повторяла
+ * её и занимала верх страницы.
+ */
+it("leaves the way back to the local Settings navigation", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  expect(screen.queryByRole("button", { name: /back to plugins/i })).toBeNull();
 });
 
 const tool = (declaredId: string): ContributionRegistration => ({
@@ -146,7 +160,6 @@ it("splits contributions into a section per kind, interface first", () => {
     <PluginDetailView
       state={{ snapshot: mixed, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -180,7 +193,6 @@ it("does not add a nested page heading when embedded under Settings", () => {
       headingLevel={2}
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -195,7 +207,6 @@ it("shows a not-found state for an unknown plugin key", () => {
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:nope"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -209,14 +220,12 @@ it("does not claim a stale missing plugin is authoritatively absent", () => {
     <PluginDetailView
       state={{ snapshot: { ...snapshot, plugins: [] }, stale: true }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
   expect(screen.getByText("What you see may be out of date")).toBeTruthy();
   expect(screen.getByText(/state is being requested again/i)).toBeTruthy();
   expect(screen.getByText("Loading…")).toBeTruthy();
@@ -228,14 +237,12 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
     <PluginDetailView
       state={{ snapshot: { ...snapshot, plugins: [] }, stale: false, failure: "snapshot failed" }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Back to plugins" })).toBeTruthy();
   expect(screen.getByText("The plugins could not be read: snapshot failed")).toBeTruthy();
   expect(screen.queryByText(/plugin not found/i)).toBeNull();
 
@@ -243,7 +250,6 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
     <PluginDetailView
       state={{ snapshot, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -259,7 +265,6 @@ it("keeps stale and write-failure notices visible on the detail route", () => {
     <PluginDetailView
       state={{ snapshot, stale: true, failure: "write failed" }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -276,7 +281,6 @@ it("shows a stale warning while the first detail snapshot is still loading", () 
     <PluginDetailView
       state={{ stale: true }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -312,7 +316,6 @@ it("names the kind of a public route and shows the address it answers at", () =>
     <PluginDetailView
       state={{ snapshot: withRoute, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -376,7 +379,6 @@ const showPlaces = (next: PluginsSnapshot): void => {
     <PluginDetailView
       state={{ snapshot: next, stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -436,7 +438,6 @@ it("says which places the plugin holds and why a claim did not apply", () => {
         stale: false,
       }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -472,7 +473,6 @@ it("names the plugin that took the place instead", () => {
         stale: false,
       }}
       pluginKey="builtin:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}
@@ -562,7 +562,6 @@ it("lists a declared page with its address and opens it", () => {
     <PluginDetailView
       state={{ snapshot: withPlaces([page("log")]), stale: false }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={onOpenPage}
       translator={translator}
@@ -585,7 +584,6 @@ it("shows a switched-off page as switched off instead of offering to open it", (
         stale: false,
       }}
       pluginKey="data:example"
-      onBack={vi.fn()}
       onSwitch={vi.fn()}
       onOpenPage={vi.fn()}
       translator={translator}

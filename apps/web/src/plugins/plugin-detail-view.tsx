@@ -37,7 +37,6 @@ export type PluginDetailViewProps = {
   headingLevel?: 1 | 2;
   state: PluginsState;
   pluginKey: string;
-  onBack: () => void;
   onSwitch: (pluginKey: string, preferences: PluginPreferences) => void;
   /** Открыть страницу плагина. Адрес строит маршрутизатор, а не эта разметка. */
   onOpenPage: (pluginId: string, pageId: string) => void;
@@ -123,7 +122,6 @@ const claimTones: Record<PlaceClaimOutcome, "success" | "muted" | "warning"> = {
 export function PluginDetailView({
   state,
   pluginKey,
-  onBack,
   onSwitch,
   onOpenPage,
   translator,
@@ -137,7 +135,6 @@ export function PluginDetailView({
   if (snapshot === undefined) {
     return (
       <div className="plugin-detail">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>
             {t("plugins.stale.hint")}
@@ -158,7 +155,6 @@ export function PluginDetailView({
 
     return (
       <div className="plugin-detail">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>
             {t("plugins.stale.hint")}
@@ -201,10 +197,6 @@ export function PluginDetailView({
 
   return (
     <div className="plugin-detail">
-      <div className="plugin-detail-back">
-        <Button onClick={onBack}>{t("plugins.detail.back")}</Button>
-      </div>
-
       <div className="plugins-notices">
         {state.stale ? (
           <Notice tone="warning" title={t("plugins.stale.title")}>

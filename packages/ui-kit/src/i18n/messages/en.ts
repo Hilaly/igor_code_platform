@@ -447,7 +447,6 @@ export const coreEnglish: CatalogRegistration = {
     "projects.stale.hint": "The list was requested again.",
     "projects.write.failed": "The write did not go through: {reason}",
     "plugins.attempt": "attempt {count}",
-    "plugins.detail.back": "Back to plugins",
     "plugins.detail.open": "Open",
     "plugins.detail.notfound": "Plugin not found: {key}",
     "plugins.detail.plugin": "Plugin",
