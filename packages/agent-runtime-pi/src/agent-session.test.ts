@@ -24,7 +24,7 @@ import type {
   SessionHookSeam,
 } from "./hook-events.ts";
 import { createPluginTool } from "./plugin-tool.ts";
-import { scriptedModelProvider, type ScriptedTurn } from "./testing.ts";
+import { scriptedModelProvider, scriptedSessionStore, type ScriptedTurn } from "./testing.ts";
 
 const folders: string[] = [];
 
@@ -1758,6 +1758,81 @@ describe("the seam of hook subscriptions", () => {
     assert.deepEqual(hooks.sessions, [
       { sessionId: session.summary().id, projectId: "p1", folder },
     ]);
+    await session.close();
+  });
+});
+
+describe("a session over a set of keys", () => {
+  async function routed(turns: ScriptedTurn[], keys: string[]) {
+    const scripted = scriptedSessionStore({
+      directory: await freshFolder("sessions"),
+      sovereignDataDirectory: await freshFolder("data"),
+      turns,
+      keys,
+    });
+    const folder = await freshFolder("project");
+    const created = await scripted.store.create({
+      projectId: "p1",
+      agentId: agent.id,
+      folder,
+      folderKey: folder.toLowerCase(),
+      model: scripted.model,
+      thinkingLevel: "off",
+      agent,
+    });
+
+    assert.ok(!("kind" in created), "модель двойника обязана резолвиться");
+
+    return { session: created, keysUsed: scripted.keysUsed, requests: scripted.requests };
+  }
+
+  it("plays the turn out with the next key when the first one is spent", async () => {
+    // Настоящий harness, настоящий турн: отказ до первого содержательного события переигрывается
+    // другим ключом, и человек видит один обычный ответ (docs/model-routing.md).
+    const { session, keysUsed, requests } = await routed(
+      [{ refuse: "429 rate limit exceeded" }, { text: "готово" }],
+      ["key-1", "key-2"],
+    );
+    const deltas: SessionDelta[] = [];
+    const stop = session.subscribe((delta) => deltas.push(delta));
+
+    const outcome = await session.prompt("сделай", "t1");
+
+    assert.equal(outcome.kind, "done");
+    assert.deepEqual(keysUsed, ["key-1", "key-2"]);
+    assert.equal(requests.length, 2);
+    assert.equal(
+      deltas.filter((delta) => delta.kind === "turn-failed").length,
+      0,
+      "упавший турн доехал до ленты",
+    );
+    stop();
+    await session.close();
+  });
+
+  it("fails the turn once the keys run out, and says why", async () => {
+    const { session, keysUsed } = await routed(
+      [{ refuse: "401 invalid x-api-key" }, { refuse: "401 invalid x-api-key" }],
+      ["key-1", "key-2"],
+    );
+
+    const outcome = await session.prompt("сделай", "t1");
+
+    assert.equal(outcome.kind, "failed");
+    assert.deepEqual(keysUsed, ["key-1", "key-2"]);
+    await session.close();
+  });
+
+  it("keeps the key of the session across its turns", async () => {
+    const { session, keysUsed } = await routed(
+      [{ text: "раз" }, { text: "два" }],
+      ["key-1", "key-2"],
+    );
+
+    await session.prompt("раз", "t1");
+    await session.prompt("два", "t2");
+
+    assert.deepEqual(keysUsed, ["key-1", "key-1"]);
     await session.close();
   });
 });

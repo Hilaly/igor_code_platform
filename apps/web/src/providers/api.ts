@@ -11,7 +11,10 @@
  */
 
 import {
+  modelAliasPath,
+  modelAliasesPath,
   providerCredentialPath,
+  providerKeyPath,
   providerLoginAnswerPath,
   providerLoginPath,
   providerLoginsPath,
@@ -24,6 +27,10 @@ import {
   type LoginAttemptState,
   type LoginAttemptsSnapshot,
   type LoginStart,
+  type ModelAlias,
+  type ModelAliasDeleted,
+  type ModelAliasesSnapshot,
+  type ProviderKeyUpdate,
   type ProviderModels,
   type ProviderSummary,
   type ProvidersSnapshot,
@@ -117,6 +124,44 @@ async function writeUserProvider(
   });
   if (!response.ok) throw new Error(await reasonOf(response));
   return (await response.json()) as UserProviderDetails;
+}
+
+export async function fetchModelAliases(signal?: AbortSignal): Promise<ModelAliasesSnapshot> {
+  const response = await fetch(modelAliasesPath, signal === undefined ? {} : { signal });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAliasesSnapshot;
+}
+
+/** Новый алиас или замена существующего. Идентификатор у замены не меняется — маршрут откажет. */
+export async function saveModelAlias(alias: ModelAlias, existing: boolean): Promise<ModelAlias> {
+  const response = await fetch(existing ? modelAliasPath(alias.id) : modelAliasesPath, {
+    method: existing ? "PUT" : "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(alias),
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAlias;
+}
+
+export async function deleteModelAlias(aliasId: string): Promise<ModelAliasDeleted> {
+  const response = await fetch(modelAliasPath(aliasId), {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ModelAliasDeleted;
 }
 
 /**
@@ -220,6 +265,45 @@ export async function logOutProvider(providerId: string): Promise<ProviderSummar
   const response = await fetch(providerCredentialPath(providerId), {
     method: "DELETE",
     headers: { "content-type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(await reasonOf(response));
+  }
+
+  return (await response.json()) as ProviderSummary;
+}
+
+/**
+ * Правка ключа: подпись или выбор. Ответ — провайдер целиком, а не сам ключ: статус и набор вью
+ * показывает рядом, и разъехаться им нельзя (docs/web-api.md).
+ */
+export async function updateProviderKey(
+  providerId: string,
+  keyId: string,
+  update: ProviderKeyUpdate,
+): Promise<ProviderSummary> {
+  return writeProviderKey(providerId, keyId, "PUT", update);
+}
+
+/** Убрать один ключ. Ушёл последний — провайдер станет ненастроенным, и это видно в ответе. */
+export async function removeProviderKey(
+  providerId: string,
+  keyId: string,
+): Promise<ProviderSummary> {
+  return writeProviderKey(providerId, keyId, "DELETE");
+}
+
+async function writeProviderKey(
+  providerId: string,
+  keyId: string,
+  method: "PUT" | "DELETE",
+  update?: ProviderKeyUpdate,
+): Promise<ProviderSummary> {
+  const response = await fetch(providerKeyPath(providerId, keyId), {
+    method,
+    headers: { "content-type": "application/json" },
+    ...(update === undefined ? {} : { body: JSON.stringify(update) }),
   });
 
   if (!response.ok) {

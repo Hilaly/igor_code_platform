@@ -58,6 +58,7 @@ import {
   type RuntimeHookSeam,
 } from "./hook-events.ts";
 import { renderRuntimeContext } from "./agent-data.ts";
+import { createSessionModels, type SessionRouter } from "./session-models.ts";
 import { renderSkillCatalogue, type AgentSkill, type InvokedSkill } from "./skills.ts";
 
 /** Инструмент глазами ядра: имя, которым его видит модель, и непрозрачная ручка на реализацию. */
@@ -390,6 +391,11 @@ export type CreateAgentSessionStoreOptions = {
    * реестр подписок, рантайм работает как раньше и за фан-аут не платит.
    */
   hooks?: RuntimeHookSeam;
+  /**
+   * Выбор ключа и переход на следующую попытку после отказа (docs/model-routing.md). Без него
+   * сессия ходит выбранным кредом провайдера — ровно как до появления набора ключей.
+   */
+  router?: SessionRouter;
 };
 
 /**
@@ -400,6 +406,7 @@ type SessionSeams = {
   compactionSettings: () => CompactionTuning;
   sovereignDataDirectory: string;
   hooks?: RuntimeHookSeam;
+  router?: SessionRouter;
 };
 
 /**
@@ -528,6 +535,7 @@ export function createAgentSessionStore(
       compactionSettings: options.compactionSettings,
       sovereignDataDirectory: options.sovereignDataDirectory,
       ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
+      ...(options.router === undefined ? {} : { router: options.router }),
     });
 
     owned.set(summary.id, persisted);
@@ -717,9 +725,14 @@ function liveSession(
   let instructions = agent.instructions;
   let agentDirectory = agent.directory;
   let skills: AgentSkill[] = [];
+  // Коллекция у harness — своя на сессию: она подставляет ключ этой сессии и после отказа берётся
+  // за следующую попытку (docs/model-routing.md). Общий каталог остаётся общим: фасад делегирует
+  // ему всё, кроме самих запросов.
+  const sessionModels =
+    seams.router === undefined ? models : createSessionModels({ models, router: seams.router });
   const harness = new AgentHarness<ExecutionToolContext>({
     session,
-    models,
+    models: sessionModels,
     model,
     thinkingLevel: summary.thinkingLevel,
     tools: [],

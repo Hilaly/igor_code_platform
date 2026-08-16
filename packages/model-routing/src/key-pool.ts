@@ -1,0 +1,148 @@
+/**
+ * Здоровье ключей и раздача их сессиям (docs/model-routing.md).
+ *
+ * **Состояние живёт в памяти и перезапуск демона не переживает.** Отказ ключа — это факт про сейчас:
+ * лимит истекает сам, а разлогиненный ключ человек чинит руками. Хранить это на диске значило бы
+ * заводить файл, который после перезапуска врёт чаще, чем помогает.
+ *
+ * Про модели и провайдеров этот модуль не знает ничего, кроме имён: он про ключи.
+ */
+
+import type { KeyVerdict } from "./failure.ts";
+
+export type KeyState =
+  | { kind: "healthy" }
+  /** Занят до названного момента: лимит запросов. */
+  | { kind: "cooling"; until: number }
+  /** Не годен, пока человек не вмешается. */
+  | { kind: "refused"; reason: string };
+
+export type KeyPool = {
+  /**
+   * Выдать ключ новой сессии. Годные раздаются по кругу — тому, у кого выдач меньше, — чтобы
+   * лимиты одного ключа не собирались на одном ключе.
+   *
+   * `undefined` — годных ключей нет вовсе. Остывающие в раздачу не идут: сессия живёт долго, и
+   * начинать её с занятого ключа значит начать с отказа.
+   */
+  lease: (providerId: string, keys: readonly string[]) => string | undefined;
+  /** Ключи по порядку пригодности: годные, потом остывающие раньше других; отказавшие не идут. */
+  usable: (providerId: string, keys: readonly string[]) => string[];
+  /** Что случилось с ключом. Успех возвращает ключ в строй. */
+  report: (providerId: string, keyId: string, verdict: KeyVerdict | "success") => void;
+  /** Состояние ключа сейчас. Остывший сам становится годным. */
+  state: (providerId: string, keyId: string) => KeyState;
+};
+
+export type CreateKeyPoolOptions = {
+  /** Подменяется тестами, чтобы не ждать настоящей минуты. */
+  now?: () => number;
+};
+
+type Entry = {
+  state: KeyState;
+  /** Сколько раз ключ выдавали. Раздача по кругу считает именно выдачи, а не запросы. */
+  leases: number;
+  /** Когда выдавали последний раз: при равенстве выдач идёт тот, кого брали давнее. */
+  leasedAt: number;
+};
+
+export function createKeyPool(options: CreateKeyPoolOptions = {}): KeyPool {
+  const now = options.now ?? Date.now;
+  const entries = new Map<string, Entry>();
+
+  /**
+   * Ключ карты — пара «провайдер и ключ». Длина имени провайдера впереди разводит пары при любых
+   * символах внутри имён: разделитель, которого не может быть ни в одном из них, пришлось бы брать
+   * непечатный, а NUL-байт заставляет git считать весь файл бинарным — ни диффа, ни поиска.
+   */
+  const keyOf = (providerId: string, keyId: string): string =>
+    `${String(providerId.length)}:${providerId}:${keyId}`;
+
+  const entryOf = (providerId: string, keyId: string): Entry => {
+    const existing = entries.get(keyOf(providerId, keyId));
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const fresh: Entry = { state: { kind: "healthy" }, leases: 0, leasedAt: 0 };
+
+    entries.set(keyOf(providerId, keyId), fresh);
+
+    return fresh;
+  };
+
+  const stateOf = (providerId: string, keyId: string): KeyState => {
+    const entry = entryOf(providerId, keyId);
+
+    // Остывший ключ становится годным сам: без этого он ждал бы следующего отчёта, которого не
+    // будет — его ведь никто не выбирает.
+    if (entry.state.kind === "cooling" && entry.state.until <= now()) {
+      entry.state = { kind: "healthy" };
+    }
+
+    return entry.state;
+  };
+
+  const ranked = (providerId: string, keys: readonly string[]): string[] =>
+    keys
+      .map((keyId) => ({
+        keyId,
+        state: stateOf(providerId, keyId),
+        entry: entryOf(providerId, keyId),
+      }))
+      .filter((candidate) => candidate.state.kind !== "refused")
+      .sort((first, second) => {
+        const healthy =
+          Number(second.state.kind === "healthy") - Number(first.state.kind === "healthy");
+
+        if (healthy !== 0) {
+          return healthy;
+        }
+
+        if (first.state.kind === "cooling" && second.state.kind === "cooling") {
+          return first.state.until - second.state.until;
+        }
+
+        return (
+          first.entry.leases - second.entry.leases || first.entry.leasedAt - second.entry.leasedAt
+        );
+      })
+      .map((candidate) => candidate.keyId);
+
+  return {
+    lease: (providerId, keys) => {
+      const chosen = ranked(providerId, keys).find(
+        (keyId) => stateOf(providerId, keyId).kind === "healthy",
+      );
+
+      if (chosen === undefined) {
+        return undefined;
+      }
+
+      const entry = entryOf(providerId, chosen);
+
+      entry.leases += 1;
+      entry.leasedAt = now();
+
+      return chosen;
+    },
+    usable: (providerId, keys) => ranked(providerId, keys),
+    report: (providerId, keyId, verdict) => {
+      const entry = entryOf(providerId, keyId);
+
+      if (verdict === "success") {
+        entry.state = { kind: "healthy" };
+
+        return;
+      }
+
+      entry.state =
+        verdict.kind === "cooling"
+          ? { kind: "cooling", until: now() + verdict.forMs }
+          : { kind: "refused", reason: verdict.reason };
+    },
+    state: stateOf,
+  };
+}

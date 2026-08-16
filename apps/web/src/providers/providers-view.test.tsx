@@ -61,6 +61,7 @@ const provider = (id: string, overrides: Partial<ProviderSummary> = {}): Provide
   name: named(id),
   logins: [{ type: "api_key", label: `${id} API key` }],
   auth: { kind: "unconfigured" },
+  keys: [],
   dynamic: false,
   custom: false,
   origin: "builtin",
@@ -93,6 +94,11 @@ function show(state: ProvidersState, providerId?: string, headingLevel: 1 | 2 = 
     onEdit: vi.fn(),
     onDelete: vi.fn(async () => undefined),
     onRefresh: vi.fn(async () => undefined),
+    onRenameKey: vi.fn(async () => undefined),
+    onSelectKey: vi.fn(async () => undefined),
+    onRemoveKey: vi.fn(async () => undefined),
+    onSaveAlias: vi.fn(async () => undefined),
+    onRemoveAlias: vi.fn(async () => undefined),
     actionFailure: undefined,
   };
 
@@ -424,6 +430,126 @@ describe("the way into a provider", () => {
     show(withLogin(state, { ...state.logins, failure: "the daemon answered 500" }), "anthropic");
 
     expect(screen.getByText(/Вход не начался: the daemon answered 500/)).toBeDefined();
+  });
+});
+
+describe("the keys of a provider", () => {
+  const configured = (keys: ProviderSummary["keys"], selectedKey?: string): ProviderSummary =>
+    provider("anthropic", {
+      auth: { kind: "configured", type: "api_key", source: "stored credential" },
+      keys,
+      ...(selectedKey === undefined ? {} : { selectedKey }),
+    });
+
+  const twoKeys = () =>
+    configured(
+      [
+        { id: "key-1", label: "личный", type: "api_key" },
+        { id: "key-2", label: "", type: "api_key" },
+      ],
+      "key-1",
+    );
+
+  it("shows every key with its label, identifier and way in", () => {
+    show(withProviders([twoKeys()]), "anthropic");
+
+    expect(screen.getByText("личный")).toBeDefined();
+    expect(screen.getByText("key-1")).toBeDefined();
+    // Ключ без подписи не остаётся безымянной строкой: адресовать его человеку было бы нечем.
+    expect(screen.getByText("Без подписи")).toBeDefined();
+    expect(screen.getByText("выбранный")).toBeDefined();
+  });
+
+  it("says nothing about the way in of a key whose credential was not understood", () => {
+    show(withProviders([configured([{ id: "key-1", label: "правленный" }], "key-1")]), "anthropic");
+
+    // Ключ из списка не пропадает: иначе чинить было бы нечего (docs/models-and-providers.md).
+    expect(screen.getByText("кред не разобран")).toBeDefined();
+  });
+
+  it("offers no key section to a provider with no stored keys", () => {
+    // Кред из окружения ключом не является, и пустой список рядом с настроенным провайдером
+    // читался бы как поломка.
+    show(
+      withProviders([
+        provider("anthropic", {
+          auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
+        }),
+      ]),
+      "anthropic",
+    );
+
+    expect(screen.queryByText("Ключи: Anthropic")).toBeNull();
+  });
+
+  it("makes another key the selected one", () => {
+    const { onSelectKey } = show(withProviders([twoKeys()]), "anthropic");
+
+    fireEvent.click(screen.getByRole("button", { name: "Сделать выбранным" }));
+
+    expect(onSelectKey).toHaveBeenCalledWith("anthropic", "key-2");
+  });
+
+  it("offers no way to select the key that is already selected", () => {
+    show(withProviders([twoKeys()]), "anthropic");
+
+    // Кнопка одна, и она у невыбранного ключа: у выбранного она ничего бы не делала.
+    expect(screen.getAllByRole("button", { name: "Сделать выбранным" })).toHaveLength(1);
+  });
+
+  it("renames a key by what was typed", () => {
+    const { onRenameKey } = show(withProviders([twoKeys()]), "anthropic");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Переименовать" })[0] as HTMLElement);
+    fireEvent.change(screen.getByLabelText("Подпись ключа key-1"), {
+      target: { value: "рабочий" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    expect(onRenameKey).toHaveBeenCalledWith("anthropic", "key-1", "рабочий");
+  });
+
+  it("replaces the credential of a key by the way in it was made with", () => {
+    const { onLogIn } = show(withProviders([twoKeys()]), "anthropic");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Заменить" })[0] as HTMLElement);
+
+    expect(onLogIn).toHaveBeenCalledWith("anthropic", "api_key", {
+      kind: "existing",
+      keyId: "key-1",
+    });
+  });
+
+  it("offers no replacement in a way the provider does not declare", () => {
+    // У ключа подписки нет шагов входа по ключу: кнопка вела бы в чужой диалог.
+    show(
+      withProviders([
+        provider("anthropic", {
+          auth: { kind: "configured", type: "oauth" },
+          logins: [{ type: "api_key", label: "Anthropic API key" }],
+          keys: [{ id: "key-1", label: "подписка", type: "oauth" }],
+          selectedKey: "key-1",
+        }),
+      ]),
+      "anthropic",
+    );
+
+    expect(screen.queryByRole("button", { name: "Заменить" })).toBeNull();
+  });
+
+  it("asks before removing a key and says the rest stay", () => {
+    const { onRemoveKey } = show(withProviders([twoKeys()]), "anthropic");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Убрать" })[0] as HTMLElement);
+
+    expect(screen.getByText(/Остальные ключи провайдера останутся/)).toBeDefined();
+    expect(onRemoveKey).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Убрать" }));
+
+    expect(onRemoveKey).toHaveBeenCalledWith("anthropic", "key-1");
   });
 });
 

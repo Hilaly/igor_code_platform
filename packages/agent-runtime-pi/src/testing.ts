@@ -29,12 +29,29 @@ import {
   type AgentSessionStore,
   type CompactionTuning,
 } from "./agent-session.ts";
+import { createKeyPool } from "@sovereign/model-routing";
+import type { LoginKeyTarget } from "@sovereign/protocol";
+
 import type { CredentialVault } from "./credentials.ts";
 import type { Environment } from "./environment.ts";
+import type { SessionRouter } from "./session-models.ts";
 
-/** Хранилище кредов в памяти. Тот же контракт, что у файла демона, без файла. */
+/**
+ * Хранилище кредов в памяти. Тот же контракт, что у файла демона, без файла: набор именованных
+ * ключей на провайдера с выбранным. Названный в `initial` кред становится единственным ключом
+ * `key-1` — ровно как файл прежней формы у демона.
+ */
 export function inMemoryVault(initial: Record<string, unknown> = {}): CredentialVault {
-  const credentials = new Map(Object.entries(initial));
+  type Key = { id: string; label: string; credential: unknown };
+  type KeySet = { keys: Key[]; selected: string };
+
+  const credentials = new Map<string, KeySet>(
+    Object.entries(initial).map(([providerId, credential]) => [
+      providerId,
+      { keys: [{ id: "key-1", label: "", credential }], selected: "key-1" },
+    ]),
+  );
+  const targets = new Map<string, { target: LoginKeyTarget; written?: string }>();
   const queues = new Map<string, Promise<unknown>>();
 
   const enqueue = <Result>(providerId: string, step: () => Promise<Result>): Promise<Result> => {
@@ -49,18 +66,138 @@ export function inMemoryVault(initial: Record<string, unknown> = {}): Credential
     return next;
   };
 
-  return {
-    read: (providerId) => Promise.resolve(credentials.get(providerId)),
-    list: () => [...credentials.keys()],
-    modify: (providerId, write) =>
-      enqueue(providerId, async () => {
-        const written = await write(credentials.get(providerId));
+  const keyOf = (providerId: string, keyId: string): Key | undefined =>
+    credentials.get(providerId)?.keys.find((key) => key.id === keyId);
 
-        if (written !== undefined) {
-          credentials.set(providerId, written);
+  const writeStep = async (
+    providerId: string,
+    target: LoginKeyTarget,
+    write: (current: unknown) => Promise<unknown>,
+  ): Promise<unknown> => {
+    const current = target.kind === "new" ? undefined : keyOf(providerId, target.keyId)?.credential;
+    const written = await write(current);
+
+    if (written === undefined) {
+      return current;
+    }
+
+    const set = credentials.get(providerId);
+    let keyId: string;
+
+    if (target.kind === "new") {
+      keyId = `key-${String((set?.keys.length ?? 0) + 1)}`;
+      credentials.set(providerId, {
+        keys: [...(set?.keys ?? []), { id: keyId, label: target.label, credential: written }],
+        selected: set === undefined ? keyId : set.selected,
+      });
+    } else {
+      keyId = target.keyId;
+      credentials.set(providerId, {
+        keys: (set?.keys ?? []).map((key) =>
+          key.id === keyId ? { ...key, credential: written } : key,
+        ),
+        selected: set?.selected ?? keyId,
+      });
+    }
+
+    const active = targets.get(providerId);
+
+    if (active !== undefined) {
+      active.written = keyId;
+    }
+
+    return written;
+  };
+
+  return {
+    read: (providerId) => {
+      const set = credentials.get(providerId);
+
+      return Promise.resolve(
+        set === undefined ? undefined : keyOf(providerId, set.selected)?.credential,
+      );
+    },
+    list: () => [...credentials.keys()],
+    keys: (providerId) =>
+      (credentials.get(providerId)?.keys ?? []).map(({ id, label }) => ({ id, label })),
+    selected: (providerId) => credentials.get(providerId)?.selected,
+    readKey: (providerId, keyId) => Promise.resolve(keyOf(providerId, keyId)?.credential),
+    modify: (providerId, write) =>
+      enqueue(providerId, () => {
+        const selected = credentials.get(providerId)?.selected;
+        const target: LoginKeyTarget =
+          targets.get(providerId)?.target ??
+          (selected === undefined
+            ? { kind: "new", label: "" }
+            : { kind: "existing", keyId: selected });
+
+        return writeStep(providerId, target, write);
+      }),
+    modifyKey: (providerId, keyId, write) =>
+      enqueue(providerId, async () =>
+        keyOf(providerId, keyId) === undefined
+          ? undefined
+          : writeStep(providerId, { kind: "existing", keyId }, write),
+      ),
+    withKeyTarget: async (providerId, target, run) => {
+      const active = { target };
+
+      targets.set(providerId, active);
+
+      try {
+        return { result: await run(), keyId: (active as { written?: string }).written };
+      } finally {
+        targets.delete(providerId);
+      }
+    },
+    select: (providerId, keyId) =>
+      enqueue(providerId, async () => {
+        const set = credentials.get(providerId);
+
+        if (set === undefined || keyOf(providerId, keyId) === undefined) {
+          return false;
         }
 
-        return credentials.get(providerId);
+        credentials.set(providerId, { ...set, selected: keyId });
+
+        return true;
+      }),
+    rename: (providerId, keyId, label) =>
+      enqueue(providerId, async () => {
+        const set = credentials.get(providerId);
+
+        if (set === undefined || keyOf(providerId, keyId) === undefined) {
+          return false;
+        }
+
+        credentials.set(providerId, {
+          ...set,
+          keys: set.keys.map((key) => (key.id === keyId ? { ...key, label } : key)),
+        });
+
+        return true;
+      }),
+    removeKey: (providerId, keyId) =>
+      enqueue(providerId, async () => {
+        const set = credentials.get(providerId);
+
+        if (set === undefined || keyOf(providerId, keyId) === undefined) {
+          return false;
+        }
+
+        const keys = set.keys.filter((key) => key.id !== keyId);
+        const first = keys[0];
+
+        if (first === undefined) {
+          credentials.delete(providerId);
+        } else {
+          credentials.set(providerId, {
+            keys,
+            selected: set.selected === keyId ? first.id : set.selected,
+          });
+        }
+
+        return true;
       }),
     remove: (providerId) =>
       enqueue(providerId, async () => {
@@ -160,6 +297,12 @@ export type ScriptedToolCall = { id: string; name: string; arguments: Record<str
 export type ScriptedTurn = {
   text?: string;
   toolCalls?: ScriptedToolCall[];
+  /**
+   * Отказать до первого содержательного события — так отвечает провайдер, у которого кончился лимит
+   * ключа. Именно этот отказ сессия имеет право переиграть другим ключом
+   * (docs/model-routing.md).
+   */
+  refuse?: string;
   /**
    * Сколько это обращение «стоило». Не названо — ноль: сложение нулей неотличимо от потерянной траты,
    * поэтому тесту учёта нужен способ назвать разные величины на разные обращения.
@@ -281,6 +424,16 @@ function playTurn(
 
   events.push({ type: "start", partial: { ...message } });
 
+  if (turn.refuse !== undefined) {
+    events.push({
+      type: "error",
+      reason: "error",
+      error: { ...message, stopReason: "error", errorMessage: turn.refuse },
+    });
+
+    return;
+  }
+
   let contentIndex = 0;
 
   if (turn.text !== undefined) {
@@ -361,6 +514,11 @@ export function scriptedSessionStore(options: {
   compactionSettings?: () => CompactionTuning;
   /** Что двойник модели принимает на вход. По умолчанию только текст. */
   input?: ("text" | "image")[];
+  /**
+   * Ключи двойника провайдера. Названы — сессия ходит набором ключей и после отказа берётся за
+   * следующий (docs/model-routing.md); не названы — маршрутизатора нет вовсе, как было раньше.
+   */
+  keys?: string[];
 }): {
   store: AgentSessionStore;
   model: string;
@@ -370,12 +528,36 @@ export function scriptedSessionStore(options: {
   restoreModel: () => void;
   /** Контексты, отправленные двойнику модели; интеграционные тесты проверяют реальный prompt/tool flow. */
   requests: Context[];
+  /** Ключи, которыми двойник провайдера отвечал, в порядке обращений. */
+  keysUsed: string[];
 } {
   const scripted = scriptedModelProvider({
     turns: options.turns ?? [],
     ...(options.input === undefined ? {} : { input: options.input }),
   });
   const models = createModels();
+  const keysUsed: string[] = [];
+  const pool = createKeyPool();
+  const keys = options.keys ?? [];
+  const router: SessionRouter = {
+    candidatesFor: (model) => [{ providerId: model.provider, modelId: model.id }],
+    keysOf: (providerId) => pool.usable(providerId, keys),
+    lease: (providerId) => pool.lease(providerId, keys),
+    authFor: (attempt) => {
+      if (attempt.keyId !== undefined) {
+        keysUsed.push(attempt.keyId);
+      }
+
+      return Promise.resolve(
+        attempt.keyId === undefined ? undefined : { apiKey: `sk-${attempt.keyId}` },
+      );
+    },
+    report: (attempt, verdict) => {
+      if (attempt.keyId !== undefined && verdict !== "success") {
+        pool.report(attempt.candidate.providerId, attempt.keyId, verdict);
+      }
+    },
+  };
 
   models.setProvider(scripted.provider);
 
@@ -387,7 +569,9 @@ export function scriptedSessionStore(options: {
       archivedDirectory: options.archivedDirectory ?? `${options.directory}-archived`,
       compactionSettings:
         options.compactionSettings ?? (() => ({ reserveTokens: 16384, keepRecentTokens: 20000 })),
+      ...(options.keys === undefined ? {} : { router }),
     }),
+    keysUsed,
     model: `${scripted.model.provider}/${scripted.model.id}`,
     requests: scripted.requests,
     contextWindow: scripted.model.contextWindow,

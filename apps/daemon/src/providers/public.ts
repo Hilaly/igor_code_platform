@@ -1,5 +1,11 @@
 export { createCredentialStore, type CredentialStore } from "./credential-store.ts";
 export { createModelCatalogStore } from "./model-catalog-store.ts";
+export { modelAliasRoutes } from "./model-alias-routes.ts";
+export {
+  createModelAliasStore,
+  type ModelAliasStore,
+  type ModelAliasStoreOutcome,
+} from "./model-alias-store.ts";
 export {
   carryLoginSteps,
   providerLoginRoutes,

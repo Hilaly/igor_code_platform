@@ -24,7 +24,7 @@ import type { ProviderLogins } from "./provider-logins.ts";
 
 export type ProviderLoginRoutesOptions = {
   logins: ProviderLogins;
-  credentials: Pick<CredentialStore, "problem">;
+  credentials: Pick<CredentialStore, "problem" | "keys">;
 };
 
 export function providerLoginRoutes(options: ProviderLoginRoutesOptions): Route[] {
@@ -63,11 +63,26 @@ export function providerLoginRoutes(options: ProviderLoginRoutesOptions): Route[
           return;
         }
 
+        // Ключа, названного целью, может уже не быть: вкладка держит список, который успел
+        // устареть. Отказ здесь, а не отложенным провалом диалога, — по той же причине, что и
+        // выше: писать этот кред всё равно некуда, и спрашивать его незачем.
+        const target = parsed.value.target;
+
+        if (
+          target?.kind === "existing" &&
+          !options.credentials.keys(parsed.value.providerId).some((key) => key.id === target.keyId)
+        ) {
+          respondWithError(response, 404, "not found");
+
+          return;
+        }
+
         const outcome = logins.start({
           providerId: parsed.value.providerId,
           method: parsed.value.method,
           origin: "session",
           owner: session?.id ?? "",
+          ...(parsed.value.target === undefined ? {} : { target: parsed.value.target }),
         });
 
         if (outcome.kind === "taken") {

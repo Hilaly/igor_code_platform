@@ -20,6 +20,7 @@ describe("describeProvider", () => {
     const summary = describeProvider(providerNamed("anthropic"), {
       auth: { kind: "unconfigured" },
       origin: "builtin",
+      keys: [],
     });
 
     assert.equal(summary.id, "anthropic");
@@ -39,6 +40,7 @@ describe("describeProvider", () => {
     const summary = describeProvider(providerNamed("openai-codex"), {
       auth: { kind: "unconfigured" },
       origin: "builtin",
+      keys: [],
     });
 
     assert.deepEqual(
@@ -53,9 +55,11 @@ describe("describeProvider", () => {
 
     assert.ok(oauth?.loginLabel, "у xai пропал loginLabel — тест проверяет не то, что задуман");
     assert.equal(
-      describeProvider(provider, { auth: { kind: "unconfigured" }, origin: "builtin" }).logins.find(
-        (login) => login.type === "oauth",
-      )?.label,
+      describeProvider(provider, {
+        auth: { kind: "unconfigured" },
+        origin: "builtin",
+        keys: [],
+      }).logins.find((login) => login.type === "oauth")?.label,
       oauth.loginLabel,
     );
   });
@@ -64,6 +68,7 @@ describe("describeProvider", () => {
     const summary = describeProvider(providerNamed("radius"), {
       auth: { kind: "unconfigured" },
       origin: "builtin",
+      keys: [],
     });
 
     assert.equal(summary.dynamic, true);
@@ -75,6 +80,8 @@ describe("describeProvider", () => {
     const summary = describeProvider(providerNamed("anthropic"), {
       auth: { kind: "configured", type: "api_key", source: "ANTHROPIC_API_KEY" },
       origin: "plugin",
+      keys: [{ id: "key-1", label: "личный", type: "api_key" }],
+      selectedKey: "key-1",
     });
 
     assert.deepEqual(summary.auth, {
@@ -96,7 +103,8 @@ describe("describeProvider", () => {
     };
 
     assert.equal(
-      describeProvider(broken, { auth: { kind: "unknown" }, origin: "plugin" }).modelCount,
+      describeProvider(broken, { auth: { kind: "unknown" }, origin: "plugin", keys: [] })
+        .modelCount,
       0,
     );
   });

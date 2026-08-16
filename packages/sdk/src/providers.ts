@@ -36,18 +36,38 @@ export type ProviderAuthState =
   | { kind: "unconfigured" }
   | { kind: "unknown" };
 
+/**
+ * Ключ провайдера: подпись, которую дал человек, и способ авторизации. Значение креда сюда не
+ * попадает никогда. `type` может отсутствовать — кред правили руками, и разобрать его не вышло.
+ */
+export type ProviderKeySummary = {
+  id: string;
+  label: string;
+  type?: ProviderAuthType;
+};
+
 export type ProviderSummary = {
   id: string;
   name: string;
   baseUrl?: string;
   logins: ProviderLoginMethod[];
   auth: ProviderAuthState;
+  /** Ключи провайдера в порядке добавления. Пустой список — сохранённых кредов нет. */
+  keys: ProviderKeySummary[];
+  /**
+   * Каким ключом провайдер представлен целиком: проверка авторизации и обновление списка моделей.
+   * Сессия агента выбирает ключ сама (docs/models-and-providers.md).
+   */
+  selectedKey?: string;
   /** Список моделей приходит из сети и обновляется `refresh`. */
   dynamic: boolean;
   /** Провайдер зарегистрирован плагином и исчезнет вместе с ним. */
   custom: boolean;
-  /** Кто владеет жизненным циклом определения. */
-  origin: "builtin" | "plugin" | "user";
+  /**
+   * Кто владеет жизненным циклом определения. `alias` — псевдо-провайдер платформы, чьи модели
+   * человек задал списком совместимых: входить в него нечем.
+   */
+  origin: "builtin" | "plugin" | "user" | "alias";
   /** Сколько моделей известно сейчас. Сами модели — отдельным вызовом: их больше тысячи. */
   modelCount: number;
 };

@@ -54,6 +54,46 @@ describe("parseLoginStart", () => {
 
     assert.equal(parseLoginStart({ providerId: "  ", method: "oauth" }).kind, "rejected");
   });
+
+  it("takes the key the credential is meant for", () => {
+    const added = parseLoginStart({
+      providerId: "anthropic",
+      method: "api_key",
+      target: { kind: "new", label: "рабочий" },
+    });
+    const replaced = parseLoginStart({
+      providerId: "anthropic",
+      method: "api_key",
+      target: { kind: "existing", keyId: "key-2" },
+    });
+
+    assert.ok(added.kind === "parsed");
+    assert.deepEqual(added.value.target, { kind: "new", label: "рабочий" });
+    assert.ok(replaced.kind === "parsed");
+    assert.deepEqual(replaced.value.target, { kind: "existing", keyId: "key-2" });
+  });
+
+  it("leaves out a target that was not named", () => {
+    const result = parseLoginStart({ providerId: "anthropic", method: "api_key" });
+
+    // Отсутствие цели — «добавить ключ», и решает это тот, кто ведёт вход, а не разбор тела.
+    assert.ok(result.kind === "parsed");
+    assert.equal("target" in result.value, false);
+  });
+
+  it("refuses a target it cannot act on", () => {
+    for (const target of [
+      { kind: "magic" },
+      { kind: "existing" },
+      { kind: "existing", keyId: "  " },
+      { kind: "new", label: 7 },
+      "key-1",
+    ]) {
+      const result = parseLoginStart({ providerId: "anthropic", method: "api_key", target });
+
+      assert.equal(result.kind, "rejected", `${JSON.stringify(target)} прошёл`);
+    }
+  });
 });
 
 describe("parseLoginAnswer", () => {

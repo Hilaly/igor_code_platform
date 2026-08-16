@@ -7,6 +7,7 @@ import type { Api, Model, Provider } from "@earendil-works/pi-ai";
 import type {
   ModelSummary,
   ProviderAuthState,
+  ProviderKeySummary,
   ProviderLoginMethod,
   ProviderOrigin,
   ProviderSummary,
@@ -15,6 +16,8 @@ import type {
 export type ProviderFacts = {
   auth: ProviderAuthState;
   origin: ProviderOrigin;
+  keys: ProviderKeySummary[];
+  selectedKey?: string;
 };
 
 export function describeProvider(provider: Provider, facts: ProviderFacts): ProviderSummary {
@@ -24,6 +27,8 @@ export function describeProvider(provider: Provider, facts: ProviderFacts): Prov
     ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
     logins: loginMethods(provider),
     auth: facts.auth,
+    keys: facts.keys,
+    ...(facts.selectedKey === undefined ? {} : { selectedKey: facts.selectedKey }),
     dynamic: typeof provider.refreshModels === "function",
     custom: facts.origin === "plugin",
     origin: facts.origin,

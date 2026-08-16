@@ -32,6 +32,8 @@ const anthropic: ProviderSummary = {
   name: "Anthropic",
   logins: [{ type: "api_key", label: "Anthropic API key" }],
   auth: { kind: "configured", type: "api_key", source: "stored credential" },
+  keys: [{ id: "key-1", label: "личный", type: "api_key" }],
+  selectedKey: "key-1",
   dynamic: false,
   custom: false,
   origin: "builtin",

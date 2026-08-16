@@ -106,10 +106,22 @@ export type LoginAttemptsSnapshot = {
   attempts: LoginAttemptState[];
 };
 
-/** Тело начала входа. `method` — то, что провайдер объявил в `logins`. */
+/**
+ * Куда ляжет кред удавшегося входа: в новый ключ провайдера или поверх названного
+ * (docs/models-and-providers.md).
+ */
+export type LoginKeyTarget = { kind: "new"; label: string } | { kind: "existing"; keyId: string };
+
+/**
+ * Тело начала входа. `method` — то, что провайдер объявил в `logins`.
+ *
+ * Цель не названа — вход **добавляет ключ**, а не переписывает существующий: у провайдера их может
+ * быть несколько, и молчаливая замена стоила бы человеку рабочего ключа.
+ */
 export type LoginStart = {
   providerId: string;
   method: ProviderAuthType;
+  target?: LoginKeyTarget;
 };
 
 /** Тело ответа на шаг. `stepId` обязателен: без него ответ уехал бы не на тот вопрос. */
@@ -127,7 +139,7 @@ export type LoginAttemptTaken = {
   conflict: LoginAttemptState;
 };
 
-const startKeys = ["providerId", "method"];
+const startKeys = ["providerId", "method", "target"];
 const answerKeys = ["stepId", "value"];
 
 export function parseLoginStart(raw: unknown, label = "login"): SettingsParseResult<LoginStart> {
@@ -154,7 +166,58 @@ export function parseLoginStart(raw: unknown, label = "login"): SettingsParseRes
     return { kind: "rejected", diagnostics };
   }
 
-  return { kind: "parsed", value: { providerId, method }, diagnostics };
+  const target = parseLoginKeyTarget(fields["target"], `${label}.target`, diagnostics);
+
+  if (target === "rejected") {
+    return { kind: "rejected", diagnostics };
+  }
+
+  return {
+    kind: "parsed",
+    value: { providerId, method, ...(target === undefined ? {} : { target }) },
+    diagnostics,
+  };
+}
+
+function parseLoginKeyTarget(
+  raw: unknown,
+  label: string,
+  diagnostics: string[],
+): LoginKeyTarget | undefined | "rejected" {
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const fields = asObject(raw);
+  const kind = fields?.["kind"];
+
+  if (kind === "new") {
+    const providedLabel = fields?.["label"] ?? "";
+
+    if (typeof providedLabel !== "string") {
+      diagnostics.push(`${label}.label must be a string`);
+
+      return "rejected";
+    }
+
+    return { kind: "new", label: providedLabel };
+  }
+
+  if (kind === "existing") {
+    const keyId = trimmedText(fields?.["keyId"]);
+
+    if (keyId === undefined) {
+      diagnostics.push(`${label}.keyId must name the key being replaced`);
+
+      return "rejected";
+    }
+
+    return { kind: "existing", keyId };
+  }
+
+  diagnostics.push(`${label}.kind must be "new" or "existing"`);
+
+  return "rejected";
 }
 
 export function parseLoginAnswer(raw: unknown, label = "answer"): SettingsParseResult<LoginAnswer> {

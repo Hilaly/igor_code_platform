@@ -10,7 +10,12 @@
  * восстанавливается снимком, а не окном догона.
  */
 
-import type { LoginStepFrame, ProviderAuthType } from "@sovereign/protocol";
+import type {
+  LoginKeyTarget,
+  LoginStepFrame,
+  ModelAlias,
+  ProviderAuthType,
+} from "@sovereign/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FrontendBus } from "../events/bus.ts";
@@ -18,12 +23,17 @@ import type { StreamStatus } from "../events/stream.ts";
 import {
   answerLoginStep,
   cancelProviderLogin,
+  deleteModelAlias,
   fetchLoginAttempts,
+  fetchModelAliases,
   fetchProviderModels,
   fetchProvidersSnapshot,
   fetchUserProviders,
   logOutProvider,
+  removeProviderKey,
+  saveModelAlias,
   startProviderLogin,
+  updateProviderKey,
 } from "./api.ts";
 import {
   applyAnswered,
@@ -39,6 +49,7 @@ import {
   type LoginsState,
 } from "./login-state.ts";
 import {
+  applyAliasesSnapshot,
   applyFailure,
   applyModels,
   applyModelsFailure,
@@ -64,13 +75,26 @@ export type UseProvidersOptions = {
 
 export type ProvidersController = {
   state: ProvidersState;
-  logIn: (providerId: string, method: ProviderAuthType) => void;
+  /**
+   * Начать вход. Цель называет ключ, в который ляжет кред: не названа — вход добавит ключ
+   * (docs/models-and-providers.md).
+   */
+  logIn: (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => void;
   /** Ответ на текущий вопрос. Попытку хук находит сам: на провайдера её не больше одной. */
   answer: (providerId: string, stepId: string, value: string) => void;
   cancelLogin: (providerId: string) => void;
   /** Убрать с экрана диалог, который уже ничем не кончится. */
   closeLogin: (providerId: string) => void;
   logOut: (providerId: string) => void;
+  /** Переименовать ключ провайдера. */
+  renameKey: (providerId: string, keyId: string, label: string) => Promise<void>;
+  /** Сделать ключ тем, которым провайдер представлен целиком. */
+  selectKey: (providerId: string, keyId: string) => Promise<void>;
+  /** Убрать один ключ. Остальные остаются, и провайдер остаётся настроенным. */
+  removeKey: (providerId: string, keyId: string) => Promise<void>;
+  /** Завести алиас или заменить существующий (docs/model-routing.md). */
+  saveAlias: (alias: ModelAlias, existing: boolean) => Promise<void>;
+  removeAlias: (aliasId: string) => Promise<void>;
   /** Кадр шага входа из потока. Не событие шины (docs/models-and-providers.md). */
   receiveLoginStep: (frame: LoginStepFrame) => void;
 };
@@ -113,10 +137,14 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     void Promise.all([
       fetchProvidersSnapshot(controller.signal),
       fetchUserProviders(controller.signal),
+      fetchModelAliases(controller.signal),
     ])
-      .then(([snapshot, userProviders]) =>
+      .then(([snapshot, userProviders, aliases]) =>
         apply((current) =>
-          applyUserProvidersSnapshot(applySnapshot(current, snapshot), userProviders),
+          applyAliasesSnapshot(
+            applyUserProvidersSnapshot(applySnapshot(current, snapshot), userProviders),
+            aliases,
+          ),
         ),
       )
       .catch((cause: unknown) => {
@@ -221,8 +249,8 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
   }, [apply, onDiagnostic, providerId]);
 
   const logIn = useCallback(
-    (providerId: string, method: ProviderAuthType) => {
-      void startProviderLogin({ providerId, method })
+    (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => {
+      void startProviderLogin({ providerId, method, ...(target === undefined ? {} : { target }) })
         .then((outcome) => {
           applyToLogins((current) =>
             outcome.kind === "started"
@@ -306,6 +334,68 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [apply, applyToLogins, onDiagnostic],
   );
 
+  /**
+   * Правка ключа. Список перезапрашивается ответом маршрута, а не только событием: событие приедет
+   * и так, но кнопка обязана погаснуть по факту записи, а не по факту его прихода.
+   */
+  const changeKey = useCallback(
+    async (change: () => Promise<unknown>, what: string) => {
+      try {
+        await change();
+        reloadProviders();
+      } catch (cause: unknown) {
+        const reason = reasonOf(cause);
+
+        onDiagnostic(`${what} did not go through: ${reason}`);
+        apply((current) => applyFailure(current, reason));
+      }
+    },
+    [apply, onDiagnostic, reloadProviders],
+  );
+
+  const renameKey = useCallback(
+    (providerId: string, keyId: string, label: string) =>
+      changeKey(
+        () => updateProviderKey(providerId, keyId, { label }),
+        `renaming the key ${keyId} of ${providerId}`,
+      ),
+    [changeKey],
+  );
+
+  const selectKey = useCallback(
+    (providerId: string, keyId: string) =>
+      changeKey(
+        () => updateProviderKey(providerId, keyId, { selected: true }),
+        `selecting the key ${keyId} of ${providerId}`,
+      ),
+    [changeKey],
+  );
+
+  const removeKey = useCallback(
+    (providerId: string, keyId: string) =>
+      changeKey(
+        () => removeProviderKey(providerId, keyId),
+        `removing the key ${keyId} of ${providerId}`,
+      ),
+    [changeKey],
+  );
+
+  /**
+   * Правка алиаса. Список провайдеров перезапрашивается следом: алиас — модель каталога, и её
+   * появление или исчезновение меняет пикер моделей.
+   */
+  const saveAlias = useCallback(
+    (alias: ModelAlias, existing: boolean) =>
+      changeKey(() => saveModelAlias(alias, existing), `saving the alias ${alias.id}`),
+    [changeKey],
+  );
+
+  const removeAlias = useCallback(
+    (aliasId: string) =>
+      changeKey(() => deleteModelAlias(aliasId), `removing the alias ${aliasId}`),
+    [changeKey],
+  );
+
   const receiveLoginStep = useCallback(
     (frame: LoginStepFrame) => {
       const outcome = applyLoginStep(latest.current.logins, frame);
@@ -319,5 +409,18 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [applyToLogins, reloadAttempts],
   );
 
-  return { state, logIn, answer, cancelLogin, closeLogin, logOut, receiveLoginStep };
+  return {
+    state,
+    logIn,
+    answer,
+    cancelLogin,
+    closeLogin,
+    logOut,
+    renameKey,
+    selectKey,
+    removeKey,
+    saveAlias,
+    removeAlias,
+    receiveLoginStep,
+  };
 }

@@ -15,9 +15,12 @@
 
 import { modelReference } from "@sovereign/protocol";
 import type {
+  LoginKeyTarget,
+  ModelAlias,
   ModelSummary,
   ProviderAuthState,
   ProviderAuthType,
+  ProviderKeySummary,
   ProviderSummary,
 } from "@sovereign/protocol";
 import {
@@ -28,6 +31,7 @@ import {
   CodeBlock,
   ConfirmDialog,
   EmptyState,
+  Input,
   List,
   ListRow,
   Notice,
@@ -39,6 +43,7 @@ import {
 } from "@sovereign/ui-kit";
 import { useMemo, useState, type ReactNode } from "react";
 
+import { AliasEditor } from "./alias-editor.tsx";
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
 import { ShellHeaderActions, useShellHeaderActions } from "../shell/header.tsx";
@@ -58,11 +63,17 @@ export type ProvidersViewProps = {
   actionFailure?: string;
   /** «← все провайдера» со страницы деталей — назад к списку. */
   onBack: () => void;
-  onLogIn: (providerId: string, method: ProviderAuthType) => void;
+  /** Цель называет ключ, в который ляжет кред: не названа — вход добавит ключ. */
+  onLogIn: (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => void;
   onAnswer: (providerId: string, stepId: string, value: string) => void;
   onCancelLogin: (providerId: string) => void;
   onCloseLogin: (providerId: string) => void;
   onLogOut: (providerId: string) => void;
+  onRenameKey: (providerId: string, keyId: string, label: string) => Promise<void>;
+  onSelectKey: (providerId: string, keyId: string) => Promise<void>;
+  onRemoveKey: (providerId: string, keyId: string) => Promise<void>;
+  onSaveAlias: (alias: ModelAlias, existing: boolean) => Promise<void>;
+  onRemoveAlias: (aliasId: string) => Promise<void>;
   translator: ScopedTranslator;
 };
 
@@ -81,6 +92,11 @@ export function ProvidersView({
   onCancelLogin,
   onCloseLogin,
   onLogOut,
+  onRenameKey,
+  onSelectKey,
+  onRemoveKey,
+  onSaveAlias,
+  onRemoveAlias,
   translator,
 }: ProvidersViewProps) {
   const { t } = translator;
@@ -205,6 +221,15 @@ export function ProvidersView({
           onLogOut={onLogOut}
           translator={translator}
         />
+        <ProviderKeys
+          provider={provider}
+          busy={state.logins.dialogs[provider.id] !== undefined}
+          onLogIn={onLogIn}
+          onRename={onRenameKey}
+          onSelect={onSelectKey}
+          onRemove={onRemoveKey}
+          translator={translator}
+        />
         <ProviderModels
           provider={provider}
           entry={state.models[provider.id]}
@@ -241,6 +266,14 @@ export function ProvidersView({
       {actionFailure ? <Notice tone="danger" title={actionFailure} /> : undefined}
 
       {logins}
+
+      <AliasEditor
+        aliases={state.aliases?.aliases}
+        {...(state.aliases?.problem === undefined ? {} : { problem: state.aliases.problem })}
+        onSave={onSaveAlias}
+        onRemove={onRemoveAlias}
+        translator={translator}
+      />
 
       <Text tone="muted">
         {t("providers.summary", {
@@ -492,6 +525,199 @@ function ProviderAccess({
         </Notice>
       )}
     </section>
+  );
+}
+
+type ProviderKeysProps = {
+  provider: ProviderSummary;
+  /** Вход в этого провайдера уже идёт: второй отклоняется маршрутом (docs/web-api.md). */
+  busy: boolean;
+  onLogIn: (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => void;
+  onRename: (providerId: string, keyId: string, label: string) => Promise<void>;
+  onSelect: (providerId: string, keyId: string) => Promise<void>;
+  onRemove: (providerId: string, keyId: string) => Promise<void>;
+  translator: ScopedTranslator;
+};
+
+/**
+ * Ключи провайдера. Секции нет вовсе у провайдера без сохранённых ключей: кред из окружения ключом
+ * не является, и пустой список рядом с настроенным провайдером читался бы как поломка.
+ */
+function ProviderKeys({
+  provider,
+  busy,
+  onLogIn,
+  onRename,
+  onSelect,
+  onRemove,
+  translator,
+}: ProviderKeysProps) {
+  const { t } = translator;
+
+  if (provider.keys.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <section
+      className="providers-detail-rows"
+      aria-label={t("providers.keys.title", { name: provider.name })}
+    >
+      <SettingsRow
+        label={t("providers.keys.title", { name: provider.name })}
+        description={<Text tone="muted">{t("providers.keys.hint")}</Text>}
+      >
+        <List>
+          {provider.keys.map((key) => (
+            <ProviderKeyRow
+              key={key.id}
+              providerId={provider.id}
+              providerKey={key}
+              selected={key.id === provider.selectedKey}
+              logins={provider.logins}
+              busy={busy}
+              onLogIn={onLogIn}
+              onRename={onRename}
+              onSelect={onSelect}
+              onRemove={onRemove}
+              translator={translator}
+            />
+          ))}
+        </List>
+      </SettingsRow>
+    </section>
+  );
+}
+
+type ProviderKeyRowProps = {
+  providerId: string;
+  providerKey: ProviderKeySummary;
+  selected: boolean;
+  logins: ProviderSummary["logins"];
+  busy: boolean;
+  onLogIn: (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => void;
+  onRename: (providerId: string, keyId: string, label: string) => Promise<void>;
+  onSelect: (providerId: string, keyId: string) => Promise<void>;
+  onRemove: (providerId: string, keyId: string) => Promise<void>;
+  translator: ScopedTranslator;
+};
+
+function ProviderKeyRow({
+  providerId,
+  providerKey,
+  selected,
+  logins,
+  busy,
+  onLogIn,
+  onRename,
+  onSelect,
+  onRemove,
+  translator,
+}: ProviderKeyRowProps) {
+  const { t } = translator;
+  const [renaming, setRenaming] = useState<string | undefined>(undefined);
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const name = providerKey.label === "" ? t("providers.key.unnamed") : providerKey.label;
+  /**
+   * Заменить кред можно только тем же способом, каким он заведён: у ключа api_key нет OAuth-шагов, и
+   * кнопка, ведущая в чужой диалог, обещала бы не то.
+   */
+  const replaceWith = logins.find((login) => login.type === providerKey.type);
+
+  const run = (change: () => Promise<void>): void => {
+    setPending(true);
+    void change()
+      .catch(() => undefined)
+      .finally(() => setPending(false));
+  };
+
+  return (
+    <ListRow>
+      <div className="providers-key">
+        <div className="providers-key-facts">
+          <Text>{name}</Text>
+          <Code>{providerKey.id}</Code>
+          {providerKey.type === undefined ? (
+            // Кред правили руками и разобрать его не вышло. Ключ из списка не пропадает: иначе
+            // чинить было бы нечего (docs/models-and-providers.md).
+            <Badge tone="warning">{t("providers.key.unreadable")}</Badge>
+          ) : (
+            <Badge tone="neutral">{t(`providers.auth.${providerKey.type}`)}</Badge>
+          )}
+          {selected ? <Badge tone="success">{t("providers.key.selected")}</Badge> : undefined}
+        </div>
+
+        {renaming === undefined ? (
+          <div className="providers-key-actions">
+            {selected ? undefined : (
+              <Button
+                disabled={pending}
+                onClick={() => run(() => onSelect(providerId, providerKey.id))}
+              >
+                {t("providers.key.select")}
+              </Button>
+            )}
+            <Button disabled={pending} onClick={() => setRenaming(providerKey.label)}>
+              {t("providers.key.rename")}
+            </Button>
+            {replaceWith === undefined ? undefined : (
+              <Button
+                disabled={busy || pending}
+                onClick={() =>
+                  onLogIn(providerId, replaceWith.type, {
+                    kind: "existing",
+                    keyId: providerKey.id,
+                  })
+                }
+              >
+                {t("providers.key.replace")}
+              </Button>
+            )}
+            <Button tone="danger" disabled={pending} onClick={() => setConfirming(true)}>
+              {t("providers.key.remove")}
+            </Button>
+          </div>
+        ) : (
+          <div className="providers-key-actions">
+            <Input
+              value={renaming}
+              onChange={setRenaming}
+              disabled={pending}
+              aria-label={t("providers.key.rename.label", { id: providerKey.id })}
+            />
+            <Button
+              tone="accent"
+              disabled={pending}
+              onClick={() =>
+                run(() =>
+                  onRename(providerId, providerKey.id, renaming).then(() => setRenaming(undefined)),
+                )
+              }
+            >
+              {t("providers.key.rename.save")}
+            </Button>
+            <Button disabled={pending} onClick={() => setRenaming(undefined)}>
+              {t("providers.key.rename.cancel")}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title={t("providers.key.remove.title", { name })}
+        description={t("providers.key.remove.hint")}
+        confirmLabel={t("providers.key.remove")}
+        cancelLabel={t("providers.user.cancel")}
+        destructive
+        pending={pending}
+        onConfirm={() =>
+          run(() => onRemove(providerId, providerKey.id).then(() => setConfirming(false)))
+        }
+      />
+    </ListRow>
   );
 }
 

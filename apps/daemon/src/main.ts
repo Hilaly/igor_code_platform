@@ -30,9 +30,11 @@ import {
 import { createEventBus } from "./platform/public.ts";
 import {
   createAgentSessionStore,
+  createModelRouter,
   createProviderCatalogue,
   processEnvironment,
 } from "@sovereign/agent-runtime-pi";
+import { createKeyPool } from "@sovereign/model-routing";
 
 import { createEventStream } from "./http/public.ts";
 import { healthRoute } from "./http/public.ts";
@@ -80,6 +82,7 @@ import { filesystemRoutes } from "./http/public.ts";
 import { carryLoginSteps, providerLoginRoutes, publishLoginOutcomes } from "./providers/public.ts";
 import { createProviderLogins } from "./providers/public.ts";
 import { providersRoutes } from "./providers/public.ts";
+import { modelAliasRoutes, createModelAliasStore } from "./providers/public.ts";
 import { userProviderRoutes } from "./providers/public.ts";
 import { createDaemonServer, staticAssetsRoute } from "./http/public.ts";
 import {
@@ -201,6 +204,36 @@ const providers = createProviderCatalogue({
 // Реестр попыток входа в памяти: попытка — живой диалог с провайдером, и перезапуск демона она
 // пережить не может (docs/models-and-providers.md).
 const providerLogins = createProviderLogins({ runner: providers, logger });
+
+/**
+ * Здоровье ключей и выбор ключа сессии (docs/model-routing.md). Пул один на демон: иначе одна
+ * сессия учится на отказе ключа, а соседняя идёт в тот же отказ следом. Состояние в памяти — отказ
+ * ключа это факт про сейчас, и после перезапуска он проверяется заново.
+ */
+const modelRouter = createModelRouter({
+  models: providers.models,
+  credentials,
+  pool: createKeyPool(),
+  environment: processEnvironment(),
+  aliasCandidates: (aliasId) => providers.aliasCandidates(aliasId),
+  onSwitch: (from, to, reason) =>
+    logger.info("a session moved on to the next key", {
+      providerId: from.candidate.providerId,
+      modelId: from.candidate.modelId,
+      from: from.keyId,
+      to: to.keyId,
+      nextModelId: to.candidate.modelId,
+      reason,
+    }),
+});
+
+/**
+ * Алиасы моделей (docs/model-routing.md). Применяются к каталогу сразу при старте: сессия, открытая
+ * на `alias/…`, обязана резолвиться до первого запроса человека, а не после первой правки списка.
+ */
+const modelAliases = createModelAliasStore({ directory, logger });
+
+providers.setAliases(modelAliases.list());
 
 const userProviderStore = createUserProviderStore({ directory, logger });
 let hasActiveProviderSession: (providerId: string) => boolean = () => false;
@@ -452,6 +485,7 @@ const sessions = createSessionService({
       keepRecentTokens: settings.current().config.compactionKeepRecentTokens,
     }),
     hooks: createRuntimeHookSeam(hookDispatcher),
+    router: modelRouter,
   }),
   projects,
   commandsDirectory: join(directory, commandsDirectoryName),
@@ -567,6 +601,7 @@ const server = createDaemonServer({
     ...sessions.routes(),
     ...providersRoutes({ catalogue: providers, credentials, logger, bus, logins: providerLogins }),
     ...userProviderRoutes({ providers: userProviders, logger, bus }),
+    ...modelAliasRoutes({ store: modelAliases, catalogue: providers, logger, bus }),
     ...providerLoginRoutes({ logins: providerLogins, credentials }),
     ...filesystemRoutes(),
     events.route(),

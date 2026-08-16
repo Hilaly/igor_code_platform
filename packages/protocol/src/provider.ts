@@ -12,6 +12,8 @@ export const userProvidersPath = "/api/user-providers";
 /** Шаблоны для таблицы маршрутов демона. `:providerId` — идентификатор провайдера у рантайма. */
 export const providerModelsPathPattern = `${providersPath}/:providerId/models`;
 export const providerCredentialPathPattern = `${providersPath}/:providerId/credential`;
+export const providerKeysPathPattern = `${providersPath}/:providerId/keys`;
+export const providerKeyPathPattern = `${providerKeysPathPattern}/:keyId`;
 export const userProviderPathPattern = `${userProvidersPath}/:providerId`;
 export const userProviderRefreshPathPattern = `${userProviderPathPattern}/models/refresh`;
 
@@ -29,6 +31,14 @@ export function providerModelsPath(providerId: string): string {
 
 export function providerCredentialPath(providerId: string): string {
   return `${providersPath}/${encodeURIComponent(providerId)}/credential`;
+}
+
+export function providerKeysPath(providerId: string): string {
+  return `${providersPath}/${encodeURIComponent(providerId)}/keys`;
+}
+
+export function providerKeyPath(providerId: string, keyId: string): string {
+  return `${providerKeysPath(providerId)}/${encodeURIComponent(keyId)}`;
 }
 
 export function userProviderPath(providerId: string): string {
@@ -76,7 +86,33 @@ export type ProviderAuthState =
   | { kind: "unconfigured" }
   | { kind: "unknown" };
 
-export type ProviderOrigin = "builtin" | "plugin" | "user";
+/**
+ * Кто владеет жизненным циклом провайдера. `alias` — псевдо-провайдер платформы, чьи модели задал
+ * человек списком совместимых (docs/model-routing.md): входить в него нечем, и правится он своим
+ * редактором, а не входом.
+ */
+export type ProviderOrigin = "builtin" | "plugin" | "user" | "alias";
+
+/**
+ * Ключ провайдера глазами вью: подпись, которую дал человек, и способ авторизации. Значение креда
+ * сюда не попадает никогда, и `type` берётся у рантайма — платформа форму креда не читает
+ * (docs/models-and-providers.md).
+ *
+ * `type` может отсутствовать: кред правили руками, и рантайм не смог его разобрать. Это не то же
+ * самое, что «ключа нет», и чинится по-другому.
+ */
+export type ProviderKeySummary = {
+  id: string;
+  label: string;
+  type?: ProviderAuthType;
+};
+
+/** Тело правки ключа. Пустое тело — ничего не меняем, и это отказ, а не молчаливый успех. */
+export type ProviderKeyUpdate = {
+  label?: string;
+  /** Только `true`: выбранный ключ не снимается, а заменяется другим. */
+  selected?: true;
+};
 
 export type ProviderSummary = {
   id: string;
@@ -84,6 +120,16 @@ export type ProviderSummary = {
   baseUrl?: string;
   logins: ProviderLoginMethod[];
   auth: ProviderAuthState;
+  /**
+   * Ключи провайдера в порядке добавления. Пустой список — сохранённых кредов нет; провайдер при
+   * этом может быть настроен из окружения, и об этом говорит `auth`.
+   */
+  keys: ProviderKeySummary[];
+  /**
+   * Каким ключом провайдер представлен целиком: проверка авторизации, обновление списка моделей,
+   * обновление OAuth-токена. Сессия агента выбирает ключ сама (docs/models-and-providers.md).
+   */
+  selectedKey?: string;
   /**
    * Список моделей приходит из сети и обновляется `refresh`. У встроенных провайдеров такой один
    * (docs/runtime-checks.md, проверка 31); у кастомных провайдеров плагинов — сколько угодно.
@@ -248,6 +294,57 @@ export function defaultModelsUrl(api: CustomProviderApi, baseUrl: string): strin
   url.pathname = `/${segments.join("/")}`;
 
   return url.toString().replace(/\/$/, "");
+}
+
+export type ProviderKeyUpdateParseResult =
+  | { kind: "parsed"; value: ProviderKeyUpdate; diagnostics: string[] }
+  | { kind: "rejected"; diagnostics: string[] };
+
+/**
+ * Разбор правки ключа. Подпись вправе быть пустой строкой — это «убрать подпись», а не «не менять»:
+ * различие держится тем, что поля вовсе нет.
+ */
+export function parseProviderKeyUpdate(raw: unknown, label = "key"): ProviderKeyUpdateParseResult {
+  const fields = objectOf(raw);
+
+  if (fields === undefined) {
+    return { kind: "rejected", diagnostics: [`${label} must be an object`] };
+  }
+
+  const diagnostics = Object.keys(fields)
+    .filter((key) => key !== "label" && key !== "selected")
+    .map((key) => `${label}.${key} is not recognised`);
+  const update: ProviderKeyUpdate = {};
+
+  if (fields["label"] !== undefined) {
+    if (typeof fields["label"] !== "string") {
+      diagnostics.push(`${label}.label must be a string`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    update.label = fields["label"];
+  }
+
+  if (fields["selected"] !== undefined) {
+    // Снять выбор нечем: выбранный ключ у настроенного провайдера есть всегда, его можно только
+    // заменить другим.
+    if (fields["selected"] !== true) {
+      diagnostics.push(`${label}.selected must be true or absent`);
+
+      return { kind: "rejected", diagnostics };
+    }
+
+    update.selected = true;
+  }
+
+  if (update.label === undefined && update.selected === undefined) {
+    diagnostics.push(`${label} changes nothing`);
+
+    return { kind: "rejected", diagnostics };
+  }
+
+  return { kind: "parsed", value: update, diagnostics };
 }
 
 export type UserProviderParseResult =

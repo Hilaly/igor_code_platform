@@ -12,6 +12,7 @@ import { emptyEnvironment } from "@sovereign/agent-runtime-pi/testing";
 import {
   coreEventTypes,
   providerCredentialPath,
+  providerKeyPath,
   providerModelsPath,
   providersPath,
   providersRefreshPath,
@@ -87,7 +88,7 @@ async function serve(options: { contents?: string; variables?: Record<string, st
 
   const { port } = server.address() as AddressInfo;
 
-  const call = (method: string, path: string): Promise<Answer> =>
+  const call = (method: string, path: string, body?: unknown): Promise<Answer> =>
     new Promise((resolve, reject) => {
       const outgoing = sendRequest(
         // Изменяющий запрос обязан назвать себя json, иначе диспетчер отвечает 415
@@ -110,7 +111,7 @@ async function serve(options: { contents?: string; variables?: Record<string, st
       );
 
       outgoing.on("error", reject);
-      outgoing.end();
+      outgoing.end(body === undefined ? undefined : JSON.stringify(body));
     });
 
   return {
@@ -120,6 +121,10 @@ async function serve(options: { contents?: string; variables?: Record<string, st
     logout: (providerId: string) => call("DELETE", providerCredentialPath(providerId)),
     models: (providerId: string) => call("GET", providerModelsPath(providerId)),
     refresh: () => call("POST", providersRefreshPath),
+    updateKey: (providerId: string, keyId: string, update: unknown) =>
+      call("PUT", providerKeyPath(providerId, keyId), update),
+    removeKey: (providerId: string, keyId: string) =>
+      call("DELETE", providerKeyPath(providerId, keyId)),
   };
 }
 
@@ -247,6 +252,101 @@ describe("DELETE /api/providers/:providerId/credential", () => {
     const { logout } = await serve();
 
     assert.equal((await logout("выдуманный")).status, 404);
+  });
+});
+
+describe("the keys of one provider", () => {
+  /** Два ключа у провайдера: вход сюда не ходит, ключи кладёт хранилище. */
+  async function twoKeys() {
+    const served = await serve();
+
+    await served.credentials.withKeyTarget("anthropic", { kind: "new", label: "личный" }, () =>
+      served.credentials.modify("anthropic", async () => ({ type: "api_key", key: "первый" })),
+    );
+    await served.credentials.withKeyTarget("anthropic", { kind: "new", label: "рабочий" }, () =>
+      served.credentials.modify("anthropic", async () => ({ type: "api_key", key: "второй" })),
+    );
+
+    return served;
+  }
+
+  it("renames a key and answers with the whole provider", async () => {
+    const { updateKey, credentials, events } = await twoKeys();
+    const answer = await updateKey("anthropic", "key-2", { label: "запасной" });
+    const summary = answer.body as ProviderSummary;
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(summary.keys, [
+      { id: "key-1", label: "личный", type: "api_key" },
+      { id: "key-2", label: "запасной", type: "api_key" },
+    ]);
+    assert.equal(summary.selectedKey, "key-1");
+    assert.deepEqual(await credentials.readKey("anthropic", "key-2"), {
+      type: "api_key",
+      key: "второй",
+    });
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providersChanged],
+    );
+  });
+
+  it("changes the key the provider is represented by", async () => {
+    const { updateKey, credentials } = await twoKeys();
+    const summary = (await updateKey("anthropic", "key-2", { selected: true }))
+      .body as ProviderSummary;
+
+    assert.equal(summary.selectedKey, "key-2");
+    assert.deepEqual(await credentials.read("anthropic"), { type: "api_key", key: "второй" });
+  });
+
+  it("refuses a body that changes nothing", async () => {
+    const { updateKey } = await twoKeys();
+
+    assert.equal((await updateKey("anthropic", "key-1", {})).status, 400);
+    assert.equal((await updateKey("anthropic", "key-1", { selected: false })).status, 400);
+  });
+
+  it("answers 404 for a key the provider does not have", async () => {
+    const { updateKey, removeKey } = await twoKeys();
+
+    assert.equal((await updateKey("anthropic", "key-9", { label: "нет такого" })).status, 404);
+    assert.equal((await removeKey("anthropic", "key-9")).status, 404);
+    assert.equal((await removeKey("выдуманный", "key-1")).status, 404);
+  });
+
+  it("removes one key and leaves the rest of the provider alone", async () => {
+    const { removeKey, credentials, events } = await twoKeys();
+    const summary = (await removeKey("anthropic", "key-1")).body as ProviderSummary;
+
+    assert.deepEqual(summary.keys, [{ id: "key-2", label: "рабочий", type: "api_key" }]);
+    // Ушёл выбранный — выбранным стал оставшийся, и провайдер остался настроенным.
+    assert.equal(summary.selectedKey, "key-2");
+    assert.equal(summary.auth.kind, "configured");
+    assert.deepEqual(await credentials.read("anthropic"), { type: "api_key", key: "второй" });
+    assert.deepEqual(
+      events.map((event) => event.type),
+      [coreEventTypes.providerLogout],
+    );
+  });
+
+  it("leaves the provider unconfigured when its last key goes", async () => {
+    const { removeKey, credentials } = await twoKeys();
+
+    await removeKey("anthropic", "key-1");
+
+    const summary = (await removeKey("anthropic", "key-2")).body as ProviderSummary;
+
+    assert.deepEqual(summary.keys, []);
+    assert.deepEqual(summary.auth, { kind: "unconfigured" });
+    assert.deepEqual(credentials.list(), []);
+  });
+
+  it("refuses to write over a credentials file it could not read", async () => {
+    const { updateKey, removeKey } = await serve({ contents: "{ это не json" });
+
+    assert.equal((await updateKey("anthropic", "key-1", { label: "личный" })).status, 409);
+    assert.equal((await removeKey("anthropic", "key-1")).status, 409);
   });
 });
 

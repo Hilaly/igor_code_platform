@@ -13,6 +13,7 @@ import { randomBytes } from "node:crypto";
 
 import type {
   LoginAttemptState,
+  LoginKeyTarget,
   LoginNotice,
   LoginOrigin,
   LoginPrompt,
@@ -31,8 +32,9 @@ export type LoginRunner = {
       tell: (notice: LoginNotice) => void;
       nextStepId: () => string;
     };
+    target?: LoginKeyTarget;
     signal?: AbortSignal;
-  }) => Promise<void>;
+  }) => Promise<string | undefined>;
 };
 
 export type StartLoginInput = {
@@ -41,6 +43,11 @@ export type StartLoginInput = {
   origin: LoginOrigin;
   /** Кому принадлежит попытка: идентификатор сессии входа или ключ плагина. */
   owner: string;
+  /**
+   * В какой ключ провайдера ляжет кред. Не названа — вход добавляет ключ
+   * (docs/models-and-providers.md).
+   */
+  target?: LoginKeyTarget;
 };
 
 export type StartLoginOutcome =
@@ -251,6 +258,7 @@ export function createProviderLogins(options: CreateProviderLoginsOptions): Prov
           providerId: input.providerId,
           method: input.method,
           dialogue,
+          ...(input.target === undefined ? {} : { target: input.target }),
           signal: controller.signal,
         })
         .then(

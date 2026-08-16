@@ -11,6 +11,7 @@ import {
   isPluginStreamEvent,
   streamGapType,
   type BusStreamEvent,
+  type ModelAliasesSnapshot,
   type ModelSummary,
   type ProviderSummary,
   type ProvidersSnapshot,
@@ -31,6 +32,8 @@ export type ProviderModelsEntry =
 export type ProvidersState = {
   snapshot?: ProvidersSnapshot;
   userProviders?: UserProvidersSnapshot;
+  /** Алиасы моделей: список, который человек правит сам (docs/model-routing.md). */
+  aliases?: ModelAliasesSnapshot;
   /** Почему список провайдеров не прочитан. Беда с файлом кредов сюда не попадает: она в снимке. */
   failure?: string;
   /**
@@ -110,6 +113,13 @@ export function applyUserProvidersSnapshot(
   snapshot: UserProvidersSnapshot,
 ): ProvidersState {
   return { ...state, userProviders: snapshot };
+}
+
+export function applyAliasesSnapshot(
+  state: ProvidersState,
+  snapshot: ModelAliasesSnapshot,
+): ProvidersState {
+  return { ...state, aliases: snapshot };
 }
 
 export function applyFailure(state: ProvidersState, reason: string): ProvidersState {

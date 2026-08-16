@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import type { LoginAttemptState, LoginNotice, LoginPrompt, LoginStep } from "@sovereign/protocol";
+import type {
+  LoginAttemptState,
+  LoginKeyTarget,
+  LoginNotice,
+  LoginPrompt,
+  LoginStep,
+} from "@sovereign/protocol";
 
 import { createLogger, type Logger } from "../platform/public.ts";
 import { createProviderLogins, type LoginRunner, type ProviderLogins } from "./provider-logins.ts";
@@ -21,18 +27,21 @@ function runner() {
     ask: (prompt: Unstepped<LoginPrompt>) => Promise<string>;
     tell: (notice: LoginNotice) => void;
     signal?: AbortSignal;
+    target?: LoginKeyTarget;
     settle: (outcome: { ok: true } | { failed: string }) => void;
   };
 
   const sessions: Session[] = [];
   const runner: LoginRunner = {
     login: (input) =>
-      new Promise<void>((resolve, reject) => {
+      new Promise<string | undefined>((resolve, reject) => {
         sessions.push({
           ask: (prompt) => input.dialogue.ask({ ...prompt, stepId: input.dialogue.nextStepId() }),
           tell: input.dialogue.tell,
           ...(input.signal === undefined ? {} : { signal: input.signal }),
-          settle: (outcome) => ("ok" in outcome ? resolve() : reject(new Error(outcome.failed))),
+          ...(input.target === undefined ? {} : { target: input.target }),
+          settle: (outcome) =>
+            "ok" in outcome ? resolve("key-1") : reject(new Error(outcome.failed)),
         });
       }),
   };
