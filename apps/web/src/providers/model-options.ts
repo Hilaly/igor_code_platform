@@ -1,3 +1,12 @@
+/**
+ * Каталог провайдеров и их моделей — группами пикера. Живёт рядом с провайдерами, а не с сессиями:
+ * спрашивающих больше одного — композер выбирает модель следующего турна, страница алиасов —
+ * кандидата, — и обе стороны говорят о каталоге, а не о разговоре.
+ *
+ * Ссылка на модель, которой в каталоге нет, остаётся в списке отдельной опцией: провайдер мог
+ * уехать вместе с плагином, а выбранное молча подменять нельзя (docs/model-routing.md).
+ */
+
 import {
   modelReference,
   parseModelReference,
@@ -6,7 +15,7 @@ import {
 } from "@sovereign/protocol";
 import type { ModelPickerGroup, ModelPickerOption } from "@sovereign/ui-kit";
 
-import type { ModelsEntry } from "./state.ts";
+import type { ProviderModelsEntry as ModelsEntry } from "./state.ts";
 
 const referenceOption = (reference: string): ModelPickerOption => ({
   value: reference,

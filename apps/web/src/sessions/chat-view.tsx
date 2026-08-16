@@ -43,7 +43,7 @@ import { AgentActivity } from "./agent-activity.tsx";
 import { carriesImages } from "./image-input.ts";
 import { EntryTreeDrawer } from "./entry-tree.tsx";
 import { MessageComposer, type ComposerDraftReplacement } from "./message-composer.tsx";
-import { modelPickerGroups, selectedModel } from "./model-options.ts";
+import { modelPickerGroups, selectedModel } from "../providers/model-options.ts";
 import { MessageAction, SessionMessageList } from "./session-message-list.tsx";
 import type { SlashEntry, SlashInvocation } from "./slash-command.ts";
 import { isBusy, type ModelsEntry, type OpenSession } from "./state.ts";
