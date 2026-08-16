@@ -63,7 +63,7 @@ export function parseBashResult(text: string): ParsedBashResult {
   const markers: string[] = [];
 
   // Маркеры исхода — последние строки результата; отделяются от тела с конца.
-  while (lines.length > 0 && outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1]))) {
+  while (lines.length > 0 && outcomeMarkerPatterns.some((pattern) => pattern.test(lines[lines.length - 1] as string))) {
     markers.unshift(lines.pop() as string);
   }
 
