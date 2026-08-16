@@ -62,4 +62,17 @@ describe("mission storage", () => {
     assert.equal((await recovered).revision, 1);
     assert.equal((await readMission("same"))?.mission, "Recovered");
   });
+
+  it("stores a blocked step together with its reason and the mission outcome", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const written = await writeMission("s", {
+      mission: "Ship",
+      plan: [{ step: "Push", status: "blocked" as const, reason: "no credentials" }],
+      outcome: { kind: "failed" as const, summary: "could not push" },
+    });
+
+    assert.deepEqual((await readMission("s"))?.plan, written.plan);
+    assert.equal((await readMission("s"))?.outcome?.kind, "failed");
+  });
 });

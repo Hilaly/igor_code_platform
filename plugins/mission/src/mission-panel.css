@@ -30,6 +30,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Исход — строка из метки и итога: метка не переносится, итог занимает остаток ширины. */
+.mission-outcome {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  line-height: var(--sovereign-line-height-snug);
+  overflow-wrap: anywhere;
+}
+
 .mission-plan {
   display: flex;
   flex-direction: column;
@@ -63,6 +73,14 @@
   line-height: var(--sovereign-line-height-snug);
   text-align: start;
   overflow-wrap: anywhere;
+}
+
+/* Шаг и причина под ним — колонка: причина принадлежит шагу, а не соседствует с ним в строке. */
+.mission-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
 }
 
 .mission-step[data-status="in_progress"] {

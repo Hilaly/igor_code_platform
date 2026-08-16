@@ -46,7 +46,23 @@ const planned = {
   updatedAt: "2026-08-16T12:30:00.000Z",
 };
 
-function response(value: ReturnType<typeof snapshot> | typeof planned): Response {
+const stalled = {
+  mission: "Merge the branch",
+  plan: [
+    { step: "Run the tests", status: "completed" as const },
+    {
+      step: "Push to origin",
+      status: "blocked" as const,
+      reason: "no credentials in this worktree",
+    },
+    { step: "Delete the branch", status: "skipped" as const, reason: "the owner keeps it" },
+  ],
+  outcome: { kind: "failed" as const, summary: "the branch stayed local" },
+  revision: 5,
+  updatedAt: "2026-08-16T12:30:00.000Z",
+};
+
+function response(value: unknown): Response {
   return { ok: true, status: 200, json: async () => value } as Response;
 }
 
@@ -257,6 +273,26 @@ it("separates the mission, its explanation, and the named state of every step", 
 
   // Сырое машинное значение статуса в панель больше не попадает.
   expect(screen.queryByText("in progress")).toBeNull();
+});
+
+/**
+ * Упершийся шаг, пропущенный шаг и исход миссии. Без них панель показывала законченную неудачей
+ * работу так же, как идущую: полоса прогресса стояла, и почему она стоит, нигде не было сказано.
+ */
+it("names why a step stalled and how the mission ended", async () => {
+  const channel = bridge();
+  missionFetch(response(stalled));
+  renderPanel(channel.events);
+
+  await screen.findByText("Merge the branch");
+
+  expect(screen.getByRole("status", { name: "Blocked" })).not.toBeNull();
+  expect(screen.getByRole("status", { name: "Skipped" })).not.toBeNull();
+  expect(screen.getByText("no credentials in this worktree")).not.toBeNull();
+  expect(screen.getByText("the owner keeps it")).not.toBeNull();
+
+  expect(screen.getByText("Failed")).not.toBeNull();
+  expect(screen.getByText("the branch stayed local")).not.toBeNull();
 });
 
 /**
