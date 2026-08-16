@@ -255,7 +255,8 @@ it("speaks the language of the window", async () => {
   expect(screen.getByText("Шаги")).not.toBeNull();
   expect(screen.getByText("1 из 3")).not.toBeNull();
   expect(screen.getByRole("status", { name: "В работе" })).not.toBeNull();
-  expect(screen.getByText(/Обновлено/u)).not.toBeNull();
+  // Дата в русской строке тоже русская: локаль браузера её больше не решает.
+  expect(screen.getByText(/Обновлено 16 авг\./u)).not.toBeNull();
 });
 
 it("shows updated time and unsubscribes from events and recovery", async () => {

@@ -11,8 +11,8 @@ import {
   StatusDot,
   Text,
   createTranslator,
-  type ScopedTranslator,
   type StatusDotTone,
+  type Translator,
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
@@ -127,7 +127,7 @@ function MissionSnapshotView({
   translator,
 }: {
   snapshot: MissionSnapshot;
-  translator: ScopedTranslator;
+  translator: Translator;
 }): ReactNode {
   const completed = snapshot.plan.filter((step) => step.status === "completed").length;
 
@@ -168,7 +168,7 @@ function MissionSnapshotView({
       </div>
       <p className="mission-updated">
         <Text tone="muted">
-          {translator.t("panel.updated", { time: formatUpdatedAt(snapshot.updatedAt) })}
+          {translator.t("panel.updated", { time: formatUpdatedAt(snapshot.updatedAt, translator) })}
         </Text>
       </p>
     </div>
@@ -181,7 +181,7 @@ function MissionSnapshotView({
  * браузерного API локали в SDK пока нет, и заводить общий модуль ради двух копий рано — сначала
  * решение, где этой локали жить (docs/backlog.md).
  */
-function useTranslator(): ScopedTranslator {
+function useTranslator(): Translator {
   const [locale, setLocale] = useState("en");
 
   useEffect(() => {
@@ -223,11 +223,12 @@ function useTranslator(): ScopedTranslator {
   );
 }
 
-function formatUpdatedAt(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+/**
+ * Дату форматирует переводчик, а не своя `Intl`: та брала локаль браузера, и в русской строке
+ * «Обновлено» стояло английское «16 Aug 2026». Язык у панели один — тот, что выбран для окна.
+ */
+function formatUpdatedAt(value: string, translator: Translator): string {
+  return translator.formatDate(new Date(value), { dateStyle: "medium", timeStyle: "short" });
 }
 
 function isMissionChanged(value: unknown): value is { sessionId: string; revision: number } {
