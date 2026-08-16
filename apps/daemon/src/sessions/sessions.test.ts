@@ -1291,7 +1291,16 @@ describe("reading sessions", () => {
 
     assert.deepEqual(
       page.entries.map((entry) => entry.kind),
-      ["model-change", "thinking-level-change", "tools-change", "message", "message"],
+      [
+        "model-change",
+        "thinking-level-change",
+        "tools-change",
+        // Первый текстовый турн называет безымянную сессию: имя — запись в дерево, и она встаёт
+        // перед сообщением (docs/sessions-and-projects.md).
+        "session-name",
+        "message",
+        "message",
+      ],
     );
 
     const rest = (await call("GET", `${sessionEntriesPath(sessionId)}?after=${String(page.seen)}`))
@@ -1546,6 +1555,119 @@ describe("the session lifecycle over http", () => {
     );
   });
 
+  it("names a fresh session from the first text message", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      undefined,
+    );
+
+    assert.equal(
+      (
+        await call("POST", sessionTurnsPath(sessionId), {
+          text: "помоги разобрать баг\nвот подробности",
+        })
+      ).status,
+      200,
+    );
+
+    // Имя пишется со стартом турна: к концу турна снимок его уже несёт.
+    await untilIdle(call, sessionId);
+
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      "помоги разобрать баг",
+    );
+  });
+
+  it("truncates the generated name at the limit of the daemon", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "а".repeat(100) });
+    await untilIdle(call, sessionId);
+
+    // Предел генератора — 60 символов: столько же вмещает строка сайдбара без переноса.
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      `${"а".repeat(60)}…`,
+    );
+  });
+
+  it("keeps a name given before the first turn", async () => {
+    const { call, start } = await serve();
+    const sessionId = String((await start()).body["id"]);
+
+    await call("PUT", sessionPath(sessionId), { title: "разбор бага", archived: false });
+
+    await call("POST", sessionTurnsPath(sessionId), { text: "первый текст" });
+
+    // Имя, данное руками, первый текст не перетирает.
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      "разбор бага",
+    );
+  });
+
+  it("leaves the session unnamed when the first turn has no text", async () => {
+    const { call, start } = await serve({ input: ["text", "image"] });
+    const sessionId = String((await start()).body["id"]);
+    const payload = Buffer.alloc(16);
+
+    payload.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    // Скриншот без единого слова — законная просьба, но имени из неё не выйдет.
+    assert.equal(
+      (
+        await call("POST", sessionTurnsPath(sessionId), {
+          images: [{ mimeType: "image/png", data: payload.toString("base64") }],
+        })
+      ).status,
+      200,
+    );
+
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      undefined,
+    );
+  });
+
+  it("does not name the session from a skill invocation", async () => {
+    const directory = mkdtempSync(join(workspace, `skill-secret-`));
+
+    writeFileSync(join(directory, "SKILL.md"), "почини сборку и ничего больше", "utf8");
+
+    const secret = skill("secret", { location: join(directory, "SKILL.md") });
+    const agent: AgentContributionRegistration = {
+      ...baseAgent,
+      skills: { include: ["secret"], exclude: [] },
+    };
+    const { call, start } = await serve({
+      turns: [{ text: "починил" }],
+      contributions: { base: () => [agent], forProject: () => [agent, secret] },
+    });
+    const sessionId = String((await start()).body["id"]);
+
+    assert.equal(
+      (
+        await call("POST", sessionTurnsPath(sessionId), {
+          skill: "secret",
+          instructions: "начни с тестов",
+        })
+      ).status,
+      200,
+    );
+    await untilIdle(call, sessionId);
+
+    // Имя принадлежит просьбе человека: инструкции скила сессию не называют.
+    assert.equal(
+      ((await call("GET", sessionsPath)).body as unknown as SessionsSnapshot).sessions[0]?.title,
+      undefined,
+    );
+  });
+
   it("archives a session out of the list and reads it by its own address", async () => {
     const { call, start, directory } = await serve();
     const sessionId = String((await start()).body["id"]);
@@ -1679,13 +1801,14 @@ describe("the session lifecycle over http", () => {
       2,
     );
 
-    // Форк отрезал вопрос вместе с ответом: у него осталась только преамбула сессии.
+    // Форк отрезал вопрос вместе с ответом: у него осталась только преамбула сессии — вместе
+    // с именем, которое первый текстовый турн записал в дерево.
     const forkedPage = (await call("GET", sessionEntriesPath(String(forked.body["id"]))))
       .body as unknown as SessionEntriesPage;
 
     assert.deepEqual(
       forkedPage.entries.map((entry) => entry.kind),
-      ["model-change", "thinking-level-change", "tools-change"],
+      ["model-change", "thinking-level-change", "tools-change", "session-name"],
     );
   });
 
@@ -1787,7 +1910,16 @@ describe("reading the branch and the context over http", () => {
     assert.equal(whole.sessionId, sessionId);
     assert.deepEqual(
       whole.entries.map((entry) => entry.kind),
-      ["model-change", "thinking-level-change", "tools-change", "message", "message"],
+      [
+        "model-change",
+        "thinking-level-change",
+        "tools-change",
+        // Первый текстовый турн называет безымянную сессию: имя — запись в дерево, и она встаёт
+        // перед сообщением (docs/sessions-and-projects.md).
+        "session-name",
+        "message",
+        "message",
+      ],
     );
     assert.equal(whole.leafId, whole.entries.at(-1)?.id);
 

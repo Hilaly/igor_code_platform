@@ -86,6 +86,7 @@ import type {
   AgentSessionSummary,
   AgentSkill,
   InvokedSkill,
+  PersistedAgentSession,
   PromptTemplate,
   PromptTemplateRoot,
   TurnOutcome,
@@ -336,6 +337,28 @@ const turnFinished: PlatformHookName = "turn_finished";
  */
 const maximumSkillBytes = 1_048_576;
 
+/**
+ * Предел имени, сгенерированного из первого сообщения. Больше в строке сайдбара не помещается,
+ * а имя всё равно переименовываемое: точную формулировку человек поправит руками.
+ */
+const maximumGeneratedSessionNameLength = 60;
+
+/**
+ * Имя сессии из первого сообщения: первая непустая строка, усечённая до предела с многоточием.
+ * Вызывающий гарантирует непустой текст, поэтому пустого результата здесь не бывает.
+ */
+function sessionNameFromMessage(text: string): string {
+  const line =
+    text
+      .split("\n")
+      .map((candidate) => candidate.trim())
+      .find((candidate) => candidate !== "") ?? text.trim();
+
+  return line.length <= maximumGeneratedSessionNameLength
+    ? line
+    : `${line.slice(0, maximumGeneratedSessionNameLength)}…`;
+}
+
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const availabilityOf =
     options.availability ?? ((project: StoredProject) => probeProjectFolder(project.folder));
@@ -345,6 +368,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
   /** Открытые сессии: harness поднят, подписка на дельты стоит. */
   const live = new Map<string, AgentSession>();
+  /**
+   * Записи открытых сессий. Имя живёт на записи, а не на harness
+   * (docs/sessions-and-projects.md), поэтому рядом с harness держится и запись: называть сессию,
+   * открывая её заново, незачем.
+   */
+  const records = new Map<string, PersistedAgentSession>();
   /** Один подъём harness на сессию: параллельные первые обращения ждут один и тот же результат. */
   const opening = new Map<string, Promise<OpenSessionOutcome>>();
 
@@ -531,6 +560,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
       watch(activated);
       live.set(sessionId, activated);
+      records.set(sessionId, persisted);
 
       return { kind: "opened", session: activated } as const;
     })();
@@ -713,6 +743,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
    */
   const forget = (sessionId: string): void => {
     live.delete(sessionId);
+    records.delete(sessionId);
     places.delete(sessionId);
     activeTools.delete(sessionId);
     // Очередь уходит вместе с сессией: архивная и удалённая турнов не запускают, и ждущее в них
@@ -781,6 +812,12 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
 
       watch(created);
       live.set(created.summary().id, created);
+      const createdRecord = await options.store.open(created.summary().id);
+
+      if (createdRecord !== undefined) {
+        records.set(created.summary().id, createdRecord);
+      }
+
       await refresh();
       announce();
 
@@ -1787,6 +1824,34 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     return { kind: "done", outbox: outbox.list(sessionId) };
   };
 
+  /**
+   * Безымянная сессия получает имя из первого же текстового сообщения. Только обычная реплика:
+   * у скила и шаблона своего текста нет, и имя от инструкций скила было бы про скил, а не про
+   * просьбу. Возвращает, названа ли сессия: по имени меняется снимок списка, и зовущий знает,
+   * что список уже перечитан. Имя — обычная запись в дерево, поэтому рядом с идущим турном оно
+   * безопасно, ровно как переименование (docs/sessions-and-projects.md).
+   */
+  const nameFromFirstMessage = async (
+    sessionId: string,
+    request: PromptRequest,
+    record: PersistedAgentSession,
+  ): Promise<boolean> => {
+    if (request.text === undefined || request.text.trim() === "") {
+      return false;
+    }
+
+    const summary = find(sessionId);
+
+    if (summary === undefined || summary.name !== undefined) {
+      return false;
+    }
+
+    await record.setName(sessionNameFromMessage(request.text));
+    await refresh();
+
+    return true;
+  };
+
   const prompt = async (request: PromptRequest): Promise<PromptOutcome> => {
     const sessionId = request.sessionId;
     const ready = await readyForModel(sessionId);
@@ -1895,6 +1960,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       kind: "turn",
       run: async (turnId, queued) => {
         try {
+          // Безымянная сессия получает имя из первого текстового сообщения. Со стартом турна, а
+          // не с принятием: запись в дерево стоит файлового I/O, а принятие обязано оставаться
+          // быстрым (docs/sessions-and-projects.md). Запись у живой сессии есть всегда — создание
+          // или открытие положили её в `records`.
+          const record = records.get(sessionId);
+
+          if (record !== undefined) {
+            await nameFromFirstMessage(sessionId, request, record);
+          }
+
           if (queued) {
             const prepared = await prepareForModel(session, session.summary());
 
