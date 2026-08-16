@@ -150,6 +150,7 @@ function SubagentList({
               <Text tone="muted">{subagent.agentId}</Text>
               {isWorking(subagent.state) ? (
                 <DurationTimer
+                  size="sm"
                   totalSeconds={elapsedSeconds(subagent.startedAt)}
                   labels={durationLabels(translator)}
                   accessibleLabel={translator.t("duration.elapsed")}

@@ -180,6 +180,12 @@ export const DurationTimers = () => (
       labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
       accessibleLabel="2 дня 1 час 1 минута 1 секунда"
     />
+    <DurationTimer
+      size="sm"
+      totalSeconds={3_661}
+      labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
+      accessibleLabel="1 час 1 минута 1 секунда"
+    />
   </div>
 );
 
