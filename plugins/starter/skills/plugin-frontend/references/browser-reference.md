@@ -13,6 +13,8 @@ import {
   settingsSections,
   useCommands,
   usePageNavigation,
+  useSovereignEvents,
+  useTranslator,
   type Command,
   type PlaceContext,
 } from "@sovereign/browser-sdk";
@@ -70,6 +72,63 @@ export function SessionBoard({ context }: { context: PlaceContext }) {
 обнаруженного разрыва последовательности событий. Событие содержит только ключ инвалидации
 (`sessionId`, `revision`); не держи в нём полное состояние. Не создавай второй `EventSource`, не
 вызывай `/api/events` напрямую и не используй polling — bus уже разделяется между host и plugins.
+
+## Язык окна
+
+Локаль принадлежит окну, а не плагину: человек выбирает язык один раз в настройках внешнего вида.
+Каталоги объявляет worker, и до браузера они доезжают снимком `/api/plugins` — тем же, которым
+приезжают остальные вклады.
+
+```ts
+// worker
+await contribute.localeCatalog({
+  id: "messages-ru",
+  namespace: "task-plugin", // либо `core` — так плагин добавляет платформе язык
+  locale: "ru",
+  messages: {
+    "component.board.title": "Доска",
+    "board.empty": "Пока пусто",
+    "board.updated": "Обновлено {time}",
+  },
+});
+```
+
+```tsx
+// browser entry
+import { useTranslator } from "@sovereign/browser-sdk";
+
+export function Board(): ReactNode {
+  const translator = useTranslator("task-plugin");
+
+  return (
+    <p>
+      {translator.t("board.updated", {
+        time: translator.formatDate(new Date(), { dateStyle: "medium", timeStyle: "short" }),
+      })}
+    </p>
+  );
+}
+```
+
+- Хук возвращает `Translator` UI-кита: `t`, `optional`, `locale`, `formatNumber`, `formatDate`,
+  `scope`. Вне `BrowserRuntimeProvider` он бросает — это ошибка автора, а не состояние.
+- Промах перевода уходит в диагностику окна, а не в консоль: базовая строка показывается, интерфейс
+  не ломается.
+- Множественная форма — отдельный ключ на категорию (`board.count.one`, `.few`, `.many`) плюс
+  параметр `count`.
+- Своей настройки языка у плагина нет, за `/api/preferences` он не ходит и строки в bundle не кладёт.
+
+**Заголовок вклада** платформа подписывает лестницей: перевод по ключу
+`<вид вклада>.<объявленный id>.title` в неймспейсе плагина → `title` объявления → объявленный
+идентификатор. Так подписаны вкладки, кнопки команд, палитра, каталог `/` и заголовок страницы
+плагина. Переводить своё название плагин не обязан — вторая ступень законна.
+
+| Вклад       | Ключ заголовка         |
+| ----------- | ---------------------- |
+| `component` | `component.<id>.title` |
+| `command`   | `command.<id>.title`   |
+| `page`      | `page.<id>.title`      |
+| `place`     | `place.<id>.title`     |
 
 ## Core places
 

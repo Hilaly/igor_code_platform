@@ -413,6 +413,11 @@ await contribute.localeCatalog({
 Namespace может быть `core` для строк платформы или id самого плагина. Чужой namespace запрещён.
 Locale канонизируется через `Intl`; пустой messages object отвергается.
 
+Каталог — единственное место строк плагина: браузерная половина берёт их отсюда хуком
+`useTranslator` и своей копии не держит. Заголовок вклада платформа ищет здесь же, по ключу
+`<вид вклада>.<объявленный id>.title` (`component.panel.title`), а `title` объявления остаётся
+запасной ступенью — см. skill `starter.plugin-frontend`.
+
 ### Custom
 
 ```ts
