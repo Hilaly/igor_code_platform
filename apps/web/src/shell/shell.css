@@ -29,9 +29,16 @@
   border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+/**
+ * Правая панель — хрома, а не полоса для чтения, и кегль ей назначает оболочка. Текст кита размера не
+ * несёт (`Text` задаёт только роль цвета), поэтому его выбирает контейнер: левая панель делает это
+ * через `Tree`, а правая не делала вовсе — и вклад плагина наследовал `md` от `body`, то есть меру
+ * связного текста, вдвое заметнее соседней хромы на `sm`.
+ */
 .shell-right {
   gap: var(--sovereign-space-2);
   padding: var(--sovereign-space-3);
+  font-size: var(--sovereign-font-size-sm);
   background: var(--sovereign-sunken-surface);
   border-inline-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
@@ -180,7 +187,6 @@
 .shell-tab-empty {
   min-width: 0;
   color: var(--sovereign-text-subtle);
-  font-size: var(--sovereign-font-size-sm);
 }
 
 /**

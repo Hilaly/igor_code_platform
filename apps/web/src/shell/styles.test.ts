@@ -339,6 +339,17 @@ describe("the style sheets of the application", () => {
   });
 
   /**
+   * Кегль вклада плагина выбирает панель, а не сам вклад: текст кита размера не несёт. Регистр стоит
+   * один раз на всей панели, поэтому заглушке пустой панели свой размер уже не нужен.
+   */
+  it("puts the right panel in the compact chrome register instead of the reading one", () => {
+    const shell = sheets.find((sheet) => sheet.name === "shell.css")?.styles ?? "";
+
+    expect(shell).toMatch(/\.shell-right\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-sm\);/s);
+    expect(shell).not.toMatch(/\.shell-tab-empty\s*\{[^}]*font-size\s*:/s);
+  });
+
+  /**
    * Свободную высоту правой панели забирает тело вкладки, и только оно. Растущая полоса вкладок
    * делила бы эту высоту с телом поровну — вкладка начиналась бы с середины панели.
    */
