@@ -19,10 +19,17 @@ export async function contributeTools(): Promise<void> {
       "Set the mission and its ordered progress plan for the current session. Replace the complete snapshot in one call.",
     parameters: missionInputSchema,
     invoke: async (input, invocation: PluginToolInvocation) => {
-      const snapshot = await writeMission(invocation.sessionId, input);
-      await changed.publish({ sessionId: invocation.sessionId, revision: snapshot.revision });
+      try {
+        const snapshot = await writeMission(invocation.sessionId, input);
+        await changed.publish({ sessionId: invocation.sessionId, revision: snapshot.revision });
 
-      return `Mission updated (revision ${snapshot.revision}).`;
+        return `Mission updated (revision ${snapshot.revision}).`;
+      } catch (cause) {
+        return {
+          content: `Mission update failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+          isError: true,
+        };
+      }
     },
   });
 }

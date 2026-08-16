@@ -35,9 +35,14 @@ describe("mission-update", () => {
     host = installTestHost({ id: "mission" });
     await contributeTools();
 
-    await assert.rejects(() =>
-      host!.callTool("mission-update", { mission: "", plan: [] }, { sessionId: "s" }),
+    const outcome = await host.callTool(
+      "mission-update",
+      { mission: "", plan: [] },
+      { sessionId: "s" },
     );
+
+    assert.equal(outcome.isError, true);
+    assert.match(outcome.content, /Mission update failed/u);
     assert.equal(host.stored.size, 0);
     assert.deepEqual(host.published, []);
   });
