@@ -8,6 +8,7 @@ import type {
   BrowserEventListener,
   BrowserRecoveryListener,
 } from "@sovereign/browser-sdk";
+import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import { MissionPanel } from "./mission-panel.tsx";
 
 afterEach(() => {
@@ -49,41 +50,56 @@ function response(value: ReturnType<typeof snapshot> | typeof planned): Response
   return { ok: true, status: 200, json: async () => value } as Response;
 }
 
-/** Язык окна. Своей настройки языка у плагина нет: он спрашивает её у платформы. */
+/** Язык окна. Своей настройки языка у плагина нет: её задаёт рантайм браузерного SDK. */
 let windowLocale = "en";
 
 afterEach(() => {
   windowLocale = "en";
 });
 
+/**
+ * Каталоги приезжают снимком вкладов — ровно так же, как в живом окне: воркер объявляет их
+ * `contribute.localeCatalog`, а панель ничего не импортирует и ничего не спрашивает.
+ */
+const catalogs = [
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "mission.messages-en",
+    declaredId: "messages-en",
+    pluginKey: "builtin:mission",
+    pluginId: "mission",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "en",
+    messages: englishMessages,
+  },
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "mission.messages-ru",
+    declaredId: "messages-ru",
+    pluginKey: "builtin:mission",
+    pluginId: "mission",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "ru",
+    messages: russianMessages,
+  },
+] as const;
+
 type MissionAnswer = Response | (() => Promise<Response>);
 
-/**
- * Панель ходит по двум адресам: за миссией и за локалью окна. Считать надо только первые — иначе
- * тест перезагрузок меряет ещё и однократный запрос настроек, к миссии отношения не имеющий.
- * Последний ответ повторяется: так же вела себя прежняя `mockResolvedValue`.
- */
+/** Последний ответ повторяется: так же вела себя прежняя `mockResolvedValue`. */
 function missionFetch(...answers: MissionAnswer[]) {
   let taken = 0;
 
-  return vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-    if (String(input).startsWith("/api/preferences")) {
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => ({ locale: windowLocale }),
-      } as Response);
-    }
-
+  return vi.spyOn(globalThis, "fetch").mockImplementation(() => {
     const answer = answers[Math.min(taken, answers.length - 1)];
     taken += 1;
 
     return typeof answer === "function" ? answer() : Promise.resolve(answer as Response);
   });
-}
-
-function missionCalls(mock: ReturnType<typeof missionFetch>): number {
-  return mock.mock.calls.filter(([input]) => String(input).startsWith("/api/p/mission")).length;
 }
 
 function bridge() {
@@ -122,10 +138,10 @@ function renderPanel(events: BrowserEventBridge, sessionId = "s1") {
   };
   const view = render(
     <BrowserRuntimeProvider
-      contributions={[]}
+      contributions={catalogs}
       plugins={[]}
       onDiagnostic={() => {}}
-      locale="en"
+      locale={windowLocale}
       events={events}
       cache={cache}
       createCache={() => cache}
@@ -138,10 +154,10 @@ function renderPanel(events: BrowserEventBridge, sessionId = "s1") {
     rerenderSession(nextSessionId: string) {
       view.rerender(
         <BrowserRuntimeProvider
-          contributions={[]}
+          contributions={catalogs}
           plugins={[]}
           onDiagnostic={() => {}}
-          locale="en"
+          locale={windowLocale}
           events={events}
           cache={cache}
           createCache={() => cache}
@@ -162,7 +178,7 @@ it("reloads for matching mission events, stream gaps, and stream recovery", asyn
   await act(async () =>
     channel.publish(event("mission.changed", { sessionId: "other", revision: 4 })),
   );
-  expect(missionCalls(fetchMock)).toBe(1);
+  expect(fetchMock.mock.calls.length).toBe(1);
 
   await act(async () =>
     channel.publish(event("mission.changed", { sessionId: "s1", revision: 4 })),
@@ -170,7 +186,7 @@ it("reloads for matching mission events, stream gaps, and stream recovery", asyn
   await act(async () => channel.publish(event("core.stream.gap")));
   await act(async () => channel.recover());
 
-  expect(missionCalls(fetchMock)).toBe(4);
+  expect(fetchMock.mock.calls.length).toBe(4);
 });
 
 it("keeps the revision announced by an event as the required response floor", async () => {
@@ -191,7 +207,7 @@ it("keeps the revision announced by an event as the required response floor", as
 
   await act(async () => channel.recover());
   await screen.findByText("Revision two");
-  expect(missionCalls(fetchMock)).toBe(3);
+  expect(fetchMock.mock.calls.length).toBe(3);
 });
 
 it("clears the old session immediately and ignores its late response", async () => {
@@ -211,7 +227,7 @@ it("clears the old session immediately and ignores its late response", async () 
   await act(async () =>
     channel.publish(event("mission.changed", { sessionId: "s1", revision: 9 })),
   );
-  expect(missionCalls(fetchMock)).toBe(2);
+  expect(fetchMock.mock.calls.length).toBe(2);
   await act(async () => resolveSecond?.(response(snapshot("Session two", 1))));
   await screen.findByText("Session two");
 });

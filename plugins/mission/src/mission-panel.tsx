@@ -1,5 +1,5 @@
 import type { PlaceContext } from "@sovereign/browser-sdk";
-import { useSovereignEvents } from "@sovereign/browser-sdk";
+import { useSovereignEvents, useTranslator } from "@sovereign/browser-sdk";
 import {
   EmptyState,
   Heading,
@@ -10,15 +10,20 @@ import {
   Spinner,
   StatusDot,
   Text,
-  createTranslator,
   type StatusDotTone,
   type Translator,
 } from "@sovereign/ui-kit";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
-import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { MissionSnapshot, MissionStep } from "./model.ts";
 import "./mission-panel.css";
+
+/**
+ * Неймспейс каталога. Тот же, что объявляет воркер, — по протоколу это идентификатор плагина, и
+ * другого он объявить не может. Строки сюда не импортируются намеренно: каталог приезжает снимком,
+ * и второй его экземпляр в бандле разошёлся бы с объявленным.
+ */
+const messagesNamespace = "mission";
 
 type PanelState =
   | { kind: "loading" }
@@ -89,7 +94,7 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
     if (sessionId === undefined) return;
     return events.subscribeRecovery?.(() => reload());
   }, [events, reload, sessionId]);
-  const translator = useTranslator();
+  const translator = useTranslator(messagesNamespace);
   return (
     <section className="mission-panel" aria-label={translator.t("panel.title")}>
       <Heading level={2}>{translator.t("panel.title")}</Heading>
@@ -172,54 +177,6 @@ function MissionSnapshotView({
         </Text>
       </p>
     </div>
-  );
-}
-
-/**
- * Переводчик панели. Локаль спрашивается у платформы: своей настройки языка у плагина нет и быть не
- * должно — человек выбирает язык один раз на всё окно. Хук повторяет тот, что живёт у subagents:
- * браузерного API локали в SDK пока нет, и заводить общий модуль ради двух копий рано — сначала
- * решение, где этой локали жить (docs/backlog.md).
- */
-function useTranslator(): Translator {
-  const [locale, setLocale] = useState("en");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const answer = await fetch("/api/preferences", { signal: controller.signal });
-
-        if (answer.ok) {
-          const body = (await answer.json()) as { locale?: string };
-
-          if (typeof body.locale === "string") {
-            setLocale(body.locale);
-          }
-        }
-      } catch {
-        // Локаль не прочиталась — панель говорит по-английски. Ронять её из-за этого нечего.
-      }
-    })();
-
-    return () => controller.abort();
-  }, []);
-
-  return useMemo(
-    () =>
-      createTranslator({
-        locale,
-        namespace: messagesNamespace,
-        catalogs: [
-          { namespace: messagesNamespace, locale: "en", messages: englishMessages },
-          { namespace: messagesNamespace, locale: "ru", messages: russianMessages },
-        ],
-        // Дырка в собственном каталоге — ошибка автора плагина, и видно её должно быть в консоли,
-        // а не в тексте панели.
-        onDiagnostic: (diagnostic) => console.warn(`[mission] ${diagnostic}`),
-      }),
-    [locale],
   );
 }
 

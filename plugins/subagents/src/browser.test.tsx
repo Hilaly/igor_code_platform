@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
+import { BrowserRuntimeProvider } from "@sovereign/browser-sdk/host";
+import type { PlaceContext } from "@sovereign/browser-sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { SubagentsPanel } from "./browser.tsx";
+import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { SubagentDetail, SubagentListed } from "./routes.ts";
 
 afterEach(() => {
@@ -57,7 +60,64 @@ const detail: SubagentDetail = {
   stats: { totalTokens: 1200, costTotal: 0.04, messageCount: 3 },
 };
 
-/** Ответы платформы и своих маршрутов: панель ходит только по HTTP, второго канала у неё нет. */
+/**
+ * Каталоги приезжают снимком вкладов, как в живом окне: воркер объявляет их
+ * `contribute.localeCatalog`, а панель ничего не импортирует и за языком никуда не ходит.
+ */
+const catalogs = [
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "subagents.messages-en",
+    declaredId: "messages-en",
+    pluginKey: "builtin:subagents",
+    pluginId: "subagents",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "en",
+    messages: englishMessages,
+  },
+  {
+    ownership: "plugin",
+    kind: "locale-catalog",
+    id: "subagents.messages-ru",
+    declaredId: "messages-ru",
+    pluginKey: "builtin:subagents",
+    pluginId: "subagents",
+    source: "builtin",
+    namespace: messagesNamespace,
+    locale: "ru",
+    messages: russianMessages,
+  },
+] as const;
+
+/** Панель живёт внутри рантайма браузерного SDK: язык окна она берёт у него. */
+function renderPanel(context: PlaceContext) {
+  const cache = {
+    load: () => ({ kind: "loading" as const }),
+    peek: () => undefined,
+    version: () => 0,
+    retain: () => {},
+    subscribe: () => () => {},
+    dispose: () => {},
+  };
+
+  return render(
+    <BrowserRuntimeProvider
+      contributions={catalogs}
+      plugins={[]}
+      onDiagnostic={() => {}}
+      events={{ subscribe: () => () => {} }}
+      locale="ru"
+      cache={cache}
+      createCache={() => cache}
+    >
+      <SubagentsPanel context={context} />
+    </BrowserRuntimeProvider>,
+  );
+}
+
+/** Ответы своих маршрутов: панель ходит только по HTTP, второго канала у неё нет. */
 function answer(bodies: Record<string, unknown>): void {
   vi.stubGlobal(
     "fetch",
@@ -75,14 +135,13 @@ function answer(bodies: Record<string, unknown>): void {
 
 beforeEach(() => {
   answer({
-    "/api/preferences": { locale: "ru" },
     "/api/p/subagents/list": { subagents: [listed()] },
     "/api/p/subagents/detail/": detail,
   });
 });
 
 it("shows a subagent with its model and an excerpt of its answer", async () => {
-  render(<SubagentsPanel context={{ subject: { page: "session", sessionId: "s-parent" } }} />);
+  renderPanel({ subject: { page: "session", sessionId: "s-parent" } });
 
   expect(await screen.findByText("check the tests")).toBeDefined();
   expect(screen.getByText("anthropic/claude-opus-4-5")).toBeDefined();
@@ -92,7 +151,7 @@ it("shows a subagent with its model and an excerpt of its answer", async () => {
 });
 
 it("narrows to the open session and asks its own route for exactly that parent", async () => {
-  render(<SubagentsPanel context={{ subject: { page: "session", sessionId: "s-parent" } }} />);
+  renderPanel({ subject: { page: "session", sessionId: "s-parent" } });
 
   await screen.findByText("check the tests");
 
@@ -104,7 +163,7 @@ it("narrows to the open session and asks its own route for exactly that parent",
 });
 
 it("asks for every subagent on a page that has no open session", async () => {
-  render(<SubagentsPanel context={{ subject: { page: "home" } }} />);
+  renderPanel({ subject: { page: "home" } });
 
   await screen.findByText("check the tests");
 
@@ -115,7 +174,7 @@ it("asks for every subagent on a page that has no open session", async () => {
 });
 
 it("opens the work of a subagent on click, with its spend and its tool calls", async () => {
-  render(<SubagentsPanel context={{ subject: { page: "session", sessionId: "s-parent" } }} />);
+  renderPanel({ subject: { page: "session", sessionId: "s-parent" } });
 
   fireEvent.click(await screen.findByRole("button", { name: /check the tests/u }));
 
@@ -126,11 +185,10 @@ it("opens the work of a subagent on click, with its spend and its tool calls", a
 
 it("says so instead of showing an empty list when nobody started a subagent", async () => {
   answer({
-    "/api/preferences": { locale: "ru" },
     "/api/p/subagents/list": { subagents: [] },
   });
 
-  render(<SubagentsPanel context={{ subject: { page: "home" } }} />);
+  renderPanel({ subject: { page: "home" } });
 
   expect(await screen.findByText("Субагентов ещё не запускали.")).toBeDefined();
 });

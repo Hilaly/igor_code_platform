@@ -7,6 +7,7 @@
  */
 
 import type { PlaceContext } from "@sovereign/browser-sdk";
+import { useTranslator } from "@sovereign/browser-sdk";
 import {
   Badge,
   Button,
@@ -22,16 +23,20 @@ import {
   StatusDot,
   Text,
   ToolCall,
-  createTranslator,
   type ScopedTranslator,
   type StatusDotTone,
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import "./subagents-panel.css";
-import { englishMessages, messagesNamespace, russianMessages } from "./messages.ts";
 import type { SubagentDetail, SubagentListed } from "./routes.ts";
 import { isWorking, type SubagentState } from "./state.ts";
+
+/**
+ * Неймспейс каталога. Тот же, что объявляет воркер, — по протоколу это идентификатор плагина.
+ * Строки сюда не импортируются: каталог приезжает снимком, а не бандлом (docs/ui-kit.md).
+ */
+const messagesNamespace = "subagents";
 
 /** Как часто перечитываются данные. Второго SSE-соединения нет, значит остаётся опрос. */
 const pollMilliseconds = 2_000;
@@ -50,7 +55,7 @@ type Scope = "session" | "all";
 
 export function SubagentsPanel({ context }: { context: PlaceContext }): ReactNode {
   const sessionId = context.subject?.["sessionId"];
-  const translator = useTranslator();
+  const translator = useTranslator(messagesNamespace);
   const [scope, setScope] = useState<Scope>("session");
   const [selected, setSelected] = useState<string | undefined>();
 
@@ -321,52 +326,6 @@ function usePolled<Value>(
   }, [active, everyMilliseconds, read]);
 
   return state;
-}
-
-/**
- * Переводчик панели. Локаль спрашивается у платформы: своей настройки языка у плагина нет и быть не
- * должно — человек выбирает язык один раз на всё окно.
- */
-function useTranslator(): ScopedTranslator {
-  const [locale, setLocale] = useState("en");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const answer = await fetch("/api/preferences", { signal: controller.signal });
-
-        if (answer.ok) {
-          const body = (await answer.json()) as { locale?: string };
-
-          if (typeof body.locale === "string") {
-            setLocale(body.locale);
-          }
-        }
-      } catch {
-        // Локаль не прочиталась — панель говорит по-английски. Ронять её из-за этого нечего.
-      }
-    })();
-
-    return () => controller.abort();
-  }, []);
-
-  return useMemo(
-    () =>
-      createTranslator({
-        locale,
-        namespace: messagesNamespace,
-        catalogs: [
-          { namespace: messagesNamespace, locale: "en", messages: englishMessages },
-          { namespace: messagesNamespace, locale: "ru", messages: russianMessages },
-        ],
-        // Дырка в собственном каталоге — ошибка автора плагина, и видно её должно быть в консоли,
-        // а не в тексте панели.
-        onDiagnostic: (diagnostic) => console.warn(`[subagents] ${diagnostic}`),
-      }),
-    [locale],
-  );
 }
 
 function durationLabels(translator: ScopedTranslator) {
