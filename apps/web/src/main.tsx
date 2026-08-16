@@ -1,5 +1,6 @@
 import "@sovereign/ui-kit/styles.css";
 import "./shell/shell.css";
+import "./aliases/aliases.css";
 import "./login/login.css";
 import "./projects/projects.css";
 import "./providers/providers.css";

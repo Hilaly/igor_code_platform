@@ -63,6 +63,7 @@ export const corePlaces = [
   { id: "core.settings.appearance", cardinality: "single", replaceable: true },
   { id: "core.settings.usage", cardinality: "single", replaceable: true },
   { id: "core.settings.providers", cardinality: "single", replaceable: true },
+  { id: "core.settings.aliases", cardinality: "single", replaceable: true },
   { id: "core.settings.plugins", cardinality: "single", replaceable: true },
   { id: "core.settings.daemon", cardinality: "single", replaceable: true },
   { id: "core.settings.diagnostics", cardinality: "single", replaceable: true },

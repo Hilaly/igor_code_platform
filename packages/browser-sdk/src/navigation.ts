@@ -8,6 +8,7 @@ export const settingsSections = [
   "appearance",
   "usage",
   "providers",
+  "aliases",
   "plugins",
   "daemon",
   "diagnostics",

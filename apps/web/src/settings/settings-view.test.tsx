@@ -33,6 +33,7 @@ it("shows one selected settings section and only its content", () => {
       appearance={<div>appearance content</div>}
       usage={<div>usage content</div>}
       providers={<div>provider content</div>}
+      aliases={<div>alias content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
       diagnostics={<div>diagnostics</div>}
@@ -74,6 +75,7 @@ it.each(["64rem", "24rem"])(
             appearance={<div>appearance content</div>}
             usage={<div>usage content</div>}
             providers={<div>provider content</div>}
+            aliases={<div>alias content</div>}
             plugins={<div>plugin content</div>}
             daemon={<div>daemon</div>}
             diagnostics={<div>diagnostics</div>}
@@ -115,8 +117,6 @@ it.each([
         onRenameKey={vi.fn(async () => undefined)}
         onSelectKey={vi.fn(async () => undefined)}
         onRemoveKey={vi.fn(async () => undefined)}
-        onSaveAlias={vi.fn(async () => undefined)}
-        onRemoveAlias={vi.fn(async () => undefined)}
         translator={translator}
       />
     ),
@@ -144,6 +144,7 @@ it.each([
         appearance={<div>appearance content</div>}
         usage={<div>usage content</div>}
         providers={section === "providers" ? content : <div>provider content</div>}
+        aliases={<div>alias content</div>}
         plugins={section === "plugins" ? content : <div>plugin content</div>}
         daemon={<div>daemon</div>}
         diagnostics={<div>diagnostics</div>}
@@ -168,6 +169,7 @@ it("leaves naming a plugin object to the shell header instead of a second chain"
         appearance={<div>appearance content</div>}
         usage={<div>usage content</div>}
         providers={<div>provider content</div>}
+        aliases={<div>alias content</div>}
         plugins={
           <>
             <h2>Usage insights summary</h2>
@@ -196,6 +198,7 @@ it("keeps the local context chain when it renders outside the shell", () => {
       appearance={<div>appearance content</div>}
       usage={<div>usage content</div>}
       providers={<div>provider content</div>}
+      aliases={<div>alias content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
       diagnostics={<div>diagnostics</div>}
@@ -218,6 +221,7 @@ it("keeps projects selected for both the list and a project detail", () => {
       appearance={<div>appearance content</div>}
       usage={<div>usage content</div>}
       providers={<div>provider content</div>}
+      aliases={<div>alias content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
       diagnostics={<div>diagnostics</div>}
@@ -243,6 +247,7 @@ it("keeps projects selected for both the list and a project detail", () => {
       appearance={<div>appearance content</div>}
       usage={<div>usage content</div>}
       providers={<div>provider content</div>}
+      aliases={<div>alias content</div>}
       plugins={<div>plugin content</div>}
       daemon={<div>daemon</div>}
       diagnostics={<div>diagnostics</div>}

@@ -67,6 +67,7 @@ describe("the style sheets of the application", () => {
   it("are all found", () => {
     // Тест обходит директорию: пустой список означал бы, что он ничего не проверяет и молчит об этом.
     expect(sheets.map((sheet) => sheet.name).sort()).toEqual([
+      "aliases.css",
       "login.css",
       "projects.css",
       "providers.css",

@@ -350,8 +350,6 @@ export const coreRussian: CatalogRegistration = {
     "providers.logout.stubborn.source":
       "Кред приходит из {source} и платформе не принадлежит: убирать здесь было нечего. Убери его из окружения и перезапусти демон.",
     "aliases.title": "Алиасы моделей",
-    "aliases.hint":
-      "Алиас — имя со списком совместимых моделей. Сессия идёт по списку сверху вниз: отказала первая — берётся следующая.",
     "aliases.problem": "Алиасы не читаются",
     "aliases.empty": "Алиасов пока нет",
     "aliases.new": "Новый алиас",
@@ -364,13 +362,14 @@ export const coreRussian: CatalogRegistration = {
     "aliases.name": "Название",
     "aliases.candidates": "Модели по порядку",
     "aliases.candidates.hint":
-      "По одной ссылке вида provider/model. Первая — предпочтительная; следующая берётся после отказа.",
+      "Модель выбирается из провайдера. Первая — предпочтительная; следующая берётся после отказа.",
     "aliases.candidate": "Модель {number}",
     "aliases.candidate.up": "Поднять модель {number}",
     "aliases.candidate.down": "Опустить модель {number}",
     "aliases.candidate.remove": "Убрать модель {number}",
     "aliases.candidate.add": "Добавить модель",
     "aliases.save": "Сохранить алиас",
+    "aliases.cancel": "Отмена",
     "providers.keys.title": "Ключи: {name}",
     "providers.keys.empty": "Сохранённых ключей нет",
     "providers.keys.hint":
@@ -478,6 +477,7 @@ export const coreRussian: CatalogRegistration = {
     "command.settings.appearance": "Настройки: внешний вид",
     "command.settings.usage": "Настройки: использование",
     "command.settings.providers": "Настройки: провайдеры",
+    "command.settings.aliases": "Настройки: алиасы",
     "command.settings.plugins": "Настройки: плагины",
     "command.settings.daemon": "Настройки: демон",
     "command.settings.diagnostics": "Настройки: диагностика",
@@ -614,6 +614,7 @@ export const coreRussian: CatalogRegistration = {
     "settings.section.appearance": "Внешний вид",
     "settings.section.usage": "Использование",
     "settings.section.providers": "Провайдеры",
+    "settings.section.aliases": "Алиасы",
     "settings.section.plugins": "Плагины",
     "settings.section.daemon": "Демон",
     "settings.section.diagnostics": "Диагностика",
@@ -622,6 +623,8 @@ export const coreRussian: CatalogRegistration = {
     "settings.section.description.usage":
       "Точные токены и стоимость по видимым действующим и архивным сессиям.",
     "settings.section.description.providers": "Управляйте подключениями к моделям и сервисам.",
+    "settings.section.description.aliases":
+      "Имя со списком совместимых моделей. Сессия идёт по списку сверху вниз: отказала первая — берётся следующая.",
     "settings.section.description.plugins": "Управляйте установленными расширениями и их вкладами.",
     "settings.section.description.daemon": "Следите за локальным демоном и его соединением.",
     "settings.section.description.diagnostics": "Просматривайте технические события и проблемы.",

@@ -9,6 +9,7 @@
 
 import {
   AddIcon,
+  AliasIcon,
   AppearanceIcon,
   ArchiveIcon,
   DaemonIcon,
@@ -84,6 +85,7 @@ const settingsIcons: Record<SettingsSection, ComponentType<SymbolIconProps>> = {
   appearance: AppearanceIcon,
   usage: UsageIcon,
   providers: ProviderIcon,
+  aliases: AliasIcon,
   plugins: PluginIcon,
   daemon: DaemonIcon,
   diagnostics: DiagnosticsIcon,

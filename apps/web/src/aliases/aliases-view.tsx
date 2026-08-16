@@ -1,16 +1,25 @@
 /**
- * Редактор алиасов моделей (docs/model-routing.md).
+ * Вью алиасов моделей (docs/model-routing.md). Свой раздел настроек, а не кусок страницы
+ * провайдеров: алиас — не провайдер, входить в него нечем, и стоя посреди каталога он читался как
+ * его часть.
  *
- * Стоит на странице списка провайдеров, а не на странице провайдера `alias`: первого алиаса ещё нет,
- * и провайдера, на страницу которого можно зайти, тоже — заводить его было бы негде.
+ * Своих запросов здесь нет: всё приходит пропами, а нажатия уходят наверх — та же дисциплина, что у
+ * соседних вью.
  *
- * Кандидат вводится ссылкой `providerId/modelId` — той же, что человек видит в списке моделей
- * провайдера. Своего пикера моделей здесь нет: он потребовал бы списка всех моделей всех
- * провайдеров разом, а их больше тысячи ([backlog.md](backlog.md)).
+ * Кандидат выбирается пикером моделей, тем же, что стоит в композере: список моделей провайдера
+ * спрашивается по раскрытию его группы, потому что всех моделей всех провайдеров больше тысячи и
+ * разом их не читает никто.
  */
 
-import { modelReference, parseModelReference, type ModelAlias } from "@sovereign/protocol";
 import {
+  aliasProviderId,
+  modelReference,
+  parseModelReference,
+  type ModelAlias,
+  type ProviderSummary,
+} from "@sovereign/protocol";
+import {
+  AddIcon,
   Badge,
   Button,
   Code,
@@ -20,23 +29,33 @@ import {
   Input,
   List,
   ListRow,
+  ModelPicker,
   Notice,
-  SettingsRow,
   Text,
+  type ModelPickerGroup,
   type ScopedTranslator,
 } from "@sovereign/ui-kit";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-export type AliasEditorProps = {
+import { modelPickerGroups } from "../providers/model-options.ts";
+import type { ProviderModelsEntry } from "../providers/state.ts";
+import { ShellHeaderActions, useShellHeaderActions } from "../shell/header.tsx";
+
+export type AliasesViewProps = {
   aliases: ModelAlias[] | undefined;
   /** Беда с файлом определений: пишущие маршруты по ней отказывают. */
   problem?: string;
+  /** Каталог, из которого выбирается кандидат. `undefined` — снимок ещё не приехал. */
+  providers: ProviderSummary[] | undefined;
+  models: Record<string, ProviderModelsEntry>;
+  /** Раскрыли группу провайдера — спросить его модели. Идемпотентно: повторный зов безвреден. */
+  onExpandProvider: (providerId: string) => void;
   onSave: (alias: ModelAlias, existing: boolean) => Promise<void>;
   onRemove: (aliasId: string) => Promise<void>;
   translator: ScopedTranslator;
 };
 
-/** Черновик формы: кандидаты живут строками, пока человек их правит. */
+/** Черновик формы: пустой кандидат — ещё не выбранная строка, а не ошибка. */
 type Draft = { id: string; name: string; candidates: string[]; existing: boolean };
 
 const emptyDraft = (): Draft => ({ id: "", name: "", candidates: [""], existing: false });
@@ -50,12 +69,39 @@ const draftOf = (alias: ModelAlias): Draft => ({
   existing: true,
 });
 
-export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: AliasEditorProps) {
+export function AliasesView({
+  aliases,
+  problem,
+  providers,
+  models,
+  onExpandProvider,
+  onSave,
+  onRemove,
+  translator,
+}: AliasesViewProps) {
   const { t } = translator;
   const [draft, setDraft] = useState<Draft | undefined>(undefined);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<ModelAlias | undefined>(undefined);
+
+  const editable = !busy && problem === undefined;
+  const createAction = useMemo(
+    () => [
+      {
+        id: "create",
+        label: t("aliases.new"),
+        icon: <AddIcon size="sm" />,
+        tone: "accent" as const,
+        primary: true,
+        disabled: !editable || draft !== undefined,
+        expanded: draft !== undefined,
+        run: () => setDraft(emptyDraft()),
+      },
+    ],
+    [draft, editable, t],
+  );
+  const headerOwnsActions = useShellHeaderActions(createAction);
 
   const run = (change: () => Promise<void>, done: () => void): void => {
     setBusy(true);
@@ -67,21 +113,11 @@ export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: 
   };
 
   return (
-    <section className="providers-detail-rows" aria-label={t("aliases.title")}>
-      <SettingsRow
-        label={t("aliases.title")}
-        description={<Text tone="muted">{t("aliases.hint")}</Text>}
-      >
-        <div className="providers-access">
-          <Button
-            tone="accent"
-            disabled={busy || problem !== undefined || draft !== undefined}
-            onClick={() => setDraft(emptyDraft())}
-          >
-            {t("aliases.new")}
-          </Button>
-        </div>
-      </SettingsRow>
+    <section className="aliases" aria-label={t("aliases.title")}>
+      {/* Вне оболочки шапки нет, и действие обязано остаться на самой странице. */}
+      {headerOwnsActions ? undefined : (
+        <ShellHeaderActions actions={createAction} moreLabel={t("page.actions.more")} />
+      )}
 
       {problem === undefined ? undefined : (
         <Notice tone="warning" title={t("aliases.problem")}>
@@ -94,6 +130,9 @@ export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: 
         <AliasForm
           draft={draft}
           busy={busy}
+          providers={providers}
+          models={models}
+          onExpandProvider={onExpandProvider}
           onChange={setDraft}
           onCancel={() => {
             setDraft(undefined);
@@ -117,21 +156,21 @@ export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: 
         <List>
           {aliases.map((alias) => (
             <ListRow key={alias.id}>
-              <div className="providers-key">
-                <div className="providers-key-facts">
+              <div className="aliases-row">
+                <div className="aliases-facts">
                   <Text>{alias.name}</Text>
-                  <Code>{modelReference("alias", alias.id)}</Code>
+                  <Code>{modelReference(aliasProviderId, alias.id)}</Code>
                   {alias.candidates.map((candidate) => (
                     <Badge key={`${candidate.providerId}/${candidate.modelId}`} tone="neutral">
                       {modelReference(candidate.providerId, candidate.modelId)}
                     </Badge>
                   ))}
                 </div>
-                <div className="providers-key-actions">
-                  <Button disabled={busy} onClick={() => setDraft(draftOf(alias))}>
+                <div className="aliases-actions">
+                  <Button disabled={!editable} onClick={() => setDraft(draftOf(alias))}>
                     {t("aliases.edit")}
                   </Button>
-                  <Button tone="danger" disabled={busy} onClick={() => setRemoving(alias)}>
+                  <Button tone="danger" disabled={!editable} onClick={() => setRemoving(alias)}>
                     {t("aliases.remove")}
                   </Button>
                 </div>
@@ -147,7 +186,7 @@ export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: 
         title={t("aliases.remove.title", { name: removing?.name ?? "" })}
         description={t("aliases.remove.hint")}
         confirmLabel={t("aliases.remove")}
-        cancelLabel={t("providers.user.cancel")}
+        cancelLabel={t("aliases.cancel")}
         destructive
         pending={busy}
         onConfirm={() => {
@@ -168,24 +207,36 @@ export function AliasEditor({ aliases, problem, onSave, onRemove, translator }: 
 type AliasFormProps = {
   draft: Draft;
   busy: boolean;
+  providers: ProviderSummary[] | undefined;
+  models: Record<string, ProviderModelsEntry>;
+  onExpandProvider: (providerId: string) => void;
   onChange: (draft: Draft) => void;
   onCancel: () => void;
   onSubmit: (alias: ModelAlias) => void;
   translator: ScopedTranslator;
 };
 
-function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: AliasFormProps) {
+function AliasForm({
+  draft,
+  busy,
+  providers,
+  models,
+  onExpandProvider,
+  onChange,
+  onCancel,
+  onSubmit,
+  translator,
+}: AliasFormProps) {
   const { t } = translator;
-  const candidates = draft.candidates.map(parseModelReference);
-  // Пустая строка — ещё не заполненный кандидат, а не ошибка: ругаться на неё, пока человек печатает,
-  // значит ругаться раньше времени.
-  const filled = draft.candidates.filter((one) => one.trim() !== "");
-  const parsed = filled.map(parseModelReference);
-  const ready =
-    draft.id.trim() !== "" &&
-    draft.name.trim() !== "" &&
-    parsed.length > 0 &&
-    parsed.every((one) => one !== undefined);
+  const chosen = draft.candidates.filter((candidate) => candidate !== "");
+  const ready = draft.id.trim() !== "" && draft.name.trim() !== "" && chosen.length > 0;
+
+  // Алиас из алиасов запрещён разбором: цикл разорвать нечем (docs/model-routing.md). Поэтому
+  // провайдера `alias` в пикере нет вовсе — кнопка, ведущая в отказ, обещала бы не то.
+  const catalogue = useMemo(
+    () => providers?.filter((provider) => provider.id !== aliasProviderId),
+    [providers],
+  );
 
   const move = (index: number, by: number): void => {
     const next = [...draft.candidates];
@@ -202,7 +253,7 @@ function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: Al
   };
 
   return (
-    <div className="provider-form-rows">
+    <div className="aliases-form">
       <Field label={t("aliases.id")} hint={t("aliases.id.hint")}>
         {() => (
           <Input
@@ -225,25 +276,27 @@ function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: Al
         )}
       </Field>
 
-      <div className="provider-form-section-label">
+      <div className="aliases-form-label">
         <Text>{t("aliases.candidates")}</Text>
         <Text tone="muted">{t("aliases.candidates.hint")}</Text>
       </div>
 
       {draft.candidates.map((candidate, index) => (
-        <div className="providers-key-actions" key={`candidate-${String(index)}`}>
-          <Input
-            value={candidate}
+        <div className="aliases-candidate" key={`candidate-${String(index)}`}>
+          <ModelPicker
+            groups={candidateGroups(catalogue, models, candidate, chosen)}
+            value={candidate === "" ? undefined : candidate}
             onChange={(value) =>
               onChange({
                 ...draft,
                 candidates: draft.candidates.map((one, at) => (at === index ? value : one)),
               })
             }
+            onExpandGroup={onExpandProvider}
+            label={t("aliases.candidate", { number: index + 1 })}
+            placeholder={t("common.choose")}
+            emptyText={t("state.empty")}
             disabled={busy}
-            invalid={candidate.trim() !== "" && candidates[index] === undefined}
-            placeholder="anthropic/claude-opus-4-5"
-            aria-label={t("aliases.candidate", { number: index + 1 })}
           />
           <Button
             disabled={busy || index === 0}
@@ -274,7 +327,7 @@ function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: Al
         </div>
       ))}
 
-      <div className="provider-form-actions">
+      <div className="aliases-form-actions">
         <Button
           disabled={busy}
           onClick={() => onChange({ ...draft, candidates: [...draft.candidates, ""] })}
@@ -283,7 +336,7 @@ function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: Al
         </Button>
       </div>
 
-      <div className="provider-form-actions">
+      <div className="aliases-form-actions">
         <Button
           tone="accent"
           disabled={busy || !ready}
@@ -291,18 +344,44 @@ function AliasForm({ draft, busy, onChange, onCancel, onSubmit, translator }: Al
             onSubmit({
               id: draft.id.trim(),
               name: draft.name.trim(),
-              candidates: parsed.flatMap((one) =>
-                one === undefined ? [] : [{ providerId: one.providerId, modelId: one.modelId }],
-              ),
+              candidates: chosen.flatMap((reference) => {
+                const parsed = parseModelReference(reference);
+
+                return parsed === undefined
+                  ? []
+                  : [{ providerId: parsed.providerId, modelId: parsed.modelId }];
+              }),
             })
           }
         >
           {t("aliases.save")}
         </Button>
         <Button disabled={busy} onClick={onCancel}>
-          {t("providers.user.cancel")}
+          {t("aliases.cancel")}
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Группы пикера для одной строки кандидата. Выбранное в соседних строках выключено: тот же список
+ * дважды алиасу не нужен, и разбор такой алиас всё равно отклоняет (docs/model-routing.md).
+ */
+function candidateGroups(
+  providers: ProviderSummary[] | undefined,
+  models: Record<string, ProviderModelsEntry>,
+  candidate: string,
+  chosen: string[],
+): ModelPickerGroup[] {
+  const taken = new Set(chosen.filter((one) => one !== candidate));
+
+  return modelPickerGroups(providers, models, candidate === "" ? undefined : candidate).map(
+    (group) => ({
+      ...group,
+      options: group.options.map((option) =>
+        taken.has(option.value) ? { ...option, disabled: true } : option,
+      ),
+    }),
   );
 }
