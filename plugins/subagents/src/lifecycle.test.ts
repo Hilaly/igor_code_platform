@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { lastAgentText, launch, notification, reconcile, settled, stop } from "./lifecycle.ts";
+import { lastAgentText, launch, reconcile, settled, stop } from "./lifecycle.ts";
 import { listRecords, readRecord, writeRecord, type SubagentRecord } from "./registry.ts";
 import { agentMessage, installWorld, session, type World } from "./world.test-helper.ts";
 
@@ -51,7 +51,7 @@ describe("lastAgentText", () => {
 });
 
 describe("reconcile", () => {
-  it("finishes a running record whose session went idle and tells an idle parent with a turn", async () => {
+  it("finishes a running record whose session went idle and writes the answer into it", async () => {
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
       session({
@@ -68,36 +68,37 @@ describe("reconcile", () => {
 
     assert.equal(settled?.state, "finished");
     assert.equal(settled?.lastResponse, "all green");
-    assert.equal(settled?.notified, true);
-
-    // Простаивающий родитель зовётся турном: догоняющее сообщение он бы не вычитал вовсе — обе
-    // очереди рантайма читаются только изнутри идущего турна.
-    const told = world.calls.find((call) => call.kind === "session-prompt");
-
-    assert.match(
-      told?.kind === "session-prompt" ? (told.turn.text ?? "") : "",
-      /Subagent s-child \(check the tests\) finished\./u,
-    );
-    assert.match(told?.kind === "session-prompt" ? (told.turn.text ?? "") : "", /all green/u);
+    assert.equal(settled?.finishedAt, now);
   });
 
-  it("tells a working parent with a follow-up message instead of a turn", async () => {
-    world = installWorld([
-      session({ id: "s-parent", phase: "turn" }),
-      session({
-        id: "s-child",
-        phase: "idle",
-        entries: [agentMessage("e1", "all green", answered)],
-      }),
-    ]);
-    await writeRecord(record());
+  it("says nothing to the parent, idle or working", async () => {
+    // Итог лежит в записи, и родитель читает его инструментом. Ни турна, ни догоняющего сообщения
+    // ему никто не заводит — из-за этого он и не может получить второй доклад об одной работе.
+    for (const phase of ["idle", "turn", "queued"] as const) {
+      world?.restore();
+      world = installWorld([
+        session({ id: "s-parent", phase }),
+        session({
+          id: "s-child",
+          phase: "idle",
+          entries: [agentMessage("e1", "all green", answered)],
+        }),
+      ]);
+      await writeRecord(record());
 
-    await reconcile(await listRecords(), now);
+      await reconcile(await listRecords(), now);
 
-    const told = world.calls.find((call) => call.kind === "session-message");
-
-    assert.equal(told?.kind === "session-message" ? told.message.mode : undefined, "follow-up");
-    assert.equal((await readRecord("s-child"))?.notified, true);
+      assert.equal((await readRecord("s-child"))?.state, "finished", phase);
+      assert.deepEqual(
+        world.calls.filter(
+          (call) =>
+            (call.kind === "session-prompt" && call.turn.sessionId === "s-parent") ||
+            (call.kind === "session-message" && call.sessionId === "s-parent"),
+        ),
+        [],
+        phase,
+      );
+    }
   });
 
   it("leaves a starting subagent to the call that is starting it", async () => {
@@ -194,38 +195,9 @@ describe("reconcile", () => {
     );
   });
 
-  it("keeps an undelivered notification and sends it on the next sweep", async () => {
-    // Родитель стоит в очереди за слотом: турна ещё нет, а простоем это уже не считается, — и он
-    // не принимает ни того, ни другого.
-    world = installWorld([
-      session({ id: "s-parent", phase: "queued" }),
-      session({
-        id: "s-child",
-        phase: "idle",
-        entries: [agentMessage("e1", "all green", answered)],
-      }),
-    ]);
-    await writeRecord(record());
-
-    await reconcile(await listRecords(), now);
-
-    const stuck = await readRecord("s-child");
-
-    assert.equal(stuck?.state, "finished");
-    assert.notEqual(stuck?.notified, true);
-
-    const parent = world.sessions.get("s-parent");
-
-    if (parent !== undefined) {
-      parent.phase = "idle";
-    }
-
-    await reconcile(await listRecords(), now);
-
-    assert.equal((await readRecord("s-child"))?.notified, true);
-  });
-
-  it("does not tell the parent twice about one subagent", async () => {
+  it("does not touch a record it has already finished", async () => {
+    // Законченную запись обход обязан пропускать: перечитанная ветка переписала бы уже подведённый
+    // итог, а сессия субагента живёт дальше и может сказать что-то ещё по следующему заданию.
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
       session({
@@ -237,11 +209,14 @@ describe("reconcile", () => {
     await writeRecord(record());
 
     await reconcile(await listRecords(), now);
-    // Родитель после уведомления ушёл в турн; второй обход не обязан ничего досылать.
-    await reconcile(await listRecords(), now);
 
-    assert.equal(world.calls.filter((call) => call.kind === "session-prompt").length, 1);
-    assert.equal(world.calls.filter((call) => call.kind === "session-message").length, 0);
+    const first = await readRecord("s-child");
+    const reads = world.calls.filter((call) => call.kind === "session-branch").length;
+
+    await reconcile(await listRecords(), "2026-08-14T11:00:00.000Z");
+
+    assert.deepEqual(await readRecord("s-child"), first);
+    assert.equal(world.calls.filter((call) => call.kind === "session-branch").length, reads);
   });
 
   it("calls a subagent whose session disappeared failed instead of leaving it running", async () => {
@@ -254,7 +229,6 @@ describe("reconcile", () => {
 
     assert.equal(settled?.state, "failed");
     assert.match(settled?.failure ?? "", /the session of the subagent is gone/u);
-    assert.equal(settled?.notified, true);
   });
 
   it("does not lose a subagent whose parent is gone", async () => {
@@ -271,19 +245,18 @@ describe("reconcile", () => {
 
     const settled = await readRecord("s-child");
 
-    // Звать некого, но работа записана и видна в панели: висеть неотправленным уведомление
-    // не остаётся.
+    // Родителя стёрли — на итоге это не сказывается никак: он лежит в записи и виден в панели,
+    // а спрашивать его больше некому.
     assert.equal(settled?.state, "finished");
     assert.equal(settled?.lastResponse, "all green");
-    assert.equal(settled?.notified, true);
   });
 });
 
 describe("launch", () => {
   it("does not let a stop land in the middle of it", async () => {
     // Остановка руками приходит, пока задание ещё едет до платформы. Не будь запуск в одной очереди
-    // с ней, он дописал бы `running` поверх уже подведённого итога, а родитель узнал бы об одной
-    // работе дважды: от остановки и от обхода, разбуженного тем же прерыванием.
+    // с ней, он дописал бы `running` поверх уже подведённого итога — и запись числилась бы идущей,
+    // уже кончившись.
     world = installWorld([
       session({ id: "s-parent", phase: "idle" }),
       session({ id: "s-child", phase: "idle", hidden: true }),
@@ -298,26 +271,13 @@ describe("launch", () => {
 
     assert.equal(stopped.kind, "stopped");
     assert.equal((await readRecord("s-child"))?.state, "stopped");
-    assert.equal(
+    assert.deepEqual(
       world.calls.filter(
         (call) =>
           (call.kind === "session-prompt" && call.turn.sessionId === "s-parent") ||
           (call.kind === "session-message" && call.sessionId === "s-parent"),
-      ).length,
-      1,
-    );
-  });
-});
-
-describe("notification", () => {
-  it("names the subagent, its label and its verdict", () => {
-    assert.match(
-      notification(record({ state: "stopped", lastResponse: "half" })),
-      /Subagent s-child \(check the tests\) was stopped\./u,
-    );
-    assert.match(
-      notification(record({ state: "failed", failure: "the model is not available" })),
-      /failed\.\n\nthe model is not available/u,
+      ),
+      [],
     );
   });
 });

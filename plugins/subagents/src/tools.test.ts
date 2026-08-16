@@ -50,9 +50,10 @@ describe("subagent-spawn", () => {
 
     assert.equal(outcome.isError, false);
     assert.match(outcome.content, /Started subagent s-new/u);
-    // Отдельно: инструмент говорит модели не ждать. Ожидание внутри вызова упёрлось бы в таймаут
-    // инструмента и держало бы слот турна родителя.
-    assert.match(outcome.content, /do not wait for it/u);
+    // Отдельно: инструмент говорит модели, что доклада не будет и спросить надо самой. Модель,
+    // которой об этом не сказали, ждала бы сообщения, которого не придёт.
+    assert.match(outcome.content, /will not report back/u);
+    assert.match(outcome.content, /subagent-output/u);
 
     const created = here.calls.find((call) => call.kind === "session-create");
 
@@ -134,12 +135,13 @@ describe("subagent-spawn", () => {
 
     assert.equal(settledRecord?.state, "finished");
     assert.equal(settledRecord?.lastResponse, "done before you looked");
-    // Родитель узнал об итоге, хотя шина плагина за это время не сказала ни слова.
-    assert.equal(
-      here.calls.some(
+    // Итог подведён обходом самого запуска, хотя шина плагина за это время не сказала ни слова, —
+    // и при этом родителю не ушло ничего: он прочитает запись сам.
+    assert.deepEqual(
+      here.calls.filter(
         (call) => call.kind === "session-prompt" && call.turn.sessionId === "s-parent",
       ),
-      true,
+      [],
     );
   });
 
@@ -439,12 +441,12 @@ describe("subagent-stop", () => {
     const record = await readRecord("s-new");
 
     assert.equal(record?.state, "stopped");
-    // То, что субагент успел сказать, доходит до родителя: молчать о прерванном значило бы
-    // оставить родителя ждать ответа, которого не будет.
+    // То, что субагент успел сказать, остаётся в записи: терять сказанное прерванным значило бы
+    // прятать работу, за которую заплачено.
     assert.equal(record?.lastResponse, "got this far");
   });
 
-  it("tells the parent once even when a sweep runs on the same interruption", async () => {
+  it("settles an interruption once even when a sweep runs on the same one", async () => {
     const here = await ready();
 
     await here.host.callTool("subagent-spawn", { description: "mine", prompt: "a" }, parent);
@@ -452,23 +454,22 @@ describe("subagent-stop", () => {
     here.calls.length = 0;
 
     // Прерывание возвращает сессию в простой, а платформа объявляет об этом на шине — обход
-    // приходит прямо посреди остановки и тоже считает субагента отработавшим. Очередь жизненного
-    // цикла оставляет от двух докладов один.
+    // приходит прямо посреди остановки и тоже считает субагента отработавшим. Без общей очереди
+    // он подвёл бы итог второй раз и написал бы `finished` поверх `stopped`.
     here.onAbort = () => void sweep();
     here.branchDelayMilliseconds = 5;
 
     await here.host.callTool("subagent-stop", { sessionId: "s-new" }, parent);
     await settled();
 
-    // Считаются оба способа доставки: второй доклад уехал бы догоняющим сообщением, потому что
-    // первый успел увести родителя в турн.
-    assert.equal(
+    assert.equal((await readRecord("s-new"))?.state, "stopped");
+    assert.deepEqual(
       here.calls.filter(
         (call) =>
           (call.kind === "session-prompt" && call.turn.sessionId === "s-parent") ||
           (call.kind === "session-message" && call.sessionId === "s-parent"),
-      ).length,
-      1,
+      ),
+      [],
     );
   });
 
