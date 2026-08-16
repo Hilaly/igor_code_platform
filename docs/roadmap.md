@@ -153,8 +153,9 @@
   ([toolchain.md](toolchain.md), [web-api.md](web-api.md), [data-directory.md](data-directory.md),
   [runtime-checks.md](runtime-checks.md)).
 
-- **Срез 16b — встроенные плагины внутри артефакта.** `starter` и `subagents` едут в нагрузке вместе
-  со своим SDK, собранным сборкой артефакта; распаковка в `builtin/<версия>/` атомарным
+- **Срез 16b — встроенные плагины внутри артефакта.** `starter`, `subagents`, `mission` и
+  skills-only `superpowers` едут в нагрузке вместе со своим SDK, собранным сборкой артефакта;
+  распаковка в `builtin/<версия>/` атомарным
   переименованием по отпечатку нагрузки; корень встроенных плагинов берётся у точки композиции
   ([toolchain.md](toolchain.md), [data-directory.md](data-directory.md),
   [runtime-checks.md](runtime-checks.md)).

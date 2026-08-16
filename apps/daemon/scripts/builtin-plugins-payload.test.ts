@@ -88,6 +88,39 @@ describe("readBuiltinPlugins", () => {
     ]);
   });
 
+  it("ships every resource of a skills-only built-in plugin", async () => {
+    const files = await readBuiltinPlugins(
+      repository({
+        ...plugin("superpowers", { "@sovereign/sdk": "workspace:*" }),
+        ...sdk,
+        "plugins/superpowers/LICENSE": "MIT License\n",
+        "plugins/superpowers/UPSTREAM-ADAPTATION.md": "# Upstream adaptation\n",
+        "plugins/superpowers/skills/using-superpowers/SKILL.md":
+          "---\nname: using-superpowers\ndescription: Use when starting work\n---\n# Using Superpowers\n",
+        "plugins/superpowers/skills/using-superpowers/references/sovereign-tools.md":
+          "# Sovereign tools\n",
+        "plugins/superpowers/skills/brainstorming/scripts/server.cjs": "// bundled helper\n",
+        "plugins/superpowers/tsconfig.json": "{}",
+        "plugins/superpowers/src/worker.test.ts": "// repository-only test\n",
+      }),
+    );
+
+    for (const path of [
+      "superpowers/LICENSE",
+      "superpowers/UPSTREAM-ADAPTATION.md",
+      "superpowers/package.json",
+      "superpowers/src/worker.ts",
+      "superpowers/skills/brainstorming/scripts/server.cjs",
+      "superpowers/skills/using-superpowers/SKILL.md",
+      "superpowers/skills/using-superpowers/references/sovereign-tools.md",
+      "superpowers/node_modules/@sovereign/sdk/package.json",
+    ]) {
+      assert.equal(files.has(path), true, path);
+    }
+    assert.equal(files.has("superpowers/tsconfig.json"), false);
+    assert.equal(files.has("superpowers/src/worker.test.ts"), false);
+  });
+
   it("ships a declared workspace dependency built, inside the folder of the plugin", async () => {
     const files = await readBuiltinPlugins(
       repository({ ...sdk, ...plugin("starter", { "@sovereign/sdk": "workspace:*" }) }),
