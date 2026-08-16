@@ -218,7 +218,7 @@ describe("defaultPluginRoots", () => {
 
     assert.deepEqual(
       discovery.plugins.map((plugin) => plugin.key),
-      ["builtin:starter", "builtin:subagents"],
+      ["builtin:mission", "builtin:starter", "builtin:subagents", "builtin:superpowers"],
     );
     assert.deepEqual(
       discovery.plugins
