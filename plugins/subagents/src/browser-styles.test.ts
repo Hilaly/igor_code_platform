@@ -40,6 +40,14 @@ describe("the style sheet of the subagents panel", () => {
     assert.ok(marked.size > 0);
   });
 
+  /**
+   * Точка состояния — маркер описания, а не самостоятельная строка. Пока описание не умело
+   * сжиматься, оно уезжало на следующую строку переноса и оставляло маркер в одиночестве.
+   */
+  it("lets the description share the line with the status dot that marks it", () => {
+    assert.match(styles, /\.subagents-row-head\s*>\s*:nth-child\(2\)\s*\{[^}]*flex:\s*1 1/s);
+  });
+
   it("takes every colour and measure from the kit instead of naming its own", () => {
     // Цвет и кегль панели принадлежат киту и оболочке, плагин назначает только геометрию
     // (docs/ui-extension-model.md).
