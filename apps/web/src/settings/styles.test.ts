@@ -33,9 +33,8 @@ describe("settings and plugin layout styles", () => {
     expect(styles).toMatch(
       /\.plugins,\s*\.plugin-detail\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;[^}]*container-type:\s*inline-size;/s,
     );
-    expect(styles).toMatch(
-      /\.plugin-detail-header-card\s*\{[^}]*background:\s*var\(--sovereign-panel-surface\);[^}]*border:/s,
-    );
+    // Карточки-шапки над заголовком «Плагин» больше нет: переключатель стоит в самих фактах плагина.
+    expect(styles).not.toMatch(/\.plugin-detail-header-card|\.plugin-detail-back/);
     expect(styles).toMatch(
       /@container\s*\(width\s*<\s*40rem\)[\s\S]*\.plugin-detail-contribution-controls\s*\{[^}]*align-items:\s*flex-start;/s,
     );

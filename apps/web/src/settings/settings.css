@@ -251,6 +251,7 @@
 }
 
 .plugins-row-meta,
+.plugin-detail-state,
 .plugin-detail-contribution-meta,
 .plugin-detail-contribution-controls {
   display: flex;
@@ -283,13 +284,6 @@
   font-weight: var(--sovereign-font-weight-medium);
   letter-spacing: var(--sovereign-letter-spacing-wide);
   text-transform: uppercase;
-}
-
-.plugin-detail-header-card {
-  min-width: 0;
-  padding: var(--sovereign-space-2) var(--sovereign-space-4);
-  background: var(--sovereign-panel-surface);
-  border: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
 .plugin-detail-section {

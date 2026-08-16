@@ -77,18 +77,17 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
     />,
   );
 
-  expect(screen.getByText("example")).toBeTruthy();
+  expect(screen.getByText("data:example")).toBeTruthy();
   expect(screen.getByText("Running")).toBeTruthy();
   expect(screen.getByText("/plugins/example")).toBeTruthy();
   expect(screen.getByText("bad contribution")).toBeTruthy();
   expect(screen.getByText("missing.id")).toBeTruthy();
-  expect(screen.getByRole("group", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Key" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Lifecycle" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Source" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example event" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Example skill" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
   expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
   const contributions = screen.getByRole("region", { name: "Contributions · 2" });
   expect(within(contributions).getAllByRole("listitem")).toHaveLength(2);
@@ -113,6 +112,27 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
   });
   fireEvent.click(screen.getByText("Payload schema"));
   expect(screen.getByText(/"type": "object"/)).toBeTruthy();
+});
+
+/**
+ * Включённость и то, чем она кончилась, — один факт: переключатель стоит в строке жизненного цикла,
+ * а не в отдельной карточке над заголовком раздела.
+ */
+it("keeps the plugin switch in the lifecycle row of the plugin facts", () => {
+  render(
+    <PluginDetailView
+      state={{ snapshot, stale: false }}
+      pluginKey="data:example"
+      onSwitch={vi.fn()}
+      onOpenPage={vi.fn()}
+      translator={translator}
+    />,
+  );
+
+  const lifecycle = screen.getByRole("group", { name: "Lifecycle" });
+
+  expect(within(lifecycle).getByText("Running")).toBeTruthy();
+  expect(within(lifecycle).getByRole("checkbox", { name: "Switched on" })).toBeTruthy();
 });
 
 /**
@@ -256,7 +276,7 @@ it("keeps a failed missing plugin non-authoritative until a later snapshot recov
     />,
   );
 
-  expect(screen.getByRole("region", { name: "example" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Plugin" })).toBeTruthy();
   expect(screen.queryByText("The plugins could not be read: snapshot failed")).toBeNull();
 });
 

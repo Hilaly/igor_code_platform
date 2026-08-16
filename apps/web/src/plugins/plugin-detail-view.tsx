@@ -208,28 +208,33 @@ export function PluginDetailView({
         )}
       </div>
 
-      <section className="plugin-detail-header-card" aria-label={status.id ?? status.key}>
-        <SettingsRow label={status.id ?? status.key} description={<Code>{status.key}</Code>}>
-          <Toggle
-            checked={preferences?.enabled ?? false}
-            disabled={preferences === undefined}
-            onChange={(enabled) =>
-              preferences === undefined
-                ? undefined
-                : onSwitch(status.key, { ...preferences, enabled })
-            }
-            label={t("plugins.toggle.plugin")}
-            labelDisplay="tooltip"
-            {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
-          />
-        </SettingsRow>
-      </section>
-
       <section className="plugin-detail-section" aria-label={t("plugins.detail.plugin")}>
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
         <div className="plugin-detail-rows">
+          {/*
+            Переключатель стоит рядом с состоянием жизненного цикла, а не в своей карточке над
+            заголовком: включённость и то, чем она кончилась, — один факт, и человек читает их вместе.
+            Имя плагина карточка повторяла за заголовком страницы, и без неё оно не теряется.
+          */}
           <SettingsRow label={t("plugins.detail.lifecycle")}>
-            <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+            <div className="plugin-detail-state">
+              <Badge tone={stateTones[status.state]}>{t(`plugins.state.${status.state}`)}</Badge>
+              <Toggle
+                checked={preferences?.enabled ?? false}
+                disabled={preferences === undefined}
+                onChange={(enabled) =>
+                  preferences === undefined
+                    ? undefined
+                    : onSwitch(status.key, { ...preferences, enabled })
+                }
+                label={t("plugins.toggle.plugin")}
+                labelDisplay="tooltip"
+                {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
+              />
+            </div>
+          </SettingsRow>
+          <SettingsRow label={t("plugins.detail.key")}>
+            <Code>{status.key}</Code>
           </SettingsRow>
           <SettingsRow label={t("plugins.detail.source")}>
             <Text>
