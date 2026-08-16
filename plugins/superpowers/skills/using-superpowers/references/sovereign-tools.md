@@ -3,18 +3,18 @@
 Superpowers skills name actions. Translate them to the public Sovereign tools below. Never invent a
 tool because another runtime exposes a similarly named capability.
 
-| Action | Sovereign tool |
-| --- | --- |
-| Read, create, or edit a file | `read`, `write`, or `edit` |
-| Search files or text | `bash` with `rg --files` or `rg` |
-| Run a shell command | `bash` |
-| Start a long command | `bash` with `run_in_background: true` |
-| Inspect or stop a background command | `job-output` or `job-kill` |
-| Track the current session goal and steps | `mission-update` |
-| Discover agent types or models | `subagent-types` or `subagent-models` |
-| Dispatch independent work | `subagent-spawn` |
-| Inspect active or completed subagents | `subagent-list` or `subagent-output` |
-| Coordinate or stop a subagent | `subagent-message` or `subagent-stop` |
+| Action                                   | Sovereign tool                        |
+| ---------------------------------------- | ------------------------------------- |
+| Read, create, or edit a file             | `read`, `write`, or `edit`            |
+| Search files or text                     | `bash` with `rg --files` or `rg`      |
+| Run a shell command                      | `bash`                                |
+| Start a long command                     | `bash` with `run_in_background: true` |
+| Inspect or stop a background command     | `job-output` or `job-kill`            |
+| Track the current session goal and steps | `mission-update`                      |
+| Discover agent types or models           | `subagent-types` or `subagent-models` |
+| Dispatch independent work                | `subagent-spawn`                      |
+| Inspect active or completed subagents    | `subagent-list` or `subagent-output`  |
+| Coordinate or stop a subagent            | `subagent-message` or `subagent-stop` |
 
 ## Mission and durable plans
 

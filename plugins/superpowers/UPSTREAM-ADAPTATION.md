@@ -23,14 +23,14 @@ Sovereign runtime instead of emulating unavailable private APIs.
 
 ## Adaptation map
 
-| Upstream assumption | Sovereign replacement |
-| --- | --- |
-| Runtime-specific skill lookup | Plugin-qualified file resources such as `superpowers.writing-plans` |
-| Task-list or plan update API | Per-session `mission-update` snapshot plus durable Markdown plans |
-| Runtime-specific shell aliases | `bash`, with `job-output` and `job-kill` for background jobs |
-| Runtime-specific file tools | Core `read`, `write`, and `edit` tools |
-| Task/general-purpose agents | Public `subagent-*` tools and discovered agent/model identifiers |
-| Native worktree API | Ownership-aware `git worktree` commands through `bash` |
+| Upstream assumption            | Sovereign replacement                                               |
+| ------------------------------ | ------------------------------------------------------------------- |
+| Runtime-specific skill lookup  | Plugin-qualified file resources such as `superpowers.writing-plans` |
+| Task-list or plan update API   | Per-session `mission-update` snapshot plus durable Markdown plans   |
+| Runtime-specific shell aliases | `bash`, with `job-output` and `job-kill` for background jobs        |
+| Runtime-specific file tools    | Core `read`, `write`, and `edit` tools                              |
+| Task/general-purpose agents    | Public `subagent-*` tools and discovered agent/model identifiers    |
+| Native worktree API            | Ownership-aware `git worktree` commands through `bash`              |
 
 ## Bundled neighboring resources
 

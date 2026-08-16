@@ -65,7 +65,9 @@ describe("the built-in Superpowers plugin", () => {
   });
 
   it("discovers exactly 14 qualified skills without invalid resources", () => {
-    const discovery = discoverPlugins([{ source: "builtin", directory: join(repositoryRoot, "plugins") }]);
+    const discovery = discoverPlugins([
+      { source: "builtin", directory: join(repositoryRoot, "plugins") },
+    ]);
     const plugin = discovery.plugins.find((candidate) => candidate.key === "builtin:superpowers");
 
     assert.ok(plugin, "builtin:superpowers must be discovered");
@@ -79,9 +81,11 @@ describe("the built-in Superpowers plugin", () => {
   });
 
   it("ships required neighboring resources and no symbolic links", () => {
-    const relativeFiles = [join(pluginRoot, "LICENSE"), join(pluginRoot, "UPSTREAM-ADAPTATION.md"), ...walkFiles(skillsRoot)].map(
-      (path) => relative(pluginRoot, path),
-    );
+    const relativeFiles = [
+      join(pluginRoot, "LICENSE"),
+      join(pluginRoot, "UPSTREAM-ADAPTATION.md"),
+      ...walkFiles(skillsRoot),
+    ].map((path) => relative(pluginRoot, path));
     for (const required of [
       "LICENSE",
       "UPSTREAM-ADAPTATION.md",

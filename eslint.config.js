@@ -247,7 +247,17 @@ const colorsComeFromTokensOnly = {
 };
 
 export default tseslint.config(
-  { ignores: ["**/build/**", "**/dist/**", "**/node_modules/**"] },
+  {
+    ignores: [
+      "**/build/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      // Superpowers helpers are shipped skill resources for browser/CommonJS execution, not
+      // workspace modules. Their runtime is documented and tested by the skills that bundle them.
+      "plugins/superpowers/skills/**/scripts/**",
+      "plugins/superpowers/skills/writing-skills/render-graphs.js",
+    ],
+  },
   js.configs.recommended,
   tseslint.configs.recommended,
   appsMustNotImportApps,

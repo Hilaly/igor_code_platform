@@ -20,6 +20,7 @@ Create a per-session Mission with `mission-update` for the plan-writing workflow
 current. The Markdown plan remains the durable source of truth; Mission is its live session summary.
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
+
 - (User preferences for plan location override this default)
 
 ## Scope Check
@@ -49,6 +50,7 @@ independently testable deliverable.
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
+
 - "Write the failing test" - step
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
@@ -86,11 +88,13 @@ include this section.]
 ### Task N: [Component Name]
 
 **Files:**
+
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
 
 **Interfaces:**
+
 - Consumes: [what this task uses from earlier tasks — exact signatures]
 - Produces: [what later tasks rely on — exact function names, parameter
   and return types. A task's implementer sees only their own task; this
@@ -132,6 +136,7 @@ git commit -m "feat: add specific feature"
 ## No Placeholders
 
 Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
+
 - "TBD", "TODO", "implement later", "fill in details"
 - "Add appropriate error handling" / "add validation" / "handle edge cases"
 - "Write tests for the above" (without actual test code)
@@ -164,9 +169,11 @@ After saving the plan, offer execution choice:
 **Which approach?"**
 
 **If Subagent-Driven chosen:**
+
 - **REQUIRED SUB-SKILL:** Use `superpowers.subagent-driven-development`
 - Fresh subagent per task + two-stage review
 
 **If Inline Execution chosen:**
+
 - **REQUIRED SUB-SKILL:** Use `superpowers.executing-plans`
 - Batch execution with checkpoints for review
