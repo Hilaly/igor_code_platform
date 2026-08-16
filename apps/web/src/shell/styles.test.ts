@@ -431,7 +431,9 @@ describe("the style sheets of the application", () => {
     expect(settings).not.toMatch(/\.plugins-row\s*\{/s);
     expect(settings).not.toMatch(/\.plugins-row-controls\s*\{/s);
     expect(settings).not.toMatch(/\.plugin-detail-(?:surface|hero|facts)\s*\{/s);
-    expect(settings).toMatch(/\.plugin-detail-rows[\s,]*\.plugin-detail-contributions\s*\{/s);
+    expect(settings).toMatch(/\.plugins-list[\s,]*\.plugin-detail-contributions\s*\{/s);
+    // Поверхность группы вкладов даёт китовая `Card`: фона, границы и радиуса здесь нет.
+    expect(settings).not.toMatch(/\bbackground:\s*var\(--sovereign-panel-surface\)/s);
     expect(settings).toMatch(/\.plugin-detail-contribution-controls\s*\{[^}]*min-width:\s*0;/s);
   });
 

@@ -17,6 +17,7 @@ import {
 import {
   Badge,
   Button,
+  Card,
   Code,
   CodeBlock,
   Disclosure,
@@ -212,7 +213,7 @@ export function PluginDetailView({
 
       <section className="plugin-detail-section" aria-label={t("plugins.detail.plugin")}>
         <Heading level={3}>{t("plugins.detail.plugin")}</Heading>
-        <div className="plugin-detail-rows">
+        <Card>
           {/*
             Переключатель стоит рядом с состоянием жизненного цикла, а не в своей карточке над
             заголовком: включённость и то, чем она кончилась, — один факт, и человек читает их вместе.
@@ -234,9 +235,6 @@ export function PluginDetailView({
                 {...(preferences === undefined ? { hint: t("plugins.toggle.unavailable") } : {})}
               />
             </div>
-          </SettingsRow>
-          <SettingsRow label={t("plugins.detail.key")}>
-            <Code>{status.key}</Code>
           </SettingsRow>
           <SettingsRow label={t("plugins.detail.source")}>
             <Text>
@@ -260,7 +258,7 @@ export function PluginDetailView({
               <Text>{String(status.attempt)}</Text>
             </SettingsRow>
           )}
-        </div>
+        </Card>
       </section>
 
       {status.reason === undefined && status.contributionProblems === undefined ? undefined : (
@@ -291,14 +289,16 @@ export function PluginDetailView({
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (
           groupsByKind(declared).map(({ kind, entries }) => (
-            <div className="plugin-detail-kind" key={kind}>
-              {/*
-                Вид назван один раз на группу, а не значком в каждой строке: у плагина с десятком
-                инструментов повторённая подпись «инструмент» занимала место и ничего не различала.
-              */}
-              <div className="plugin-detail-kind-label" id={`${groupLabelId}-${kind}`}>
-                {t(`plugins.kind.${kind}`)} · {entries.length}
-              </div>
+            /*
+              Вид назван один раз ярлыком карточки, а не значком в каждой строке: у плагина с десятком
+              инструментов повторённая подпись «инструмент» занимала место и ничего не различала.
+              Своя поверхность у каждой группы — чтобы список вкладов не читался одним сплошным текстом.
+            */
+            <Card
+              key={kind}
+              label={`${t(`plugins.kind.${kind}`)} · ${entries.length}`}
+              labelId={`${groupLabelId}-${kind}`}
+            >
               <div
                 className="plugin-detail-contributions"
                 role="list"
@@ -331,7 +331,7 @@ export function PluginDetailView({
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           ))
         )}
       </section>
@@ -343,47 +343,54 @@ export function PluginDetailView({
             Автоматической записи в левой панели у страницы нет: её кладёт туда сам плагин. Здесь —
             гарантия, что объявленная страница видна и достижима, а не только заявлена.
           */}
-          <div className="plugin-detail-rows" role="list">
-            {pages.map(({ registration, off }) => (
-              <div role="listitem" key={registration.id}>
-                <SettingsRow
-                  label={registration.title}
-                  description={<Code>{pluginPageAddress(registration)}</Code>}
-                >
-                  {off ? (
-                    <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
-                  ) : (
-                    <Button
-                      tone="secondary"
-                      onClick={() => onOpenPage(registration.pluginId, registration.declaredId)}
-                    >
-                      {t("plugins.pages.open")}
-                    </Button>
-                  )}
-                </SettingsRow>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <div role="list">
+              {pages.map(({ registration, off }) => (
+                <div role="listitem" key={registration.id}>
+                  <SettingsRow
+                    label={registration.title}
+                    description={<Code>{pluginPageAddress(registration)}</Code>}
+                  >
+                    {off ? (
+                      <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                    ) : (
+                      <Button
+                        tone="secondary"
+                        onClick={() => onOpenPage(registration.pluginId, registration.declaredId)}
+                      >
+                        {t("plugins.pages.open")}
+                      </Button>
+                    )}
+                  </SettingsRow>
+                </div>
+              ))}
+            </div>
+          </Card>
         </section>
       )}
 
       {claims.length === 0 ? undefined : (
         <section className="plugin-detail-section">
           <Heading level={3}>{t("plugins.places.title")}</Heading>
-          <div className="plugin-detail-rows" role="list">
-            {claims.map(({ registration, outcome, holder }) => (
-              <div role="listitem" key={registration.id}>
-                <SettingsRow
-                  label={registration.placeId}
-                  description={<Code>{registration.id}</Code>}
-                >
-                  <Text tone={claimTones[outcome]}>
-                    {t(`plugins.places.${outcome}`, holder === undefined ? undefined : { holder })}
-                  </Text>
-                </SettingsRow>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <div role="list">
+              {claims.map(({ registration, outcome, holder }) => (
+                <div role="listitem" key={registration.id}>
+                  <SettingsRow
+                    label={registration.placeId}
+                    description={<Code>{registration.id}</Code>}
+                  >
+                    <Text tone={claimTones[outcome]}>
+                      {t(
+                        `plugins.places.${outcome}`,
+                        holder === undefined ? undefined : { holder },
+                      )}
+                    </Text>
+                  </SettingsRow>
+                </div>
+              ))}
+            </div>
+          </Card>
         </section>
       )}
 

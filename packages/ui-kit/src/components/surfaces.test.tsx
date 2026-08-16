@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Card } from "./card.tsx";
 import { Dialog } from "./dialog.tsx";
 import { Notice } from "./notice.tsx";
 import { Tabs } from "./tabs.tsx";
@@ -13,6 +14,25 @@ import { Tooltip } from "./tooltip.tsx";
 afterEach(cleanup);
 
 describe("surface semantics", () => {
+  /** Ярлык карточки называет её содержимое: список внутри ссылается на него `aria-labelledby`. */
+  it("gives the card label the requested id and skips the header without a label", () => {
+    const { rerender } = render(
+      <Card label="Инструменты · 2" labelId="tools-label">
+        <div role="list" aria-labelledby="tools-label" />
+      </Card>,
+    );
+
+    expect(screen.getByRole("list", { name: "Инструменты · 2" })).toBeTruthy();
+
+    rerender(
+      <Card>
+        <div role="list" />
+      </Card>,
+    );
+
+    expect(screen.queryByText("Инструменты · 2")).toBeNull();
+  });
+
   it("keeps notice body contrast at the approved translucent role", () => {
     const source = readFileSync(join(import.meta.dirname, "notice.module.css"), "utf8");
     expect(source).toContain(

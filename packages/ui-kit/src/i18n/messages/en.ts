@@ -452,7 +452,6 @@ export const coreEnglish: CatalogRegistration = {
     "plugins.detail.plugin": "Plugin",
     "plugins.detail.contributions": "Contributions",
     "plugins.detail.lifecycle": "Lifecycle",
-    "plugins.detail.key": "Key",
     "plugins.detail.source": "Source",
     "plugins.detail.path": "Path",
     "plugins.detail.technical": "Technical data",

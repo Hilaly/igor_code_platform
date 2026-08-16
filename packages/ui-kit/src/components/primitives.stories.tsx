@@ -32,6 +32,7 @@ import { List, ListRow } from "./list.tsx";
 import { Menu } from "./menu.tsx";
 import { ModelPicker, type ModelPickerGroup } from "./model-picker.tsx";
 import { Notice } from "./notice.tsx";
+import { Card } from "./card.tsx";
 import { Panel } from "./panel.tsx";
 import { Select } from "./select.tsx";
 import {
@@ -308,6 +309,22 @@ export const Surfaces = () => (
     <Panel>
       <Text>Панель без шапки: у неё нет заголовка, и место под него не занято.</Text>
     </Panel>
+    <Card label="Инструменты · 2">
+      <SettingsRow label="Обновить задачу" description={<Code>mission.update</Code>}>
+        <Toggle checked onChange={() => {}} label="Обновить задачу" labelDisplay="tooltip" />
+      </SettingsRow>
+      <SettingsRow label="Прочитать задачу" description={<Code>mission.read</Code>}>
+        <Toggle
+          checked={false}
+          onChange={() => {}}
+          label="Прочитать задачу"
+          labelDisplay="tooltip"
+        />
+      </SettingsRow>
+    </Card>
+    <Card>
+      <Text>Карточка без ярлыка: шапки у неё нет, и место под неё не занято.</Text>
+    </Card>
     <List>
       <ListRow onSelect={() => {}}>Обычная строка</ListRow>
       <ListRow selected onSelect={() => {}}>

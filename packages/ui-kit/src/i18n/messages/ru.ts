@@ -449,7 +449,6 @@ export const coreRussian: CatalogRegistration = {
     "plugins.detail.plugin": "Плагин",
     "plugins.detail.contributions": "Вклады",
     "plugins.detail.lifecycle": "Жизненный цикл",
-    "plugins.detail.key": "Ключ",
     "plugins.detail.source": "Источник",
     "plugins.detail.path": "Путь",
     "plugins.detail.technical": "Технические данные",

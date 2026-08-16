@@ -77,13 +77,11 @@ it("shows plugin facts, controls each contribution, and exposes technical data",
     />,
   );
 
-  expect(screen.getByText("data:example")).toBeTruthy();
   expect(screen.getByText("Running")).toBeTruthy();
   // Короткий путь показан целиком, а подсказка повторяет его полностью.
   expect(screen.getAllByText("/plugins/example")).toHaveLength(2);
   expect(screen.getByText("bad contribution")).toBeTruthy();
   expect(screen.getByText("missing.id")).toBeTruthy();
-  expect(screen.getByRole("group", { name: "Key" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Lifecycle" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Source" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Path" })).toBeTruthy();
@@ -214,9 +212,12 @@ it("splits contributions into a section per kind, interface first", () => {
   );
 
   const contributions = screen.getByRole("region", { name: "Contributions · 5" });
-  const labels = [...contributions.querySelectorAll(".plugin-detail-kind-label")].map(
-    (label) => label.textContent,
-  );
+  // Имя списку даёт ярлык его карточки: видимый текст, а не второй, невидимый.
+  const labels = within(contributions)
+    .getAllByRole("list")
+    .map(
+      (list) => document.getElementById(list.getAttribute("aria-labelledby") ?? "")?.textContent,
+    );
 
   expect(labels).toEqual(["Pages · 1", "Tools · 2", "Skills · 1", "Events · 1"]);
 
