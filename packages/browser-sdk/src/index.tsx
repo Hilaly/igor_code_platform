@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 
 import {
   useCommandCatalog,
@@ -12,6 +12,8 @@ import { settingsSections, type CoreDestination, type SettingsSection } from "./
 import { usePageNavigation, type PageNavigateOptions, type PageNavigation } from "./page.tsx";
 import type { PlaceContext, PlaceProps } from "./runtime-context.tsx";
 import { PluginPlaceTabs } from "./tabs.tsx";
+import { BrowserRuntimeContext } from "./runtime-context.tsx";
+export type { BrowserEvent, BrowserEventBridge, BrowserEventListener } from "./runtime-context.tsx";
 
 export type {
   Command,
@@ -26,6 +28,16 @@ export type {
 };
 
 export { settingsSections, useCommandCatalog, useCommands, usePageNavigation };
+
+export function useSovereignEvents() {
+  const runtime = useContext(BrowserRuntimeContext);
+
+  if (runtime === undefined) {
+    throw new Error("useSovereignEvents must be used inside BrowserRuntimeProvider");
+  }
+
+  return runtime.events;
+}
 
 export function Place(props: PlaceProps): ReactNode {
   return <PluginPlace {...props} />;

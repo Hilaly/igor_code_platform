@@ -47,6 +47,7 @@ function view(state: PluginPageState, onNavigateCore = vi.fn()) {
       contributions={[registration]}
       plugins={[placed]}
       onDiagnostic={() => {}}
+      events={{ subscribe: () => () => {} }}
     >
       <PluginPageView
         page={{ kind: "plugin", pluginId: "placed", pageId: "log", rest: "" }}

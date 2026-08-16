@@ -110,6 +110,7 @@ function host(
         contributions={[log]}
         plugins={[placed]}
         onDiagnostic={() => {}}
+        events={{ subscribe: () => () => {} }}
         createCache={() => cache({})}
         cache={cache({ "data:placed": { LogPage: () => page } })}
       >
@@ -222,6 +223,7 @@ describe("usePageNavigation", () => {
         contributions={[log]}
         plugins={[placed]}
         onDiagnostic={(text) => complaints.push(text)}
+        events={{ subscribe: () => () => {} }}
         createCache={() => cache({})}
         cache={cache({ "data:placed": { LogPage: Broken } })}
       >
@@ -253,6 +255,7 @@ describe("HostPluginPage", () => {
         contributions={[log]}
         plugins={[{ ...placed, state: "building", browser: undefined }]}
         onDiagnostic={() => {}}
+        events={{ subscribe: () => () => {} }}
         createCache={() => cache({})}
       >
         <HostPluginPage
@@ -290,6 +293,7 @@ describe("HostPluginPage", () => {
         contributions={[log]}
         plugins={[{ ...placed, browser: { revision, entry: `/assets/placed-${revision}.js` } }]}
         onDiagnostic={(text) => mounted.push(text)}
+        events={{ subscribe: () => () => {} }}
         createCache={() => modules}
         cache={modules}
       >

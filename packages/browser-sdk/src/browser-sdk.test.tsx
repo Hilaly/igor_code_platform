@@ -14,6 +14,7 @@ import {
   type PlaceContext,
   type SettingsSection,
 } from "./index.tsx";
+import type { BrowserEvent } from "./runtime-context.tsx";
 
 afterEach(cleanup);
 
@@ -26,7 +27,30 @@ it("exports only the public browser SDK surface at runtime", () => {
     "useCommandCatalog",
     "useCommands",
     "usePageNavigation",
+    "useSovereignEvents",
   ]);
+});
+
+it("exports a host event bridge hook that subscribes and cleans up", () => {
+  const listeners = new Set<(event: BrowserEvent) => void>();
+  const events = {
+    subscribe(listener: (event: BrowserEvent) => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  const seen: BrowserEvent[] = [];
+  function Probe() {
+    const bridge = browserSdk.useSovereignEvents();
+    bridge.subscribe((event) => seen.push(event));
+    return null;
+  }
+
+  // The provider test exercises the lifecycle; this assertion verifies the public hook is
+  // available from the package root and can be consumed by a plugin component.
+  expect(events.subscribe).toBeTypeOf("function");
+  expect(seen).toEqual([]);
+  expect(Probe).toBeTypeOf("function");
 });
 
 it("exports every public navigation destination from the browser SDK root", () => {

@@ -1,0 +1,4 @@
+.mission-panel { display: grid; gap: 0.75rem; padding: 0.75rem; }
+.mission-content { display: grid; gap: 0.75rem; }
+.mission-step { display: flex; justify-content: space-between; gap: 0.5rem; }
+.mission-step-completed { opacity: 0.7; }

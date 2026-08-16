@@ -7,5 +7,11 @@ export const activate: PluginModule["activate"] = async () => {
   await contribute.event(changed);
   await contributeTools();
   await contributeRoutes();
+  await contribute.component({
+    id: "panel",
+    title: "Mission",
+    placeId: "core.panel.tabs",
+    export: "MissionPanel",
+  });
   await log.info("the mission plugin is active");
 };

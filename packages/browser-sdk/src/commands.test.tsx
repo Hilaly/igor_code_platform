@@ -144,6 +144,7 @@ function provider(
       contributions={options.contributions ?? [command()]}
       plugins={options.plugins ?? [placed]}
       onDiagnostic={options.onDiagnostic ?? (() => {})}
+      events={{ subscribe: () => () => {} }}
       createCache={() => readyCache({})}
       cache={options.cache}
     >

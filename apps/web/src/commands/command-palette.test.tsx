@@ -77,6 +77,7 @@ function palette(
       contributions={options.contributions ?? []}
       plugins={[placed]}
       onDiagnostic={options.onDiagnostic ?? (() => {})}
+      events={{ subscribe: () => () => {} }}
       cache={{
         load: (status) => {
           asked.push(status.key);

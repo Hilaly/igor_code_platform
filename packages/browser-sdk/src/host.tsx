@@ -24,6 +24,7 @@ import { boundaryKey, InstanceBoundary } from "./instance-boundary.tsx";
 import {
   BrowserRuntimeContext,
   type BrowserRuntime,
+  type BrowserEventBridge,
   type PlaceContext,
   type PlaceProps,
 } from "./runtime-context.tsx";
@@ -53,6 +54,7 @@ export type BrowserRuntimeProviderProps = {
   contributions: readonly ContributionRegistration[];
   plugins: readonly PluginStatus[];
   onDiagnostic(text: string): void;
+  events: BrowserEventBridge;
   createCache(): PluginModuleCache;
   cache?: PluginModuleCache;
   children: ReactNode;
@@ -80,6 +82,7 @@ export function BrowserRuntimeProvider({
   contributions,
   plugins,
   onDiagnostic,
+  events,
   createCache,
   cache,
   children,
@@ -120,8 +123,8 @@ export function BrowserRuntimeProvider({
   }, [owned]);
 
   const runtime = useMemo<BrowserRuntime>(
-    () => ({ contributions, plugins, cache: owned, onDiagnostic }),
-    [contributions, plugins, owned, onDiagnostic],
+    () => ({ contributions, plugins, cache: owned, onDiagnostic, events }),
+    [contributions, plugins, owned, onDiagnostic, events],
   );
 
   return <BrowserRuntimeContext value={runtime}>{children}</BrowserRuntimeContext>;

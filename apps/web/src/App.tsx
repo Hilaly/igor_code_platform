@@ -643,6 +643,7 @@ export function App() {
       contributions={placeContributions}
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
+      events={bus}
     >
       <ShellWithPlaceTabs
         tabsContext={pageContext}
