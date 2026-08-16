@@ -30,6 +30,12 @@ readonly-подписку через `useSovereignEvents()` из публичн�
 import { useEffect } from "react";
 import { useSovereignEvents, type PlaceContext } from "@sovereign/browser-sdk";
 
+function isBoardChangedPayload(value: unknown): value is { sessionId: string; revision: number } {
+  if (typeof value !== "object" || value === null) return false;
+  const payload = value as Record<string, unknown>;
+  return typeof payload.sessionId === "string" && typeof payload.revision === "number";
+}
+
 export function SessionBoard({ context }: { context: PlaceContext }) {
   const events = useSovereignEvents();
 
@@ -44,7 +50,7 @@ export function SessionBoard({ context }: { context: PlaceContext }) {
         reload();
         return;
       }
-      if (event.type !== "board.changed") return;
+      if (event.type !== "board.changed" || !isBoardChangedPayload(event.payload)) return;
       if (event.payload.sessionId !== sessionId) return;
       // Raise the required revision to event.payload.revision before re-fetching.
       reload();
