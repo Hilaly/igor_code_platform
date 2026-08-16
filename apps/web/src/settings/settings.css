@@ -266,6 +266,25 @@
   font-size: var(--sovereign-font-size-xs);
 }
 
+.plugin-detail-kind {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/**
+ * Подпись вида — ярлык раздела списка, а не заголовок: третий уровень заголовков странице не положен
+ * (docs/ui-kit.md), и в кегле секции ярлыки читались бы наравне с самими вкладами.
+ */
+.plugin-detail-kind-label {
+  padding-block: var(--sovereign-space-2) var(--sovereign-space-1);
+  color: var(--sovereign-text-subtle);
+  font-size: var(--sovereign-font-size-xs);
+  font-weight: var(--sovereign-font-weight-medium);
+  letter-spacing: var(--sovereign-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
 .plugin-detail-back {
   display: flex;
   align-items: center;

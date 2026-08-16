@@ -1,8 +1,11 @@
+import { useId } from "react";
+
 import {
   corePlace,
   projectOfContribution,
   resolvePlaceProvider,
   type PlacedContributionRegistration,
+  type ContributionKind,
   type ContributionRegistration,
   type PlaceCardinality,
   type PluginLifecycleState,
@@ -57,6 +60,33 @@ const stateTones: Record<PluginLifecycleState, BadgeTone> = {
 type ContributionEntry = { registration: ContributionRegistration; off: boolean };
 
 /**
+ * Порядок разделов списка вкладов: сперва то, что человек видит в интерфейсе, затем то, что плагин
+ * даёт агенту, и последней — внутренняя механика, до которой доходят реже всего. Внутри вида порядок
+ * прежний, по идентификатору.
+ *
+ * `Record<ContributionKind, number>` не даёт забыть новый вид: без записи здесь сборка падает, а не
+ * теряет вклад из списка молча.
+ */
+const kindOrder = {
+  page: 0,
+  component: 1,
+  command: 2,
+  place: 3,
+  "color-scheme": 4,
+  "locale-catalog": 5,
+  tool: 6,
+  agent: 7,
+  skill: 8,
+  hook: 9,
+  event: 10,
+  route: 11,
+  "public-route": 12,
+  custom: 13,
+} satisfies Record<ContributionKind, number>;
+
+type ContributionGroup = { kind: ContributionKind; entries: ContributionEntry[] };
+
+/**
  * Чем кончилась заявка компонента на место. Человек, поставивший плагин ради замены вью, обязан
  * увидеть, применён вклад или нет, а если нет — по какой причине: молчаливый отказ выглядит как
  * сломанный плагин.
@@ -99,6 +129,9 @@ export function PluginDetailView({
   translator,
 }: PluginDetailViewProps) {
   const { t } = translator;
+  // Подпись группы называет её список: имя раздела в дереве доступности берётся из видимого текста,
+  // а не дублируется вторым, невидимым.
+  const groupLabelId = useId();
   const snapshot = state.snapshot;
 
   if (snapshot === undefined) {
@@ -249,35 +282,49 @@ export function PluginDetailView({
         {declared.length === 0 ? (
           <Text tone="muted">{t("plugins.contributions.none")}</Text>
         ) : (
-          <div className="plugin-detail-contributions" role="list">
-            {declared.map(({ registration, off }) => (
-              <div role="listitem" key={registration.id}>
-                <SettingsRow
-                  label={registration.title ?? registration.declaredId}
-                  description={
-                    <div className="plugin-detail-contribution-meta">
-                      <Badge tone="neutral">{t(`plugins.kind.${registration.kind}`)}</Badge>
-                      <Code>{registration.id}</Code>
-                      {off ? (
-                        <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
-                      ) : undefined}
-                    </div>
-                  }
-                >
-                  <div className="plugin-detail-contribution-controls">
-                    <TechnicalData registration={registration} translator={translator} />
-                    <Toggle
-                      checked={!off}
-                      disabled={preferences === undefined}
-                      onChange={(on) => switchContribution(registration.id, on)}
-                      label={registration.title ?? registration.declaredId}
-                      labelDisplay="tooltip"
-                    />
-                  </div>
-                </SettingsRow>
+          groupsByKind(declared).map(({ kind, entries }) => (
+            <div className="plugin-detail-kind" key={kind}>
+              {/*
+                Вид назван один раз на группу, а не значком в каждой строке: у плагина с десятком
+                инструментов повторённая подпись «инструмент» занимала место и ничего не различала.
+              */}
+              <div className="plugin-detail-kind-label" id={`${groupLabelId}-${kind}`}>
+                {t(`plugins.kind.${kind}`)} · {entries.length}
               </div>
-            ))}
-          </div>
+              <div
+                className="plugin-detail-contributions"
+                role="list"
+                aria-labelledby={`${groupLabelId}-${kind}`}
+              >
+                {entries.map(({ registration, off }) => (
+                  <div role="listitem" key={registration.id}>
+                    <SettingsRow
+                      label={registration.title ?? registration.declaredId}
+                      description={
+                        <div className="plugin-detail-contribution-meta">
+                          <Code>{registration.id}</Code>
+                          {off ? (
+                            <Text tone="warning">{t("plugins.contribution.switchedOff")}</Text>
+                          ) : undefined}
+                        </div>
+                      }
+                    >
+                      <div className="plugin-detail-contribution-controls">
+                        <TechnicalData registration={registration} translator={translator} />
+                        <Toggle
+                          checked={!off}
+                          disabled={preferences === undefined}
+                          onChange={(on) => switchContribution(registration.id, on)}
+                          label={registration.title ?? registration.declaredId}
+                          labelDisplay="tooltip"
+                        />
+                      </div>
+                    </SettingsRow>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </section>
 
@@ -423,6 +470,21 @@ function placeClaims(
         ? { registration, outcome: "taken" }
         : { registration, outcome: "overridden", holder: resolution.contribution.id };
     });
+}
+
+/**
+ * Вклады по видам. Пустой группы не бывает: раздел «Маршруты · 0» сказал бы, что плагин их приносит,
+ * а он не приносит.
+ */
+function groupsByKind(declared: ContributionEntry[]): ContributionGroup[] {
+  const kinds = [...new Set(declared.map((entry) => entry.registration.kind))].sort(
+    (left, right) => kindOrder[left] - kindOrder[right],
+  );
+
+  return kinds.map((kind) => ({
+    kind,
+    entries: declared.filter((entry) => entry.registration.kind === kind),
+  }));
 }
 
 function contributionsFor(snapshot: PluginsSnapshot, status: PluginStatus): ContributionEntry[] {
