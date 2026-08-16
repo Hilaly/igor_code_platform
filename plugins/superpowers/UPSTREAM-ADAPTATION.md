@@ -32,5 +32,24 @@ Sovereign runtime instead of emulating unavailable private APIs.
 | Task/general-purpose agents | Public `subagent-*` tools and discovered agent/model identifiers |
 | Native worktree API | Ownership-aware `git worktree` commands through `bash` |
 
-The final port audit records intentional removals and every bundled neighboring resource after the
-skill trees are adapted.
+## Bundled neighboring resources
+
+The port keeps each upstream neighbor used by the 14 skills, including the brainstorming visual
+companion, review prompt templates, Subagent-Driven Development helper scripts, systematic debugging
+references and pressure scenarios, TDD test guidance, and writing-skills references/examples. The
+resources are copied as regular files; the built-in payload contains no symlinks.
+
+## Intentional removals and fallbacks
+
+- `codex-tools.md`, `pi-tools.md`, `gemini-tools.md`, and `antigravity-tools.md` are replaced by the
+  single `skills/using-superpowers/references/sovereign-tools.md` reference.
+- Runtime-specific Task/general-purpose dispatch is replaced by discovered agent/model IDs and
+  `subagent-spawn`, `subagent-list`, `subagent-output`, `subagent-message`, and `subagent-stop`.
+- Runtime-specific todo or plan APIs are not emulated. `mission-update` holds the current per-session
+  snapshot; Markdown plans and ledgers remain durable repository state.
+- No native worktree API is promised. Worktree workflows use ownership-aware `git worktree` commands
+  through `bash` and never remove a worktree merely because its path looks conventional.
+- The visual companion remains optional and bundled. Its scripts run through `bash`; foreground jobs
+  use `run_in_background: true`, `job-output`, and `job-kill` when detached processes cannot survive.
+
+The plugin adds no tools, routes, storage, browser code, or UI contributions of its own.

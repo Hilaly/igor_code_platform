@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { parseSkillFile } from "./file-resource-parser.ts";
+import { discoverPlugins } from "./plugin-sources.ts";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const pluginRoot = join(repositoryRoot, "plugins/superpowers");
@@ -62,10 +63,72 @@ describe("the built-in Superpowers plugin", () => {
       }
     }
   });
+
+  it("discovers exactly 14 qualified skills without invalid resources", () => {
+    const discovery = discoverPlugins([{ source: "builtin", directory: join(repositoryRoot, "plugins") }]);
+    const plugin = discovery.plugins.find((candidate) => candidate.key === "builtin:superpowers");
+
+    assert.ok(plugin, "builtin:superpowers must be discovered");
+    assert.deepEqual(plugin.fileResources.invalid, []);
+    assert.deepEqual(
+      plugin.fileResources.definitions
+        .map((definition) => `${plugin.id}.${definition.name}`)
+        .sort(),
+      expectedSkills.map((name) => `superpowers.${name}`).sort(),
+    );
+  });
+
+  it("ships required neighboring resources and no symbolic links", () => {
+    const relativeFiles = [join(pluginRoot, "LICENSE"), join(pluginRoot, "UPSTREAM-ADAPTATION.md"), ...walkFiles(skillsRoot)].map(
+      (path) => relative(pluginRoot, path),
+    );
+    for (const required of [
+      "LICENSE",
+      "UPSTREAM-ADAPTATION.md",
+      "skills/brainstorming/visual-companion.md",
+      "skills/brainstorming/scripts/server.cjs",
+      "skills/requesting-code-review/code-reviewer.md",
+      "skills/subagent-driven-development/implementer-prompt.md",
+      "skills/subagent-driven-development/scripts/review-package",
+      "skills/systematic-debugging/root-cause-tracing.md",
+      "skills/test-driven-development/writing-good-tests.md",
+      "skills/using-superpowers/references/sovereign-tools.md",
+      "skills/writing-plans/plan-document-reviewer-prompt.md",
+      "skills/writing-skills/testing-skills-with-subagents.md",
+    ]) {
+      assert.ok(relativeFiles.includes(required), required);
+    }
+  });
+
+  it("does not instruct agents to call unsupported runtime tools", () => {
+    const liveInstructions = walkFiles(skillsRoot)
+      .filter((path) =>
+        /(?:SKILL\.md|prompt\.md|visual-companion\.md|sovereign-tools\.md)$/u.test(path),
+      )
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
+
+    assert.doesNotMatch(
+      liveInstructions,
+      /\b(?:TodoWrite|update_plan|TaskCreate|TaskUpdate|TaskList|AskUserQuestion|invoke_agent|invoke_subagent|EnterWorktree|WorktreeCreate)\b/u,
+    );
+    assert.doesNotMatch(liveInstructions, /Subagent \(general-purpose\)/u);
+    assert.doesNotMatch(liveInstructions, /superpowers:[a-z0-9-]+/u);
+    assert.match(liveInstructions, /\bmission-update\b/u);
+    assert.match(liveInstructions, /\bsubagent-spawn\b/u);
+  });
 });
 
 function markdownLinks(markdown: string): string[] {
   return [...markdown.matchAll(/\[[^\]]+\]\(([^)]+)\)/gu)]
     .map((match) => match[1]?.trim())
     .filter((link): link is string => link !== undefined && link !== "");
+}
+
+function walkFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    assert.equal(lstatSync(path).isSymbolicLink(), false, `${path} must not be a symbolic link`);
+    return entry.isDirectory() ? walkFiles(path) : entry.isFile() ? [path] : [];
+  });
 }
