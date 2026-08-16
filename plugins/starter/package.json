@@ -5,26 +5,17 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test \"src/**/*.test.ts\" && vitest run"
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@sovereign/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@sovereign/browser-sdk": "workspace:*",
-    "@sovereign/ui-kit": "workspace:*",
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.0.0",
-    "eslint": "^9.0.0",
-    "jsdom": "^30.0.0",
-    "react": "^19.0.0",
-    "vite": "^7.0.0",
-    "vitest": "^4.1.10"
+    "eslint": "^9.0.0"
   },
   "sovereign": {
     "id": "starter",
     "worker": "src/worker.ts",
-    "browser": "src/browser.tsx",
     "platform": "^0.1.0"
   }
 }

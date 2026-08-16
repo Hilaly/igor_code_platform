@@ -1,11 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es2023", "dom", "dom.iterable"],
-    "jsx": "react-jsx",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "types": ["vite/client", "node"]
+    "lib": ["es2023"],
+    // Типы Node нужны тестам плагина; сам воркер ни на что из Node не опирается.
+    "types": ["node"]
   },
   "include": ["src"]
 }
