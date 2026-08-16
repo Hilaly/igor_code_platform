@@ -269,8 +269,9 @@ describe("App shell composition", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show the side panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Board" }));
 
+    // Открытая панель всегда показывает вкладку: щёлкать по единственной, чтобы её увидеть, незачем.
+    expect(screen.getByRole("radio", { name: "Board" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("доска")).toBeDefined();
   });
 

@@ -48,6 +48,7 @@ function view(state: PluginPageState, onNavigateCore = vi.fn()) {
       plugins={[placed]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
     >
       <PluginPageView
         page={{ kind: "plugin", pluginId: "placed", pageId: "log", rest: "" }}

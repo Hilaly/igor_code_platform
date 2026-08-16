@@ -12,6 +12,7 @@ import { Tabs } from "@sovereign/ui-kit";
 import { useContext, useState, type ReactNode } from "react";
 
 import { PlaceInstance } from "./host.tsx";
+import { useContributionTitle } from "./i18n.ts";
 import { BrowserRuntimeContext, type PlaceProps } from "./runtime-context.tsx";
 
 /**
@@ -33,6 +34,7 @@ export type HostPlaceTab = {
  */
 export function useHostPlaceTabs({ id, context }: PlaceProps): HostPlaceTab[] {
   const runtime = useContext(BrowserRuntimeContext);
+  const titleOf = useContributionTitle();
 
   if (runtime === undefined) {
     return [];
@@ -49,7 +51,7 @@ export function useHostPlaceTabs({ id, context }: PlaceProps): HostPlaceTab[] {
         id: registration.id,
         // Заголовок необязателен у объявления: реестр не знает кардинальности места, потому что
         // место вправе ещё не существовать. Запасной вариант детерминирован и жалобы не требует.
-        label: registration.title ?? registration.declaredId,
+        label: titleOf(registration),
         content: (
           <PlaceInstance
             reference={{
@@ -76,6 +78,7 @@ export function PluginPlaceTabs({ id, context }: PlaceProps): ReactNode {
   const declaration =
     runtime === undefined ? undefined : resolvePlaceDeclaration(id, runtime.contributions, context);
   const tabs = useHostPlaceTabs({ id, context });
+  const titleOf = useContributionTitle();
   const [chosen, setChosen] = useState<string | undefined>(undefined);
 
   if (declaration?.cardinality !== "tabs" || tabs.length === 0) {
@@ -87,11 +90,6 @@ export function PluginPlaceTabs({ id, context }: PlaceProps): ReactNode {
   const open = tabs.find((tab) => tab.id === chosen) ?? tabs[0];
 
   return open === undefined ? null : (
-    <Tabs
-      tabs={tabs}
-      value={open.id}
-      onChange={setChosen}
-      label={declaration.title ?? declaration.declaredId}
-    />
+    <Tabs tabs={tabs} value={open.id} onChange={setChosen} label={titleOf(declaration)} />
   );
 }

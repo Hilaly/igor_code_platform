@@ -252,6 +252,10 @@ describe("stylesheets of the kit", () => {
     );
     expect(timerCss).toMatch(/\.digits\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/s);
     expect(timerCss).not.toMatch(/(?:background|border|box-shadow)\s*:/);
+    // Компактный размер садится в кегль плотной строки, а не остаётся табло среди текста.
+    expect(timerCss).toMatch(
+      /\.sm\s+\.digits,\s*\n?\s*\.sm\s+\.separator\s*\{[^}]*font-size:\s*var\(--sovereign-font-size-sm\);/s,
+    );
   });
 
   it("defines the animated switch track, thumb, sizes, and motion fallback", () => {

@@ -30,6 +30,7 @@ import {
 } from "./runtime-context.tsx";
 
 export { useHostCommandCatalog, type HostCommandCatalogEntry } from "./commands.tsx";
+export { contributionTitle, pluginCatalogs } from "./i18n.ts";
 export { isSettingsSection } from "./navigation.ts";
 export { normalizePagePath } from "./page-path.ts";
 export { HostPluginPage, type HostPageNavigation, type HostPluginPageProps } from "./page.tsx";
@@ -55,6 +56,11 @@ export type BrowserRuntimeProviderProps = {
   plugins: readonly PluginStatus[];
   onDiagnostic(text: string): void;
   events: BrowserEventBridge;
+  /**
+   * Язык окна. Обязателен, а не с умолчанием: язык знает хост, и молчаливое умолчание превратило бы
+   * забытый проп в английские панели у человека, выбравшего другой язык.
+   */
+  locale: string;
   createCache(): PluginModuleCache;
   cache?: PluginModuleCache;
   children: ReactNode;
@@ -83,6 +89,7 @@ export function BrowserRuntimeProvider({
   plugins,
   onDiagnostic,
   events,
+  locale,
   createCache,
   cache,
   children,
@@ -123,8 +130,8 @@ export function BrowserRuntimeProvider({
   }, [owned]);
 
   const runtime = useMemo<BrowserRuntime>(
-    () => ({ contributions, plugins, cache: owned, onDiagnostic, events }),
-    [contributions, plugins, owned, onDiagnostic, events],
+    () => ({ contributions, plugins, cache: owned, onDiagnostic, events, locale }),
+    [contributions, plugins, owned, onDiagnostic, events, locale],
   );
 
   return <BrowserRuntimeContext value={runtime}>{children}</BrowserRuntimeContext>;

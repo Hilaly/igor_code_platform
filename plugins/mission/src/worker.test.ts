@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe("mission worker", () => {
-  it("declares the changed event, tool, and protected snapshot route", async () => {
+  it("declares the changed event, tool, protected snapshot route, and both catalogs", async () => {
     host = installTestHost({ id: "mission", source: "builtin" });
     const { activate } = await import("./worker.ts");
 
@@ -23,6 +23,10 @@ describe("mission worker", () => {
         ["event", "changed"],
         ["tool", "mission-update"],
         ["route", "snapshot"],
+        // Каталоги объявляет воркер, а строит из них переводчик браузерная половина: строки живут
+        // одним модулем на обе, иначе расхождение поймал бы только читающий панель человек.
+        ["locale-catalog", "messages-en"],
+        ["locale-catalog", "messages-ru"],
         ["component", "panel"],
       ],
     );

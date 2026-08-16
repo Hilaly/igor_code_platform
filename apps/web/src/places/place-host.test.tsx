@@ -49,6 +49,7 @@ it("lets a plugin replace Usage Analytics and falls back to its built-in view", 
       plugins={[plugin("usage-r1")]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={cache}
     >
       <HostPlace id="core.settings.usage" context={{}} builtIn={<p>built-in usage</p>} />
@@ -67,6 +68,7 @@ it("lets a plugin replace Usage Analytics and falls back to its built-in view", 
       plugins={[plugin("usage-r1")]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={cache}
     >
       <HostPlace id="core.settings.usage" context={{}} builtIn={<p>built-in usage</p>} />
@@ -99,6 +101,7 @@ it("removes a real plugin stylesheet when the SDK adapter provider unmounts", as
       plugins={[plugin("r1")]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={cache}
     >
       <HostPlace id="core.settings.plugins" context={context} builtIn={<p>built-in</p>} />
@@ -126,6 +129,7 @@ it("isolates a late callback from an old adapter mount", async () => {
       plugins={[plugin("r1")]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={oldCache}
     >
       <HostPlace id="core.settings.plugins" context={context} builtIn={<p>built-in</p>} />
@@ -144,6 +148,7 @@ it("isolates a late callback from an old adapter mount", async () => {
       plugins={[plugin("r2")]}
       onDiagnostic={() => {}}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={newCache}
     >
       <HostPlace id="core.settings.plugins" context={context} builtIn={<p>built-in</p>} />

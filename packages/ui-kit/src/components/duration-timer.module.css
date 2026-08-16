@@ -29,6 +29,21 @@
   line-height: var(--sovereign-line-height-tight);
 }
 
+/*
+ * Компактный размер: та же длительность строкой текста. Разряды садятся в общий кегль плотной
+ * строки, вес остаётся обычным — жирные цифры в списке спорили бы с его содержанием, — а подписи
+ * единиц не рисуются вовсе: полное значение остаётся доступным именем группы.
+ */
+.sm .digits,
+.sm .separator {
+  font-size: var(--sovereign-font-size-sm);
+  font-weight: var(--sovereign-font-weight-regular);
+}
+
+.sm .visual {
+  gap: 0;
+}
+
 .label {
   color: var(--sovereign-text-muted);
   font-size: var(--sovereign-font-size-xs);

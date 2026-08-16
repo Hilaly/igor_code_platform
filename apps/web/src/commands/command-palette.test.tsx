@@ -78,6 +78,7 @@ function palette(
       plugins={[placed]}
       onDiagnostic={options.onDiagnostic ?? (() => {})}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       cache={{
         load: (status) => {
           asked.push(status.key);

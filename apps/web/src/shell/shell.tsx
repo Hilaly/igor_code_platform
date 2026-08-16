@@ -10,6 +10,7 @@ import {
   PanelLeftOpenIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
+  SegmentedControl,
   ViewHeader,
 } from "@sovereign/ui-kit";
 import { useEffect, useState, type ReactNode } from "react";
@@ -39,6 +40,8 @@ export type ShellProps = {
   labels: {
     left: string;
     right: string;
+    /** Имя группы переключателей вкладок: сама полоса подписи не несёт. */
+    tabs: string;
     emptyTabs: string;
     hideLeft: string;
     hideRight: string;
@@ -80,7 +83,11 @@ export function Shell({
   headerActions,
   children,
 }: ShellProps) {
-  const open = tabs.find((tab) => tab.id === layout.openTab);
+  // Открытая панель всегда что-то показывает: полоса вкладок объявляет выбранной ровно одну, и
+  // состояния «панель открыта, а вкладка ни одна» у неё нет. Запомненный `openTab` при этом не
+  // трогается — вклад исчезает на каждой пересборке плагина, и стирать выбор человека из-за этого
+  // нельзя. Пока вклада нет, показывается первая вкладка, а вернувшийся вклад забирает своё место.
+  const open = tabs.find((tab) => tab.id === layout.openTab) ?? tabs[0];
   const rightVisible = !rightUnavailable && !layout.rightHidden;
   const viewportWidth = useViewportWidth();
   const leftWidthBeforeRight = clampPanelWidth(
@@ -186,27 +193,25 @@ export function Shell({
             style={{ width: `${rightWidth}px` }}
           >
             {/*
-              Не `role="tablist"`: у вкладок ARIA выбрана ровно одна, а здесь повторный щелчок по
-              открытой вкладке закрывает её. Это группа кнопок-переключателей, чем `aria-pressed`
-              у каждой кнопки её и объявляет. Полоса занимает всю строку: кнопка скрытия панели
-              уехала в жёлоб шапки маршрута и места у вкладок больше не отнимает.
+              Полоса вкладок — переключатель вида из кита, а не россыпь кнопок-тумблеров: у открытой
+              панели выбрана ровно одна вкладка, и утопленная дорожка с кареткой говорит это одним
+              взглядом, тогда как капсулы `aria-pressed` читались как несколько независимых
+              переключателей. Ценой ушёл повторный щелчок, закрывавший открытую вкладку: закрывается
+              теперь вся панель — кнопкой в жёлобе шапки и командой окна.
+
+              Полоса занимает всю строку: кнопка скрытия панели уехала в жёлоб шапки маршрута и места
+              у вкладок больше не отнимает.
             */}
-            <div className="shell-tabs">
-              {tabs.map((tab) => (
-                <Button
-                  key={tab.id}
-                  onClick={() =>
-                    onLayoutChange({
-                      ...layout,
-                      openTab: layout.openTab === tab.id ? undefined : tab.id,
-                    })
-                  }
-                  pressed={layout.openTab === tab.id}
-                >
-                  {tab.label}
-                </Button>
-              ))}
-            </div>
+            {tabs.length === 0 ? undefined : (
+              <div className="shell-tabs">
+                <SegmentedControl
+                  label={labels.tabs}
+                  value={open?.id ?? ""}
+                  options={tabs.map((tab) => ({ value: tab.id, label: tab.label }))}
+                  onChange={(openTab) => onLayoutChange({ ...layout, openTab })}
+                />
+              </div>
+            )}
             {open === undefined ? (
               <div className="shell-tab-empty">{labels.emptyTabs}</div>
             ) : (

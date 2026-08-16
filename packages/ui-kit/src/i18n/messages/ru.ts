@@ -548,6 +548,7 @@ export const coreRussian: CatalogRegistration = {
     "plugins.write.failed": "Решение не записано: {reason}",
     "panel.left": "Навигация",
     "panel.right": "Боковая панель",
+    "panel.tabs": "Вкладки боковой панели",
     "panel.tabs.empty": "Вкладок нет: их принесёт плагин",
     "panel.left.hide": "Скрыть навигацию",
     "panel.right.hide": "Скрыть боковую панель",

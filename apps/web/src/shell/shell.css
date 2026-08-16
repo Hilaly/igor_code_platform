@@ -29,9 +29,16 @@
   border-inline-end: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
 
+/**
+ * Правая панель — хрома, а не полоса для чтения, и кегль ей назначает оболочка. Текст кита размера не
+ * несёт (`Text` задаёт только роль цвета), поэтому его выбирает контейнер: левая панель делает это
+ * через `Tree`, а правая не делала вовсе — и вклад плагина наследовал `md` от `body`, то есть меру
+ * связного текста, вдвое заметнее соседней хромы на `sm`.
+ */
 .shell-right {
   gap: var(--sovereign-space-2);
   padding: var(--sovereign-space-3);
+  font-size: var(--sovereign-font-size-sm);
   background: var(--sovereign-sunken-surface);
   border-inline-start: var(--sovereign-stroke-thin) solid var(--sovereign-border-subtle);
 }
@@ -156,12 +163,22 @@
   min-height: 0;
 }
 
+/**
+ * Полоса вкладок растёт только по своему содержимому. Рост по свободной высоте она получила, когда в
+ * одной строке с вкладками стояла кнопка скрытия панели; кнопка уехала в жёлоб шапки, а `flex-grow`
+ * остался — и делил высоту панели поровну с телом вкладки, потому что растут они оба. Прозрачная
+ * полоса высотой в половину панели читалась как «содержимое вкладки центрировано по вертикали».
+ */
 .shell-tabs {
   display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* Дорожка переключателя занимает всю ширину панели: вкладки делят её поровну, как полоса табов. */
+.shell-tabs > * {
   flex: 1 1 auto;
   min-width: 0;
-  flex-wrap: wrap;
-  gap: var(--sovereign-space-2);
 }
 
 .shell-tab-body {
@@ -174,7 +191,6 @@
 .shell-tab-empty {
   min-width: 0;
   color: var(--sovereign-text-subtle);
-  font-size: var(--sovereign-font-size-sm);
 }
 
 /**
@@ -238,10 +254,6 @@
   .shell-left,
   .shell-right {
     padding-inline: var(--sovereign-space-2);
-  }
-
-  .shell-tabs {
-    gap: var(--sovereign-space-1);
   }
 }
 

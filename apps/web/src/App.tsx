@@ -650,6 +650,7 @@ export function App() {
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
       events={browserEventBridge.events}
+      locale={preferences.locale}
     >
       <ShellWithPlaceTabs
         tabsContext={pageContext}
@@ -660,6 +661,7 @@ export function App() {
         labels={{
           left: translator.t("panel.left"),
           right: translator.t("panel.right"),
+          tabs: translator.t("panel.tabs"),
           emptyTabs: translator.t("panel.tabs.empty"),
           hideLeft: translator.t("panel.left.hide"),
           hideRight: translator.t("panel.right.hide"),

@@ -181,6 +181,12 @@ export const DurationTimers = () => (
       labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
       accessibleLabel="2 дня 1 час 1 минута 1 секунда"
     />
+    <DurationTimer
+      size="sm"
+      totalSeconds={3_661}
+      labels={{ days: "дн", hours: "ч", minutes: "мин", seconds: "с" }}
+      accessibleLabel="1 час 1 минута 1 секунда"
+    />
   </div>
 );
 
@@ -499,6 +505,7 @@ export const States = () => (
       <StatusDot tone="positive" label="Подключено" />
       <StatusDot tone="pending" label="Подключение" />
       <StatusDot tone="danger" label="Соединение потеряно" />
+      <StatusDot tone="neutral" label="Не начато" />
     </div>
     <EmptyState title="Плагинов нет" hint="Положите папку плагина в plugins/ директории данных" />
     <Spinner label="Снимок состояния запрашивается" />

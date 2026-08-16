@@ -52,6 +52,28 @@ describe("DurationTimer", () => {
     expect(within(timer).getAllByText("01")).toHaveLength(3);
   });
 
+  /**
+   * Компактный размер — для плотной строки списка: подписи единиц там дороже места, которое
+   * занимают. Значение при этом не теряется: оно целиком в имени группы, а его-то и читают вслух.
+   */
+  it("drops the unit captions at the compact size and keeps the value in the accessible name", () => {
+    render(
+      <DurationTimer
+        totalSeconds={3_661}
+        labels={labels}
+        accessibleLabel="1 hour 1 minute 1 second"
+        size="sm"
+      />,
+    );
+
+    const timer = screen.getByRole("group", { name: "1 hour 1 minute 1 second" });
+
+    expect(within(timer).getAllByText("01")).toHaveLength(3);
+    expect(within(timer).queryByText("hours")).toBeNull();
+    expect(within(timer).queryByText("minutes")).toBeNull();
+    expect(within(timer).queryByText("seconds")).toBeNull();
+  });
+
   it("is a named static group rather than an aria live region", () => {
     render(<DurationTimer totalSeconds={0} labels={labels} accessibleLabel="0 seconds" />);
 

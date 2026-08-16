@@ -1,7 +1,6 @@
 import type { PlaceContext } from "@sovereign/browser-sdk";
-import { useSovereignEvents } from "@sovereign/browser-sdk";
+import { useSovereignEvents, useTranslator } from "@sovereign/browser-sdk";
 import {
-  Badge,
   EmptyState,
   Heading,
   List,
@@ -9,12 +8,22 @@ import {
   Notice,
   Progress,
   Spinner,
+  StatusDot,
   Text,
+  type StatusDotTone,
+  type Translator,
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
-import type { MissionSnapshot } from "./model.ts";
+import type { MissionSnapshot, MissionStep } from "./model.ts";
 import "./mission-panel.css";
+
+/**
+ * Неймспейс каталога. Тот же, что объявляет воркер, — по протоколу это идентификатор плагина, и
+ * другого он объявить не может. Строки сюда не импортируются намеренно: каталог приезжает снимком,
+ * и второй его экземпляр в бандле разошёлся бы с объявленным.
+ */
+const messagesNamespace = "mission";
 
 type PanelState =
   | { kind: "loading" }
@@ -85,52 +94,98 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
     if (sessionId === undefined) return;
     return events.subscribeRecovery?.(() => reload());
   }, [events, reload, sessionId]);
+  const translator = useTranslator(messagesNamespace);
   return (
-    <section className="mission-panel" aria-label="Mission">
-      <Heading level={2}>Mission</Heading>
-      {state.kind === "loading" ? <Spinner label="Loading mission" /> : undefined}
+    <section className="mission-panel" aria-label={translator.t("panel.title")}>
+      <Heading level={2}>{translator.t("panel.title")}</Heading>
+      {state.kind === "loading" ? <Spinner label={translator.t("panel.loading")} /> : undefined}
       {state.kind === "empty" ? (
-        <EmptyState title={sessionId === undefined ? "No active session" : "No mission yet"} />
+        <EmptyState
+          title={translator.t(sessionId === undefined ? "panel.empty.session" : "panel.empty")}
+        />
       ) : undefined}
       {state.kind === "error" ? (
-        <Notice tone="danger" title={`Could not read mission: ${state.reason}`} />
+        <Notice tone="danger" title={translator.t("panel.failure", { reason: state.reason })} />
       ) : undefined}
-      {state.kind === "ready" ? <MissionSnapshotView snapshot={state.snapshot} /> : undefined}
+      {state.kind === "ready" ? (
+        <MissionSnapshotView snapshot={state.snapshot} translator={translator} />
+      ) : undefined}
     </section>
   );
 }
 
-function MissionSnapshotView({ snapshot }: { snapshot: MissionSnapshot }): ReactNode {
+/** Состояние шага цветом не сообщается: точка кита несёт его словом в `aria-label` и подсказке. */
+const stepTones: Record<MissionStep["status"], StatusDotTone> = {
+  completed: "positive",
+  in_progress: "pending",
+  pending: "neutral",
+};
+
+/**
+ * Три яруса вместо ровного столбца абзацев: сама миссия, её пояснение и план. Раньше миссия,
+ * пояснение, время правки и шаги шли одним кеглем и различались только цветом — прочесть, где
+ * задание, а где примечание к нему, было нельзя. Время правки уехало вниз служебной строкой: это
+ * сведения о записи, а не её содержание.
+ */
+function MissionSnapshotView({
+  snapshot,
+  translator,
+}: {
+  snapshot: MissionSnapshot;
+  translator: Translator;
+}): ReactNode {
   const completed = snapshot.plan.filter((step) => step.status === "completed").length;
-  const active = snapshot.plan.find((step) => step.status === "in_progress");
+
   return (
     <div className="mission-content">
-      <Text>{snapshot.mission}</Text>
+      <p className="mission-statement">{snapshot.mission}</p>
       {snapshot.explanation === undefined ? undefined : (
-        <Text tone="muted">{snapshot.explanation}</Text>
+        <p className="mission-explanation">
+          <Text tone="muted">{snapshot.explanation}</Text>
+        </p>
       )}
-      <Text tone="muted">Updated {formatUpdatedAt(snapshot.updatedAt)}</Text>
-      <Progress label="Mission progress" value={completed / snapshot.plan.length} />
-      {active === undefined ? undefined : <Badge tone="neutral">{"Current: " + active.step}</Badge>}
-      <List>
-        {snapshot.plan.map((step, index) => (
-          <ListRow key={`${index}-${step.step}`}>
-            <span className={`mission-step mission-step-${step.status}`}>
-              <Text>{step.step}</Text>
-              <Text tone="muted">{step.status.replace("_", " ")}</Text>
-            </span>
-          </ListRow>
-        ))}
-      </List>
+      <div className="mission-plan">
+        <div className="mission-plan-head">
+          <Text tone="muted">{translator.t("plan.label")}</Text>
+          <Text tone="muted">
+            {translator.t("plan.count", { completed, total: snapshot.plan.length })}
+          </Text>
+        </div>
+        <Progress label={translator.t("plan.progress")} value={completed / snapshot.plan.length} />
+        <List>
+          {/*
+            Подсветку текущего шага рисует сама строка списка: заливкой строк владеет кит, и
+            собственный фон здесь разошёлся бы с ним при первой правке палитры. Состояние при этом
+            сообщается не только цветом — точка несёт его словом.
+          */}
+          {snapshot.plan.map((step, index) => (
+            <ListRow key={`${index}-${step.step}`} selected={step.status === "in_progress"}>
+              <span className="mission-step" data-status={step.status}>
+                <StatusDot
+                  tone={stepTones[step.status]}
+                  label={translator.t(`state.${step.status}`)}
+                />
+                <Text tone={step.status === "completed" ? "muted" : "normal"}>{step.step}</Text>
+              </span>
+            </ListRow>
+          ))}
+        </List>
+      </div>
+      <p className="mission-updated">
+        <Text tone="muted">
+          {translator.t("panel.updated", { time: formatUpdatedAt(snapshot.updatedAt, translator) })}
+        </Text>
+      </p>
     </div>
   );
 }
 
-function formatUpdatedAt(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+/**
+ * Дату форматирует переводчик, а не своя `Intl`: та брала локаль браузера, и в русской строке
+ * «Обновлено» стояло английское «16 Aug 2026». Язык у панели один — тот, что выбран для окна.
+ */
+function formatUpdatedAt(value: string, translator: Translator): string {
+  return translator.formatDate(new Date(value), { dateStyle: "medium", timeStyle: "short" });
 }
 
 function isMissionChanged(value: unknown): value is { sessionId: string; revision: number } {

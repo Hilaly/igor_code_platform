@@ -18,3 +18,7 @@
 .danger {
   color: var(--sovereign-danger);
 }
+
+.neutral {
+  color: var(--sovereign-text-subtle);
+}

@@ -39,11 +39,20 @@ worker и lifecycle.
    reconnect или обнаруженного gap выполняй GET snapshot. Route — источник истины, событие лишь
    invalidation.
 8. **Используй browser SDK.** `Place`, `PlaceCollection`, `PlaceTabs`, `useCommands`,
-   `usePageNavigation` импортируются из `@sovereign/browser-sdk`.
-9. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
-   отображаться как diagnostics/outcome, а не маскироваться пустым UI.
-10. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
-    вызови каждую command минимум один раз.
+   `usePageNavigation`, `useTranslator` импортируются из `@sovereign/browser-sdk`.
+9. **Собери интерфейс из UI-кита.** Примитивы `@sovereign/ui-kit` и токены `--sovereign-*`; своих
+   цветов, кеглей и шрифтов в CSS плагина нет. Каждый `className` разметки обязан быть описан в
+   таблице стилей, которую импортирует entry: неописанный класс не ошибка сборки, а сбитая вёрстка,
+   которую видно только глазом.
+10. **Локализуй строки.** Каталоги объявляет worker (`contribute.localeCatalog`), панель берёт
+    переводчик хуком `useTranslator(<id плагина>)`. Строк в браузерном bundle нет, своей настройки
+    языка у плагина нет, за локалью он никуда не ходит. Даты и числа — `formatDate`/`formatNumber`
+    того же переводчика.
+11. **Проверь failure states.** Неверное имя export, ошибка bundle и exception команды должны
+    отображаться как diagnostics/outcome, а не маскироваться пустым UI.
+12. **Собери и проверь.** Typecheck worker и browser entry, запусти plugin, открой contribution и
+    вызови каждую command минимум один раз. Посмотри на результат в обоих языках: непереведённая
+    строка и разъехавшаяся вёрстка тестами не ловятся.
 
 ## Manifest
 
@@ -64,6 +73,15 @@ worker и lifecycle.
 import { contribute, type PluginModule } from "@sovereign/sdk";
 
 export const activate: PluginModule["activate"] = async () => {
+  // Каталог объявляется до вкладов, которые он подписывает: `<вид>.<id вклада>.title` — ключ
+  // заголовка, который человек увидит на месте.
+  await contribute.localeCatalog({
+    id: "messages-en",
+    namespace: "task-plugin",
+    locale: "en",
+    messages: { "page.log.title": "Task log", "command.review.title": "Review this session" },
+  });
+
   await contribute.page({
     id: "log",
     title: "Task log",
@@ -89,14 +107,22 @@ export const activate: PluginModule["activate"] = async () => {
 ## Browser entry
 
 ```tsx
-import { usePageNavigation, type Command, type PlaceContext } from "@sovereign/browser-sdk";
+import {
+  usePageNavigation,
+  useTranslator,
+  type Command,
+  type PlaceContext,
+} from "@sovereign/browser-sdk";
 import type { ReactNode } from "react";
 
 export function LogPage({ context }: { context: PlaceContext }): ReactNode {
   const navigation = usePageNavigation();
+  // Неймспейс — идентификатор плагина: тот же, что объявлен каталогом в worker.
+  const translator = useTranslator("task-plugin");
 
   return (
     <section>
+      <h2>{translator.t("page.log.title")}</h2>
       project: {context.project ?? "none"}, path: {navigation.path}
     </section>
   );
@@ -140,6 +166,11 @@ Host добавляет slash-команду в каталог как `/<pluginI
   проглатывается;
 - replaceable place имеет cardinality `single` и `builtIn`;
 - page использует `usePageNavigation`, а не собирает base path вручную;
+- каталоги объявлены worker'ом, а в браузерном bundle нет ни строк, ни своей `Intl`, ни запроса за
+  локалью;
+- у каждого вклада, чей заголовок видит человек, в каталоге есть ключ `<вид>.<id вклада>.title`;
+- каждому `className` разметки соответствует правило в импортированной таблице стилей, а цвета и
+  кегли в ней — токены `--sovereign-*`;
 - loading, missing export и thrown command видны пользователю;
 - tests/typecheck и фактический browser smoke test проходят.
 
@@ -155,6 +186,17 @@ Host добавляет slash-команду в каталог как `/<pluginI
 - **Plugin page получает произвольный path из manifest.** Адрес выводится из plugin id и page id.
 - **Core places копируются по памяти.** Сверяй id и cardinality со справочником.
 - **Browser SDK бандлится второй копией.** Импортируй публичный root; host предоставляет singleton.
+- **Строки зашиты в браузерный код.** Панель заговорит по-английски у человека, выбравшего другой
+  язык. Каталог объявляет worker, а импорт модуля сообщений в entry заводит второй их экземпляр,
+  который разойдётся с объявленным.
+- **Заголовок вклада не переведён.** `title` в объявлении — текст на языке автора; на языке окна
+  вклад говорит только через ключ `<вид>.<id вклада>.title` в каталоге.
+- **Дата собрана своей `Intl`.** Она возьмёт локаль браузера, и в русской строке встанет английская
+  дата. Форматируй `translator.formatDate`.
+- **Разметка ссылается на классы, которых нет в CSS.** Сборка об этом не скажет: контейнеры
+  схлопнутся в поток строк, и увидит это только тот, кто открыл панель.
+- **Примитив взят в регистре чужого места.** Компонент, нарисованный для раздела настроек, в плотной
+  панели выглядит крупнее всего вокруг. У примитивов кита для этого есть `size`.
 
 Core places, cardinality и точные browser contracts:
 [справочник browser SDK](references/browser-reference.md).

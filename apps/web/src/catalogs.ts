@@ -3,7 +3,7 @@
  * от плагина он доезжает тем же снимком `/api/plugins`, что и остальные вклады (docs/plugins.md).
  */
 
-import type { ContributionRegistration } from "@sovereign/protocol";
+import { pluginCatalogs } from "@sovereign/browser-sdk/host";
 import {
   coreEnglish,
   coreNamespace,
@@ -12,19 +12,16 @@ import {
 } from "@sovereign/ui-kit";
 
 /**
+ * Отбор каталогов из снимка живёт в браузерном SDK: там же его читает переводчик плагина
+ * (`useTranslator`), и два одинаковых фильтра разошлись бы на первой правке вклада.
+ */
+export { pluginCatalogs };
+
+/**
  * Каталоги поставки. Порядок значим: каталоги применяются по очереди и побеждают по каждому
  * сообщению отдельно, поэтому каталог плагина обязан идти после наших.
  */
 export const shippedCatalogs: readonly CatalogRegistration[] = [coreEnglish, coreRussian];
-
-/** Каталоги, объявленные плагинами. Форму проверил демон, содержание никто не проверяет — его нет. */
-export function pluginCatalogs(
-  contributions: readonly ContributionRegistration[],
-): CatalogRegistration[] {
-  return contributions
-    .filter((registration) => registration.kind === "locale-catalog")
-    .map(({ namespace, locale, messages }) => ({ namespace, locale, messages }));
-}
 
 /**
  * Языки, которые можно выбрать. Считаются **только по каталогам неймспейса `core`**: каталог плагина

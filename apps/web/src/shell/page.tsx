@@ -11,7 +11,8 @@ import type {
   ProviderSummary,
   Session,
 } from "@sovereign/protocol";
-import { EmptyState, type ScopedTranslator } from "@sovereign/ui-kit";
+import { contributionTitle } from "@sovereign/browser-sdk/host";
+import { EmptyState, type ScopedTranslator, type Translator } from "@sovereign/ui-kit";
 import type { ReactNode } from "react";
 
 import type { Page } from "../router.ts";
@@ -29,7 +30,7 @@ export type PageHeaderData = {
 /** Stable route-level title/context. Missing remote data is intentionally not guessed. */
 export function describePage(
   page: Page,
-  translator: ScopedTranslator,
+  translator: Translator,
   data: PageHeaderData = {},
 ): ShellHeaderDescription {
   const { t } = translator;
@@ -77,7 +78,10 @@ export function describePage(
       };
     case "plugin":
       return {
-        title: data.pluginPage?.title ?? t("page.plugin.title"),
+        title:
+          data.pluginPage === undefined
+            ? t("page.plugin.title")
+            : contributionTitle(data.pluginPage, translator),
         context: `${page.pluginId}/${page.pageId}`,
       };
     case "unknown":
