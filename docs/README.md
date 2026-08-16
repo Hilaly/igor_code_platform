@@ -310,6 +310,8 @@
   граница нового template-скила и распределение plugin command между backend и frontend skills.
 - [План authoring-скилов сессии](superpowers/plans/2026-08-13-starter-session-authoring.md) —
   TDD-шаги для нового `creating-prompt-templates`, обновления plugin skills и проверок поставки.
+- [План автоименования сессии из первого сообщения](superpowers/plans/2026-08-16-session-auto-name.md) —
+  TDD-задача для генерации имени на сервере при первом текстовом турне без изменения контракта.
 
 Появился новый документ — строка о нём добавляется в этот список тем же коммитом.
 
