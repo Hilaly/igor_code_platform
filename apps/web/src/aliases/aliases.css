@@ -1,0 +1,87 @@
+.aliases {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--sovereign-space-3);
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.aliases-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sovereign-space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--sovereign-space-2) var(--sovereign-space-3);
+}
+
+.aliases-facts {
+  display: flex;
+  align-items: center;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.aliases-actions,
+.aliases-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.aliases-form {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.aliases-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sovereign-space-1);
+  min-width: 0;
+  padding-block: var(--sovereign-space-3) var(--sovereign-space-2);
+  overflow-wrap: anywhere;
+}
+
+.aliases-form-actions {
+  padding-block: var(--sovereign-space-2);
+}
+
+/* Пикер тянется, кнопки порядка остаются при нём. Выравнивание по низу: над пикером стоит его
+   собственная этикетка, и по центру кнопки уехали бы выше поля. */
+.aliases-candidate {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sovereign-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+  padding-block: var(--sovereign-space-1);
+}
+
+/* Своя мера, а не `auto`: ссылка на модель длинная, и в узкой колонке пикер обязан уйти на
+   отдельную строку целиком, а не ужиматься до многоточия рядом с тремя кнопками. */
+.aliases-candidate > :first-child {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+@container (width <= 42rem) {
+  .aliases-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sovereign-space-2);
+  }
+
+  .aliases-actions,
+  .aliases-form-actions {
+    justify-content: flex-start;
+  }
+}

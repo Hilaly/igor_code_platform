@@ -103,6 +103,7 @@ Settings обошло бы единый resolver, fallback и диагности
 | `core.settings.appearance`  | одиночное      | да        | —                                    |
 | `core.settings.usage`       | одиночное      | да        | —                                    |
 | `core.settings.providers`   | одиночное      | да        | `view: list \| detail`, `providerId` |
+| `core.settings.aliases`     | одиночное      | да        | —                                    |
 | `core.settings.plugins`     | одиночное      | да        | `view: list \| detail`, `pluginKey`  |
 | `core.settings.daemon`      | одиночное      | да        | —                                    |
 | `core.settings.diagnostics` | одиночное      | да        | —                                    |

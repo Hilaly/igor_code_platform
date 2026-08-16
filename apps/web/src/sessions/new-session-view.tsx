@@ -40,7 +40,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ComposerAttachments } from "./composer-attachments.tsx";
 import { imageFilesOf, readImageFiles } from "./image-input.ts";
-import { modelPickerGroups, selectedModel } from "./model-options.ts";
+import { modelPickerGroups, selectedModel } from "../providers/model-options.ts";
 import type { ModelsEntry } from "./state.ts";
 import type { ProjectAgentsState } from "./use-sessions.ts";
 

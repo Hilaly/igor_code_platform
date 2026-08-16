@@ -39,6 +39,7 @@ import {
   shippedSchemes,
   writeAppearance,
 } from "./appearance.ts";
+import { AliasesView } from "./aliases/aliases-view.tsx";
 import { availableLocales, pluginCatalogs, shippedCatalogs } from "./catalogs.ts";
 import { createDiagnosticsStore, type Diagnostic } from "./diagnostics.ts";
 import { createFrontendBus } from "./events/bus.ts";
@@ -1048,8 +1049,26 @@ export function App() {
                       onRenameKey={providers.renameKey}
                       onSelectKey={providers.selectKey}
                       onRemoveKey={providers.removeKey}
-                      onSaveAlias={providers.saveAlias}
-                      onRemoveAlias={providers.removeAlias}
+                      translator={translator}
+                    />
+                  }
+                />
+              }
+              aliases={
+                <HostPlace
+                  id="core.settings.aliases"
+                  context={settingsContext}
+                  builtIn={
+                    <AliasesView
+                      aliases={providers.state.aliases?.aliases}
+                      {...(providers.state.aliases?.problem === undefined
+                        ? {}
+                        : { problem: providers.state.aliases.problem })}
+                      providers={providers.state.snapshot?.providers}
+                      models={providers.state.models}
+                      onExpandProvider={providers.loadModels}
+                      onSave={providers.saveAlias}
+                      onRemove={providers.removeAlias}
                       translator={translator}
                     />
                   }

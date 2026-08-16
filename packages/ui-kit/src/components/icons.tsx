@@ -25,6 +25,7 @@ import {
   Palette,
   Plug,
   Plus,
+  Route,
   Search,
   Send,
   Server,
@@ -77,6 +78,8 @@ export const SettingsIcon = actionIcon(Settings);
 export const AppearanceIcon = actionIcon(Palette);
 export const UsageIcon = actionIcon(BarChart3);
 export const ProviderIcon = actionIcon(Plug);
+/** Алиас — маршрут по списку моделей: отказала первая, идём к следующей. */
+export const AliasIcon = actionIcon(Route);
 export const PluginIcon = actionIcon(Blocks);
 export const DaemonIcon = actionIcon(Server);
 export const DiagnosticsIcon = actionIcon(Activity);

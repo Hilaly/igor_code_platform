@@ -2,7 +2,7 @@ import type { ModelSummary, ProviderSummary } from "@sovereign/protocol";
 import { describe, expect, it } from "vitest";
 
 import { modelPickerGroups, selectedModel } from "./model-options.ts";
-import type { ModelsEntry } from "./state.ts";
+import type { ProviderModelsEntry as ModelsEntry } from "./state.ts";
 
 const anthropic: ProviderSummary = {
   id: "anthropic",
@@ -27,7 +27,7 @@ const opus: ModelSummary = {
   cost: { input: 3, output: 15 },
 };
 
-describe("session model options", () => {
+describe("the model picker options of the catalogue", () => {
   it("builds a ready provider catalogue", () => {
     const models: Record<string, ModelsEntry> = {
       anthropic: { kind: "ready", models: [opus] },

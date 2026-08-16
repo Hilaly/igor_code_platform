@@ -355,8 +355,6 @@ export const coreEnglish: CatalogRegistration = {
     "providers.logout.stubborn.source":
       "The credential comes from {source} and does not belong to the platform: there was nothing here to remove. Take it out of the environment and restart the daemon.",
     "aliases.title": "Model aliases",
-    "aliases.hint":
-      "An alias is a name with a list of compatible models. A session walks the list top down: the first one refuses, the next one takes over.",
     "aliases.problem": "The aliases cannot be read",
     "aliases.empty": "No aliases yet",
     "aliases.new": "New alias",
@@ -369,13 +367,14 @@ export const coreEnglish: CatalogRegistration = {
     "aliases.name": "Name",
     "aliases.candidates": "Models in order",
     "aliases.candidates.hint":
-      "One provider/model reference per line. The first one is preferred; the next one takes over after a refusal.",
+      "Pick a model out of a provider. The first one is preferred; the next one takes over after a refusal.",
     "aliases.candidate": "Model {number}",
     "aliases.candidate.up": "Move model {number} up",
     "aliases.candidate.down": "Move model {number} down",
     "aliases.candidate.remove": "Remove model {number}",
     "aliases.candidate.add": "Add a model",
     "aliases.save": "Save the alias",
+    "aliases.cancel": "Cancel",
     "providers.keys.title": "Keys: {name}",
     "providers.keys.empty": "No stored keys",
     "providers.keys.hint":
@@ -480,6 +479,7 @@ export const coreEnglish: CatalogRegistration = {
     "command.settings.appearance": "Settings: appearance",
     "command.settings.usage": "Settings: usage",
     "command.settings.providers": "Settings: providers",
+    "command.settings.aliases": "Settings: aliases",
     "command.settings.plugins": "Settings: plugins",
     "command.settings.daemon": "Settings: daemon",
     "command.settings.diagnostics": "Settings: diagnostics",
@@ -617,6 +617,7 @@ export const coreEnglish: CatalogRegistration = {
     "settings.section.appearance": "Appearance",
     "settings.section.usage": "Usage",
     "settings.section.providers": "Providers",
+    "settings.section.aliases": "Aliases",
     "settings.section.plugins": "Plugins",
     "settings.section.daemon": "Daemon",
     "settings.section.diagnostics": "Diagnostics",
@@ -626,6 +627,8 @@ export const coreEnglish: CatalogRegistration = {
     "settings.section.description.usage":
       "Inspect exact token and cost statistics from visible active and archived sessions.",
     "settings.section.description.providers": "Manage connections to language models and services.",
+    "settings.section.description.aliases":
+      "A name with a list of compatible models. A session walks the list top down: the first one refuses, the next one takes over.",
     "settings.section.description.plugins": "Manage installed extensions and their contributions.",
     "settings.section.description.daemon": "Monitor the local daemon and its connection.",
     "settings.section.description.diagnostics": "Inspect technical events and reported problems.",

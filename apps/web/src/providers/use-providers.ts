@@ -92,6 +92,8 @@ export type ProvidersController = {
   selectKey: (providerId: string, keyId: string) => Promise<void>;
   /** Убрать один ключ. Остальные остаются, и провайдер остаётся настроенным. */
   removeKey: (providerId: string, keyId: string) => Promise<void>;
+  /** Модели одного провайдера. Все сразу не спрашиваем: их больше тысячи (docs/web-api.md). */
+  loadModels: (providerId: string) => void;
   /** Завести алиас или заменить существующий (docs/model-routing.md). */
   saveAlias: (alias: ModelAlias, existing: boolean) => Promise<void>;
   removeAlias: (aliasId: string) => Promise<void>;
@@ -217,36 +219,46 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     [],
   );
 
-  // Модели открытой страницы провайдера. Не жест раскрытия строки, а адрес: повторный заход на
-  // страницу не перечитывает прочитанное, но отказавшее — переспрашивает (`shouldFetchModels`).
+  /**
+   * Модели одного провайдера. Прочитанное не перечитывается, отказавшее — переспрашивается
+   * (`shouldFetchModels`), поэтому повторный зов безвреден: и страница провайдера, и раскрытая
+   * группа пикера алиасов зовут это одним и тем же способом.
+   */
+  const loadModels = useCallback(
+    (providerId: string) => {
+      if (!shouldFetchModels(latest.current, providerId)) {
+        return;
+      }
+
+      apply((current) => markModelsLoading(current, providerId));
+
+      const controller = new AbortController();
+      pendingModels.current.add(controller);
+
+      void fetchProviderModels(providerId, controller.signal)
+        .then((answer) => apply((current) => applyModels(current, providerId, answer.models)))
+        .catch((cause: unknown) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          const reason = reasonOf(cause);
+
+          onDiagnostic(`the models of ${providerId} could not be read: ${reason}`);
+          apply((current) => applyModelsFailure(current, providerId, reason));
+        })
+        .finally(() => pendingModels.current.delete(controller));
+    },
+    [apply, onDiagnostic],
+  );
+
+  // Модели открытой страницы провайдера. Не жест раскрытия строки, а адрес: страница провайдера
+  // показывает его модели сразу, не дожидаясь нажатия.
   useEffect(() => {
-    if (providerId === undefined) {
-      return;
+    if (providerId !== undefined) {
+      loadModels(providerId);
     }
-
-    if (!shouldFetchModels(latest.current, providerId)) {
-      return;
-    }
-
-    apply((current) => markModelsLoading(current, providerId));
-
-    const controller = new AbortController();
-    pendingModels.current.add(controller);
-
-    void fetchProviderModels(providerId, controller.signal)
-      .then((answer) => apply((current) => applyModels(current, providerId, answer.models)))
-      .catch((cause: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        const reason = reasonOf(cause);
-
-        onDiagnostic(`the models of ${providerId} could not be read: ${reason}`);
-        apply((current) => applyModelsFailure(current, providerId, reason));
-      })
-      .finally(() => pendingModels.current.delete(controller));
-  }, [apply, onDiagnostic, providerId]);
+  }, [loadModels, providerId]);
 
   const logIn = useCallback(
     (providerId: string, method: ProviderAuthType, target?: LoginKeyTarget) => {
@@ -419,6 +431,7 @@ export function useProviders(options: UseProvidersOptions): ProvidersController 
     renameKey,
     selectKey,
     removeKey,
+    loadModels,
     saveAlias,
     removeAlias,
     receiveLoginStep,

@@ -27,6 +27,7 @@ export type SettingsViewProps = {
   appearance: ReactNode;
   usage: ReactNode;
   providers: ReactNode;
+  aliases: ReactNode;
   plugins: ReactNode;
   detailTitle?: string;
   daemon: ReactNode;
@@ -41,6 +42,7 @@ export function SettingsView({
   appearance,
   usage,
   providers,
+  aliases,
   plugins,
   detailTitle,
   daemon,
@@ -50,20 +52,18 @@ export function SettingsView({
   const { t } = translator;
   const embedded = useShellHeaderAvailable();
 
-  const content =
-    section === "projects"
-      ? projects
-      : section === "appearance"
-        ? appearance
-        : section === "usage"
-          ? usage
-          : section === "providers"
-            ? providers
-            : section === "plugins"
-              ? plugins
-              : section === "daemon"
-                ? daemon
-                : diagnostics;
+  // Запись полная по типу, а не лестница условий: раздел без содержимого не соберётся, и последнее
+  // «иначе» перестало показывать диагностику всякий раз, когда список разделов рос.
+  const content: Record<SettingsSection, ReactNode> = {
+    projects,
+    appearance,
+    usage,
+    providers,
+    aliases,
+    plugins,
+    daemon,
+    diagnostics,
+  };
 
   const title = detailTitle ?? t(`settings.section.${section}`);
 
@@ -95,7 +95,7 @@ export function SettingsView({
           detailTitle === undefined ? t(`settings.section.description.${section}`) : undefined
         }
       >
-        {content}
+        {content[section]}
       </SettingsPage>
     </SettingsKitView>
   );

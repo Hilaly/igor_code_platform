@@ -99,6 +99,7 @@ it("exports every public navigation destination from the browser SDK root", () =
     "appearance",
     "usage",
     "providers",
+    "aliases",
     "plugins",
     "daemon",
     "diagnostics",

@@ -141,6 +141,7 @@ describe("corePlaces", () => {
       "core.settings.appearance",
       "core.settings.usage",
       "core.settings.providers",
+      "core.settings.aliases",
       "core.settings.plugins",
       "core.settings.daemon",
       "core.settings.diagnostics",

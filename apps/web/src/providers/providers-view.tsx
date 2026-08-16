@@ -16,7 +16,6 @@
 import { modelReference } from "@sovereign/protocol";
 import type {
   LoginKeyTarget,
-  ModelAlias,
   ModelSummary,
   ProviderAuthState,
   ProviderAuthType,
@@ -43,7 +42,6 @@ import {
 } from "@sovereign/ui-kit";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { AliasEditor } from "./alias-editor.tsx";
 import { ProviderLogin } from "./login-view.tsx";
 import { configuredCount, type ProviderModelsEntry, type ProvidersState } from "./state.ts";
 import { ShellHeaderActions, useShellHeaderActions } from "../shell/header.tsx";
@@ -72,8 +70,6 @@ export type ProvidersViewProps = {
   onRenameKey: (providerId: string, keyId: string, label: string) => Promise<void>;
   onSelectKey: (providerId: string, keyId: string) => Promise<void>;
   onRemoveKey: (providerId: string, keyId: string) => Promise<void>;
-  onSaveAlias: (alias: ModelAlias, existing: boolean) => Promise<void>;
-  onRemoveAlias: (aliasId: string) => Promise<void>;
   translator: ScopedTranslator;
 };
 
@@ -95,8 +91,6 @@ export function ProvidersView({
   onRenameKey,
   onSelectKey,
   onRemoveKey,
-  onSaveAlias,
-  onRemoveAlias,
   translator,
 }: ProvidersViewProps) {
   const { t } = translator;
@@ -266,14 +260,6 @@ export function ProvidersView({
       {actionFailure ? <Notice tone="danger" title={actionFailure} /> : undefined}
 
       {logins}
-
-      <AliasEditor
-        aliases={state.aliases?.aliases}
-        {...(state.aliases?.problem === undefined ? {} : { problem: state.aliases.problem })}
-        onSave={onSaveAlias}
-        onRemove={onRemoveAlias}
-        translator={translator}
-      />
 
       <Text tone="muted">
         {t("providers.summary", {

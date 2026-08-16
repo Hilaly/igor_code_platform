@@ -174,9 +174,9 @@
 
 - **Срез 17c — алиасы моделей.** Имя со списком совместимых моделей, живущее в `model-aliases.json`
   и видимое системе как модель провайдера `alias`; сессия идёт по списку сверху вниз, перебирая
-  внутри каждой модели её ключи; маршруты и редактор на странице провайдеров
-  ([model-routing.md](model-routing.md), [data-directory.md](data-directory.md),
-  [web-api.md](web-api.md), [ui-kit.md](ui-kit.md)).
+  внутри каждой модели её ключи; маршруты и свой раздел настроек `/settings/aliases`, где кандидат
+  выбирается пикером моделей ([model-routing.md](model-routing.md),
+  [data-directory.md](data-directory.md), [web-api.md](web-api.md), [ui-kit.md](ui-kit.md)).
 
 ## Дальше
 
