@@ -30,6 +30,7 @@ it("exports only the public browser SDK surface at runtime", () => {
     "useCommands",
     "usePageNavigation",
     "useSovereignEvents",
+    "useTranslator",
   ]);
 });
 
@@ -65,6 +66,7 @@ it("exports a host event bridge hook that subscribes and cleans up", () => {
       plugins={[]}
       onDiagnostic={() => {}}
       events={events}
+      locale="en"
       createCache={createCache}
     >
       <Probe />

@@ -8,6 +8,7 @@ import {
   type CommandOutcome,
 } from "./commands.tsx";
 import { PluginPlace, PluginPlaceCollection } from "./host.tsx";
+import { useTranslator } from "./i18n.ts";
 import { settingsSections, type CoreDestination, type SettingsSection } from "./navigation.ts";
 import { usePageNavigation, type PageNavigateOptions, type PageNavigation } from "./page.tsx";
 import type { PlaceContext, PlaceProps } from "./runtime-context.tsx";
@@ -32,7 +33,7 @@ export type {
   SettingsSection,
 };
 
-export { settingsSections, useCommandCatalog, useCommands, usePageNavigation };
+export { settingsSections, useCommandCatalog, useCommands, usePageNavigation, useTranslator };
 
 export function useSovereignEvents() {
   const runtime = useContext(BrowserRuntimeContext);

@@ -28,6 +28,8 @@ export type BrowserRuntime = {
   cache: PluginModuleCache;
   onDiagnostic(text: string): void;
   events: BrowserEventBridge;
+  /** Язык окна: тег локали, выбранный человеком в настройках внешнего вида. */
+  locale: string;
 };
 
 export const BrowserRuntimeContext = createContext<BrowserRuntime | undefined>(undefined);

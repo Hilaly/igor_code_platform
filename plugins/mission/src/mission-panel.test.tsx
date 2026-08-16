@@ -125,6 +125,7 @@ function renderPanel(events: BrowserEventBridge, sessionId = "s1") {
       contributions={[]}
       plugins={[]}
       onDiagnostic={() => {}}
+      locale="en"
       events={events}
       cache={cache}
       createCache={() => cache}
@@ -140,6 +141,7 @@ function renderPanel(events: BrowserEventBridge, sessionId = "s1") {
           contributions={[]}
           plugins={[]}
           onDiagnostic={() => {}}
+          locale="en"
           events={events}
           cache={cache}
           createCache={() => cache}

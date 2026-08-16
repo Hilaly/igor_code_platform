@@ -112,6 +112,7 @@ function provider(
       plugins={options.plugins ?? [placed]}
       onDiagnostic={options.onDiagnostic ?? (() => {})}
       events={{ subscribe: () => () => {} }}
+      locale="en"
       createCache={() => cache().cache}
       cache={options.cache}
     >

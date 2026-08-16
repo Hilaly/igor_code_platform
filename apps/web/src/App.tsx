@@ -649,6 +649,7 @@ export function App() {
       plugins={pluginStatuses}
       onDiagnostic={diagnostics.record}
       events={browserEventBridge.events}
+      locale={preferences.locale}
     >
       <ShellWithPlaceTabs
         tabsContext={pageContext}
