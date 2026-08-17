@@ -46,7 +46,23 @@ const planned = {
   updatedAt: "2026-08-16T12:30:00.000Z",
 };
 
-function response(value: ReturnType<typeof snapshot> | typeof planned): Response {
+const stalled = {
+  mission: "Merge the branch",
+  plan: [
+    { step: "Run the tests", status: "completed" as const },
+    {
+      step: "Push to origin",
+      status: "blocked" as const,
+      reason: "no credentials in this worktree",
+    },
+    { step: "Delete the branch", status: "skipped" as const, reason: "the owner keeps it" },
+  ],
+  outcome: { kind: "failed" as const, summary: "the branch stayed local" },
+  revision: 5,
+  updatedAt: "2026-08-16T12:30:00.000Z",
+};
+
+function response(value: unknown): Response {
   return { ok: true, status: 200, json: async () => value } as Response;
 }
 
@@ -251,12 +267,35 @@ it("separates the mission, its explanation, and the named state of every step", 
     screen.getByRole("progressbar", { name: "Mission progress" }).getAttribute("aria-valuenow"),
   ).toBe("33");
 
-  expect(screen.getByRole("status", { name: "Done" })).not.toBeNull();
-  expect(screen.getByRole("status", { name: "In progress" })).not.toBeNull();
-  expect(screen.getByRole("status", { name: "Not started" })).not.toBeNull();
+  expect(screen.getByText("Done")).not.toBeNull();
+  expect(screen.getByText("In progress")).not.toBeNull();
+  expect(screen.getByText("Not started")).not.toBeNull();
+
+  // Видимый текст — единственный источник статуса для accessibility tree: точка декоративна.
+  expect(screen.queryAllByRole("status")).toHaveLength(0);
 
   // Сырое машинное значение статуса в панель больше не попадает.
   expect(screen.queryByText("in progress")).toBeNull();
+});
+
+/**
+ * Упершийся шаг, пропущенный шаг и исход миссии. Без них панель показывала законченную неудачей
+ * работу так же, как идущую: полоса прогресса стояла, и почему она стоит, нигде не было сказано.
+ */
+it("names why a step stalled and how the mission ended", async () => {
+  const channel = bridge();
+  missionFetch(response(stalled));
+  renderPanel(channel.events);
+
+  await screen.findByText("Merge the branch");
+
+  expect(screen.getByText("Blocked")).not.toBeNull();
+  expect(screen.getByText("Skipped")).not.toBeNull();
+  expect(screen.getByText("no credentials in this worktree")).not.toBeNull();
+  expect(screen.getByText("the owner keeps it")).not.toBeNull();
+
+  expect(screen.getByText("Failed")).not.toBeNull();
+  expect(screen.getByText("the branch stayed local")).not.toBeNull();
 });
 
 /**
@@ -272,7 +311,7 @@ it("speaks the language of the window", async () => {
   await screen.findByRole("heading", { name: "Миссия" });
   expect(screen.getByText("Шаги")).not.toBeNull();
   expect(screen.getByText("1 из 3")).not.toBeNull();
-  expect(screen.getByRole("status", { name: "В работе" })).not.toBeNull();
+  expect(screen.getByText("В работе")).not.toBeNull();
   // Дата в русской строке тоже русская: локаль браузера её больше не решает.
   expect(screen.getByText(/Обновлено 16 авг\./u)).not.toBeNull();
 });

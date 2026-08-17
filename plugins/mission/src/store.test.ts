@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import { installTestHost, type PluginTestHost } from "@sovereign/sdk/testing";
 
-import { readMission, writeMission } from "./store.ts";
+import { MissionConflictError, readMission, writeMission } from "./store.ts";
 
 let host: PluginTestHost | undefined;
 
@@ -25,12 +25,12 @@ describe("mission storage", () => {
     const second = await writeMission("session-a", input("Second"));
     await writeMission("session-b", input("Other"));
 
-    assert.equal(first.revision, 1);
-    assert.equal(second.revision, 2);
+    assert.equal(first.snapshot.revision, 1);
+    assert.equal(second.snapshot.revision, 2);
     assert.equal((await readMission("session-a"))?.mission, "Second");
     assert.equal((await readMission("session-b"))?.mission, "Other");
     assert.equal(await readMission("missing"), undefined);
-    assert.match(second.updatedAt, /^\d{4}-\d\d-\d\dT/u);
+    assert.match(second.snapshot.updatedAt, /^\d{4}-\d\d-\d\dT/u);
   });
 
   it("uses the canonical mission.<sessionId> storage key", async () => {
@@ -47,8 +47,24 @@ describe("mission storage", () => {
       writeMission("same", input("Second")),
     ]);
 
-    assert.deepEqual([first.revision, second.revision].sort(), [1, 2]);
+    assert.deepEqual([first.snapshot.revision, second.snapshot.revision].sort(), [1, 2]);
     assert.equal((await readMission("same"))?.revision, 2);
+  });
+
+  it("rejects concurrent writes with the same expectedRevision", async () => {
+    host = installTestHost({ id: "mission" });
+    const [first, second] = await Promise.allSettled([
+      writeMission("same", { ...input("First"), expectedRevision: 0 }),
+      writeMission("same", { ...input("Second"), expectedRevision: 0 }),
+    ]);
+
+    assert.equal(first.status, "fulfilled");
+    assert.equal(first.value.snapshot.revision, 1);
+    assert.equal(second.status, "rejected");
+    assert.ok(second.reason instanceof MissionConflictError);
+    assert.equal(second.reason.expectedRevision, 0);
+    assert.equal(second.reason.current?.revision, 1);
+    assert.equal((await readMission("same"))?.revision, 1);
   });
 
   it("continues a session queue after an earlier write fails", async () => {
@@ -59,7 +75,113 @@ describe("mission storage", () => {
     const recovered = writeMission("same", input("Recovered"));
 
     await assert.rejects(failed, /disk full/u);
-    assert.equal((await recovered).revision, 1);
+    assert.equal((await recovered).snapshot.revision, 1);
     assert.equal((await readMission("same"))?.mission, "Recovered");
+  });
+
+  it("stores a blocked step together with its reason and the mission outcome", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const written = await writeMission("s", {
+      mission: "Ship",
+      plan: [{ step: "Push", status: "blocked" as const, reason: "no credentials" }],
+      outcome: { kind: "failed" as const, summary: "could not push" },
+    });
+
+    assert.deepEqual((await readMission("s"))?.plan, written.snapshot.plan);
+    assert.equal((await readMission("s"))?.outcome?.kind, "failed");
+  });
+
+  it("does not keep expectedRevision in the stored snapshot", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const written = await writeMission("s", { ...input("A"), expectedRevision: 0 });
+
+    assert.equal("expectedRevision" in written.snapshot, false);
+    assert.equal("expectedRevision" in (host.stored.get("mission.s") as object), false);
+  });
+
+  it("refuses a write whose expectedRevision lost the race and keeps the stored snapshot", async () => {
+    host = installTestHost({ id: "mission" });
+    await writeMission("s", input("First"));
+    await writeMission("s", input("Second"));
+
+    const refused = writeMission("s", { ...input("Third"), expectedRevision: 1 });
+
+    await assert.rejects(refused, (cause: unknown) => {
+      assert.ok(cause instanceof MissionConflictError);
+      assert.equal(cause.expectedRevision, 1);
+      assert.equal(cause.current?.revision, 2);
+      assert.equal(cause.current?.mission, "Second");
+
+      return true;
+    });
+    assert.equal((await readMission("s"))?.mission, "Second");
+    assert.equal((await readMission("s"))?.revision, 2);
+  });
+
+  it("treats expectedRevision 0 as a claim that no mission exists", async () => {
+    host = installTestHost({ id: "mission" });
+
+    const first = await writeMission("s", { ...input("First"), expectedRevision: 0 });
+    const second = writeMission("s", { ...input("Second"), expectedRevision: 0 });
+
+    assert.equal(first.snapshot.revision, 1);
+    await assert.rejects(second, MissionConflictError);
+  });
+
+  it("refuses a non-zero expectedRevision when there is no mission yet", async () => {
+    host = installTestHost({ id: "mission" });
+
+    await assert.rejects(
+      writeMission("s", { ...input("First"), expectedRevision: 3 }),
+      (cause: unknown) => {
+        assert.ok(cause instanceof MissionConflictError);
+        assert.equal(cause.current, undefined);
+
+        return true;
+      },
+    );
+    assert.equal(host.stored.size, 0);
+  });
+
+  it("names completed steps that disappeared from the rewritten plan", async () => {
+    host = installTestHost({ id: "mission" });
+    await writeMission("s", {
+      mission: "Ship",
+      plan: [
+        { step: "Read the code", status: "completed" as const },
+        { step: "Write the tests", status: "completed" as const },
+        { step: "Run the build", status: "pending" as const },
+      ],
+    });
+
+    const written = await writeMission("s", {
+      mission: "Ship",
+      plan: [
+        { step: "Read the code", status: "completed" as const },
+        { step: "Run the build", status: "in_progress" as const },
+      ],
+    });
+
+    assert.deepEqual(written.missingCompletedSteps, ["Write the tests"]);
+  });
+
+  it("stays quiet when the plan grows or a completed step is only reworded", async () => {
+    host = installTestHost({ id: "mission" });
+    await writeMission("s", {
+      mission: "Ship",
+      plan: [{ step: "Read the code", status: "completed" as const }],
+    });
+
+    const reworded = await writeMission("s", {
+      mission: "Ship",
+      plan: [
+        { step: "Read the existing code", status: "completed" as const },
+        { step: "Write the tests", status: "pending" as const },
+      ],
+    });
+
+    assert.deepEqual(reworded.missingCompletedSteps, []);
   });
 });

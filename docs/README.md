@@ -11,7 +11,7 @@
 
 ## Что есть сейчас
 
-- [Встроенный плагин Mission и bridge событий браузерного SDK](superpowers/specs/2026-08-16-mission-plugin-and-browser-event-bridge-design.md) — утверждённый дизайн per-session миссии, инструмента `mission-update`, правой панели и доставки через общий SSE/frontend bus.
+- [Встроенный плагин Mission и bridge событий браузерного SDK](superpowers/specs/2026-08-16-mission-plugin-and-browser-event-bridge-design.md) — дизайн исходного среза per-session миссии, правой панели и доставки через общий SSE/frontend bus; действующий контракт инструментов — в [mission.md](mission.md).
 - [Встроенный плагин Superpowers](superpowers/specs/2026-08-16-superpowers-built-in-port-design.md) — утверждённый дизайн полного английского порта Superpowers 6.2.0 в skills-only built-in plugin с адаптацией к Sovereign.
 - [Обновление starter skills для Mission и расширенного SDK](superpowers/specs/2026-08-16-starter-sdk-skills-update-design.md) — обновление навыков написания backend и browser-плагинов после добавления `mission-update` и browser event bridge; polling отвергнут в пользу событий и snapshot routes.
 - [План Mission plugin и browser event bridge](superpowers/plans/2026-08-16-mission-plugin-and-browser-bridge.md) — TDD-задачи для per-session snapshots, `mission-update`, единого SSE bridge, правой панели и artifact dependencies.
@@ -49,6 +49,8 @@
 - [product-plugins.md](product-plugins.md) — утверждённый каталог пользовательских продуктов,
   которые строятся плагинами: системные сервисы, персональная работа, автоматизация, знания,
   документы, разработка, каналы и готовые сборки.
+- [mission.md](mission.md) — цель сессии и её план: контракт `mission-update` и `mission-read`,
+  состояния шага, исход миссии, защита от затирания и возврат снимка писателю.
 - [event-bus.md](event-bus.md) — шина: гарантии доставки, события ядра, события плагинов.
 - [ui-extension-model.md](ui-extension-model.md) — как плагин добавляет и переопределяет
   элементы интерфейса: публичный browser SDK, места ядра и самого плагина, вклады, экземпляры и

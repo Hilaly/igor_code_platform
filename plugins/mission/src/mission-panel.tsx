@@ -1,6 +1,7 @@
 import type { PlaceContext } from "@sovereign/browser-sdk";
 import { useSovereignEvents, useTranslator } from "@sovereign/browser-sdk";
 import {
+  Badge,
   EmptyState,
   Heading,
   List,
@@ -10,12 +11,13 @@ import {
   Spinner,
   StatusDot,
   Text,
+  type BadgeTone,
   type StatusDotTone,
   type Translator,
 } from "@sovereign/ui-kit";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchMission } from "./api.ts";
-import type { MissionSnapshot, MissionStep } from "./model.ts";
+import type { MissionOutcome, MissionSnapshot, MissionStep } from "./model.ts";
 import "./mission-panel.css";
 
 /**
@@ -114,12 +116,23 @@ export function MissionPanel({ context }: { context: PlaceContext }): ReactNode 
   );
 }
 
-/** Состояние шага цветом не сообщается: точка кита несёт его словом в `aria-label` и подсказке. */
+/** Состояние шага всегда названо видимым словом; точка лишь дублирует его цветом. */
 const stepTones: Record<MissionStep["status"], StatusDotTone> = {
   completed: "positive",
   in_progress: "pending",
   pending: "neutral",
+  blocked: "danger",
+  // Пропущенный шаг — решение, а не беда: тревожный тон приравнял бы его к упершемуся.
+  skipped: "neutral",
 };
+
+const outcomeTones: Record<MissionOutcome["kind"], BadgeTone> = {
+  succeeded: "success",
+  failed: "danger",
+};
+
+/** Шаги, к которым уже не вернутся: их текст гасится, чтобы взгляд шёл по незакрытым. */
+const settledTones = new Set<MissionStep["status"]>(["completed", "skipped"]);
 
 /**
  * Три яруса вместо ровного столбца абзацев: сама миссия, её пояснение и план. Раньше миссия,
@@ -144,6 +157,19 @@ function MissionSnapshotView({
           <Text tone="muted">{snapshot.explanation}</Text>
         </p>
       )}
+      {/*
+        Исход стоит над планом, а не под ним: он отменяет то, как читается всё остальное. Полоса
+        прогресса у законченной миссии показывает, сколько шагов дошло до конца, — и без исхода
+        «три из семи» неотличимо от работы, которая ещё идёт.
+      */}
+      {snapshot.outcome === undefined ? undefined : (
+        <p className="mission-outcome">
+          <Badge tone={outcomeTones[snapshot.outcome.kind]}>
+            {translator.t(`outcome.${snapshot.outcome.kind}`)}
+          </Badge>
+          <Text>{snapshot.outcome.summary}</Text>
+        </p>
+      )}
       <div className="mission-plan">
         <div className="mission-plan-head">
           <Text tone="muted">{translator.t("plan.label")}</Text>
@@ -156,16 +182,29 @@ function MissionSnapshotView({
           {/*
             Подсветку текущего шага рисует сама строка списка: заливкой строк владеет кит, и
             собственный фон здесь разошёлся бы с ним при первой правке палитры. Состояние при этом
-            сообщается не только цветом — точка несёт его словом.
+            названо видимым словом; точка скрыта от accessibility tree, чтобы скринридер не озвучивал
+            то же слово дважды.
           */}
           {snapshot.plan.map((step, index) => (
             <ListRow key={`${index}-${step.step}`} selected={step.status === "in_progress"}>
               <span className="mission-step" data-status={step.status}>
-                <StatusDot
-                  tone={stepTones[step.status]}
-                  label={translator.t(`state.${step.status}`)}
-                />
-                <Text tone={step.status === "completed" ? "muted" : "normal"}>{step.step}</Text>
+                <span className="mission-step-state">
+                  <span aria-hidden="true">
+                    <StatusDot
+                      tone={stepTones[step.status]}
+                      label={translator.t(`state.${step.status}`)}
+                    />
+                  </span>
+                  <Text tone="muted">{translator.t(`state.${step.status}`)}</Text>
+                </span>
+                <span className="mission-step-body">
+                  <Text tone={settledTones.has(step.status) ? "muted" : "normal"}>{step.step}</Text>
+                  {/*
+                    Причина стоит под шагом, а не вместо него: заблокированный шаг без причины —
+                    это «не сделано» без ответа на вопрос почему, а он и есть содержание записи.
+                  */}
+                  {step.reason === undefined ? undefined : <Text tone="muted">{step.reason}</Text>}
+                </span>
               </span>
             </ListRow>
           ))}

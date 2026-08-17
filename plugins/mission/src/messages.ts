@@ -20,6 +20,10 @@ export const englishMessages: Record<string, string> = {
   "state.completed": "Done",
   "state.in_progress": "In progress",
   "state.pending": "Not started",
+  "state.blocked": "Blocked",
+  "state.skipped": "Skipped",
+  "outcome.succeeded": "Succeeded",
+  "outcome.failed": "Failed",
 };
 
 export const russianMessages: Record<string, string> = {
@@ -36,4 +40,8 @@ export const russianMessages: Record<string, string> = {
   "state.completed": "Сделан",
   "state.in_progress": "В работе",
   "state.pending": "Не начат",
+  "state.blocked": "Упёрся",
+  "state.skipped": "Пропущен",
+  "outcome.succeeded": "Выполнена",
+  "outcome.failed": "Не выполнена",
 };
