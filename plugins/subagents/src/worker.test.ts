@@ -92,9 +92,10 @@ describe("the subagents plugin", () => {
 
     assert.equal(settled?.state, "finished");
     assert.equal(settled?.lastResponse, "all green");
-    assert.equal(
-      world.calls.some((call) => call.kind === "session-prompt"),
-      true,
+    // Итог оказался в записи, и на этом всё: родителю плагин ни турна, ни сообщения не заводит.
+    assert.deepEqual(
+      world.calls.filter((call) => call.kind === "session-prompt"),
+      [],
     );
   });
 });

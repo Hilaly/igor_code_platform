@@ -44,7 +44,9 @@ export const activate: PluginModule["activate"] = async () => {
     export: "SubagentsPanel",
   });
 
-  await events.subscribe(sessionsChanged, () => void sweep());
+  // Событие приходит на каждое изменение любой сессии, а обход всегда читает все записи: стоящему
+  // в очереди второй такой же ничего не добавит, поэтому обходы по шине схлопываются.
+  await events.subscribe(sessionsChanged, () => void sweep({ coalesce: true }));
 
   // Память воркера теряется при перезагрузке плагина, а субагент к этому моменту мог закончить.
   // Без этого обхода запись навсегда осталась бы идущей, а родитель — не позванным. Только этот

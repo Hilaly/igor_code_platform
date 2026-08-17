@@ -153,6 +153,8 @@ async function serve(
       forProject: (projectId: string) => ContributionRegistration[];
     };
     limit?: number;
+    /** Доля агентской полосы. Умолчание равно общему пределу: полоса тогда ничего не ограничивает. */
+    agentLimit?: number;
     modelChangeGate?: ReturnType<typeof gate>;
     openGate?: ReturnType<typeof gate>;
     createGate?: ReturnType<typeof gate>;
@@ -378,7 +380,10 @@ async function serve(
     projects,
     contributions: options.contributions ?? defaultContributions,
     tools: collector,
-    queue: createTurnQueue({ limit: () => options.limit ?? 4 }),
+    queue: createTurnQueue({
+      limit: () => options.limit ?? 4,
+      agentLimit: () => options.agentLimit ?? options.limit ?? 4,
+    }),
     ...(options.imageLimits === undefined
       ? {}
       : { imageLimits: () => options.imageLimits as ImageLimits }),
@@ -1099,6 +1104,38 @@ describe("running a turn over http", () => {
     await running;
     await untilIdle(call, first);
     await untilIdle(call, second);
+  });
+
+  it("keeps a slot for the human when hidden sessions fill the agent lane", async () => {
+    const blocker = gate();
+    const { call, start } = await serve({
+      limit: 2,
+      agentLimit: 1,
+      turns: [{ text: "субагент" }, { text: "второй субагент" }, { text: "человек" }],
+      operationGate: blocker,
+    });
+    const agentOne = String((await start({ hidden: true })).body["id"]);
+    const agentTwo = String((await start({ hidden: true })).body["id"]);
+    const mine = String((await start()).body["id"]);
+
+    const running = call("POST", sessionTurnsPath(agentOne), { text: "субагент" });
+
+    await blocker.entry;
+
+    const second = await call("POST", sessionTurnsPath(agentTwo), { text: "второй субагент" });
+    const human = await call("POST", sessionTurnsPath(mine), { text: "человек" });
+
+    // Скрытая сессия — агентская. Её доля выбрана первой сессией, поэтому вторая ждёт; а человек
+    // идёт сразу, хотя пришёл последним: место общего предела ещё есть, и агентская пробка на него
+    // не претендует (docs/architecture.md).
+    assert.equal(second.body["phase"], "queued");
+    assert.notEqual(human.body["phase"], "queued");
+
+    blocker.open();
+    await running;
+    await untilIdle(call, agentOne);
+    await untilIdle(call, agentTwo);
+    await untilIdle(call, mine);
   });
 
   it("re-resolves definitions when a queued turn actually starts", async () => {

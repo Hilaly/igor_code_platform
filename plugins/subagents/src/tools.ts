@@ -3,8 +3,12 @@
  * выбирать агентов и модели, прочитать итог, дописать задание, остановить.
  *
  * Запуск **фоновый**. Ждать субагента внутри вызова нельзя: инструмент плагина мерится своим
- * таймаутом, а ожидающий вызов вдобавок держит слот турна родителя, которых на всю платформу
- * четыре. Поэтому `subagent-spawn` возвращается сразу, а итог доезжает до родителя сам.
+ * таймаутом, а ожидающий вызов вдобавок держит слот турна родителя. Поэтому `subagent-spawn`
+ * возвращается сразу — а итог никуда не рассылается, и спрашивает о нём вызывающий сам.
+ *
+ * Из этого следует требование к описаниям: каждое место, где модель узнаёт о фоновой работе,
+ * обязано сказать ей, что доклада не будет и проверить надо до конца своего ответа. Модель, которой
+ * об этом не сказали, будет ждать сообщения, которого не придёт.
  */
 
 import { contribute, providers, sessions, thinkingLevels, z } from "@sovereign/sdk";
@@ -73,9 +77,11 @@ export async function contributeTools(): Promise<void> {
     id: "subagent-spawn",
     title: "Start a subagent",
     description:
-      "Start a subagent: a separate agent session that works on one task on its own and reports back. " +
-      "Returns immediately — the answer of the subagent arrives on its own when it is done, so do not " +
-      "poll for it. Give the subagent everything it needs in the prompt: it does not see this conversation.",
+      "Start a subagent: a separate agent session that works on one task on its own. Returns " +
+      "immediately, and the subagent does not report back — nothing will interrupt you to say it is " +
+      "done. Call subagent-list to see whether it finished and subagent-output to read its answer, " +
+      "and do that before you finish your reply: until you ask, nobody carries the answer to you. " +
+      "Give the subagent everything it needs in the prompt: it does not see this conversation.",
     parameters: z.object({
       description: z
         .string()
@@ -167,7 +173,8 @@ export async function contributeTools(): Promise<void> {
       return (
         `Started subagent ${created.session.id} (${given.description}) on ${agentId}, ` +
         `model ${created.session.model}, thinking ${created.session.thinkingLevel}. ` +
-        `Its answer will arrive on its own — carry on with your work and do not wait for it.`
+        `It will not report back: carry on with your work, then call subagent-list to see whether ` +
+        `it is done and subagent-output to read what it said.`
       );
     },
   });
@@ -278,7 +285,8 @@ export async function contributeTools(): Promise<void> {
     title: "List subagents",
     description:
       "List the subagents started from this session: what each is doing, how it went and an excerpt " +
-      "of its last answer.",
+      "of its last answer. This is how you find out that a subagent finished — no subagent announces " +
+      "it on its own.",
     parameters: z.object({
       all: z
         .boolean()
@@ -300,8 +308,8 @@ export async function contributeTools(): Promise<void> {
     id: "subagent-output",
     title: "Read what a subagent answered",
     description:
-      "Read the full answer of one subagent. Use it when the excerpt in subagent-list is not enough " +
-      "or when a subagent is still working and you want to see how far it got.",
+      "Read the full answer of one subagent — the only way to get it, since a subagent never sends " +
+      "it anywhere. Works on a subagent that is still working too, and then shows how far it got.",
     parameters: z.object({
       sessionId: z.string().min(1).describe("The subagent, by the identifier spawn returned."),
     }),
@@ -336,7 +344,8 @@ export async function contributeTools(): Promise<void> {
     title: "Send a subagent another message",
     description:
       "Send a message to a subagent. A working subagent is steered — the message reaches it inside " +
-      "its current turn. A finished subagent takes it as a new task and reports back again.",
+      "its current turn. A finished subagent takes it as a new task. Either way the answer stays " +
+      "where it was: read it with subagent-output, nothing brings it to you.",
     parameters: z.object({
       sessionId: z.string().min(1).describe("The subagent, by the identifier spawn returned."),
       text: z.string().min(1).describe("What to tell it."),
@@ -351,7 +360,10 @@ export async function contributeTools(): Promise<void> {
       if (isWorking(record.state)) {
         await sessions.message(given.sessionId, { text: given.text, mode: "steer" });
 
-        return `Steered the subagent ${given.sessionId}. Its answer will arrive on its own.`;
+        return (
+          `Steered the subagent ${given.sessionId}. Read what it says with subagent-output once ` +
+          `subagent-list shows it done.`
+        );
       }
 
       // Законченный субагент берёт второе задание обычным турном, без единого перехода файла:
@@ -379,7 +391,10 @@ export async function contributeTools(): Promise<void> {
         );
       }
 
-      return `Gave the subagent ${given.sessionId} a new task. Its answer will arrive on its own.`;
+      return (
+        `Gave the subagent ${given.sessionId} a new task. Read what it says with subagent-output ` +
+        `once subagent-list shows it done.`
+      );
     },
   });
 

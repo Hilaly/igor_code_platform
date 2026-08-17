@@ -8,13 +8,24 @@
  *
  * Ожидание в очереди — наблюдаемое состояние сессии, а не пауза внутри вызова: человек обязан
  * видеть, что турн принят, но ещё не начат.
+ *
+ * **Полос две.** Общий предел один на всех — он про деньги и частоту запросов у провайдера, — но
+ * агентские сессии вправе занять только часть его слотов, и остаток человеку гарантирован. Порядок
+ * внутри полосы прежний: кто пришёл раньше, тот и стартует раньше, обгона нет.
  */
 
 export type TurnKind = "turn" | "compaction" | "branch-summary";
 
+/**
+ * Чья это работа. `agent` — сессия, заведённая не человеком, а другим агентом: субагент. Полоса
+ * читается из признака сессии вызывающим, а не выводится здесь: очередь про сессии ничего не знает.
+ */
+export type TurnLane = "interactive" | "agent";
+
 export type TurnJob = {
   sessionId: string;
   kind: TurnKind;
+  lane: TurnLane;
   /**
    * Идентификатор турна выдаёт очередь и отдаёт его работе аргументом: он же уезжает в ответ на
    * запуск и в дельты потока, и родись он позже старта — первые дельты приехали бы без него.
@@ -41,8 +52,8 @@ export type TurnRefusal = { kind: "busy" };
 export type TurnReservation = {
   kind: "accepted";
   turnId: string;
-  /** Запустить зарезервированную работу после подготовки сессии. */
-  start: (job: Omit<TurnJob, "sessionId">) => TurnPlace | undefined;
+  /** Запустить зарезервированную работу после подготовки сессии. Полоса названа при резервировании. */
+  start: (job: Omit<TurnJob, "sessionId" | "lane">) => TurnPlace | undefined;
   /** Отказаться от reservation после неуспешной подготовки. */
   release: () => void;
   /** Отменили ли reservation, пока вызывающий готовил работу. */
@@ -53,10 +64,10 @@ export type TurnReservation = {
 
 export type TurnQueue = {
   /** Атомарно занять sessionId до асинхронной подготовки turn. */
-  reserve: (sessionId: string) => TurnReservation | TurnRefusal;
+  reserve: (sessionId: string, lane: TurnLane) => TurnReservation | TurnRefusal;
   submit: (job: TurnJob) => TurnPlace | TurnRefusal;
   stateOf: (sessionId: string) => "idle" | "queued" | "running";
-  size: () => { running: number; queued: number };
+  size: () => { running: number; queued: number; agentRunning: number; agentQueued: number };
 };
 
 export type CreateTurnQueueOptions = {
@@ -65,6 +76,11 @@ export type CreateTurnQueueOptions = {
    * (docs/data-directory.md), и пересоздавать очередь ради неё не надо.
    */
   limit: () => number;
+  /**
+   * Сколько слотов из общего предела вправе занять агентская полоса. Спрашивается тем же способом и
+   * по той же причине. Выше общего предела не поднимает: полоса — доля от него, а не второй предел.
+   */
+  agentLimit: () => number;
   /** Наблюдаемое состояние сессии изменилось: поставлена, начата или закончена. */
   onChange?: (sessionId: string) => void;
   /** Работа отказала. Очередь на этом не останавливается — слот освобождается и на отказе. */
@@ -81,7 +97,8 @@ type Waiting = {
 
 export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
   const waiting: Waiting[] = [];
-  const running = new Set<string>();
+  /** Значение — полоса идущей работы: по нему считается занятое агентами. */
+  const running = new Map<string, TurnLane>();
   const reserved = new Set<string>();
 
   let turns = 0;
@@ -94,20 +111,52 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
       return `turn-${String(turns)}`;
     });
 
+  /** Доля агентов не бывает больше общего предела: полоса — часть его, а не второй предел. */
+  const agentLimit = (): number => Math.min(options.agentLimit(), options.limit());
+
+  const busyInLane = (lane: TurnLane): number => {
+    let count = 0;
+
+    for (const one of running.values()) {
+      if (one === lane) {
+        count += 1;
+      }
+    }
+
+    return count;
+  };
+
+  const roomFor = (lane: TurnLane): boolean =>
+    running.size < options.limit() && (lane !== "agent" || busyInLane("agent") < agentLimit());
+
+  /**
+   * Взять из очереди всё, чьей полосе есть место.
+   *
+   * Берётся не голова, а **первая работа своей полосы**: голова очереди может быть агентской при
+   * забитой агентской полосе, и человек, стоящий за ней, ждал бы ровно того, ради чего полосы и
+   * заведены. Порядок внутри полосы это не нарушает — обгоняется только чужая.
+   */
   const drain = (): void => {
-    while (waiting.length > 0 && running.size < options.limit()) {
-      const next = waiting.shift();
+    for (let index = 0; index < waiting.length;) {
+      const next = waiting[index];
 
       if (next === undefined || next.cancelled) {
+        waiting.splice(index, 1);
         continue;
       }
 
+      if (!roomFor(next.job.lane)) {
+        index += 1;
+        continue;
+      }
+
+      waiting.splice(index, 1);
       start(next.job, next.turnId, true);
     }
   };
 
   const start = (job: TurnJob, turnId: string, queued: boolean): void => {
-    running.add(job.sessionId);
+    running.set(job.sessionId, job.lane);
     options.onChange?.(job.sessionId);
 
     void (async () => {
@@ -123,7 +172,7 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
     })();
   };
 
-  const reserve = (sessionId: string): TurnReservation | TurnRefusal => {
+  const reserve = (sessionId: string, lane: TurnLane): TurnReservation | TurnRefusal => {
     if (
       running.has(sessionId) ||
       waiting.some((entry) => entry.job.sessionId === sessionId) ||
@@ -187,6 +236,7 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
           job: {
             ...job,
             sessionId,
+            lane,
             run: async (activeTurnId, queued) => {
               try {
                 await job.run(activeTurnId, queued);
@@ -201,7 +251,9 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
 
         drain();
 
-        if (waiting.length === 0 && running.size < options.limit()) {
+        // Своя полоса пуста и место в ней есть — стартуем сразу. Ждущие чужой полосы не помеха:
+        // они всё равно не взяли бы этот слот.
+        if (!waiting.some((entry) => entry.job.lane === lane) && roomFor(lane)) {
           start(place.job, turnId, false);
         } else {
           waiting.push(place);
@@ -226,7 +278,7 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
   return {
     reserve,
     submit: (job) => {
-      const reservation = reserve(job.sessionId);
+      const reservation = reserve(job.sessionId, job.lane);
 
       if (reservation.kind === "busy") {
         return reservation;
@@ -242,6 +294,11 @@ export function createTurnQueue(options: CreateTurnQueueOptions): TurnQueue {
 
       return waiting.some((entry) => entry.job.sessionId === sessionId) ? "queued" : "idle";
     },
-    size: () => ({ running: running.size, queued: waiting.length }),
+    size: () => ({
+      running: running.size,
+      queued: waiting.length,
+      agentRunning: busyInLane("agent"),
+      agentQueued: waiting.filter((entry) => entry.job.lane === "agent").length,
+    }),
   };
 }

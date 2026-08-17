@@ -110,7 +110,7 @@ import {
 } from "./image-limits.ts";
 import { createMessageOutbox } from "./message-outbox.ts";
 import type { ToolCollector } from "./tool-collection.ts";
-import type { TurnQueue } from "./turn-queue.ts";
+import type { TurnLane, TurnQueue } from "./turn-queue.ts";
 
 export type SessionDeltaSink = (frame: {
   sessionId: string;
@@ -483,6 +483,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     hidden: summary.hidden,
     createdAt: summary.createdAt,
   });
+
+  /**
+   * В какой полосе очереди походов к модели идёт работа этой сессии (docs/architecture.md).
+   *
+   * Скрытая — значит агентская: скрытые сессии заводит агент, а не человек, и других таких сегодня
+   * нет. Признак берётся именно потому, что он уже есть, неизменяем с создания и совпадает с
+   * нужным один в один; заводить рядом второй, который всегда равен первому, незачем.
+   */
+  const laneOf = (summary: AgentSessionSummary): TurnLane =>
+    summary.hidden ? "agent" : "interactive";
 
   /**
    * Очередь — источник истины про занятость, рантайм — про то, чем именно сессия занята. Порядок
@@ -1010,7 +1020,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return ready;
     }
 
-    const place = options.queue.reserve(sessionId);
+    const place = options.queue.reserve(sessionId, laneOf(ready.session.summary()));
 
     if (place.kind === "busy") {
       return { kind: "refused", reason: "the session is busy" };
@@ -1113,7 +1123,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       return describeNavigation(sessionId, await session.navigate(request));
     }
 
-    const place = options.queue.reserve(sessionId);
+    const place = options.queue.reserve(sessionId, laneOf(session.summary()));
 
     if (place.kind === "busy") {
       return { kind: "refused", reason: "the session is busy" };
@@ -1888,7 +1898,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       };
     }
 
-    const place = options.queue.reserve(sessionId);
+    const place = options.queue.reserve(sessionId, laneOf(summary));
 
     if (place.kind === "busy") {
       return { kind: "refused", reason: "the session is busy" };

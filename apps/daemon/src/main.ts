@@ -495,8 +495,9 @@ const sessions = createSessionService({
   },
   tools: toolCollector,
   queue: createTurnQueue({
-    // Предел читается живьём: правка `config.json` применяется без перезапуска демона.
+    // Пределы читаются живьём: правка `config.json` применяется без перезапуска демона.
     limit: () => settings.current().config.maxConcurrentTurns,
+    agentLimit: () => settings.current().config.maxConcurrentAgentTurns,
     onFailure: (sessionId, reason) =>
       logger.error("a turn failed", { session: sessionId, reason: String(reason) }),
   }),

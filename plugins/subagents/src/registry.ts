@@ -12,7 +12,7 @@ import type { SubagentState } from "./state.ts";
 
 export type SubagentRecord = {
   sessionId: string;
-  /** Сессия, из инструмента которой субагент запущен: ей же уезжает результат. */
+  /** Сессия, из инструмента которой субагент запущен: по ней собирается её список субагентов. */
   parentSessionId: string;
   projectId: string;
   agentId: string;
@@ -29,11 +29,6 @@ export type SubagentRecord = {
   lastResponse?: string;
   /** Почему работа не удалась. Есть только у `failed`. */
   failure?: string;
-  /**
-   * Узнал ли родитель об итоге. Занятый родитель не принимает ни турна, ни догоняющего сообщения,
-   * поэтому недоставленное уведомление ждёт следующего обхода, а не пропадает.
-   */
-  notified?: boolean;
 };
 
 const keyPrefix = "subagent.";

@@ -569,6 +569,9 @@ export const coreRussian: CatalogRegistration = {
     "settings.config.hint.logLevel": "Сколько демон пишет в свой журнал",
     "settings.config.key.maxConcurrentTurns": "Одновременных обращений",
     "settings.config.hint.maxConcurrentTurns": "Сколько сессий разом ходят к модели",
+    "settings.config.key.maxConcurrentAgentTurns": "Из них агентских",
+    "settings.config.hint.maxConcurrentAgentTurns":
+      "Сколько из этих слотов вправе занять субагенты; остальное остаётся вам",
     "settings.config.key.compactionThreshold": "Порог компакции",
     "settings.config.hint.compactionThreshold":
       "Доля контекстного окна, после которой компакция запускается сама; 0 — выключено",
